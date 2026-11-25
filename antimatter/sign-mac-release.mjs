@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Re-signs a built macOS release with Kestrel's self-signed certificate and rebuilds the
+// Re-signs a built macOS release with Antimatter's self-signed certificate and rebuilds the
 // zip, DMG, blockmaps and update manifest to match. Runs after electron-builder so upstream merges stay clean.
-// Usage: node kestrel/sign-mac-release.mjs --release-dir <dir> --identity <sha1> [--keychain <path>]
+// Usage: node antimatter/sign-mac-release.mjs --release-dir <dir> --identity <sha1> [--keychain <path>]
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -16,7 +16,7 @@ const { values } = NodeUtil.parseArgs({
     "release-dir": { type: "string" },
     identity: { type: "string" },
     keychain: { type: "string" },
-    "product-name": { type: "string", default: "Kestrel" },
+    "product-name": { type: "string", default: "Antimatter" },
   },
 });
 const releaseDir = NodePath.resolve(values["release-dir"] ?? "");
@@ -55,7 +55,7 @@ const dmgName = manifest.files.find((file) => file.url.endsWith(".dmg"))?.url;
 if (!zipName) throw new Error(`${manifestName} lists no zip`);
 const zipPath = NodePath.join(releaseDir, zipName);
 
-const work = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "kestrel-sign-"));
+const work = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "antimatter-sign-"));
 try {
   run("ditto", ["-x", "-k", zipPath, work]);
   const appName = NodeFS.readdirSync(work).find((name) => name.endsWith(".app"));
