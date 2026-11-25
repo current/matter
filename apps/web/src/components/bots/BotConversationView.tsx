@@ -10,7 +10,7 @@ import type {
 import { Link } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import { T, useGT, useMessages } from "gt-react";
-import { ArrowUpIcon, ExternalLinkIcon } from "lucide-react";
+import { ArrowUpIcon, ExternalLinkIcon, SquareIcon } from "lucide-react";
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import {
@@ -92,7 +92,10 @@ export function BotConversationView({ providerId, botId }: { providerId: string;
             ) : null}
           </WorkspaceBreadcrumbItem>
         </WorkspaceBreadcrumb>
-        <OfficialAppLink url={bot?.officialAppUrl ?? provider?.officialAppUrl ?? null} />
+        <OfficialAppLink
+          url={bot?.officialAppUrl ?? provider?.officialAppUrl ?? null}
+          appName={provider?.displayName ?? null}
+        />
       </WorkspacePageHeader>
       {!bots.loaded || config === null ? (
         <p className="p-6 text-sm text-muted-foreground" role="status">
@@ -161,7 +164,8 @@ function useBotConversations(
   return config !== null && providerId !== null && botId !== null ? conversations : [];
 }
 
-function OfficialAppLink({ url }: { url: string | null }) {
+function OfficialAppLink({ url, appName }: { url: string | null; appName: string | null }) {
+  const gt = useGT();
   if (!url) return null;
   return (
     <Button
@@ -170,7 +174,7 @@ function OfficialAppLink({ url }: { url: string | null }) {
       render={<a href={url} target="_blank" rel="noreferrer noopener" />}
     >
       <ExternalLinkIcon />
-      <T>Open in official app</T>
+      {appName ? gt("Open in {name}", { name: appName }) : gt("Open in official app")}
     </Button>
   );
 }
@@ -236,6 +240,18 @@ function BotConversationBody({
               bot={bot}
             />
           ))}
+          {capabilities.cancel && bot.status === "working" ? (
+            <Button
+              size="xs"
+              variant="outline"
+              className="self-center"
+              disabled={conversation.stopping}
+              onClick={() => void conversation.stop()}
+            >
+              <SquareIcon />
+              <T>Stop</T>
+            </Button>
+          ) : null}
           {conversation.error ? (
             <p className="text-sm text-destructive-foreground" role="alert">
               {conversation.error}
@@ -250,6 +266,7 @@ function BotConversationBody({
                 request.kind === "approval" ? capabilities.approvals : capabilities.questions
               }
               officialAppUrl={bot.officialAppUrl ?? provider.officialAppUrl}
+              appName={provider.displayName}
             />
           ))}
         </div>
@@ -280,6 +297,7 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
   const [olderCursor, setOlderCursor] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sending, setSending] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the conversation's latest page and follows its live events from the server
@@ -319,9 +337,8 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
       setOlderCursor(page.olderCursor);
     } catch (cause) {
       setError(errorText(cause));
-    } finally {
-      setLoadingOlder(false);
     }
+    setLoadingOlder(false);
   };
 
   const send = async (text: string, confirmUsage: boolean) => {
@@ -362,19 +379,44 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
         },
       );
       setMessages((current) => upsertBotMessage(current, message));
+      setSending(false);
       return true;
     } catch (cause) {
       setMessages((current) =>
         upsertBotMessage(current, { ...optimistic, deliveryState: "failed" }),
       );
       setError(errorText(cause));
-      return false;
-    } finally {
       setSending(false);
+      return false;
     }
   };
 
-  return { messages, olderCursor, loadingOlder, sending, error, loadOlder, send };
+  // Best effort: a provider that can't stop the run says so, and the header links to its app.
+  const stop = async () => {
+    setStopping(true);
+    setError(null);
+    try {
+      await mattrApiRequest(config, "/api/mattr/bots/cancel", {
+        method: "POST",
+        body: { providerId, conversationId },
+      });
+    } catch (cause) {
+      setError(errorText(cause));
+    }
+    setStopping(false);
+  };
+
+  return {
+    messages,
+    olderCursor,
+    loadingOlder,
+    sending,
+    stopping,
+    error,
+    loadOlder,
+    send,
+    stop,
+  };
 }
 
 function errorText(cause: unknown) {
@@ -413,24 +455,22 @@ function BotPendingRequestCard({
   request,
   supported,
   officialAppUrl,
+  appName,
 }: {
   config: MattrApiConfig;
   request: BotPendingRequest;
   supported: boolean;
   officialAppUrl: string | null;
+  appName: string;
 }) {
   const gt = useGT();
   const [busy, setBusy] = useState(false);
-  const respond = async (response: unknown) => {
+  const respond = (response: unknown) => {
     setBusy(true);
-    try {
-      await mattrApiRequest(config, "/api/mattr/bots/respond", {
-        method: "POST",
-        body: { providerId: request.providerId, requestId: request.requestId, response },
-      });
-    } finally {
-      setBusy(false);
-    }
+    return mattrApiRequest(config, "/api/mattr/bots/respond", {
+      method: "POST",
+      body: { providerId: request.providerId, requestId: request.requestId, response },
+    }).finally(() => setBusy(false));
   };
   return (
     <div className="rounded-lg border bg-card p-3 text-sm" role="group" aria-label={request.title}>
@@ -439,7 +479,7 @@ function BotPendingRequestCard({
       <div className="mt-3 flex flex-wrap gap-2">
         {!supported ? (
           officialAppUrl ? (
-            <OfficialAppLink url={officialAppUrl} />
+            <OfficialAppLink url={officialAppUrl} appName={appName} />
           ) : (
             <span className="text-xs text-muted-foreground">
               <T>Answer this in the official app.</T>

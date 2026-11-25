@@ -1,6 +1,6 @@
 import type { BotActivityState, BotIdentity } from "@t3tools/contracts";
 import { BotIcon } from "lucide-react";
-import { createElement, type ComponentType } from "react";
+import { Suspense, createElement, lazy, type ComponentType } from "react";
 
 import { cn } from "../../lib/utils";
 
@@ -67,3 +67,19 @@ function DefaultBotAvatar({ bot, size, className }: BotAvatarProps) {
 export function BotAvatar(props: BotAvatarProps) {
   return createElement(renderers.get(props.bot.providerId) ?? DefaultBotAvatar, props);
 }
+
+// Built in, but lazy: the character code loads only when a Grok Bot avatar first renders, which
+// only happens while the Grok Bot add-on is on.
+const LazyGrokBotAvatar = lazy(() =>
+  import("./GrokBotAvatar").then((module) => ({ default: module.GrokBotAvatar })),
+);
+
+function GrokBotAvatarSlot(props: BotAvatarProps) {
+  return (
+    <Suspense fallback={<DefaultBotAvatar {...props} />}>
+      <LazyGrokBotAvatar {...props} />
+    </Suspense>
+  );
+}
+
+registerBotAvatarRenderer("grok-bot", GrokBotAvatarSlot);

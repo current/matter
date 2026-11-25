@@ -149,6 +149,10 @@ export const AddonUpdateConfigRequest = Schema.Struct({
 });
 export type AddonUpdateConfigRequest = typeof AddonUpdateConfigRequest.Type;
 
+/** Restarts an enabled add-on's connection now, instead of waiting for its retry backoff. */
+export const AddonReconnectRequest = Schema.Struct({ id: AddonIdSchema });
+export type AddonReconnectRequest = typeof AddonReconnectRequest.Type;
+
 /** Config keys that look like credentials. Add-on config is non-secret; secrets go to secret storage. */
 export const ADDON_SECRET_CONFIG_KEY_PATTERN =
   /(token|secret|password|passwd|api[-_]?key|cookie|credential|bearer|session|private[-_]?key)/i;
@@ -200,4 +204,22 @@ export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
 
 export function findAddonManifest(id: string): AddonManifest | undefined {
   return MATTR_ADDON_MANIFESTS.find((manifest) => manifest.id === id);
+}
+
+/** Grok Bot's loopback debug port lives in its non-secret add-on config under this key. */
+export const GROK_BOT_CDP_PORT_CONFIG_KEY = "cdpPort";
+export const GROK_BOT_DEFAULT_CDP_PORT = 9222;
+
+const isValidPort = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65_535;
+
+export function grokBotCdpPortFromConfig(config: AddonConfig): number {
+  const raw = config[GROK_BOT_CDP_PORT_CONFIG_KEY];
+  const port = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
+  return isValidPort(port) ? port : GROK_BOT_DEFAULT_CDP_PORT;
+}
+
+/** The command a user runs to reopen Grok Bot with its debug port; mattr never runs it. */
+export function grokBotLaunchCommand(port: number = GROK_BOT_DEFAULT_CDP_PORT): string {
+  return `open -a "Grok Bot" --args --remote-debugging-port=${isValidPort(port) ? port : GROK_BOT_DEFAULT_CDP_PORT}`;
 }

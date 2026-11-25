@@ -6,6 +6,7 @@ import {
   getAddonStoreState,
   isAddonEnabled,
   loadAddons,
+  reconnectAddon,
   setAddonEnabled,
   subscribeAddonStore,
   useAddonStore,
@@ -32,6 +33,7 @@ export function useAddonRegistry() {
     setEnabled: (id: AddonId, enabled: boolean) =>
       config === null ? Promise.resolve() : setAddonEnabled(config, id, enabled),
     reload: () => (config === null ? Promise.resolve() : loadAddons(config)),
+    reconnect: (id: AddonId) => (config === null ? Promise.resolve() : reconnectAddon(config, id)),
   };
 }
 

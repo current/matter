@@ -1,5 +1,7 @@
 import {
   MATTR_ADDON_MANIFESTS,
+  type AddonConfig,
+  type AddonConfigResponse,
   type AddonEntry,
   type AddonId,
   type AddonListResponse,
@@ -207,6 +209,49 @@ export async function setAddonEnabled(
   } finally {
     emit({ pendingIds: state.pendingIds.filter((pendingId) => pendingId !== id) });
   }
+}
+
+/** Reconnects an enabled add-on now and applies the status it settles on. */
+export async function reconnectAddon(config: MattrApiConfig, id: AddonId): Promise<void> {
+  emit({ pendingIds: [...state.pendingIds, id] });
+  try {
+    applyServerResponse(
+      await mattrApiRequest<AddonListResponse>(config, "/api/mattr/addons/reconnect", {
+        method: "POST",
+        body: { id },
+      }),
+    );
+  } catch (error) {
+    emit({ error: error instanceof Error ? error.message : String(error) });
+  } finally {
+    emit({ pendingIds: state.pendingIds.filter((pendingId) => pendingId !== id) });
+  }
+}
+
+export async function getAddonConfig(
+  config: MattrApiConfig,
+  id: AddonId,
+  signal?: AbortSignal,
+): Promise<AddonConfig> {
+  const response = await mattrApiRequest<AddonConfigResponse>(
+    config,
+    `/api/mattr/addons/config?id=${encodeURIComponent(id)}`,
+    signal ? { signal } : {},
+  );
+  return response.config;
+}
+
+/** Merges a patch into an add-on's non-secret config; a null value removes that key. */
+export async function updateAddonConfig(
+  config: MattrApiConfig,
+  id: AddonId,
+  patch: AddonConfig,
+): Promise<AddonConfig> {
+  const response = await mattrApiRequest<AddonConfigResponse>(config, "/api/mattr/addons/config", {
+    method: "POST",
+    body: { id, config: patch },
+  });
+  return response.config;
 }
 
 export function resetAddonStoreForTests() {

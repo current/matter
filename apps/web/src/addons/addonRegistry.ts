@@ -8,6 +8,8 @@ interface AddonPresentation {
   readonly title: string;
   readonly description: string;
   readonly Icon: ComponentType<{ className?: string }>;
+  /** Status wording specific to this add-on, over the generic labels. */
+  readonly statusLabels?: Readonly<Partial<Record<AddonRuntimeStatusKind, string>>>;
 }
 
 const ADDON_PRESENTATION: Readonly<Record<string, AddonPresentation>> = {
@@ -15,6 +17,11 @@ const ADDON_PRESENTATION: Readonly<Record<string, AddonPresentation>> = {
     title: msg("Grok Bot"),
     description: msg("Talk to your existing Grok Bot teammates from the mattr sidebar."),
     Icon: BotIcon,
+    statusLabels: {
+      connected: msg("Connected"),
+      enabled_unconfigured: msg("Needs debug port"),
+      app_unavailable: msg("Grok Bot app not installed"),
+    },
   },
   "voice-assistant": {
     title: msg("Voice Assistant"),

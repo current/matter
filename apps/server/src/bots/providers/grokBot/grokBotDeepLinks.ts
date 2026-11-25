@@ -1,8 +1,10 @@
+import { GROK_BOT_DEFAULT_CDP_PORT, grokBotLaunchCommand } from "@t3tools/contracts";
+
+export { GROK_BOT_DEFAULT_CDP_PORT };
 export const GROK_BOT_APP_PATH = "/Applications/Grok Bot.app";
 export const GROK_BOT_BUNDLE_ID = "com.anysphere.sand";
 export const GROK_BOT_URL_SCHEME = "grokbot";
 export const GROK_BOT_DEFAULT_CDP_HOST = "127.0.0.1";
-export const GROK_BOT_DEFAULT_CDP_PORT = 9222;
 export const GROK_BOT_MAX_PROMPT_LENGTH = 1_000;
 
 export type GrokBotSyncMode = "push" | "poll" | "none";
@@ -90,11 +92,7 @@ function sanitizeIdentifier(raw: string | undefined): string | null {
   return trimmed;
 }
 
-export function buildGrokBotLaunchCommand(port: number = GROK_BOT_DEFAULT_CDP_PORT): string {
-  const safePort =
-    Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : GROK_BOT_DEFAULT_CDP_PORT;
-  return `open -a "Grok Bot" --args --remote-debugging-port=${safePort}`;
-}
+export const buildGrokBotLaunchCommand = grokBotLaunchCommand;
 
 export function buildGrokBotPromptDeepLink(input?: {
   readonly botId?: string;

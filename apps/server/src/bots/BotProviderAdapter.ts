@@ -20,6 +20,10 @@ export class BotProviderError extends Schema.TaggedError<BotProviderError>()("Bo
   providerId: Schema.String,
   reason: Schema.Literals([
     "unavailable",
+    /** Installed, but the user still has to set something up, such as a debug port. */
+    "unconfigured",
+    /** Was connected and lost the connection. */
+    "disconnected",
     "auth_required",
     "incompatible_version",
     "unsupported",

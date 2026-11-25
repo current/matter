@@ -1,4 +1,5 @@
 import {
+  AddonReconnectRequest,
   AddonSetEnabledRequest,
   AddonUpdateConfigRequest,
   AuthOrchestrationOperateScope,
@@ -46,6 +47,7 @@ const NO_STORE_HEADERS = {
 
 const decodeSetEnabled = Schema.decodeUnknownEffect(AddonSetEnabledRequest);
 const decodeUpdateConfig = Schema.decodeUnknownEffect(AddonUpdateConfigRequest);
+const decodeReconnect = Schema.decodeUnknownEffect(AddonReconnectRequest);
 const decodeSend = Schema.decodeUnknownEffect(BotSendMessageRequest);
 const decodeRespond = Schema.decodeUnknownEffect(BotRespondRequest);
 const decodeCancel = Schema.decodeUnknownEffect(BotCancelRequest);
@@ -224,6 +226,18 @@ const layerBotsRoutes = Layer.unwrap(
       }).pipe(catchAuthErrors),
     );
 
+    const reconnectRoute = HttpRouter.add(
+      "POST",
+      "/api/mattr/addons/reconnect",
+      Effect.gen(function* () {
+        yield* authenticate(AuthSettingsWriteScope);
+        const body = yield* readJson(decodeReconnect);
+        if (!body) return INVALID_REQUEST;
+        yield* platform.reconnect(body.id);
+        return json(yield* listAddons);
+      }).pipe(catchAuthErrors),
+    );
+
     const providersRoute = HttpRouter.add(
       "GET",
       "/api/mattr/bots/providers",
@@ -357,6 +371,7 @@ const layerBotsRoutes = Layer.unwrap(
       setEnabledRoute,
       getConfigRoute,
       updateConfigRoute,
+      reconnectRoute,
       providersRoute,
       botsRoute,
       conversationsRoute,

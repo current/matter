@@ -11,6 +11,7 @@ import {
   SettingsSection,
 } from "../components/settings/settingsLayout";
 import { ADDON_STATUS_LABELS, addonPresentation } from "./addonRegistry";
+import { GrokBotAddonSettings } from "./GrokBotAddonSettings";
 import { useAddonRegistry } from "./useAddonRegistry";
 
 const STATUS_VARIANT: Readonly<
@@ -53,6 +54,7 @@ export function AddonsSettingsPanel() {
             pending={registry.pendingIds.includes(entry.manifest.id)}
             canWrite={registry.canWrite}
             onToggle={(enabled) => void registry.setEnabled(entry.manifest.id, enabled)}
+            onReconnect={() => registry.reconnect(entry.manifest.id)}
           />
         ))}
       </SettingsSection>
@@ -70,11 +72,13 @@ function AddonRow({
   pending,
   canWrite,
   onToggle,
+  onReconnect,
 }: {
   entry: AddonEntry;
   pending: boolean;
   canWrite: boolean;
   onToggle: (enabled: boolean) => void;
+  onReconnect: () => Promise<void>;
 }) {
   const gt = useGT();
   const m = useMessages();
@@ -84,6 +88,7 @@ function AddonRow({
   const [configurePath, configureHash] = manifest.settingsRoute.split("#");
   const showConfigure =
     state.enabled && configurePath !== undefined && configurePath !== ADDONS_PAGE;
+  const showGrokBotSettings = state.enabled && manifest.id === "grok-bot";
   return (
     <SettingsRow
       id={`addon-${manifest.id}`}
@@ -101,14 +106,17 @@ function AddonRow({
       description={
         <>
           {m(presentation.description)}
-          {state.enabled && state.status.detail ? (
+          {state.enabled && !showGrokBotSettings && state.status.detail ? (
             <span className="mt-1 block text-muted-foreground">{state.status.detail}</span>
           ) : null}
         </>
       }
       status={
         <Badge variant={STATUS_VARIANT[state.status.kind]} size="sm" data-addon-status="">
-          {m(ADDON_STATUS_LABELS[state.status.kind])}
+          {m(
+            presentation.statusLabels?.[state.status.kind] ??
+              ADDON_STATUS_LABELS[state.status.kind],
+          )}
         </Badge>
       }
       control={
@@ -132,6 +140,15 @@ function AddonRow({
           />
         </div>
       }
-    />
+    >
+      {showGrokBotSettings ? (
+        <GrokBotAddonSettings
+          status={state.status}
+          busy={pending}
+          canWrite={canWrite}
+          onReconnect={onReconnect}
+        />
+      ) : null}
+    </SettingsRow>
   );
 }

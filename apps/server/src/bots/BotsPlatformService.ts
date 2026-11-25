@@ -14,6 +14,7 @@ import {
   type BotSendMessageRequest,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Latch from "effect/Latch";
@@ -37,6 +38,7 @@ const DEFAULT_POLL_INTERVALS = { idleMs: 30_000, activeMs: 5_000 } as const;
 const MIN_POLL_INTERVAL_MS = 2_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
 const EVENT_BUFFER = 512;
+const RECONNECT_SETTLE_TIMEOUT = "10 seconds";
 
 export class BotsPlatformError extends Schema.TaggedError<BotsPlatformError>()(
   "BotsPlatformError",
@@ -65,6 +67,11 @@ export class BotsPlatformService extends Context.Service<
     readonly runningProviderIds: Effect.Effect<ReadonlyArray<string>>;
     /** Runtime status of an add-on's provider, or null when it has none registered. */
     readonly addonStatus: (addonId: string) => Effect.Effect<AddonRuntimeStatus | null>;
+    /**
+     * Restarts a running provider now and waits briefly for its first settled status. Only
+     * reconnects mattr's side; it never launches or restarts the provider's app.
+     */
+    readonly reconnect: (addonId: string) => Effect.Effect<AddonRuntimeStatus | null>;
     readonly listProviders: Effect.Effect<ReadonlyArray<BotProviderDescriptor>>;
     readonly listBots: (
       providerId: string,
@@ -92,8 +99,18 @@ export class BotsPlatformService extends Context.Service<
 
 interface RunningProvider {
   readonly scope: Scope.Closeable;
+  /** Completes on the first status other than `connecting`. */
+  readonly settled: Deferred.Deferred<void>;
   session: BotProviderSession | null;
 }
+
+/** Provider errors that mean the session is gone, so the platform restarts it. */
+const RESTART_REASONS: ReadonlySet<BotProviderError["reason"]> = new Set([
+  "unavailable",
+  "unconfigured",
+  "disconnected",
+  "auth_required",
+]);
 
 const statusFromProviderError = (error: BotProviderError): AddonRuntimeStatus => {
   const detail = error.detail === undefined ? {} : { detail: error.detail };
@@ -102,6 +119,10 @@ const statusFromProviderError = (error: BotProviderError): AddonRuntimeStatus =>
       return { kind: "auth_required", ...detail, action: { kind: "sign-in" } };
     case "unavailable":
       return { kind: "app_unavailable", ...detail, action: { kind: "open-app" } };
+    case "unconfigured":
+      return { kind: "enabled_unconfigured", ...detail, action: { kind: "configure" } };
+    case "disconnected":
+      return { kind: "disconnected", ...detail, action: { kind: "retry" } };
     case "incompatible_version":
       return { kind: "incompatible_version", ...detail, action: { kind: "update" } };
     default:
@@ -116,7 +137,7 @@ const platformErrorFromProvider = (error: BotProviderError) =>
         ? "not_found"
         : error.reason === "unsupported"
           ? "unsupported"
-          : error.reason === "unavailable" || error.reason === "auth_required"
+          : RESTART_REASONS.has(error.reason)
             ? "provider_unavailable"
             : "provider_error",
     ...(error.detail === undefined ? {} : { detail: error.detail }),
@@ -147,6 +168,8 @@ const make = Effect.gen(function* () {
   ) {
     const previous = statuses.get(providerId);
     statuses.set(providerId, status);
+    const entry = running.get(providerId);
+    if (entry && status.kind !== "connecting") yield* Deferred.succeed(entry.settled, undefined);
     if (previous?.kind !== status.kind || previous.detail !== status.detail) {
       yield* publish({ type: "provider-status", providerId, status });
     }
@@ -197,7 +220,7 @@ const make = Effect.gen(function* () {
       failures += 1;
       yield* setStatus(adapter.providerId, statusFromProviderError(error.value));
       // Losing the connection or the sign-in restarts the provider instead of polling blind.
-      if (error.value.reason === "unavailable" || error.value.reason === "auth_required") {
+      if (RESTART_REASONS.has(error.value.reason)) {
         return error.value;
       }
       yield* Effect.sleep(backoffMs(idleMs, failures));
@@ -250,7 +273,7 @@ const make = Effect.gen(function* () {
     adapter: BotProviderAdapter,
   ) {
     const scope = yield* Scope.make();
-    const entry: RunningProvider = { scope, session: null };
+    const entry: RunningProvider = { scope, settled: yield* Deferred.make<void>(), session: null };
     running.set(adapter.providerId, entry);
     yield* runProvider(adapter, entry).pipe(
       Effect.catchCause((cause) =>
@@ -262,18 +285,26 @@ const make = Effect.gen(function* () {
       ),
       Effect.forkIn(scope),
     );
+    return entry;
   });
 
   // Closes local resources only. Remote tasks keep running and pick up again on re-enable.
-  const stopProvider = Effect.fn("BotsPlatformService.stopProvider")(function* (
+  const closeProvider = Effect.fn("BotsPlatformService.closeProvider")(function* (
     providerId: string,
   ) {
     const entry = running.get(providerId);
-    if (!entry) return;
+    if (!entry) return false;
     running.delete(providerId);
     yield* Scope.close(entry.scope, Exit.void);
     statuses.delete(providerId);
     yield* dropPending(providerId);
+    return true;
+  });
+
+  const stopProvider = Effect.fn("BotsPlatformService.stopProvider")(function* (
+    providerId: string,
+  ) {
+    if (!(yield* closeProvider(providerId))) return;
     yield* publish({ type: "provider-status", providerId, status: { kind: "disabled" } });
   });
 
@@ -350,6 +381,21 @@ const make = Effect.gen(function* () {
       if (!running.has(adapter.providerId)) return { kind: "disabled" } as const;
       return statuses.get(adapter.providerId) ?? ({ kind: "connecting" } as const);
     });
+
+  const reconnect = Effect.fn("BotsPlatformService.reconnect")(function* (addonId: string) {
+    const adapter = [...adapters.values()].find((a) => a.addonId === addonId);
+    if (!adapter) return null;
+    const entry = yield* lifecycleLock.withPermit(
+      Effect.gen(function* () {
+        if (!(yield* closeProvider(adapter.providerId))) return null;
+        return yield* startProvider(adapter);
+      }),
+    );
+    if (entry) {
+      yield* Deferred.await(entry.settled).pipe(Effect.timeoutOption(RECONNECT_SETTLE_TIMEOUT));
+    }
+    return yield* addonStatus(addonId);
+  });
 
   const listBots = Effect.fn("BotsPlatformService.listBots")(function* (providerId: string) {
     const session = yield* requireSession(providerId);
@@ -465,6 +511,7 @@ const make = Effect.gen(function* () {
     reconcile,
     runningProviderIds: Effect.sync(() => [...running.keys()]),
     addonStatus,
+    reconnect,
     listProviders,
     listBots,
     listConversations,
