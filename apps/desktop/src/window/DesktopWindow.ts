@@ -57,8 +57,9 @@ class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyE
     return "Could not copy the context-menu image.";
   }
 }
-// Match --workspace-topbar-height in apps/web/src/index.css; native macOS buttons stay 14 points at any zoom.
-const MACOS_WORKSPACE_TOPBAR_HEIGHT = 52;
+// Match the titlebar row in antimatter/shell.css; native macOS buttons stay 14 points at any zoom.
+const MACOS_WORKSPACE_TOPBAR_HEIGHT = 38;
+const MACOS_WINDOW_BUTTON_X = 20;
 const MACOS_WINDOW_BUTTON_RADIUS = 7;
 
 function parseMailtoAddress(rawUrl: string): Option.Option<string> {
@@ -79,7 +80,7 @@ function parseMailtoAddress(rawUrl: string): Option.Option<string> {
 function syncMacosWindowButtons(window: Electron.BrowserWindow): void {
   if (window.isDestroyed() || window.isFullScreen()) return;
   window.setWindowButtonPosition({
-    x: 16,
+    x: MACOS_WINDOW_BUTTON_X,
     y: Math.round(
       (MACOS_WORKSPACE_TOPBAR_HEIGHT * window.webContents.getZoomFactor()) / 2 -
         MACOS_WINDOW_BUTTON_RADIUS,
@@ -329,7 +330,7 @@ function getWindowTitleBarOptions(
     return {
       titleBarStyle: "hiddenInset",
       trafficLightPosition: {
-        x: 16,
+        x: MACOS_WINDOW_BUTTON_X,
         y: MACOS_WORKSPACE_TOPBAR_HEIGHT / 2 - MACOS_WINDOW_BUTTON_RADIUS,
       },
     };

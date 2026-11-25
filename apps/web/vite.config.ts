@@ -19,6 +19,8 @@ import { loadRepoEnv } from "../../scripts/lib/public-config";
 import { resolveTaggedSourceVersion } from "../../scripts/lib/tagged-source-version";
 import { thirdPartyLicensesPlugin } from "../../scripts/lib/third-party-licenses";
 import { mattrRebrandPlugin } from "../../antimatter/rebrand";
+import { mattrIconsPlugin } from "../../antimatter/icons/plugin";
+import { mattrShellPlugin } from "../../antimatter/shell";
 import { tailwindPlugins } from "./vite/tailwind";
 import { warmBundledDevPlugin } from "./vite/warmBundledDev";
 import { formatAppDisplayName, resolveWebAppStageLabel } from "./src/branding.logic";
@@ -325,6 +327,8 @@ export default defineConfig(({ command }) => {
     assetsInclude: ["**/*.wasm"],
     plugins: [
       mattrRebrandPlugin(),
+      mattrShellPlugin(),
+      mattrIconsPlugin(),
       bootstrapTitlePlugin(),
       devCompressionPlugin(),
       chunkCycleGuardPlugin(),

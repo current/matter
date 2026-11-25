@@ -31,8 +31,9 @@ export const showProjectFile = <A extends { readonly exitCode: number }, E, R>(
   show: (fileName: string) => Effect.Effect<A, E, R>,
 ) =>
   show(T3_PROJECT_FILE_NAME).pipe(
-    Effect.flatMap((result) =>
-      result.exitCode === 0 ? Effect.succeed(result) : show(LEGACY_PROJECT_FILE_NAME),
+    Effect.filterOrElse(
+      (result) => result.exitCode === 0,
+      () => show(LEGACY_PROJECT_FILE_NAME),
     ),
   );
 

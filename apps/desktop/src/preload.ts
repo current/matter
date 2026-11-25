@@ -51,7 +51,7 @@ if (clientPlatform === "darwin") {
   const syncWindowControlInset = () => {
     document.documentElement.style.setProperty(
       "--desktop-window-controls-inset",
-      `${90 / webFrame.getZoomFactor()}px`,
+      `${83 / webFrame.getZoomFactor()}px`,
     );
   };
   window.addEventListener("DOMContentLoaded", syncWindowControlInset, { once: true });
