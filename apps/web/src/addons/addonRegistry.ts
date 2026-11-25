@@ -1,5 +1,5 @@
 import type { AddonManifest, AddonRuntimeStatusKind } from "@t3tools/contracts";
-import { BotIcon, MicIcon, PuzzleIcon } from "lucide-react";
+import { BotIcon, CloudIcon, MicIcon, PuzzleIcon } from "lucide-react";
 import { msg } from "gt-react";
 import type { ComponentType } from "react";
 
@@ -29,6 +29,17 @@ const ADDON_PRESENTATION: Readonly<Record<string, AddonPresentation>> = {
       "A hands-free assistant that can summarize threads, report progress and steer your agents.",
     ),
     Icon: MicIcon,
+  },
+  "claude-cloud": {
+    title: msg("Claude Cloud"),
+    description: msg(
+      "Offload heavy work to Claude Cloud VMs on your Claude subscription, send follow-ups, and pull sessions back into local worktree threads.",
+    ),
+    Icon: CloudIcon,
+    statusLabels: {
+      enabled_unconfigured: msg("Check accounts"),
+      auth_required: msg("Needs a claude.ai login"),
+    },
   },
 };
 

@@ -72,6 +72,9 @@ import { EnvironmentToolkit } from "./toolkits/environment/tools.ts";
 import * as EnvironmentHandlers from "./toolkits/environment/handlers.ts";
 import { ThemeToolkit } from "./toolkits/theme/tools.ts";
 import * as ThemeHandlers from "./toolkits/theme/handlers.ts";
+import { ClaudeCloudToolkit } from "./toolkits/claudeCloud/tools.ts";
+import * as ClaudeCloudHandlers from "./toolkits/claudeCloud/handlers.ts";
+import * as ClaudeCloudService from "../cloud/ClaudeCloudService.ts";
 import { ProjectToolkit } from "./toolkits/project/tools.ts";
 import * as ProjectHandlers from "./toolkits/project/handlers.ts";
 import { AttachmentToolkit } from "./toolkits/attachment/tools.ts";
@@ -1671,6 +1674,28 @@ export const layerMilestoneEvents = Layer.effectDiscard(
   Layer.provide(layerWebhookTransport),
 );
 
+/**
+ * mattr's claude-cloud add-on tools. Outside layerTools: they are listed only while the add-on
+ * is on and agents may delegate, so they cost no context otherwise.
+ */
+const layerClaudeCloudToolkit = toolkitRegistration(
+  ClaudeCloudToolkit,
+  ClaudeCloudHandlers.layer,
+).pipe(
+  Layer.provide(
+    McpServer.visibility(
+      Effect.gen(function* () {
+        return ClaudeCloudHandlers.toolListCheck(yield* ClaudeCloudService.ClaudeCloudService);
+      }),
+    ).layer,
+  ),
+);
+
 export const layer = layerMcpTransport(
-  Layer.mergeAll(layerTools, layerToolSearch, layerMilestoneEvents),
+  Layer.mergeAll(
+    layerTools,
+    layerToolSearch,
+    layerMilestoneEvents,
+    layerClaudeCloudToolkit.pipe(Layer.provide(ClaudeCloudService.layerWithRunner)),
+  ),
 );

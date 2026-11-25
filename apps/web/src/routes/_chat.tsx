@@ -3,6 +3,7 @@ import { Outlet, createFileRoute, redirect, useMatches } from "@tanstack/react-r
 import { ThreadRouteView } from "../components/ThreadRouteView";
 import { GlobalVoiceInputIndicator } from "../components/chat/GlobalVoiceInputIndicator";
 import { MattrIslandHost } from "../island/MattrIslandHost";
+import { ClaudeCloudModalHost } from "../components/cloud/ClaudeCloudModal";
 import { isAppModalPage } from "../components/sidebar/mainAppLocation";
 import { SidebarInset } from "../components/ui/sidebar";
 import { resolveThreadRouteTarget } from "../threadRoutes";
@@ -34,6 +35,7 @@ function ChatRouteLayout() {
       {modalOpen ? <Outlet /> : null}
       <GlobalVoiceInputIndicator hidden={modalOpen} />
       <MattrIslandHost />
+      <ClaudeCloudModalHost />
     </>
   );
 }

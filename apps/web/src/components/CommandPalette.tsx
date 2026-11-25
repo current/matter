@@ -67,6 +67,8 @@ import {
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
+  CloudDownloadIcon,
+  CloudUploadIcon,
   CornerLeftUpIcon,
   FileSearchIcon,
   FolderGit2Icon,
@@ -92,6 +94,8 @@ import {
   setVoiceAssistantModalOpen,
   toggleVoiceAssistantHandsFree,
 } from "../island/voiceAssistantStore";
+import { openClaudeCloudDialog } from "../addons/claudeCloudApi";
+import { useIsAddonEnabled } from "../addons/useAddonRegistry";
 import { openThreadFind } from "./chat/threadFindStore";
 import { dispatchPreviewAction } from "./preview/previewActionBus";
 import { previewBridge } from "./preview/previewBridge";
@@ -515,6 +519,7 @@ function OpenCommandPaletteDialog(props: {
   const { environments } = useEnvironments();
   const desktopLocalBootstraps = useDesktopLocalBootstraps();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const claudeCloudEnabled = useIsAddonEnabled("claude-cloud");
   const availableSettingsSearchItems = useAvailableSettingsSearchItems();
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread } =
     useHandleNewThread();
@@ -1851,6 +1856,32 @@ function OpenCommandPaletteDialog(props: {
       toggleVoiceAssistantHandsFree();
     },
   });
+
+  // mattr: Claude Cloud add-on; its API lives on the primary environment.
+  if (claudeCloudEnabled) {
+    const cloudProjectId =
+      currentProjectEnvironmentId === primaryEnvironmentId ? currentProjectId : null;
+    actionItems.push({
+      kind: "action",
+      value: "action:claude-cloud-launch",
+      searchTerms: ["claude", "cloud", "offload", "remote", "vm", "tests", "send"],
+      title: gt("Send to Claude Cloud…"),
+      icon: <CloudUploadIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openClaudeCloudDialog({ mode: "launch", projectId: cloudProjectId });
+      },
+    });
+    actionItems.push({
+      kind: "action",
+      value: "action:claude-cloud-teleport",
+      searchTerms: ["claude", "cloud", "teleport", "pull", "worktree", "import"],
+      title: gt("Teleport Claude Cloud session…"),
+      icon: <CloudDownloadIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openClaudeCloudDialog({ mode: "teleport", projectId: cloudProjectId });
+      },
+    });
+  }
 
   actionItems.push({
     kind: "action",

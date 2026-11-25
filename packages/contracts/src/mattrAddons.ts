@@ -7,14 +7,14 @@ import { TrimmedNonEmptyString } from "./baseSchemas.ts";
  * user's choice) is separate from runtime status (whether an enabled add-on is actually usable).
  */
 
-export type KnownAddonId = "grok-bot" | "voice-assistant";
+export type KnownAddonId = "grok-bot" | "voice-assistant" | "claude-cloud";
 export type AddonId = KnownAddonId | (string & {});
 
 export const AddonIdSchema = TrimmedNonEmptyString.check(
   Schema.isPattern(/^[a-z][a-z0-9-]{1,47}$/),
 );
 
-export const AddonCategory = Schema.Literals(["bots", "assistant"]);
+export const AddonCategory = Schema.Literals(["bots", "assistant", "cloud"]);
 export type AddonCategory = typeof AddonCategory.Type;
 
 export const AddonSurface = Schema.Literals(["desktop", "web", "mobile"]);
@@ -39,6 +39,7 @@ export const AddonContribution = Schema.Literals([
   "microphone",
   "network",
   "bots-provider",
+  "agent-tools",
 ]);
 export type AddonContribution = typeof AddonContribution.Type;
 
@@ -199,6 +200,26 @@ export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
     settingsRoute: "/settings/general#mattr-voice-assistant",
     contributions: ["settings", "commands", "overlay", "microphone", "network"],
     experimental: false,
+  },
+  {
+    id: "claude-cloud",
+    displayName: "Claude Cloud",
+    description:
+      "Offload heavy work to Claude Cloud VMs on your Claude subscription, send follow-ups, and pull sessions back into local worktree threads.",
+    icon: "cloud",
+    category: "cloud",
+    platformRequirements: { surfaces: ["desktop", "web", "mobile"] },
+    dependencies: [],
+    defaultEnabled: false,
+    onboarding: {
+      prompt:
+        "Do you want to run heavy work such as test suites and large refactors on Claude Cloud with your claude.ai subscription, and let your agents offload it too?",
+      enableLabel: "Enable Claude Cloud",
+      skipLabel: "Skip",
+    },
+    settingsRoute: "/settings/addons#addon-claude-cloud",
+    contributions: ["settings", "commands", "network", "agent-tools"],
+    experimental: true,
   },
 ];
 

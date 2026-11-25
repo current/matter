@@ -11,6 +11,7 @@ import {
   SettingsSection,
 } from "../components/settings/settingsLayout";
 import { ADDON_STATUS_LABELS, addonPresentation } from "./addonRegistry";
+import { ClaudeCloudAddonSettings } from "./ClaudeCloudAddonSettings";
 import { GrokBotAddonSettings } from "./GrokBotAddonSettings";
 import { useAddonRegistry } from "./useAddonRegistry";
 
@@ -89,6 +90,7 @@ function AddonRow({
   const showConfigure =
     state.enabled && configurePath !== undefined && configurePath !== ADDONS_PAGE;
   const showGrokBotSettings = state.enabled && manifest.id === "grok-bot";
+  const showClaudeCloudSettings = state.enabled && manifest.id === "claude-cloud";
   return (
     <SettingsRow
       id={`addon-${manifest.id}`}
@@ -149,6 +151,7 @@ function AddonRow({
           onReconnect={onReconnect}
         />
       ) : null}
+      {showClaudeCloudSettings ? <ClaudeCloudAddonSettings canWrite={canWrite} /> : null}
     </SettingsRow>
   );
 }

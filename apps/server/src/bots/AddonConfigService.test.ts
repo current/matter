@@ -36,6 +36,7 @@ describe("AddonConfigService", () => {
         [
           { id: "grok-bot", enabled: false, enablementSource: "default" },
           { id: "voice-assistant", enabled: false, enablementSource: "default" },
+          { id: "claude-cloud", enabled: false, enablementSource: "default" },
         ],
       );
       assert.isFalse(yield* fileSystem.exists(yield* configFilePath));

@@ -10,40 +10,31 @@ import {
   BotRespondRequest,
   BotSendMessageRequest,
   MAX_BOT_MESSAGES_PAGE,
+  CLAUDE_CLOUD_ADDON_ID,
   type AddonEntry,
-  type AuthEnvironmentScope,
   type AddonListResponse,
   type AddonRuntimeStatus,
   type BotsErrorCode,
-  type EnvironmentAuthInvalidError,
-  type EnvironmentInternalError,
-  type EnvironmentScopeRequiredError,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import {
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerRespondable,
-  HttpServerResponse,
-} from "effect/http";
+import { HttpRouter } from "effect/http";
 
-import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
-import {
-  failEnvironmentAuthInvalid,
-  failEnvironmentInternal,
-  failEnvironmentScopeRequired,
-} from "../auth/http.ts";
+import * as ClaudeCloudService from "../cloud/ClaudeCloudService.ts";
+import { layerClaudeCloudRoutes } from "../cloud/claudeCloudHttp.ts";
 import { eventStreamResponse } from "../eventStreamResponse.ts";
 import * as AddonConfigService from "./AddonConfigService.ts";
 import * as BotsPlatformService from "./BotsPlatformService.ts";
+import {
+  authenticate,
+  catchAuthErrors,
+  INVALID_REQUEST,
+  json,
+  readJson,
+  readQuery,
+} from "./mattrHttp.ts";
 import { layerRegisteredBotProviders } from "./registeredProviders.ts";
-
-const NO_STORE_HEADERS = {
-  "cache-control": "no-store",
-  "x-content-type-options": "nosniff",
-} as const;
 
 const decodeSetEnabled = Schema.decodeUnknownEffect(AddonSetEnabledRequest);
 const decodeUpdateConfig = Schema.decodeUnknownEffect(AddonUpdateConfigRequest);
@@ -52,43 +43,6 @@ const decodeSend = Schema.decodeUnknownEffect(BotSendMessageRequest);
 const decodeRespond = Schema.decodeUnknownEffect(BotRespondRequest);
 const decodeCancel = Schema.decodeUnknownEffect(BotCancelRequest);
 const encodeEvent = Schema.encodeEffect(Schema.fromJsonString(BotEvent));
-
-const authenticate = Effect.fnUntraced(function* (scope: AuthEnvironmentScope) {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
-  const session = yield* serverAuth.authenticateHttpRequest(request).pipe(
-    Effect.catchIf(EnvironmentAuth.isServerAuthCredentialError, (error) =>
-      failEnvironmentAuthInvalid(
-        EnvironmentAuth.serverAuthCredentialReason(error),
-        EnvironmentAuth.serverAuthDpopFailureReason(error),
-      ),
-    ),
-    Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (error) =>
-      failEnvironmentInternal("internal_error", error),
-    ),
-  );
-  if (!session.scopes.includes(scope)) {
-    return yield* failEnvironmentScopeRequired(scope);
-  }
-});
-
-const catchAuthErrors = <A, R>(
-  effect: Effect.Effect<
-    A,
-    EnvironmentAuthInvalidError | EnvironmentInternalError | EnvironmentScopeRequiredError,
-    R
-  >,
-) =>
-  effect.pipe(
-    Effect.catchTags({
-      EnvironmentAuthInvalidError: HttpServerRespondable.toResponse,
-      EnvironmentInternalError: HttpServerRespondable.toResponse,
-      EnvironmentScopeRequiredError: HttpServerRespondable.toResponse,
-    }),
-  );
-
-const json = (body: unknown, status = 200) =>
-  HttpServerResponse.jsonUnsafe(body, { status, headers: NO_STORE_HEADERS });
 
 const BOTS_ERROR_STATUS: Record<BotsErrorCode, number> = {
   invalid_request: 400,
@@ -117,31 +71,15 @@ const addonErrorResponse = (error: AddonConfigService.AddonConfigError) =>
     ),
   );
 
-const readJson = Effect.fnUntraced(function* <A>(
-  decode: (raw: unknown) => Effect.Effect<A, Schema.SchemaError>,
-) {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const raw = yield* request.json.pipe(Effect.option);
-  if (raw._tag === "None") return null;
-  const decoded = yield* decode(raw.value).pipe(Effect.option);
-  return decoded._tag === "None" ? null : decoded.value;
-});
-
-const readQuery = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest;
-  const index = request.url.indexOf("?");
-  return new URLSearchParams(index === -1 ? "" : request.url.slice(index + 1));
-});
-
-const INVALID_REQUEST = json({ error: "invalid_request" }, 400);
-
 const layerBotsRoutes = Layer.unwrap(
   Effect.gen(function* () {
     const addonConfig = yield* AddonConfigService.AddonConfigService;
     const platform = yield* BotsPlatformService.BotsPlatformService;
+    const claudeCloud = yield* ClaudeCloudService.ClaudeCloudService;
 
     const statusFor = Effect.fn("botsHttp.statusFor")(function* (id: string, enabled: boolean) {
       if (!enabled) return { kind: "disabled" } satisfies AddonRuntimeStatus;
+      if (id === CLAUDE_CLOUD_ADDON_ID) return yield* claudeCloud.addonStatus;
       const providerStatus = yield* platform.addonStatus(id);
       if (providerStatus) return providerStatus;
       const manifest = addonConfig.manifests.find((entry) => entry.id === id);
@@ -385,8 +323,16 @@ const layerBotsRoutes = Layer.unwrap(
   }),
 );
 
-/** Add-on and Bots routes with the platform and every registered provider. */
+/** Add-on, Bots and Claude Cloud routes with the platform and every registered provider. */
 export const layerMattrAddonsAndBots = Layer.mergeAll(
   layerBotsRoutes,
   layerRegisteredBotProviders,
-).pipe(Layer.provide(BotsPlatformService.layer.pipe(Layer.provideMerge(AddonConfigService.layer))));
+  layerClaudeCloudRoutes,
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      BotsPlatformService.layer.pipe(Layer.provideMerge(AddonConfigService.layer)),
+      ClaudeCloudService.layerWithRunner,
+    ),
+  ),
+);

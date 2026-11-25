@@ -80,6 +80,8 @@ export class AddonConfigService extends Context.Service<
       patch: AddonConfig,
     ) => Effect.Effect<AddonConfig, AddonConfigError>;
     readonly changes: Stream.Stream<AddonEnablementChange>;
+    /** Ids of add-ons whose config was just written. */
+    readonly configChanges: Stream.Stream<string>;
   }
 >()("t3/bots/AddonConfigService") {}
 
@@ -99,6 +101,7 @@ export const make = Effect.gen(function* () {
 
   const writeLock = yield* Semaphore.make(1);
   const changesPubSub = yield* PubSub.unbounded<AddonEnablementChange>();
+  const configChangesPubSub = yield* PubSub.unbounded<string>();
   // Read lazily so a server with no add-on traffic never touches the file.
   const cache = yield* Ref.make<StoredAddonsFile | null>(null);
 
@@ -222,7 +225,7 @@ export const make = Effect.gen(function* () {
     if (secretKey !== null) {
       return yield* new AddonConfigError({ reason: "secret_config_key", detail: secretKey });
     }
-    return yield* writeLock.withPermit(
+    const merged = yield* writeLock.withPermit(
       Effect.gen(function* () {
         const file = yield* load();
         const previous = file.addons[id];
@@ -245,6 +248,8 @@ export const make = Effect.gen(function* () {
         return merged;
       }),
     );
+    yield* PubSub.publish(configChangesPubSub, id);
+    return merged;
   });
 
   return AddonConfigService.of({
@@ -256,6 +261,7 @@ export const make = Effect.gen(function* () {
     getConfig,
     updateConfig,
     changes: Stream.fromPubSub(changesPubSub),
+    configChanges: Stream.fromPubSub(configChangesPubSub),
   });
 });
 

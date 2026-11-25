@@ -15,6 +15,19 @@ Link each PR you create, take over, or push to: link_pull_request, or link_pull_
 If available, call link_issue for each issue you take on or file, even via CLI; skip issues you only read.
 </pull_request_linking>`;
 
+// mattr: fork add-ons contribute session instructions here. Each returns "" while off.
+const addonInstructionSources = new Map<string, () => string>();
+
+/** Registers (or with null, removes) an add-on's instructions for sessions that start later. */
+export function setAddonRuntimeInstructions(id: string, source: (() => string) | null): void {
+  if (source === null) addonInstructionSources.delete(id);
+  else addonInstructionSources.set(id, source);
+}
+
+function addonRuntimeInstructions(): Array<string> {
+  return [...addonInstructionSources.values()].map((source) => source()).filter(Boolean);
+}
+
 /** Omit model and effort when the harness manages them dynamically. */
 export function buildRuntimeInstructions(runtime: {
   readonly harness: string;
@@ -44,7 +57,11 @@ export function buildRuntimeInstructions(runtime: {
     runtime.pullRequestLinking === false
       ? runtimeInfo
       : `${runtimeInfo}\n\n${PULL_REQUEST_LINKING_INSTRUCTIONS}`;
-  return [linked + feedback, ...(workspace === "" ? [] : [workspace])].join("\n\n");
+  return [
+    linked + feedback,
+    ...(workspace === "" ? [] : [workspace]),
+    ...addonRuntimeInstructions(),
+  ].join("\n\n");
 }
 
 function toSingleLine(value: string): string {
