@@ -1,5 +1,6 @@
 import type { Icon } from "@tabler/icons-react-native/types";
 /* Package-root imports eagerly register the entire Tabler icon set in Metro. */
+import IconActivity from "@tabler/icons-react-native/IconActivity";
 import IconAdjustmentsHorizontal from "@tabler/icons-react-native/IconAdjustmentsHorizontal";
 import IconAlarm from "@tabler/icons-react-native/IconAlarm";
 import IconAlignLeft from "@tabler/icons-react-native/IconAlignLeft";
@@ -294,6 +295,7 @@ const ANDROID_ICON_BY_SF_SYMBOL = {
   "tray.and.arrow.down": IconDownload,
   "tray.and.arrow.up": IconUpload,
   trash: IconTrash,
+  waveform: IconActivity,
   wifi: IconWifi,
   "wifi.slash": IconWifiOff,
   "wrench.and.screwdriver": IconTool,

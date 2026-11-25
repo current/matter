@@ -9,6 +9,12 @@ import type {
 export const MAX_VOICE_CONTEXT_THREADS = 12;
 export const MAX_VOICE_HISTORY_MESSAGES = 12;
 
+export interface VoiceThreadScope {
+  readonly environmentId: string;
+  readonly threadId: string;
+  readonly title?: string | undefined;
+}
+
 export interface VoiceContextProjectInput {
   readonly id: string;
   readonly title: string;
@@ -29,6 +35,8 @@ export interface VoiceContextThreadInput {
   readonly runStatus: string | null;
   /** Server-reported usage limit pause. */
   readonly limited?: boolean;
+  readonly latestUserMessage?: string | null;
+  readonly latestAssistantMessage?: string | null;
 }
 
 export interface VoiceContextApprovalInput {
@@ -85,9 +93,38 @@ export function approvalTitle(approval: {
   return approval.appName ?? humanizeRequestKind(approval.requestKind);
 }
 
+function truncateMessage(text: string, maxLength: number): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) return compact;
+  return `${compact.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+/** Pulls the newest non-empty user and assistant messages from a thread's projection for voice context. */
+export function extractLatestThreadMessages(
+  messages: ReadonlyArray<{ readonly role: string; readonly text: string }>,
+): {
+  readonly latestUserMessage: string | null;
+  readonly latestAssistantMessage: string | null;
+} {
+  let latestUserMessage: string | null = null;
+  let latestAssistantMessage: string | null = null;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message || !message.text.trim()) continue;
+    if (latestAssistantMessage === null && message.role === "assistant") {
+      latestAssistantMessage = truncateMessage(message.text, 520);
+    } else if (latestUserMessage === null && message.role === "user") {
+      latestUserMessage = truncateMessage(message.text, 240);
+    }
+    if (latestUserMessage !== null && latestAssistantMessage !== null) break;
+  }
+  return { latestUserMessage, latestAssistantMessage };
+}
+
 export function buildVoiceWorkspaceContext(input: {
   readonly activeEnvironmentId: string | null;
   readonly activeThreadId: string | null;
+  readonly activeThreadFallbackTitle?: string | null;
   readonly activeRoute: string | null;
   readonly projects: ReadonlyArray<VoiceContextProjectInput>;
   readonly threads: ReadonlyArray<VoiceContextThreadInput>;
@@ -100,10 +137,51 @@ export function buildVoiceWorkspaceContext(input: {
   );
   const threadTitle = (environmentId: string, threadId: string) =>
     threadTitles.get(`${environmentId}:${threadId}`) ?? "Untitled thread";
-  const recent = input.threads
+  const matchesActiveThread = (thread: VoiceContextThreadInput) =>
+    input.activeThreadId !== null &&
+    thread.id === input.activeThreadId &&
+    (input.activeEnvironmentId === null || thread.environmentId === input.activeEnvironmentId);
+  const unarchived = input.threads
     .filter((thread) => thread.archivedAt === null)
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .slice(0, MAX_VOICE_CONTEXT_THREADS);
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  let recent = unarchived.slice(0, MAX_VOICE_CONTEXT_THREADS);
+  if (input.activeThreadId !== null && !recent.some(matchesActiveThread)) {
+    const activeMatch = input.threads.find(matchesActiveThread);
+    if (activeMatch) {
+      recent = [activeMatch, ...recent.slice(0, MAX_VOICE_CONTEXT_THREADS - 1)];
+    }
+  }
+  const threadSummaries: VoiceWorkspaceThreadSummary[] = recent.map((thread) => ({
+    environmentId: thread.environmentId,
+    threadId: thread.id,
+    title: thread.title,
+    projectId: thread.projectId,
+    projectTitle: thread.projectId === null ? null : (projectTitles.get(thread.projectId) ?? null),
+    status: mapVoiceThreadStatus(thread),
+    updatedAt: thread.updatedAt,
+    latestUserMessage: thread.latestUserMessage ?? null,
+    latestAssistantMessage: thread.latestAssistantMessage ?? null,
+    isActive: matchesActiveThread(thread),
+  }));
+  if (
+    input.activeThreadId !== null &&
+    input.activeEnvironmentId !== null &&
+    !threadSummaries.some((thread) => thread.isActive)
+  ) {
+    threadSummaries.unshift({
+      environmentId: input.activeEnvironmentId,
+      threadId: input.activeThreadId,
+      // oxlint-disable-next-line t3code/no-untranslated-copy -- model-facing fallback title sent to the voice assistant, not UI copy
+      title: input.activeThreadFallbackTitle?.trim() || "Untitled thread",
+      projectId: null,
+      projectTitle: null,
+      status: "idle",
+      updatedAt: new Date().toISOString(),
+      latestUserMessage: null,
+      latestAssistantMessage: null,
+      isActive: true,
+    });
+  }
   return {
     activeEnvironmentId: input.activeEnvironmentId,
     activeThreadId: input.activeThreadId,
@@ -117,19 +195,7 @@ export function buildVoiceWorkspaceContext(input: {
       workspaceRoot: project.workspaceRoot,
       archived: project.archivedAt !== null,
     })),
-    threads: recent.map((thread) => ({
-      environmentId: thread.environmentId,
-      threadId: thread.id,
-      title: thread.title,
-      projectId: thread.projectId,
-      projectTitle:
-        thread.projectId === null ? null : (projectTitles.get(thread.projectId) ?? null),
-      status: mapVoiceThreadStatus(thread),
-      updatedAt: thread.updatedAt,
-      latestUserMessage: null,
-      latestAssistantMessage: null,
-      isActive: thread.id === input.activeThreadId,
-    })),
+    threads: threadSummaries,
     pendingApprovals: input.approvals.map((approval): VoiceWorkspaceApprovalSummary => ({
       environmentId: approval.environmentId,
       threadId: approval.threadId,

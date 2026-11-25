@@ -13,6 +13,7 @@ import type {
 import { DEFAULT_VOICE_ASSISTANT_SETTINGS } from "../../../../antimatter/voice-assistant/types";
 import { updateIslandSettings, updateVoiceAssistantSettings } from "./islandSettingsStore";
 import {
+  applyThreadScopeToWorkspaceContext,
   bargeInVoiceAssistant as bargeIn,
   buildServerTtsPreferences,
   buildVoiceSpeakOptions,
@@ -20,10 +21,12 @@ import {
   confirmsSpokenInterruption,
   getVoiceAssistantState,
   hasSustainedSpeech,
+  openThreadVoiceMode,
   registerHostBridge,
   resetVoiceAssistantStoreForTests,
   setVoiceAssistantModalOpen as setModalOpen,
   setVoiceAssistantMode as setMode,
+  setVoiceAssistantScopedThread,
   submitQuickBriefing,
   submitVoiceAssistantUtterance as submitUtterance,
   syncVoiceTtsPreferencesToServer,
@@ -1228,5 +1231,143 @@ describe("voice barge-in guard", () => {
       expect(harness.utterances).toEqual(["how is the build", "actually check the tests"]),
     );
     expect(reply.stop).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("in-thread voice mode scoping", () => {
+  beforeEach(() => {
+    resetVoiceAssistantStoreForTests();
+  });
+
+  afterEach(() => {
+    resetVoiceAssistantStoreForTests();
+  });
+
+  it("applyThreadScopeToWorkspaceContext overrides activeThreadId and synthesizes missing thread entries", () => {
+    const base = makeContext({
+      activeEnvironmentId: "env-1",
+      activeThreadId: "thread-1",
+      threads: [
+        {
+          environmentId: "env-1",
+          threadId: "thread-1",
+          title: "Other thread",
+          projectId: null,
+          projectTitle: null,
+          status: "running",
+          updatedAt: "2026-11-25T10:00:00.000Z",
+          latestUserMessage: null,
+          latestAssistantMessage: null,
+          isActive: true,
+        },
+      ],
+    });
+
+    const scoped = applyThreadScopeToWorkspaceContext(base, {
+      environmentId: "env-2",
+      threadId: "thread-99",
+      title: "Antimatter setup check",
+    });
+
+    expect(scoped.activeEnvironmentId).toBe("env-2");
+    expect(scoped.activeThreadId).toBe("thread-99");
+    expect(scoped.threads[0]).toMatchObject({
+      environmentId: "env-2",
+      threadId: "thread-99",
+      title: "Antimatter setup check",
+      isActive: true,
+    });
+    expect(scoped.threads[1]?.isActive).toBe(false);
+  });
+
+  it("openThreadVoiceMode opens modal scoped to the thread, sends scoped activeThreadId on turns, and resets cleanly for global mode", async () => {
+    const requests: VoiceAssistantTurnRequest[] = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (typeof init?.body === "string") {
+        requests.push(JSON.parse(init.body) as VoiceAssistantTurnRequest);
+      }
+      return jsonResponse({
+        route: "assistant",
+        spokenReply: "Looking at that thread now.",
+        displayReply: "Looking at that thread now.",
+        expectFollowUp: true,
+        toolResults: [],
+        clientActions: [],
+      } satisfies VoiceAssistantTurnResponse);
+    });
+    const fakePlayer: VoiceTtsPlayer = {
+      speak: vi.fn(async () => {}),
+      stop: vi.fn(),
+      isSpeaking: () => false,
+    };
+
+    registerHostBridge({
+      getWorkspaceContext: () =>
+        makeContext({
+          activeEnvironmentId: "env-1",
+          activeThreadId: "thread-1",
+        }),
+      executeClientAction: vi.fn(),
+      transcribePcm: vi.fn(async () => ""),
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773", headers: {} }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createTtsPlayer: () => fakePlayer,
+    });
+
+    openThreadVoiceMode(
+      {
+        environmentId: "env-2",
+        threadId: "thread-77",
+        title: "Antimatter setup check",
+      },
+      { autoStartHandsFree: false },
+    );
+
+    expect(getVoiceAssistantState()).toMatchObject({
+      modalOpen: true,
+      mode: "voice-mode",
+      scopedThread: {
+        environmentId: "env-2",
+        threadId: "thread-77",
+        title: "Antimatter setup check",
+      },
+      originThread: {
+        environmentId: "env-2",
+        threadId: "thread-77",
+        title: "Antimatter setup check",
+      },
+    });
+
+    await submitUtterance("What is happening here?");
+    expect(requests[0]?.context.activeEnvironmentId).toBe("env-2");
+    expect(requests[0]?.context.activeThreadId).toBe("thread-77");
+    expect(requests[0]?.context.threads[0]?.isActive).toBe(true);
+
+    // Switching to All workspace clears active thread scope override but keeps originThread reversible.
+    setVoiceAssistantScopedThread(null);
+    expect(getVoiceAssistantState().scopedThread).toBeNull();
+    expect(getVoiceAssistantState().originThread?.threadId).toBe("thread-77");
+
+    await submitUtterance("What else is running?");
+    expect(requests[1]?.context.activeEnvironmentId).toBe("env-1");
+    expect(requests[1]?.context.activeThreadId).toBe("thread-1");
+
+    // Switching to a different thread clears stale turns from the prior thread conversation.
+    openThreadVoiceMode(
+      {
+        environmentId: "env-1",
+        threadId: "thread-88",
+        title: "Another thread",
+      },
+      { autoStartHandsFree: false },
+    );
+    expect(getVoiceAssistantState().recentTurns).toEqual([]);
+    expect(getVoiceAssistantState().scopedThread?.threadId).toBe("thread-88");
+
+    // Global entry points clear any thread scope cleanly.
+    setModalOpen(false);
+    setModalOpen(true);
+    expect(getVoiceAssistantState().scopedThread).toBeNull();
+    expect(getVoiceAssistantState().originThread).toBeNull();
   });
 });

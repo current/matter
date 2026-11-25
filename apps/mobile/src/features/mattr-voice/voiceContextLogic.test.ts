@@ -5,6 +5,7 @@ import {
   MAX_VOICE_HISTORY_MESSAGES,
   approvalTitle,
   buildVoiceWorkspaceContext,
+  extractLatestThreadMessages,
   historyFromTurns,
   mapVoiceThreadStatus,
   trimVoiceHistory,
@@ -160,6 +161,80 @@ describe("buildVoiceWorkspaceContext", () => {
       questions: [],
     });
     expect(context.pendingApprovals[0]?.threadTitle).toBe("Untitled thread");
+  });
+
+  it("retains an older active scoped thread inside the capped thread list with its latest messages", () => {
+    const newer = Array.from({ length: MAX_VOICE_CONTEXT_THREADS + 3 }, (_, index) =>
+      thread({
+        id: `recent-${index}`,
+        updatedAt: new Date(Date.UTC(2026, 10, 25, 1, index)).toISOString(),
+      }),
+    );
+    const activeOld = thread({
+      id: "old-active",
+      title: "Antimatter setup check",
+      updatedAt: "2026-11-24T01:00:00.000Z",
+      latestUserMessage: "Check setup",
+      latestAssistantMessage: "Everything looks healthy.",
+    });
+
+    const context = buildVoiceWorkspaceContext({
+      activeEnvironmentId: "env-1",
+      activeThreadId: "old-active",
+      activeRoute: "MattrVoiceMode",
+      projects,
+      threads: [...newer, activeOld],
+      approvals: [],
+      questions: [],
+    });
+
+    expect(context.activeThreadId).toBe("old-active");
+    expect(context.threads).toHaveLength(MAX_VOICE_CONTEXT_THREADS);
+    expect(context.threads[0]).toMatchObject({
+      threadId: "old-active",
+      title: "Antimatter setup check",
+      isActive: true,
+      latestUserMessage: "Check setup",
+      latestAssistantMessage: "Everything looks healthy.",
+    });
+    expect(context.threads.slice(1).every((entry) => !entry.isActive)).toBe(true);
+  });
+
+  it("synthesizes an active thread summary when the scoped thread shell is not loaded yet", () => {
+    const context = buildVoiceWorkspaceContext({
+      activeEnvironmentId: "env-2",
+      activeThreadId: "thread-unloaded",
+      activeThreadFallbackTitle: "Voice test thread",
+      activeRoute: "MattrVoiceMode",
+      projects: [],
+      threads: [],
+      approvals: [],
+      questions: [],
+    });
+
+    expect(context.threads).toHaveLength(1);
+    expect(context.threads[0]).toMatchObject({
+      environmentId: "env-2",
+      threadId: "thread-unloaded",
+      title: "Voice test thread",
+      isActive: true,
+    });
+  });
+});
+
+describe("extractLatestThreadMessages", () => {
+  it("picks the newest non-empty user and assistant messages and truncates long replies", () => {
+    const extracted = extractLatestThreadMessages([
+      { role: "user", text: "First prompt" },
+      { role: "assistant", text: "First answer" },
+      { role: "user", text: "  Second   prompt  " },
+      { role: "assistant", text: "   " },
+      { role: "assistant", text: "a".repeat(600) },
+    ]);
+
+    expect(extracted.latestUserMessage).toBe("Second prompt");
+    expect(extracted.latestAssistantMessage).toHaveLength(520);
+    expect(extracted.latestAssistantMessage?.endsWith("…")).toBe(true);
   });
 });
 

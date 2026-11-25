@@ -151,6 +151,8 @@ import { useDictationShortcut } from "../../speech/useDictationShortcut";
 import { useDictationSubmissionShortcut } from "../../speech/useDictationSubmissionShortcut";
 import { useEnvironmentSpeechInput } from "../../speech/useEnvironmentSpeechInput";
 import { ComposerSpeechButton, ComposerSpeechRecordingPill } from "./ComposerSpeechButton";
+import { ComposerVoiceModeButton } from "./ComposerVoiceModeButton";
+import { openThreadVoiceMode } from "../../island/voiceAssistantStore";
 import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection";
 import { shortcutLabelForCommand, type ShortcutMatchContext } from "../../keybindings";
 import {
@@ -2033,6 +2035,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     attachmentTargetKey,
     submissionBlocked,
   );
+  const handleOpenThreadVoiceModeStable = useStableCallback(() => {
+    if (routeKind !== "server" || activeThreadId === null) return;
+    openThreadVoiceMode({
+      environmentId,
+      threadId: activeThreadId,
+      title: activeThread?.title || gt("Untitled thread"),
+    });
+  });
+
   // The pending Submit button follows the answer's own blockers, matching submitComposer.
   const primaryActionSendDisabledReason =
     (activePendingProgress ? attachmentBlockReason : sendDisabledReason) ??
@@ -3779,6 +3790,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   )}
                 </button>
                 {collapsedComposerImagePreviews}
+                {routeKind === "server" &&
+                activeThreadId !== null &&
+                !isEditingQueuedMessage &&
+                !hasMessageToSend ? (
+                  <ComposerVoiceModeButton
+                    disabled={environmentUnavailable !== null || !canOperateThread}
+                    onOpen={handleOpenThreadVoiceModeStable}
+                  />
+                ) : null}
                 <CollapsedComposerStopAction
                   key={`${environmentId}:${activeThreadId ?? "new"}`}
                   canOperateThread={canOperateThread}
@@ -4146,6 +4166,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           onStart={() => void speechInput.start()}
                         />
                       </>
+                    ) : null}
+                    {routeKind === "server" &&
+                    activeThreadId !== null &&
+                    speechInput.state.phase === "idle" &&
+                    pendingPrimaryAction === null &&
+                    !isEditingQueuedMessage ? (
+                      <ComposerVoiceModeButton
+                        disabled={environmentUnavailable !== null || !canOperateThread}
+                        onOpen={handleOpenThreadVoiceModeStable}
+                      />
                     ) : null}
                     <VoiceInputSetup
                       environmentId={speechInput.transcriptionEnvironmentId}

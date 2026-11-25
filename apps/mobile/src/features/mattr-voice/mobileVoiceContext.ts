@@ -31,8 +31,10 @@ import {
 } from "../../state/threads";
 import {
   buildVoiceWorkspaceContext,
+  extractLatestThreadMessages,
   type VoiceContextApprovalInput,
   type VoiceContextQuestionInput,
+  type VoiceThreadScope,
 } from "./voiceContextLogic";
 
 type ThreadShell = ReturnType<typeof readShells>[number];
@@ -88,16 +90,33 @@ function readPending(shells: ReadonlyArray<ThreadShell>) {
   return { approvals, questions };
 }
 
+function readThreadMessageSnippet(environmentId: string, threadId: string) {
+  const detail = appAtomRegistry.get(
+    environmentThreadDetails.threadAtom({
+      environmentId: EnvironmentId.make(environmentId),
+      threadId: ThreadId.make(threadId),
+    }),
+  );
+  if (!detail) return { latestUserMessage: null, latestAssistantMessage: null };
+  return extractLatestThreadMessages(detail.projection.messages);
+}
+
 /** Reads the phone's current projects, threads and pending requests for a voice turn. */
-export function readVoiceWorkspaceContext(): VoiceWorkspaceContext {
+export function readVoiceWorkspaceContext(
+  scope: VoiceThreadScope | null = null,
+): VoiceWorkspaceContext {
   const shells = readShells();
   const { approvals, questions } = readPending(shells);
   const newest = shells
     .filter((shell) => shell.archivedAt === null)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+  const scopedMessages = scope
+    ? readThreadMessageSnippet(scope.environmentId, scope.threadId)
+    : null;
   return buildVoiceWorkspaceContext({
-    activeEnvironmentId: newest?.environmentId ?? null,
-    activeThreadId: null,
+    activeEnvironmentId: scope?.environmentId ?? newest?.environmentId ?? null,
+    activeThreadId: scope?.threadId ?? null,
+    activeThreadFallbackTitle: scope?.title ?? null,
     activeRoute: "MattrVoiceMode",
     projects: appAtomRegistry.get(environmentProjects.projectsAtom).map((project) => ({
       id: project.id,
@@ -105,18 +124,25 @@ export function readVoiceWorkspaceContext(): VoiceWorkspaceContext {
       workspaceRoot: project.workspaceRoot,
       archivedAt: project.archivedAt ?? null,
     })),
-    threads: shells.map((shell) => ({
-      environmentId: shell.environmentId,
-      id: shell.id,
-      title: shell.title,
-      projectId: shell.projectId,
-      updatedAt: shell.updatedAt,
-      archivedAt: shell.archivedAt,
-      hasPendingApprovals: shell.hasPendingApprovals,
-      hasPendingUserInput: shell.hasPendingUserInput,
-      runStatus: shell.latestRun?.status ?? null,
-      limited: shell.limitRecovery != null,
-    })),
+    threads: shells.map((shell) => {
+      const isScoped =
+        scope !== null &&
+        shell.environmentId === scope.environmentId &&
+        shell.id === scope.threadId;
+      return {
+        environmentId: shell.environmentId,
+        id: shell.id,
+        title: shell.title,
+        projectId: shell.projectId,
+        updatedAt: shell.updatedAt,
+        archivedAt: shell.archivedAt,
+        hasPendingApprovals: shell.hasPendingApprovals,
+        hasPendingUserInput: shell.hasPendingUserInput,
+        runStatus: shell.latestRun?.status ?? null,
+        limited: shell.limitRecovery != null,
+        ...(isScoped && scopedMessages ? scopedMessages : {}),
+      };
+    }),
     approvals,
     questions,
   });
@@ -126,7 +152,10 @@ export function readVoiceWorkspaceContext(): VoiceWorkspaceContext {
  * Calls `onChange` whenever the thread list or a pending approval or question changes. Pending
  * requests stream with their thread's detail, so each such thread is subscribed while it waits.
  */
-export function watchVoiceWorkspace(onChange: () => void): () => void {
+export function watchVoiceWorkspace(
+  onChange: () => void,
+  scope: VoiceThreadScope | null = null,
+): () => void {
   const detailWatches = new Map<string, () => void>();
   const syncDetailWatches = () => {
     const wanted = new Map<string, { environmentId: EnvironmentId; threadId: ThreadId }>();
@@ -150,6 +179,16 @@ export function watchVoiceWorkspace(onChange: () => void): () => void {
       );
     }
   };
+  const stopScopedThread = scope
+    ? appAtomRegistry.subscribe(
+        environmentThreadDetails.threadAtom({
+          environmentId: EnvironmentId.make(scope.environmentId),
+          threadId: ThreadId.make(scope.threadId),
+        }),
+        onChange,
+        { immediate: false },
+      )
+    : null;
   const stopShells = appAtomRegistry.subscribe(
     environmentThreadShells.threadShellsAtom,
     () => {
@@ -159,6 +198,7 @@ export function watchVoiceWorkspace(onChange: () => void): () => void {
     { immediate: true },
   );
   return () => {
+    stopScopedThread?.();
     stopShells();
     for (const stop of detailWatches.values()) stop();
     detailWatches.clear();
@@ -166,16 +206,19 @@ export function watchVoiceWorkspace(onChange: () => void): () => void {
 }
 
 /**
- * The environment that answers voice turns: the one holding the newest thread when it is
- * connected with operate rights, else the first connected one.
+ * The environment that answers voice turns: the scoped thread's environment when set, else the one
+ * holding the newest thread when connected with operate rights, else the first connected one.
  */
-export function pickVoiceConnection(): PreparedConnection | null {
+export function pickVoiceConnection(
+  preferredEnvironmentId: string | null = null,
+): PreparedConnection | null {
   const newest = readShells()
     .filter((shell) => shell.archivedAt === null)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+  const preferred = preferredEnvironmentId ?? newest?.environmentId ?? null;
   const presentations = appAtomRegistry.get(environmentPresentations.presentationsAtom);
   const ordered = [...presentations.keys()].sort(
-    (a, b) => Number(b === newest?.environmentId) - Number(a === newest?.environmentId),
+    (a, b) => Number(b === preferred) - Number(a === preferred),
   );
   for (const environmentId of ordered) {
     const presentation = presentations.get(environmentId);

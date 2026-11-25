@@ -1,4 +1,4 @@
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useGT } from "gt-react-native";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
+import { useVisibleThreadShells } from "../../state/entities";
 import { useOpenWorkspaceDetail } from "../layout/useOpenWorkspaceDetail";
 import { NativeVoiceAudio } from "./nativeVoiceAudio";
 import {
@@ -27,8 +28,14 @@ import {
 } from "./mobileVoiceContext";
 import { SiriWaveMobile, type SiriWaveMobileMode } from "./SiriWaveMobile";
 import { createVoiceAssistantApi } from "./voiceAssistantApi";
-import type { VoiceTurnEntry } from "./voiceContextLogic";
+import type { VoiceThreadScope, VoiceTurnEntry } from "./voiceContextLogic";
 import { VoiceModeSession, type VoicePhase } from "./voiceModeSession";
+
+export type MattrVoiceModeRouteParams = {
+  readonly environmentId?: string;
+  readonly threadId?: string;
+  readonly threadTitle?: string;
+};
 
 const BACKGROUND = "#05060A";
 
@@ -144,22 +151,58 @@ function RoundButton(props: {
   );
 }
 
-export function MattrVoiceModeScreen() {
+function initialThreadScope(
+  params: MattrVoiceModeRouteParams | undefined,
+): VoiceThreadScope | null {
+  const environmentId = params?.environmentId?.trim();
+  const threadId = params?.threadId?.trim();
+  if (!environmentId || !threadId) return null;
+  return {
+    environmentId,
+    threadId,
+    ...(params?.threadTitle?.trim() ? { title: params.threadTitle.trim() } : {}),
+  };
+}
+
+function createScopeBox(initial: VoiceThreadScope | null) {
+  let current = initial;
+  return {
+    get: () => current,
+    set: (next: VoiceThreadScope | null) => {
+      current = next;
+    },
+  };
+}
+
+export function MattrVoiceModeScreen(
+  props: Partial<StaticScreenProps<MattrVoiceModeRouteParams | undefined>> = {},
+) {
   const gt = useGT();
   const navigation = useNavigation();
   const openWorkspaceDetail = useOpenWorkspaceDetail();
   const insets = useSafeAreaInsets();
+  const visibleShells = useVisibleThreadShells();
+  const [originScope] = useState<VoiceThreadScope | null>(() =>
+    initialThreadScope(props.route?.params),
+  );
+  const [scopeBox] = useState(() => createScopeBox(originScope));
+  const [scopedThread, setScopedThread] = useState<VoiceThreadScope | null>(originScope);
+  const updateScopedThread = (next: VoiceThreadScope | null) => {
+    scopeBox.set(next);
+    setScopedThread(next);
+  };
+
   const [level] = useState(() => makeMutable(0));
   const [session] = useState(
     () =>
       new VoiceModeSession({
         audio: new NativeVoiceAudio(),
         getApi: () => {
-          const prepared = pickVoiceConnection();
+          const prepared = pickVoiceConnection(scopeBox.get()?.environmentId ?? null);
           return prepared ? createVoiceAssistantApi(prepared) : null;
         },
-        readContext: readVoiceWorkspaceContext,
-        watchWorkspace: watchVoiceWorkspace,
+        readContext: () => readVoiceWorkspaceContext(scopeBox.get()),
+        watchWorkspace: (onChange) => watchVoiceWorkspace(onChange, originScope),
         executeAction: (action) =>
           executeVoiceClientAction(action, {
             openThread: (target) => {
@@ -180,6 +223,16 @@ export function MattrVoiceModeScreen() {
     return () => void session.stop();
   }, [session]);
   const transcript = useRef<ScrollViewInstance>(null);
+
+  const resolveScopeTitle = (scope: VoiceThreadScope | null): string | null => {
+    if (!scope) return null;
+    const liveTitle = visibleShells.find(
+      (shell) => shell.environmentId === scope.environmentId && shell.id === scope.threadId,
+    )?.title;
+    return liveTitle?.trim() || scope.title?.trim() || gt("Untitled thread");
+  };
+  const activeScopedTitle = resolveScopeTitle(scopedThread);
+  const originScopeTitle = resolveScopeTitle(originScope);
 
   const labels: Record<VoicePhase, string> = {
     starting: gt("Starting…"),
@@ -243,6 +296,75 @@ export function MattrVoiceModeScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {originScope !== null && originScopeTitle !== null ? (
+        <View className="mt-2.5 flex-row items-center justify-center px-4">
+          {scopedThread !== null && activeScopedTitle !== null ? (
+            <View
+              className="max-w-full flex-row items-center rounded-full py-1 pl-3.5 pr-1.5"
+              style={{ backgroundColor: "rgba(255,255,255,0.1)", gap: 8 }}
+            >
+              <View
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: "#4DE3B5" }}
+              />
+              <Text
+                numberOfLines={1}
+                className="shrink text-xs font-semibold"
+                style={{ color: "rgba(255,255,255,0.92)" }}
+              >
+                {activeScopedTitle}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={gt("Switch to all workspace")}
+                hitSlop={10}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  updateScopedThread(null);
+                }}
+                className="min-h-[28px] shrink-0 items-center justify-center rounded-full px-2.5 py-1 active:opacity-70"
+                style={{ backgroundColor: "rgba(255,255,255,0.14)" }}
+              >
+                <Text className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.78)" }}>
+                  {gt("All workspace")}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View
+              className="max-w-full flex-row items-center rounded-full py-1 pl-3.5 pr-1.5"
+              style={{ backgroundColor: "rgba(255,255,255,0.08)", gap: 8 }}
+            >
+              <Text
+                className="shrink-0 text-xs font-medium"
+                style={{ color: "rgba(255,255,255,0.7)" }}
+              >
+                {gt("All workspace")}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={gt("Focus {title}", { title: originScopeTitle })}
+                hitSlop={10}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  updateScopedThread(originScope);
+                }}
+                className="min-h-[28px] max-w-[180px] shrink items-center justify-center rounded-full px-2.5 py-1 active:opacity-70"
+                style={{ backgroundColor: "rgba(77,227,181,0.16)" }}
+              >
+                <Text
+                  numberOfLines={1}
+                  className="text-xs font-semibold"
+                  style={{ color: "#4DE3B5" }}
+                >
+                  {originScopeTitle}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      ) : null}
 
       <View className="flex-1 items-center justify-center">
         <VoiceWave
@@ -341,7 +463,11 @@ export function MattrVoiceModeScreen() {
             onChangeText={setDraft}
             onSubmitEditing={sendDraft}
             returnKeyType="send"
-            placeholder={gt("Type instead")}
+            placeholder={
+              activeScopedTitle !== null
+                ? gt("Message {title}", { title: activeScopedTitle })
+                : gt("Type instead")
+            }
             placeholderTextColor="rgba(255,255,255,0.4)"
             className="min-h-12 flex-1 rounded-full px-4 text-base"
             style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "#FFFFFF" }}

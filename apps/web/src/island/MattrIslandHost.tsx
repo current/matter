@@ -375,14 +375,23 @@ export function MattrIslandHost() {
     )
     .slice(0, MAX_RECENT_THREADS);
 
+  const scopedVoiceThreadKey = assistantState.scopedThread
+    ? threadKey({
+        environmentId: EnvironmentId.make(assistantState.scopedThread.environmentId),
+        threadId: ThreadId.make(assistantState.scopedThread.threadId),
+      })
+    : null;
+
   const effectiveSelectedKey =
+    (scopedVoiceThreadKey && shellsByKey.has(scopedVoiceThreadKey) ? scopedVoiceThreadKey : null) ??
     (selectedThreadKey && shellsByKey.has(selectedThreadKey) ? selectedThreadKey : null) ??
     sortedShells[0]?.[0] ??
     null;
 
-  // Mount detail streams for the selected thread + any thread awaiting approval or user input
+  // Mount detail streams for the selected/scoped thread + any thread awaiting approval or user input
   const watchedDetailKeys = new Set<string>();
   if (effectiveSelectedKey) watchedDetailKeys.add(effectiveSelectedKey);
+  if (scopedVoiceThreadKey) watchedDetailKeys.add(scopedVoiceThreadKey);
   let watchedRunning = 0;
   for (const [key, entry] of shellsByKey) {
     if (entry.status === "approval" || entry.status === "input") {
@@ -523,7 +532,18 @@ export function MattrIslandHost() {
       }
     }
 
-    for (const [key, entry] of sortedShells) {
+    const shellsForSummary = (() => {
+      if (!scopedVoiceThreadKey) return sortedShells;
+      if (sortedShells.some(([key]) => key === scopedVoiceThreadKey)) return sortedShells;
+      const scopedEntry = shellsByKey.get(scopedVoiceThreadKey);
+      if (!scopedEntry) return sortedShells;
+      return [
+        [scopedVoiceThreadKey, scopedEntry] as const,
+        ...sortedShells.slice(0, MAX_RECENT_THREADS - 1),
+      ];
+    })();
+
+    for (const [key, entry] of shellsForSummary) {
       const ref = parseThreadKey(key);
       const preview = watchedDetailKeys.has(key)
         ? summarizeThreadProjection(
@@ -589,11 +609,18 @@ export function MattrIslandHost() {
 
   // Register live host bridge for VoiceAssistantStore (hands-free Voice Mode + Assistant + Briefings)
   const buildWorkspaceContext = useStableCallback((): VoiceWorkspaceContext => {
+    const scoped = assistantState.scopedThread;
     const activeEnvId =
-      selectedRef?.environmentId ?? primaryEnvironmentId ?? environmentIds[0] ?? null;
+      scoped?.environmentId ??
+      selectedRef?.environmentId ??
+      primaryEnvironmentId ??
+      environmentIds[0] ??
+      null;
+    const activeThreadId = scoped?.threadId ?? selectedRef?.threadId ?? null;
+    const activeKey = scopedVoiceThreadKey ?? effectiveSelectedKey;
     return {
       activeEnvironmentId: activeEnvId,
-      activeThreadId: selectedRef?.threadId ?? null,
+      activeThreadId,
       activeRoute: location.pathname,
       mainWindowFocused,
       composerFocused: isEditableElementFocused(),
@@ -613,7 +640,7 @@ export function MattrIslandHost() {
         updatedAt: t.updatedAt,
         latestUserMessage: t.latestUserMessage,
         latestAssistantMessage: t.latestAssistantMessage,
-        isActive: t.key === effectiveSelectedKey,
+        isActive: t.key === activeKey,
       })),
       pendingApprovals: pendingApprovals.map((a) => ({
         environmentId: a.environmentId,

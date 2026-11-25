@@ -35,9 +35,19 @@ import {
 const MAX_RECENT_TURNS = 16;
 const MAX_QUEUED_BRIEFINGS = 12;
 
+export interface VoiceAssistantThreadScope {
+  readonly environmentId: string;
+  readonly threadId: string;
+  readonly title: string;
+}
+
 export interface VoiceAssistantStoreState extends IslandVoiceAssistantState {
   readonly modalOpen: boolean;
   readonly inputLevel: number;
+  /** Active thread when Voice Mode is launched from inside a thread; null means all workspace. */
+  readonly scopedThread: VoiceAssistantThreadScope | null;
+  /** Thread that opened the current Voice Mode session, so switching to All workspace is reversible. */
+  readonly originThread: VoiceAssistantThreadScope | null;
 }
 
 export interface VoiceAssistantHostBridge {
@@ -262,6 +272,46 @@ function createInitialState(): VoiceAssistantStoreState {
     pendingBriefingCount: 0,
     error: null,
     modalOpen: false,
+    scopedThread: null,
+    originThread: null,
+  };
+}
+
+/**
+ * Applies an explicit in-thread Voice Mode scope onto a workspace snapshot so the server always
+ * sees the scoped thread as primary context (even when older than the recent-threads window).
+ */
+export function applyThreadScopeToWorkspaceContext(
+  context: VoiceWorkspaceContext,
+  scopedThread: VoiceAssistantThreadScope | null,
+): VoiceWorkspaceContext {
+  if (!scopedThread) return context;
+  const matchesScope = (thread: VoiceWorkspaceContext["threads"][number]) =>
+    thread.environmentId === scopedThread.environmentId &&
+    thread.threadId === scopedThread.threadId;
+  const hasScopedThread = context.threads.some(matchesScope);
+  const threads = hasScopedThread
+    ? context.threads.map((thread) => ({ ...thread, isActive: matchesScope(thread) }))
+    : [
+        {
+          environmentId: scopedThread.environmentId,
+          threadId: scopedThread.threadId,
+          title: scopedThread.title,
+          projectId: null,
+          projectTitle: null,
+          status: "idle" as const,
+          updatedAt: new Date().toISOString(),
+          latestUserMessage: null,
+          latestAssistantMessage: null,
+          isActive: true,
+        },
+        ...context.threads.map((thread) => ({ ...thread, isActive: false })),
+      ];
+  return {
+    ...context,
+    activeEnvironmentId: scopedThread.environmentId,
+    activeThreadId: scopedThread.threadId,
+    threads,
   };
 }
 
@@ -1153,8 +1203,59 @@ export function setVoiceAssistantMode(mode: IslandVoicePanelMode): void {
 }
 
 export function setVoiceAssistantModalOpen(open: boolean): void {
-  if (state.modalOpen === open) return;
-  emit({ modalOpen: open });
+  if (open) {
+    if (state.modalOpen && state.scopedThread === null && state.originThread === null) return;
+    emit({ modalOpen: true, scopedThread: null, originThread: null });
+    return;
+  }
+  if (!state.modalOpen) return;
+  emit({ modalOpen: false });
+}
+
+/**
+ * Opens Voice Mode pre-scoped to a specific thread (triggered from inside a thread's composer).
+ * Starts hands-free immediately when a host bridge is connected unless opted out.
+ */
+export function openThreadVoiceMode(
+  scope: VoiceAssistantThreadScope,
+  options?: { readonly autoStartHandsFree?: boolean },
+): void {
+  const switchingScope =
+    state.scopedThread?.environmentId !== scope.environmentId ||
+    state.scopedThread?.threadId !== scope.threadId;
+  emit({
+    modalOpen: true,
+    mode: "voice-mode",
+    scopedThread: scope,
+    originThread: scope,
+    ...(switchingScope
+      ? {
+          recentTurns: [],
+          lastReply: null,
+          lastToolResults: [],
+          liveTranscript: "",
+          error: null,
+        }
+      : {}),
+  });
+  if (options?.autoStartHandsFree !== false && hostBridge !== null && !state.handsFreeActive) {
+    void startHandsFree();
+  }
+}
+
+/** Switches the active Voice Mode session between a thread scope and All workspace (`null`). */
+export function setVoiceAssistantScopedThread(scope: VoiceAssistantThreadScope | null): void {
+  if (
+    state.scopedThread?.environmentId === scope?.environmentId &&
+    state.scopedThread?.threadId === scope?.threadId &&
+    state.scopedThread?.title === scope?.title
+  ) {
+    return;
+  }
+  emit({
+    scopedThread: scope,
+    ...(scope !== null ? { originThread: scope } : {}),
+  });
 }
 
 export function clearVoiceAssistantHistory(): void {
@@ -1492,7 +1593,8 @@ export async function submitVoiceAssistantUtterance(
   activeTurnRunning = true;
   activeBriefingRunning = false;
 
-  const context = hostBridge ? hostBridge.getWorkspaceContext() : emptyWorkspaceContext();
+  const rawContext = hostBridge ? hostBridge.getWorkspaceContext() : emptyWorkspaceContext();
+  const context = applyThreadScopeToWorkspaceContext(rawContext, state.scopedThread);
   const effectiveMode: VoiceAssistantInteractionMode =
     options?.modeOverride ?? (state.handsFreeActive ? "voice-mode" : state.mode);
 

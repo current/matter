@@ -122,6 +122,7 @@ import {
 } from "../voice-input/ComposerDictationControl";
 import { useVoiceInputController } from "../voice-input/useVoiceInputController";
 import { resolveVoiceComposerPresentation } from "../voice-input/voiceInputPresentation";
+import { ComposerVoiceModeButton } from "../mattr-voice/ComposerVoiceModeButton";
 import type { ExistingThreadSettingsRouteParams } from "./ThreadSettingsSheet";
 import {
   useThreadSettingsSheetPresentation,
@@ -1050,6 +1051,20 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   onStart={voiceInput.start}
                   onCancel={voiceInput.cancel}
                 />
+                {!props.isDraft && queuedEdit === null ? (
+                  <ComposerVoiceModeButton
+                    size={usesLargeControls ? "large" : "regular"}
+                    disabled={isSubmissionLocked || operateDenied}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      navigation.navigate("MattrVoiceMode", {
+                        environmentId: String(props.environmentId),
+                        threadId: String(props.selectedThread.id),
+                        threadTitle: props.selectedThread.title || gt("Untitled thread"),
+                      });
+                    }}
+                  />
+                ) : null}
                 {showStopAction ? (
                   <ComposerActionButton
                     size={usesLargeControls ? "large" : "regular"}

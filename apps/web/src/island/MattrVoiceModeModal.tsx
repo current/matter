@@ -28,6 +28,7 @@ import {
   clearVoiceAssistantHistory,
   setVoiceAssistantModalOpen,
   setVoiceAssistantMode,
+  setVoiceAssistantScopedThread,
   submitVoiceAssistantUtterance,
   toggleVoiceAssistantHandsFree,
   toggleVoiceAssistantMute,
@@ -122,6 +123,22 @@ export function MattrVoiceModeModal({
               : gt("Tap the orb to start Hands-Free Voice Mode");
 
   const runningThreads = activeThreads.filter((t) => t.status === "running");
+  const activeScopedThread = state.scopedThread;
+  const originThread = state.originThread;
+  const activeScopedTitle = activeScopedThread
+    ? (activeThreads.find(
+        (thread) =>
+          thread.environmentId === activeScopedThread.environmentId &&
+          thread.threadId === activeScopedThread.threadId,
+      )?.title ?? activeScopedThread.title)
+    : null;
+  const originThreadTitle = originThread
+    ? (activeThreads.find(
+        (thread) =>
+          thread.environmentId === originThread.environmentId &&
+          thread.threadId === originThread.threadId,
+      )?.title ?? originThread.title)
+    : null;
 
   const handleSubmit = (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -167,12 +184,57 @@ export function MattrVoiceModeModal({
                 </span>
               ) : null}
             </div>
-            <p className="truncate text-xs text-muted-foreground">
-              {gt("{running} active · {approvals} waiting", {
-                running: String(runningThreads.length),
-                approvals: String(pendingApprovals.length + pendingUserInputs.length),
-              })}
-            </p>
+            {activeScopedThread !== null && activeScopedTitle !== null ? (
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                <span
+                  data-voice-thread-scope="thread"
+                  className="inline-flex min-w-0 max-w-52 items-center gap-1.5 rounded-full border border-border/70 bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-foreground sm:max-w-64"
+                >
+                  <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                  <span className="truncate">{activeScopedTitle}</span>
+                </span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setVoiceAssistantScopedThread(null)}
+                  aria-label={gt("Switch to all workspace")}
+                >
+                  <T>All workspace</T>
+                </Button>
+              </div>
+            ) : originThread !== null && originThreadTitle !== null ? (
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                <span
+                  data-voice-thread-scope="workspace"
+                  className="inline-flex shrink-0 items-center rounded-full border border-border/70 bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                >
+                  <T>All workspace</T>
+                </span>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() =>
+                    setVoiceAssistantScopedThread({
+                      environmentId: originThread.environmentId,
+                      threadId: originThread.threadId,
+                      title: originThreadTitle,
+                    })
+                  }
+                  aria-label={gt("Focus {title}", { title: originThreadTitle })}
+                >
+                  <span className="max-w-36 truncate">{originThreadTitle}</span>
+                </Button>
+              </div>
+            ) : (
+              <p className="truncate text-xs text-muted-foreground">
+                {gt("{running} active · {approvals} waiting", {
+                  running: String(runningThreads.length),
+                  approvals: String(pendingApprovals.length + pendingUserInputs.length),
+                })}
+              </p>
+            )}
           </div>
         </div>
 
@@ -333,10 +395,17 @@ export function MattrVoiceModeModal({
             <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
               {state.recentTurns.length === 0 ? (
                 <div className="rounded-2xl border border-border/50 bg-muted/25 px-4 py-3 text-center text-xs text-muted-foreground">
-                  <T>
-                    Try saying: “What’s running right now?”, “Create a project for Placket and
-                    launch two audit threads”, or “Tell the auth thread to add unit tests.”
-                  </T>
+                  {activeScopedTitle !== null ? (
+                    gt(
+                      "Ask about “{title}”, steer what it's doing, or give it your next instruction.",
+                      { title: activeScopedTitle },
+                    )
+                  ) : (
+                    <T>
+                      Try saying: “What’s running right now?”, “Create a project for Placket and
+                      launch two audit threads”, or “Tell the auth thread to add unit tests.”
+                    </T>
+                  )}
                 </div>
               ) : (
                 state.recentTurns.slice(-8).map((turn) => (
@@ -420,7 +489,11 @@ export function MattrVoiceModeModal({
               type="text"
               value={draft}
               onChange={(event) => setDraft(event.currentTarget.value)}
-              placeholder={gt("Or type a command for mattr Assistant…")}
+              placeholder={
+                activeScopedTitle !== null
+                  ? gt("Message or ask about {title}…", { title: activeScopedTitle })
+                  : gt("Or type a command for mattr Assistant…")
+              }
               className="h-10 min-w-0 flex-1 rounded-full border border-border/70 bg-muted/35 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
             />
             <Button
