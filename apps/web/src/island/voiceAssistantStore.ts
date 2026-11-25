@@ -21,6 +21,7 @@ import type {
 } from "../../../../antimatter/voice-assistant/types";
 import { getIslandSettings } from "./islandSettingsStore";
 import {
+  createDeepgramFluxCapture,
   createHandsFreeVadCapture,
   createVoiceTtsPlayer,
   type HandsFreeVadCapture,
@@ -44,6 +45,7 @@ export interface VoiceAssistantHostBridge {
   readonly getMicrophoneId?: () => Promise<string> | string;
   readonly fetchImpl?: typeof fetch;
   readonly createVadCapture?: typeof createHandsFreeVadCapture;
+  readonly createFluxCapture?: typeof createDeepgramFluxCapture;
   readonly createTtsPlayer?: typeof createVoiceTtsPlayer;
 }
 
@@ -663,9 +665,7 @@ export function toggleVoiceAssistantMute(): void {
   });
 }
 
-async function startHandsFree(): Promise<void> {
-  if (state.handsFreeActive && vadCapture?.isActive()) return;
-
+async function startVadCapture(): Promise<void> {
   const factory = hostBridge?.createVadCapture ?? createHandsFreeVadCapture;
   vadCapture?.stop();
 
@@ -704,15 +704,110 @@ async function startHandsFree(): Promise<void> {
   });
 
   vadCapture = capture;
+  try {
+    await capture.start();
+    if (vadCapture !== capture) {
+      capture.stop();
+    }
+  } catch (error) {
+    if (vadCapture === capture) {
+      vadCapture = null;
+      emit({
+        handsFreeActive: false,
+        inputLevel: 0,
+        phase: "error",
+        statusLabel: null,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : m(msg("Could not start hands-free voice mode.")),
+      });
+    }
+  }
+}
+
+async function startHandsFree(): Promise<void> {
+  if (state.handsFreeActive && vadCapture?.isActive()) return;
+
+  vadCapture?.stop();
   emit({
     handsFreeActive: true,
     muted: false,
     mode: "voice-mode",
     phase: "listening",
+    liveTranscript: "",
     statusLabel: m(msg("Listening...")),
     error: null,
   });
 
+  const shouldTryFlux =
+    hostBridge?.createFluxCapture !== undefined || hostBridge?.createVadCapture === undefined;
+
+  if (!shouldTryFlux) {
+    await startVadCapture();
+    return;
+  }
+
+  const fluxFactory = hostBridge?.createFluxCapture ?? createDeepgramFluxCapture;
+  const capture = fluxFactory({
+    getApiConfig,
+    ...(hostBridge?.getMicrophoneId ? { getMicrophoneId: hostBridge.getMicrophoneId } : {}),
+    fetchImpl: getFetchImpl(),
+    onLevel: (level) => {
+      if (state.inputLevel === level) return;
+      emit({ inputLevel: level });
+    },
+    onSpeechStart: () => {
+      userSpeaking = true;
+      if (state.speaking && getIslandSettings().voiceAssistant.bargeInEnabled) {
+        bargeInVoiceAssistant();
+      }
+      if (state.phase === "idle" || state.phase === "listening") {
+        emit({ phase: "listening", statusLabel: m(msg("Listening...")) });
+      }
+    },
+    onLiveTranscript: (transcript) => {
+      if (!state.handsFreeActive || state.muted) return;
+      emit({
+        liveTranscript: transcript,
+        ...(state.phase === "idle" || state.phase === "listening"
+          ? { phase: "listening", statusLabel: transcript ? null : m(msg("Listening...")) }
+          : {}),
+      });
+    },
+    onFinalTranscript: (transcript) => {
+      userSpeaking = false;
+      if (!state.handsFreeActive || state.muted) return;
+      const trimmed = transcript.trim();
+      if (!trimmed) {
+        emit({ phase: "listening", statusLabel: null });
+        void drainBriefingQueue();
+        return;
+      }
+      void submitVoiceAssistantUtterance(trimmed, { modeOverride: "voice-mode" });
+    },
+    onFallbackToVad: () => {
+      if (vadCapture !== capture || !state.handsFreeActive) return;
+      userSpeaking = false;
+      vadCapture = null;
+      void startVadCapture();
+    },
+    onError: (message) => {
+      userSpeaking = false;
+      if (vadCapture === capture) {
+        vadCapture = null;
+      }
+      emit({
+        handsFreeActive: false,
+        inputLevel: 0,
+        phase: "error",
+        statusLabel: null,
+        error: message,
+      });
+    },
+  });
+
+  vadCapture = capture;
   try {
     await capture.start();
     if (vadCapture !== capture) {

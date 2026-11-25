@@ -143,6 +143,7 @@ export class VoiceTtsService extends Context.Service<
       language?: string,
     ) => Effect.Effect<VoiceTranscribeResponse, VoiceTtsUnavailableError | VoiceTtsSynthesisError>;
     readonly saveDeepgramApiKey: (apiKey: string) => Effect.Effect<VoiceCredentialsStatus>;
+    readonly resolveDeepgramApiKey: () => Effect.Effect<string | null>;
   }
 >()("t3/voiceAssistant/VoiceTtsService") {}
 
@@ -675,6 +676,7 @@ const make = Effect.gen(function* () {
     speak,
     transcribeDeepgram,
     saveDeepgramApiKey,
+    resolveDeepgramApiKey: resolveDeepgramKey,
   });
 });
 

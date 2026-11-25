@@ -28,6 +28,7 @@ import {
   failEnvironmentScopeRequired,
 } from "../auth/http.ts";
 import * as VoiceAssistantService from "./VoiceAssistantService.ts";
+import { makeVoiceAssistantFluxRoute } from "./voiceAssistantFluxWs.ts";
 import * as VoiceTtsService from "./VoiceTtsService.ts";
 
 const NO_STORE_HEADERS = {
@@ -379,6 +380,7 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
       ttsInfoRoute,
       transcribeRoute,
       credentialsRoute,
+      makeVoiceAssistantFluxRoute(tts),
     );
   }),
 );

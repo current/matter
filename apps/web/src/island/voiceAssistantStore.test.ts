@@ -21,9 +21,18 @@ import {
   setVoiceAssistantMode as setMode,
   submitQuickBriefing,
   submitVoiceAssistantUtterance as submitUtterance,
+  toggleVoiceAssistantHandsFree,
   tryFastPathIntent,
 } from "./voiceAssistantStore";
-import { encodeWav16k, type VoiceTtsPlayer } from "./voiceModeAudio";
+import {
+  createDeepgramFluxCapture,
+  encodeWav16k,
+  float32ToInt16Le,
+  parseDeepgramFluxServerMessage,
+  type DeepgramFluxCaptureOptions,
+  type HandsFreeVadCaptureOptions,
+  type VoiceTtsPlayer,
+} from "./voiceModeAudio";
 
 function makeApproval(
   overrides: Partial<VoiceWorkspaceApprovalSummary> = {},
@@ -446,5 +455,251 @@ describe("encodeWav16k", () => {
     expect(view.getUint32(24, true)).toBe(16_000); // 16 kHz
     expect(view.getUint16(34, true)).toBe(16); // 16-bit
     expect(view.getUint32(40, true)).toBe(pcm.length * 2);
+  });
+});
+
+describe("Deepgram Flux streaming STT", () => {
+  beforeEach(() => {
+    updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
+    resetVoiceAssistantStoreForTests();
+  });
+
+  afterEach(() => {
+    resetVoiceAssistantStoreForTests();
+  });
+
+  it("parses Flux TurnInfo events and encodes linear16 Int16 PCM", () => {
+    expect(
+      parseDeepgramFluxServerMessage(JSON.stringify({ type: "Connected", request_id: "r1" })),
+    ).toEqual({ type: "Connected", request_id: "r1" });
+    expect(
+      parseDeepgramFluxServerMessage(
+        JSON.stringify({ type: "TurnInfo", event: "StartOfTurn", transcript: "" }),
+      ),
+    ).toEqual({ type: "TurnInfo", event: "StartOfTurn", transcript: "" });
+    expect(
+      parseDeepgramFluxServerMessage(
+        JSON.stringify({ type: "TurnInfo", event: "Update", transcript: "check the" }),
+      ),
+    ).toEqual({ type: "TurnInfo", event: "Update", transcript: "check the" });
+    expect(
+      parseDeepgramFluxServerMessage(
+        JSON.stringify({
+          type: "TurnInfo",
+          event: "EndOfTurn",
+          transcript: "check the build",
+          end_of_turn_confidence: 0.89,
+        }),
+      ),
+    ).toEqual({
+      type: "TurnInfo",
+      event: "EndOfTurn",
+      transcript: "check the build",
+      end_of_turn_confidence: 0.89,
+    });
+    expect(parseDeepgramFluxServerMessage("{bad json")).toBeNull();
+
+    const bytes = float32ToInt16Le(new Float32Array([0, 1, -1]));
+    const view = new DataView(bytes.buffer);
+    expect(bytes.byteLength).toBe(6);
+    expect(view.getInt16(0, true)).toBe(0);
+    expect(view.getInt16(2, true)).toBe(32767);
+    expect(view.getInt16(4, true)).toBe(-32768);
+  });
+
+  it("falls back cleanly to VAD when Flux WS closes with 4401 deepgram_not_configured", async () => {
+    const constructedUrls: string[] = [];
+    const fallbackReasons: string[] = [];
+
+    class MockClosedWebSocket {
+      binaryType = "blob";
+      readyState = 0;
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { readonly data: unknown }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onclose: ((event: { readonly code: number; readonly reason: string }) => void) | null = null;
+
+      constructor(url: string) {
+        constructedUrls.push(url);
+        queueMicrotask(() => {
+          this.readyState = 3;
+          this.onclose?.({ code: 4401, reason: "deepgram_not_configured" });
+        });
+      }
+
+      send(): void {}
+      close(): void {
+        this.readyState = 3;
+      }
+    }
+
+    const fetchMock = vi.fn(async () => jsonResponse({ ticket: "media-ticket-123" }));
+
+    const capture = createDeepgramFluxCapture({
+      getApiConfig: () => ({
+        baseUrl: "https://mac.tailnet.ts.net:3773",
+        headers: { Authorization: "Bearer session-token" },
+      }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      webSocketImpl: MockClosedWebSocket as unknown as typeof WebSocket,
+      onLevel: () => undefined,
+      onSpeechStart: () => undefined,
+      onLiveTranscript: () => undefined,
+      onFinalTranscript: () => undefined,
+      onFallbackToVad: (reason) => {
+        fallbackReasons.push(reason);
+      },
+      onError: () => undefined,
+    });
+
+    await capture.start();
+
+    expect(constructedUrls).toEqual([
+      "wss://mac.tailnet.ts.net:3773/api/mattr/voice-assistant/flux?wsTicket=media-ticket-123",
+    ]);
+    expect(fallbackReasons).toEqual(["deepgram_not_configured"]);
+    expect(capture.isActive()).toBe(false);
+  });
+
+  it("streams live transcripts, barges in on StartOfTurn, and submits EndOfTurn directly without transcribePcm", async () => {
+    let fluxOptions: DeepgramFluxCaptureOptions | null = null;
+    const transcribePcmMock = vi.fn(async () => "should not be called");
+    const stopTtsSpy = vi.fn();
+    const submittedUtterances: string[] = [];
+    const turnDone = Promise.withResolvers<void>();
+
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as VoiceAssistantTurnRequest;
+      submittedUtterances.push(body.utterance);
+      queueMicrotask(() => turnDone.resolve());
+      return jsonResponse({
+        route: "direct-reply",
+        spokenReply: "All checks are green.",
+        displayReply: "All checks are green.",
+        expectFollowUp: false,
+        toolResults: [],
+        clientActions: [],
+      } satisfies VoiceAssistantTurnResponse);
+    });
+
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: () => undefined,
+      transcribePcm: transcribePcmMock,
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createTtsPlayer: () => ({
+        speak: () => new Promise<void>(() => {}),
+        stop: stopTtsSpy,
+        isSpeaking: () => true,
+      }),
+      createFluxCapture: (opts) => {
+        fluxOptions = opts;
+        let running = false;
+        return {
+          start: async () => {
+            running = true;
+          },
+          stop: () => {
+            running = false;
+          },
+          setMuted: () => undefined,
+          setSpeakingDuck: () => undefined,
+          isActive: () => running,
+        };
+      },
+    });
+
+    toggleVoiceAssistantHandsFree();
+    await Promise.resolve();
+    expect(fluxOptions).not.toBeNull();
+    expect(getVoiceAssistantState().handsFreeActive).toBe(true);
+
+    // Simulate StartOfTurn + streaming Update + EndOfTurn
+    fluxOptions!.onSpeechStart();
+    fluxOptions!.onLiveTranscript("how is the");
+    expect(getVoiceAssistantState().liveTranscript).toBe("how is the");
+
+    fluxOptions!.onLiveTranscript("how is the build looking");
+    expect(getVoiceAssistantState().liveTranscript).toBe("how is the build looking");
+
+    fluxOptions!.onFinalTranscript("how is the build looking");
+    await turnDone.promise;
+
+    expect(transcribePcmMock).not.toHaveBeenCalled();
+    expect(submittedUtterances).toEqual(["how is the build looking"]);
+  });
+
+  it("falls back seamlessly from Flux to VAD capture in voiceAssistantStore", async () => {
+    let fluxOptions: DeepgramFluxCaptureOptions | null = null;
+    let vadOptions: HandsFreeVadCaptureOptions | null = null;
+    let vadStarted = false;
+    const transcribePcmMock = vi.fn(async () => "open settings");
+    const turnDone = Promise.withResolvers<void>();
+
+    const fetchMock = vi.fn(async () => {
+      queueMicrotask(() => turnDone.resolve());
+      return jsonResponse({
+        route: "direct-reply",
+        spokenReply: "Opened settings.",
+        displayReply: "Opened settings.",
+        expectFollowUp: false,
+        toolResults: [],
+        clientActions: [],
+      } satisfies VoiceAssistantTurnResponse);
+    });
+
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: () => undefined,
+      transcribePcm: transcribePcmMock,
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createTtsPlayer: () => ({
+        speak: async () => undefined,
+        stop: vi.fn(),
+        isSpeaking: () => false,
+      }),
+      createFluxCapture: (opts) => {
+        fluxOptions = opts;
+        return {
+          start: async () => {
+            opts.onFallbackToVad("deepgram_not_configured");
+          },
+          stop: () => undefined,
+          setMuted: () => undefined,
+          setSpeakingDuck: () => undefined,
+          isActive: () => false,
+        };
+      },
+      createVadCapture: (opts) => {
+        vadOptions = opts;
+        return {
+          start: async () => {
+            vadStarted = true;
+          },
+          stop: () => {
+            vadStarted = false;
+          },
+          setMuted: () => undefined,
+          setSpeakingDuck: () => undefined,
+          isActive: () => vadStarted,
+        };
+      },
+    });
+
+    toggleVoiceAssistantHandsFree();
+    await vi.waitFor(() => expect(vadStarted).toBe(true));
+
+    expect(fluxOptions).not.toBeNull();
+    expect(vadOptions).not.toBeNull();
+    expect(getVoiceAssistantState().handsFreeActive).toBe(true);
+    expect(getVoiceAssistantState().error).toBeNull();
+
+    vadOptions!.onUtterance(new Float32Array([0.1, -0.1, 0.2]), 16000);
+    await turnDone.promise;
+
+    expect(transcribePcmMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

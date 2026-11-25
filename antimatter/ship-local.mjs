@@ -29,6 +29,61 @@ const UPSTREAM_URL = "https://github.com/pingdotgg/t3code.git";
 const FORK_URL = "https://github.com/current/mattr.git";
 const NODE = "node@26.13.1";
 const BUNDLE_ID = "com.current.antimatter";
+const LAUNCHD_LABEL = "com.current.antimatter.ship-install";
+const VERIFY_URL = "http://127.0.0.1:3773/.well-known/t3/environment";
+const CLEAN_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+
+function escapeXml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function buildLaunchdPlist({ label, programArguments, env, logPath }) {
+  const argsXml = programArguments
+    .map((arg) => `    <string>${escapeXml(arg)}</string>`)
+    .join("\n");
+  const envXml = Object.entries(env)
+    .map(
+      ([key, value]) =>
+        `    <key>${escapeXml(key)}</key>\n    <string>${escapeXml(value)}</string>`,
+    )
+    .join("\n");
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    "  <key>Label</key>",
+    `  <string>${escapeXml(label)}</string>`,
+    "  <key>ProgramArguments</key>",
+    "  <array>",
+    argsXml,
+    "  </array>",
+    "  <key>RunAtLoad</key>",
+    "  <true/>",
+    "  <key>KeepAlive</key>",
+    "  <false/>",
+    "  <key>AbandonProcessGroup</key>",
+    "  <true/>",
+    "  <key>ProcessType</key>",
+    "  <string>Interactive</string>",
+    "  <key>StandardOutPath</key>",
+    `  <string>${escapeXml(logPath)}</string>`,
+    "  <key>StandardErrorPath</key>",
+    `  <string>${escapeXml(logPath)}</string>`,
+    "  <key>EnvironmentVariables</key>",
+    "  <dict>",
+    envXml,
+    "  </dict>",
+    "</dict>",
+    "</plist>",
+    "",
+  ].join("\n");
+}
 
 const started = Date.now();
 const step = (label) => console.log(`\n▸ ${label} (${Math.round((Date.now() - started) / 1000)}s)`);
@@ -221,18 +276,78 @@ console.log(
 if (!values.install) process.exit(0);
 
 step("Handing off the install");
-// Detached in its own session: quitting the live app also ends any agent that started this script.
+// Copy into buildRoot and launch in a clean gui/<uid> launchd job so quitting the live app
+// does not tear down the installer or leak ELECTRON_RUN_AS_NODE / agent env vars into mattr.
 const log = NodePath.join(buildRoot, "ship-local-install.log");
-const child = NodeChildProcess.spawn(
-  "/bin/bash",
-  [NodePath.join(repoRoot, "antimatter/ship-local-install.sh"), stagedApp, BUNDLE_ID],
-  {
-    detached: true,
-    stdio: ["ignore", NodeFS.openSync(log, "a"), NodeFS.openSync(log, "a")],
-    env: { ...process.env, QUIT_DELAY: values["quit-delay"] },
-  },
-);
-child.unref();
-console.log(
-  `mattr quits in ${values["quit-delay"]}s, then reopens as /Applications/mattr.app. Log: ${log}`,
-);
+const runScriptPath = NodePath.join(buildRoot, "ship-local-install-run.sh");
+NodeFS.copyFileSync(NodePath.join(repoRoot, "antimatter/ship-local-install.sh"), runScriptPath);
+NodeFS.chmodSync(runScriptPath, 0o755);
+
+const plistPath = NodePath.join(buildRoot, `${LAUNCHD_LABEL}.plist`);
+const baseInstallEnv = {
+  HOME: NodeOS.homedir(),
+  USER: NodeOS.userInfo().username,
+  PATH: CLEAN_PATH,
+  QUIT_DELAY: String(values["quit-delay"]),
+  LOG_FILE: log,
+  VERIFY_URL,
+};
+
+let launchedViaLaunchd = false;
+// oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone Node script with no Effect runtime.
+if (process.platform === "darwin") {
+  const uid = process.getuid();
+  const domain = `gui/${uid}`;
+  const launchdEnv = {
+    ...baseInstallEnv,
+    PLIST_PATH: plistPath,
+    LAUNCHD_LABEL,
+  };
+  NodeFS.writeFileSync(
+    plistPath,
+    buildLaunchdPlist({
+      label: LAUNCHD_LABEL,
+      programArguments: ["/bin/bash", runScriptPath, stagedApp, BUNDLE_ID],
+      env: launchdEnv,
+      logPath: log,
+    }),
+    "utf8",
+  );
+  NodeChildProcess.spawnSync("launchctl", ["bootout", `${domain}/${LAUNCHD_LABEL}`], {
+    stdio: "ignore",
+  });
+  const bootstrap = NodeChildProcess.spawnSync("launchctl", ["bootstrap", domain, plistPath], {
+    encoding: "utf8",
+  });
+  if (bootstrap.status === 0) {
+    launchedViaLaunchd = true;
+    console.log(
+      `Scheduled via launchd (${domain}/${LAUNCHD_LABEL}): mattr quits in ${values["quit-delay"]}s, then reopens as /Applications/mattr.app. Log: ${log}`,
+    );
+  } else {
+    const detail =
+      bootstrap.error?.message ||
+      bootstrap.stderr?.trim() ||
+      bootstrap.stdout?.trim() ||
+      `exit status ${bootstrap.status}`;
+    console.error(`launchctl bootstrap failed (${detail}); falling back to detached spawn.`);
+    NodeFS.rmSync(plistPath, { force: true });
+  }
+}
+
+if (!launchedViaLaunchd) {
+  const logFd = NodeFS.openSync(log, "a");
+  try {
+    const child = NodeChildProcess.spawn("/bin/bash", [runScriptPath, stagedApp, BUNDLE_ID], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: baseInstallEnv,
+    });
+    child.unref();
+  } finally {
+    NodeFS.closeSync(logFd);
+  }
+  console.log(
+    `Scheduled via detached spawn: mattr quits in ${values["quit-delay"]}s, then reopens as /Applications/mattr.app. Log: ${log}`,
+  );
+}

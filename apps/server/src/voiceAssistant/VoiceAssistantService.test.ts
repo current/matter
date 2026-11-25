@@ -1,7 +1,11 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
+  AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
+  AuthSessionId,
   EnvironmentId,
   ProjectId,
   ProviderInstanceId,
@@ -13,19 +17,29 @@ import {
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Config from "effect/Config";
+import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import type * as NetAddress from "effect/net/NetAddress";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import { FetchHttpClient } from "effect/http";
+import {
+  FetchHttpClient,
+  HttpRouter,
+  HttpServer,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/http";
 import { vi } from "vite-plus/test";
 
 import type {
   VoiceAssistantTurnRequest,
   VoiceWorkspaceContext,
 } from "../../../../antimatter/voice-assistant/types.ts";
+import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
+import * as SessionStore from "../auth/SessionStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
@@ -38,6 +52,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VoiceAssistantService from "./VoiceAssistantService.ts";
+import * as VoiceAssistantFluxWs from "./voiceAssistantFluxWs.ts";
 import * as VoiceTtsService from "./VoiceTtsService.ts";
 
 const LOCAL_ENV_ID = EnvironmentId.make("env-local-test");
@@ -754,6 +769,7 @@ describe("VoiceTtsService", () => {
 
         const saved = yield* tts.saveDeepgramApiKey("  dg-persisted-key  ");
         assert.strictEqual(saved.deepgramAvailable, true);
+        assert.strictEqual(yield* tts.resolveDeepgramApiKey(), "dg-persisted-key");
         const rawSaved = yield* fs.readFileString(secretsPath);
         assert.deepStrictEqual(JSON.parse(rawSaved), { deepgramApiKey: "dg-persisted-key" });
 
@@ -766,8 +782,299 @@ describe("VoiceTtsService", () => {
         );
         if (!envKey.trim()) {
           assert.strictEqual(cleared.deepgramAvailable, false);
+          assert.strictEqual(yield* tts.resolveDeepgramApiKey(), null);
         }
       }).pipe(Effect.provide(fullLayer));
     }),
+  );
+});
+
+describe("voiceAssistantFluxWs", () => {
+  it("parses Deepgram Flux Connected, TurnInfo, and Error events", () => {
+    assert.deepStrictEqual(
+      VoiceAssistantFluxWs.parseDeepgramFluxEvent(
+        JSON.stringify({ type: "Connected", request_id: "req-flux-1", sequence_id: 0 }),
+      ),
+      { type: "Connected", request_id: "req-flux-1" },
+    );
+
+    assert.deepStrictEqual(
+      VoiceAssistantFluxWs.parseDeepgramFluxEvent(
+        JSON.stringify({
+          type: "TurnInfo",
+          event: "StartOfTurn",
+          turn_index: 0,
+          transcript: "",
+        }),
+      ),
+      { type: "TurnInfo", event: "StartOfTurn", transcript: "", turn_index: 0 },
+    );
+
+    assert.deepStrictEqual(
+      VoiceAssistantFluxWs.parseDeepgramFluxEvent(
+        JSON.stringify({
+          type: "TurnInfo",
+          event: "Update",
+          turn_index: 0,
+          transcript: "open the auth",
+        }),
+      ),
+      { type: "TurnInfo", event: "Update", transcript: "open the auth", turn_index: 0 },
+    );
+
+    assert.deepStrictEqual(
+      VoiceAssistantFluxWs.parseDeepgramFluxEvent(
+        JSON.stringify({
+          type: "TurnInfo",
+          event: "EndOfTurn",
+          turn_index: 0,
+          transcript: "open the auth thread",
+          end_of_turn_confidence: 0.91,
+        }),
+      ),
+      {
+        type: "TurnInfo",
+        event: "EndOfTurn",
+        transcript: "open the auth thread",
+        turn_index: 0,
+        end_of_turn_confidence: 0.91,
+      },
+    );
+
+    assert.deepStrictEqual(
+      VoiceAssistantFluxWs.parseDeepgramFluxEvent(
+        JSON.stringify({ type: "FatalError", description: "quota exceeded" }),
+      ),
+      { type: "Error", description: "quota exceeded" },
+    );
+
+    assert.strictEqual(VoiceAssistantFluxWs.parseDeepgramFluxEvent("not-json"), null);
+    assert.strictEqual(
+      VoiceAssistantFluxWs.parseDeepgramFluxEvent(
+        JSON.stringify({ type: "TurnInfo", event: "UnknownEvent", transcript: "hi" }),
+      ),
+      null,
+    );
+  });
+
+  const makeAuthLayers = (options: {
+    readonly authorized: boolean;
+    readonly scopes?: ReadonlyArray<
+      typeof AuthOrchestrationOperateScope | typeof AuthOrchestrationReadScope
+    >;
+  }) =>
+    Layer.mergeAll(
+      Layer.succeed(EnvironmentAuth.EnvironmentAuth, {
+        authenticateWebSocketUpgrade: () =>
+          options.authorized
+            ? Effect.succeed({
+                sessionId: AuthSessionId.make("sess-flux-test"),
+                subject: "test-user",
+                method: "bearer-access-token" as const,
+                scopes: options.scopes ?? [AuthOrchestrationOperateScope],
+              })
+            : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
+      } as unknown as EnvironmentAuth.EnvironmentAuth["Service"]),
+      Layer.succeed(SessionStore.SessionStore, {
+        awaitInvalidation: () => Effect.never,
+      } as unknown as SessionStore.SessionStore["Service"]),
+    );
+
+  it.live("closes with 4401 deepgram_not_configured when no Deepgram API key is set", () =>
+    Effect.gen(function* () {
+      const route = VoiceAssistantFluxWs.makeVoiceAssistantFluxRoute({
+        resolveDeepgramApiKey: () => Effect.succeed(null),
+      });
+      yield* Layer.build(HttpRouter.serve(route, { disableLogger: true, disableListenLog: true }));
+      const server = yield* HttpServer.HttpServer;
+      const address = server.address as NetAddress.InetAddress;
+      const host = address._tag === "InetAddressV6" ? "[::1]" : "127.0.0.1";
+      const wsUrl = `ws://${host}:${address.port}${VoiceAssistantFluxWs.VOICE_ASSISTANT_FLUX_WS_PATH}`;
+
+      const closed = yield* Effect.promise(
+        () =>
+          new Promise<{ readonly code: number; readonly reason: string }>((resolve, reject) => {
+            const ws = new WebSocket(wsUrl);
+            ws.addEventListener("close", (event) => {
+              resolve({ code: event.code, reason: event.reason });
+            });
+            ws.addEventListener("error", () => {
+              reject(new Error("Unexpected WebSocket error before close"));
+            });
+          }),
+      );
+
+      assert.strictEqual(closed.code, VoiceAssistantFluxWs.FLUX_NOT_CONFIGURED_CLOSE_CODE);
+      assert.strictEqual(closed.reason, "deepgram_not_configured");
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(Layer.merge(NodeHttpServer.layerTest, makeAuthLayers({ authorized: true }))),
+    ),
+  );
+
+  it("rejects unauthenticated and read-only WebSocket upgrades before upgrading", async () => {
+    const unauth = HttpRouter.toWebHandler(
+      VoiceAssistantFluxWs.makeVoiceAssistantFluxRoute({
+        resolveDeepgramApiKey: () => Effect.succeed("dg-test-key"),
+      }).pipe(Layer.provideMerge(makeAuthLayers({ authorized: false }))),
+    );
+    try {
+      const res401 = await unauth.handler(
+        new Request(`http://localhost${VoiceAssistantFluxWs.VOICE_ASSISTANT_FLUX_WS_PATH}`, {
+          headers: { upgrade: "websocket" },
+        }),
+      );
+      assert.strictEqual(res401.status, 401);
+    } finally {
+      await unauth.dispose();
+    }
+
+    const readOnly = HttpRouter.toWebHandler(
+      VoiceAssistantFluxWs.makeVoiceAssistantFluxRoute({
+        resolveDeepgramApiKey: () => Effect.succeed("dg-test-key"),
+      }).pipe(
+        Layer.provideMerge(
+          makeAuthLayers({
+            authorized: true,
+            scopes: [AuthOrchestrationReadScope],
+          }),
+        ),
+      ),
+    );
+    try {
+      const res403 = await readOnly.handler(
+        new Request(`http://localhost${VoiceAssistantFluxWs.VOICE_ASSISTANT_FLUX_WS_PATH}`, {
+          headers: { upgrade: "websocket" },
+        }),
+      );
+      assert.strictEqual(res403.status, 403);
+    } finally {
+      await readOnly.dispose();
+    }
+  });
+
+  it.live("proxies binary PCM to upstream Flux WS and forwards TurnInfo events back", () =>
+    Effect.gen(function* () {
+      let receivedAuthHeader: string | undefined;
+      const receivedBinaryLengths: Array<number> = [];
+      const upstreamClosed = Promise.withResolvers<void>();
+
+      const mockUpstreamRoute = HttpRouter.add(
+        "GET",
+        "/v2/listen",
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          receivedAuthHeader = request.headers.authorization;
+          const socket = yield* request.upgrade;
+          yield* Effect.scoped(
+            Effect.gen(function* () {
+              const writer = yield* socket.writer;
+              const { pull } = yield* socket.reader;
+              yield* writer.write(JSON.stringify({ type: "Connected", request_id: "mock-dg-1" }));
+              const frames = yield* pull;
+              for (const frame of frames) {
+                if (frame instanceof Uint8Array) {
+                  receivedBinaryLengths.push(frame.byteLength);
+                }
+              }
+              yield* writer.write(
+                JSON.stringify({
+                  type: "TurnInfo",
+                  event: "StartOfTurn",
+                  turn_index: 0,
+                  transcript: "",
+                }),
+              );
+              yield* writer.write(
+                JSON.stringify({
+                  type: "TurnInfo",
+                  event: "Update",
+                  turn_index: 0,
+                  transcript: "check build",
+                }),
+              );
+              yield* writer.write(
+                JSON.stringify({
+                  type: "TurnInfo",
+                  event: "EndOfTurn",
+                  turn_index: 0,
+                  transcript: "check build status",
+                  end_of_turn_confidence: 0.94,
+                }),
+              );
+              // Wait until client disconnects so we verify cleanup.
+              while (true) {
+                yield* pull;
+              }
+            }),
+          ).pipe(Effect.ensuring(Effect.sync(() => upstreamClosed.resolve())), Effect.ignoreCause);
+          return HttpServerResponse.empty();
+        }),
+      );
+
+      yield* Layer.build(
+        HttpRouter.serve(mockUpstreamRoute, { disableLogger: true, disableListenLog: true }),
+      );
+      const upstreamServer = yield* HttpServer.HttpServer;
+      const upstreamAddress = upstreamServer.address as NetAddress.InetAddress;
+      const upstreamHost = upstreamAddress._tag === "InetAddressV6" ? "[::1]" : "127.0.0.1";
+      const upstreamUrl = `ws://${upstreamHost}:${upstreamAddress.port}/v2/listen`;
+
+      const proxyRoute = VoiceAssistantFluxWs.makeVoiceAssistantFluxRoute(
+        { resolveDeepgramApiKey: () => Effect.succeed("dg-secret-token") },
+        { upstreamUrl },
+      );
+      const proxyContext = yield* Layer.build(
+        HttpRouter.serve(proxyRoute, { disableLogger: true, disableListenLog: true }).pipe(
+          Layer.provideMerge(Layer.fresh(NodeHttpServer.layerTest)),
+        ),
+      );
+      const proxyServer = Context.get(proxyContext, HttpServer.HttpServer);
+      const proxyAddress = proxyServer.address as NetAddress.InetAddress;
+      const proxyHost = proxyAddress._tag === "InetAddressV6" ? "[::1]" : "127.0.0.1";
+      const proxyUrl = `ws://${proxyHost}:${proxyAddress.port}${VoiceAssistantFluxWs.VOICE_ASSISTANT_FLUX_WS_PATH}`;
+
+      const events = yield* Effect.promise(
+        () =>
+          new Promise<Array<VoiceAssistantFluxWs.DeepgramFluxEvent>>((resolve, reject) => {
+            const received: Array<VoiceAssistantFluxWs.DeepgramFluxEvent> = [];
+            const ws = new WebSocket(proxyUrl);
+            ws.addEventListener("open", () => {
+              ws.send(new Uint8Array(2560));
+            });
+            ws.addEventListener("message", (event) => {
+              const parsed = VoiceAssistantFluxWs.parseDeepgramFluxEvent(String(event.data));
+              if (parsed) received.push(parsed);
+              if (parsed?.type === "TurnInfo" && parsed.event === "EndOfTurn") {
+                ws.close(1000);
+                resolve(received);
+              }
+            });
+            ws.addEventListener("error", () => {
+              reject(new Error("Proxy WebSocket error"));
+            });
+          }),
+      );
+
+      yield* Effect.promise(() => upstreamClosed.promise);
+
+      assert.strictEqual(receivedAuthHeader, "Token dg-secret-token");
+      assert.deepStrictEqual(receivedBinaryLengths, [2560]);
+      assert.deepStrictEqual(events, [
+        { type: "Connected", request_id: "mock-dg-1" },
+        { type: "TurnInfo", event: "StartOfTurn", transcript: "", turn_index: 0 },
+        { type: "TurnInfo", event: "Update", transcript: "check build", turn_index: 0 },
+        {
+          type: "TurnInfo",
+          event: "EndOfTurn",
+          transcript: "check build status",
+          turn_index: 0,
+          end_of_turn_confidence: 0.94,
+        },
+      ]);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(Layer.merge(NodeHttpServer.layerTest, makeAuthLayers({ authorized: true }))),
+    ),
   );
 });

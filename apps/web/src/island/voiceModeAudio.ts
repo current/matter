@@ -14,6 +14,49 @@ const DEFAULT_MAX_UTTERANCE_MS = 30_000;
 const ONSET_MS = 140;
 const DUCKED_ONSET_MS = 185;
 const SCRIPT_BUFFER_SIZE = 2048;
+const FLUX_CHUNK_MS = 80;
+const FLUX_CHUNK_SAMPLES = Math.round((TARGET_SAMPLE_RATE * FLUX_CHUNK_MS) / 1000);
+const FLUX_DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
+const FLUX_WS_PATH = "/api/mattr/voice-assistant/flux";
+const FLUX_WS_TICKET_PATH = "/api/auth/websocket-ticket/media";
+
+export type DeepgramFluxTurnEventKind =
+  | "StartOfTurn"
+  | "Update"
+  | "EagerEndOfTurn"
+  | "TurnResumed"
+  | "EndOfTurn";
+
+export type DeepgramFluxServerMessage =
+  | {
+      readonly type: "Connected";
+      readonly request_id?: string;
+    }
+  | {
+      readonly type: "TurnInfo";
+      readonly event: DeepgramFluxTurnEventKind;
+      readonly transcript: string;
+      readonly turn_index?: number;
+      readonly end_of_turn_confidence?: number;
+    }
+  | {
+      readonly type: "Error";
+      readonly description?: string;
+    };
+
+export interface DeepgramFluxCaptureOptions {
+  readonly getApiConfig: () => Promise<VoiceTtsApiConfig> | VoiceTtsApiConfig;
+  readonly getMicrophoneId?: (() => string | Promise<string>) | undefined;
+  readonly fetchImpl?: typeof fetch | undefined;
+  readonly webSocketImpl?: typeof WebSocket | undefined;
+  readonly connectTimeoutMs?: number | undefined;
+  readonly onLevel: (level: number) => void;
+  readonly onSpeechStart: () => void;
+  readonly onLiveTranscript: (transcript: string) => void;
+  readonly onFinalTranscript: (transcript: string) => void;
+  readonly onFallbackToVad: (reason: string) => void;
+  readonly onError: (message: string) => void;
+}
 
 export interface HandsFreeVadCaptureOptions {
   readonly getMicrophoneId?: (() => string | Promise<string>) | undefined;
@@ -408,6 +451,478 @@ export function createHandsFreeVadCapture(
     },
     setSpeakingDuck: (speaking: boolean) => {
       speakingDuck = speaking;
+    },
+    isActive: () => active,
+  };
+}
+
+const VALID_FLUX_TURN_EVENTS: ReadonlySet<string> = new Set<DeepgramFluxTurnEventKind>([
+  "StartOfTurn",
+  "Update",
+  "EagerEndOfTurn",
+  "TurnResumed",
+  "EndOfTurn",
+]);
+
+function isFluxTurnEventKind(value: unknown): value is DeepgramFluxTurnEventKind {
+  return typeof value === "string" && VALID_FLUX_TURN_EVENTS.has(value);
+}
+
+/** Parses a Deepgram Flux v2 JSON message forwarded by the mattr Flux WS proxy. */
+export function parseDeepgramFluxServerMessage(raw: string): DeepgramFluxServerMessage | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+
+  if (obj.type === "Connected") {
+    return {
+      type: "Connected",
+      ...(typeof obj.request_id === "string" ? { request_id: obj.request_id } : {}),
+    };
+  }
+
+  if (obj.type === "TurnInfo" && isFluxTurnEventKind(obj.event)) {
+    return {
+      type: "TurnInfo",
+      event: obj.event,
+      transcript: typeof obj.transcript === "string" ? obj.transcript : "",
+      ...(typeof obj.turn_index === "number" && Number.isFinite(obj.turn_index)
+        ? { turn_index: obj.turn_index }
+        : {}),
+      ...(typeof obj.end_of_turn_confidence === "number" &&
+      Number.isFinite(obj.end_of_turn_confidence)
+        ? { end_of_turn_confidence: obj.end_of_turn_confidence }
+        : {}),
+    };
+  }
+
+  if (obj.type === "Error" || obj.type === "FatalError") {
+    const description =
+      typeof obj.description === "string"
+        ? obj.description
+        : typeof obj.message === "string"
+          ? obj.message
+          : undefined;
+    return {
+      type: "Error",
+      ...(description !== undefined ? { description } : {}),
+    };
+  }
+
+  return null;
+}
+
+/** Converts 16 kHz mono Float32 PCM samples into little-endian 16-bit signed linear PCM bytes. */
+export function float32ToInt16Le(samples: Float32Array): Uint8Array<ArrayBuffer> {
+  const buffer = new ArrayBuffer(samples.length * 2);
+  const view = new DataView(buffer);
+  for (let i = 0; i < samples.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    const int16 = sample < 0 ? Math.round(sample * 0x8000) : Math.round(sample * 0x7fff);
+    view.setInt16(i * 2, int16, true);
+  }
+  return new Uint8Array(buffer);
+}
+
+function readAuthorizationHeader(headers: Record<string, string> | undefined): string | null {
+  if (!headers) return null;
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === "authorization" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+async function resolveFluxWebSocketUrl(
+  apiConfig: VoiceTtsApiConfig,
+  fetchFn: typeof fetch,
+): Promise<string> {
+  const rawBase = apiConfig.baseUrl.trim().replace(/\/+$/, "");
+  const fallbackOrigin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "http://localhost";
+  const httpBase = rawBase.length > 0 ? rawBase : fallbackOrigin;
+  const wsUrl = new URL(FLUX_WS_PATH, `${httpBase}/`);
+  wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
+
+  const authHeader = readAuthorizationHeader(apiConfig.headers);
+  if (authHeader) {
+    try {
+      const ticketRes = await fetchFn(`${httpBase}${FLUX_WS_TICKET_PATH}`, {
+        method: "POST",
+        headers: { ...apiConfig.headers },
+        credentials: apiConfig.credentials ?? "include",
+      });
+      if (ticketRes.ok) {
+        const json = (await ticketRes.json()) as { readonly ticket?: unknown };
+        if (typeof json.ticket === "string" && json.ticket.trim().length > 0) {
+          wsUrl.searchParams.set("wsTicket", json.ticket.trim());
+        }
+      }
+    } catch {
+      // Proceed with cookie/origin auth; server rejection falls back to VAD seamlessly.
+    }
+  }
+
+  return wsUrl.toString();
+}
+
+/**
+ * Real-time Deepgram Flux streaming STT capture over `/api/mattr/voice-assistant/flux`.
+ * Streams 80ms 16 kHz mono Int16 PCM chunks while maintaining local smoothed RMS metering,
+ * instant StartOfTurn barge-in, live streaming transcripts, and seamless VAD fallback.
+ */
+export function createDeepgramFluxCapture(
+  options: DeepgramFluxCaptureOptions,
+): HandsFreeVadCapture {
+  let active = false;
+  let muted = false;
+  let speakingDuck = false;
+  let intentionalStop = false;
+  let fellBack = false;
+  let startToken = 0;
+
+  let ws: WebSocket | undefined;
+  let stream: MediaStream | undefined;
+  let audioContext: AudioContext | undefined;
+  let sourceNode: MediaStreamAudioSourceNode | undefined;
+  let processorNode: ScriptProcessorNode | undefined;
+  let muteGainNode: GainNode | undefined;
+
+  let resampler: PcmResampler | null = null;
+  let smoothedLevel = 0;
+  let latestTranscript = "";
+  let pendingPcm = new Float32Array(FLUX_CHUNK_SAMPLES * 4);
+  let pendingLength = 0;
+
+  const cleanupResources = (sendCloseStream: boolean) => {
+    active = false;
+    smoothedLevel = 0;
+    latestTranscript = "";
+    pendingLength = 0;
+    resampler = null;
+
+    if (processorNode) {
+      processorNode.onaudioprocess = null;
+      try {
+        processorNode.disconnect();
+      } catch {}
+      processorNode = undefined;
+    }
+    if (sourceNode) {
+      try {
+        sourceNode.disconnect();
+      } catch {}
+      sourceNode = undefined;
+    }
+    if (muteGainNode) {
+      try {
+        muteGainNode.disconnect();
+      } catch {}
+      muteGainNode = undefined;
+    }
+    if (stream) {
+      for (const track of stream.getTracks()) track.stop();
+      stream = undefined;
+    }
+    if (audioContext) {
+      const ctx = audioContext;
+      audioContext = undefined;
+      void ctx.close().catch(() => undefined);
+    }
+    if (ws) {
+      const socket = ws;
+      ws = undefined;
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      if (sendCloseStream && socket.readyState === 1) {
+        try {
+          socket.send(JSON.stringify({ type: "CloseStream" }));
+        } catch {}
+      }
+      if (socket.readyState === 0 || socket.readyState === 1) {
+        try {
+          socket.close(1000);
+        } catch {}
+      }
+    }
+    options.onLevel(0);
+  };
+
+  const triggerFallback = (reason: string) => {
+    if (intentionalStop || fellBack) return;
+    fellBack = true;
+    startToken += 1;
+    cleanupResources(false);
+    options.onFallbackToVad(reason);
+  };
+
+  const appendAndSendPcm = (pcm16k: Float32Array) => {
+    if (!active || pcm16k.length === 0) return;
+
+    const frameMs = (pcm16k.length / TARGET_SAMPLE_RATE) * 1000;
+    const rms = computeRms(pcm16k);
+    const targetLevel = muted ? 0 : Math.min(1, rms * 4.2);
+    const timeConstant = targetLevel > smoothedLevel ? 0.075 : 0.2;
+    const decay = Math.exp(-frameMs / 1000 / timeConstant);
+    smoothedLevel = targetLevel + (smoothedLevel - targetLevel) * decay;
+    options.onLevel(muted ? 0 : smoothedLevel);
+
+    if (muted || !ws || ws.readyState !== 1) {
+      pendingLength = 0;
+      return;
+    }
+
+    const needed = pendingLength + pcm16k.length;
+    if (needed > pendingPcm.length) {
+      const grown = new Float32Array(Math.max(needed, pendingPcm.length * 2));
+      grown.set(pendingPcm.subarray(0, pendingLength), 0);
+      pendingPcm = grown;
+    }
+    pendingPcm.set(pcm16k, pendingLength);
+    pendingLength = needed;
+
+    let offset = 0;
+    while (pendingLength - offset >= FLUX_CHUNK_SAMPLES) {
+      const slice = pendingPcm.subarray(offset, offset + FLUX_CHUNK_SAMPLES);
+      try {
+        ws.send(float32ToInt16Le(slice));
+      } catch {
+        triggerFallback("flux_send_failed");
+        return;
+      }
+      offset += FLUX_CHUNK_SAMPLES;
+    }
+
+    if (offset > 0) {
+      const remaining = pendingLength - offset;
+      if (remaining > 0) {
+        pendingPcm.copyWithin(0, offset, pendingLength);
+      }
+      pendingLength = remaining;
+    }
+  };
+
+  const handleFluxMessage = (raw: string) => {
+    if (intentionalStop || fellBack) return;
+    const message = parseDeepgramFluxServerMessage(raw);
+    if (!message) return;
+
+    if (message.type === "Error") {
+      triggerFallback(message.description ?? "deepgram_flux_error");
+      return;
+    }
+    if (message.type !== "TurnInfo" || muted) return;
+
+    const trimmed = message.transcript.trim();
+    switch (message.event) {
+      case "StartOfTurn":
+        latestTranscript = trimmed;
+        options.onSpeechStart();
+        if (trimmed.length > 0) {
+          options.onLiveTranscript(trimmed);
+        }
+        return;
+      case "Update":
+      case "EagerEndOfTurn":
+        latestTranscript = trimmed;
+        options.onLiveTranscript(trimmed);
+        return;
+      case "TurnResumed":
+        if (trimmed.length > 0) {
+          latestTranscript = trimmed;
+          options.onLiveTranscript(trimmed);
+        }
+        return;
+      case "EndOfTurn": {
+        const finalText = trimmed.length > 0 ? trimmed : latestTranscript;
+        latestTranscript = "";
+        if (finalText.length > 0) {
+          options.onFinalTranscript(finalText);
+        }
+        return;
+      }
+    }
+  };
+
+  return {
+    start: async () => {
+      if (active) return;
+      const WebSocketCtor =
+        options.webSocketImpl ?? (typeof WebSocket !== "undefined" ? WebSocket : undefined);
+      if (!WebSocketCtor) {
+        options.onFallbackToVad("websocket_unavailable");
+        return;
+      }
+
+      const token = ++startToken;
+      intentionalStop = false;
+      fellBack = false;
+
+      let wsUrl: string;
+      try {
+        const apiConfig = await options.getApiConfig();
+        if (token !== startToken || intentionalStop || fellBack) return;
+        wsUrl = await resolveFluxWebSocketUrl(apiConfig, options.fetchImpl ?? fetch);
+      } catch {
+        triggerFallback("flux_config_failed");
+        return;
+      }
+      if (token !== startToken || intentionalStop || fellBack) return;
+
+      const opened = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const finish = (ok: boolean, fallbackReason?: string) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (!ok && fallbackReason) {
+            triggerFallback(fallbackReason);
+          }
+          resolve(ok);
+        };
+
+        const timer = setTimeout(() => {
+          finish(false, "flux_connect_timeout");
+        }, options.connectTimeoutMs ?? FLUX_DEFAULT_CONNECT_TIMEOUT_MS);
+
+        let socket: WebSocket;
+        try {
+          socket = new WebSocketCtor(wsUrl);
+        } catch {
+          finish(false, "flux_websocket_construct_failed");
+          return;
+        }
+        socket.binaryType = "arraybuffer";
+        ws = socket;
+
+        socket.onopen = () => {
+          if (token !== startToken || intentionalStop || fellBack) {
+            finish(false);
+            return;
+          }
+          finish(true);
+        };
+        socket.onmessage = (event) => {
+          if (typeof event.data === "string") {
+            handleFluxMessage(event.data);
+          }
+        };
+        socket.onerror = () => {
+          if (!settled) {
+            finish(false, "flux_websocket_error");
+          } else {
+            triggerFallback("flux_websocket_error");
+          }
+        };
+        socket.onclose = (event) => {
+          const reason =
+            event.code === 4401
+              ? "deepgram_not_configured"
+              : event.reason || `flux_closed_${event.code}`;
+          if (!settled) {
+            finish(false, reason);
+          } else {
+            triggerFallback(reason);
+          }
+        };
+      });
+
+      if (!opened || token !== startToken || intentionalStop || fellBack) return;
+
+      try {
+        const microphoneId = (await options.getMicrophoneId?.()) ?? "";
+        if (token !== startToken || intentionalStop || fellBack) return;
+        const mediaStream = await openHandsFreeMicrophone(microphoneId);
+        if (token !== startToken || intentionalStop || fellBack) {
+          for (const track of mediaStream.getTracks()) track.stop();
+          return;
+        }
+        stream = mediaStream;
+        const ctx = new AudioContext();
+        audioContext = ctx;
+        const inputRate = ctx.sampleRate;
+        resampler = inputRate >= TARGET_SAMPLE_RATE ? new PcmResampler(inputRate) : null;
+
+        const source = ctx.createMediaStreamSource(mediaStream);
+        sourceNode = source;
+        const processor = ctx.createScriptProcessor(SCRIPT_BUFFER_SIZE, 1, 1);
+        processorNode = processor;
+        const zeroGain = ctx.createGain();
+        zeroGain.gain.value = 0;
+        muteGainNode = zeroGain;
+
+        processor.onaudioprocess = (event) => {
+          if (!active) return;
+          const channel = event.inputBuffer.getChannelData(0);
+          const output = event.outputBuffer.getChannelData(0);
+          output.fill(0);
+          const resampled = resampler
+            ? resampler.push(channel)
+            : resampleFallbackLinear(channel, inputRate);
+          appendAndSendPcm(resampled);
+        };
+
+        for (const track of mediaStream.getTracks()) {
+          track.addEventListener(
+            "ended",
+            () => {
+              if (!active) return;
+              intentionalStop = true;
+              cleanupResources(true);
+              options.onError(m(msg("The microphone disconnected.")));
+            },
+            { once: true },
+          );
+        }
+
+        source.connect(processor);
+        processor.connect(zeroGain);
+        zeroGain.connect(ctx.destination);
+        await ctx.resume();
+        if (token !== startToken || intentionalStop || fellBack) {
+          cleanupResources(false);
+          return;
+        }
+        active = true;
+      } catch (error) {
+        if (fellBack || intentionalStop) return;
+        intentionalStop = true;
+        cleanupResources(true);
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Could not access microphone for hands-free voice mode.";
+        options.onError(message);
+        throw error;
+      }
+    },
+    stop: () => {
+      intentionalStop = true;
+      startToken += 1;
+      cleanupResources(true);
+    },
+    setMuted: (nextMuted: boolean) => {
+      muted = nextMuted;
+      if (muted) {
+        pendingLength = 0;
+        latestTranscript = "";
+        smoothedLevel = 0;
+        options.onLevel(0);
+      }
+    },
+    setSpeakingDuck: (speaking: boolean) => {
+      speakingDuck = speaking;
+      void speakingDuck;
     },
     isActive: () => active,
   };
