@@ -66,7 +66,10 @@ const switchTo = (excluded: ReadonlyArray<string>) => {
     nowMs,
     limitedUntil: new Map(),
   });
-  return command?.type === "message.dispatch" ? command.modelSelection?.instanceId : command;
+  if (!command) return null;
+  return command.type === "message.dispatch"
+    ? (command.modelSelection?.instanceId ?? null)
+    : command.type;
 };
 
 describe("limitSwitchCommand with excluded accounts", () => {
