@@ -85,7 +85,16 @@ describe("islandSettingsStore", () => {
     expect(next.voiceAssistant.silenceTimeoutMs).toBe(400);
     expect(next.voiceAssistant.announceCompletions).toBe(false);
     expect(next.voiceAssistant.announceApprovals).toBe(true);
+    expect(next.voiceAssistant.soundCuesEnabled).toBe(true);
+    expect(next.voiceAssistant.thinkingCueEnabled).toBe(true);
     expect(getIslandSettings()).toEqual(next);
+
+    const muted = updateVoiceAssistantSettings({
+      soundCuesEnabled: false,
+      thinkingCueEnabled: false,
+    });
+    expect(muted.voiceAssistant.soundCuesEnabled).toBe(false);
+    expect(muted.voiceAssistant.thinkingCueEnabled).toBe(false);
   });
 
   it("preserves backwards compatibility with legacy stored settings lacking voiceAssistant", () => {

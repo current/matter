@@ -130,6 +130,14 @@ function normalizeVoiceAssistantSettings(
       typeof parsed.announceFailures === "boolean"
         ? parsed.announceFailures
         : base.announceFailures,
+    soundCuesEnabled:
+      typeof parsed.soundCuesEnabled === "boolean"
+        ? parsed.soundCuesEnabled
+        : base.soundCuesEnabled,
+    thinkingCueEnabled:
+      typeof parsed.thinkingCueEnabled === "boolean"
+        ? parsed.thinkingCueEnabled
+        : base.thinkingCueEnabled,
   };
 }
 

@@ -169,6 +169,10 @@ export interface Preferences {
   /** The client `language` setting: a locale code or "system". Unset means English. */
   readonly language?: string;
   readonly microphones?: ReadonlyArray<MicrophoneEntry>;
+  /** Unset means on: play Lilt-style audio cues for dictation and Voice Mode. */
+  readonly voiceSoundCuesEnabled?: boolean;
+  /** Unset means on: play a single subtle muted pulse when Voice Mode starts thinking. */
+  readonly voiceThinkingCueEnabled?: boolean;
   readonly projectGroupingEnabled?: boolean;
   readonly projectGroupingMode?: SidebarProjectGroupingMode;
   readonly toolCallVisibility?: ToolCallVisibility;
@@ -263,6 +267,8 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     followUpBehavior?: FollowUpBehavior;
     language?: string;
     microphones?: ReadonlyArray<MicrophoneEntry>;
+    voiceSoundCuesEnabled?: boolean;
+    voiceThinkingCueEnabled?: boolean;
     projectGroupingEnabled?: boolean;
     projectGroupingMode?: SidebarProjectGroupingMode;
     toolCallVisibility?: ToolCallVisibility;
@@ -399,6 +405,12 @@ function sanitizePreferences(parsed: Preferences): Preferences {
         ? [{ kind: entry.kind, uid: entry.uid, name: entry.name }]
         : [];
     });
+  }
+  if (typeof parsed.voiceSoundCuesEnabled === "boolean") {
+    preferences.voiceSoundCuesEnabled = parsed.voiceSoundCuesEnabled;
+  }
+  if (typeof parsed.voiceThinkingCueEnabled === "boolean") {
+    preferences.voiceThinkingCueEnabled = parsed.voiceThinkingCueEnabled;
   }
   if (typeof parsed.projectGroupingEnabled === "boolean") {
     preferences.projectGroupingEnabled = parsed.projectGroupingEnabled;

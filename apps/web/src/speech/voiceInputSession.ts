@@ -30,6 +30,7 @@ import {
   createAppleSpeechVoiceInputPlatform,
   createBrowserVoiceInputPlatform,
 } from "./browserVoiceInput";
+import { playMattrAudioCue } from "./mattrAudioCues";
 import { runEnvironmentSpeech } from "./runEnvironmentSpeech";
 import { bindAudioGrant, readCleanupGrant } from "./voiceConsent";
 import { msg } from "gt-react";
@@ -251,9 +252,15 @@ export class VoiceInputSession {
       },
       onStateChange: (state) => {
         if (this.disposed) return;
+        const previousPhase = this.snapshot.state.phase;
         const recordingStartedAt =
           state.phase !== "recording" ? null : (this.snapshot.recordingStartedAt ?? Date.now());
         this.publish({ ...this.snapshot, state, recordingStartedAt });
+        if (state.phase === "recording" && previousPhase !== "recording") {
+          playMattrAudioCue("dictation-start");
+        } else if (previousPhase === "recording" && state.phase !== "recording") {
+          playMattrAudioCue("dictation-stop");
+        }
         if (state.phase !== "recording" && state.phase !== "transcribing")
           this.publishActivity(SILENT_ACTIVITY);
         if (state.phase === "error") {

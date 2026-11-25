@@ -88,6 +88,10 @@ export interface VoiceModeDeps {
   readonly executeAction: (action: VoiceAssistantClientAction) => Promise<void>;
   /** Normalized 0..1 microphone level for the orb. */
   readonly setLevel: (level: number) => void;
+  /** Optional Lilt-style audio cue hook on Voice Mode open, close, and thinking handoff. */
+  readonly onAudioCue?: (
+    cue: "voice-mode-open" | "voice-mode-close" | "voice-mode-thinking",
+  ) => void;
   readonly settings?: VoiceAssistantSettings;
   readonly now?: () => number;
 }
@@ -179,8 +183,12 @@ export class VoiceModeSession {
   }
 
   private setPhase(phase: VoicePhase, error: string | null = null) {
+    const previousPhase = this.snapshot.phase;
     this.update({ phase, error });
     if (phase !== "listening" && phase !== "hearing") this.deps.setLevel(0);
+    if (phase === "thinking" && previousPhase !== "thinking") {
+      this.deps.onAudioCue?.("voice-mode-thinking");
+    }
   }
 
   private current(generation: number) {
@@ -192,6 +200,7 @@ export class VoiceModeSession {
     this.started = true;
     this.generation += 1;
     this.setPhase("starting");
+    this.deps.onAudioCue?.("voice-mode-open");
     this.stopWorkspaceWatch = this.deps.watchWorkspace(() => this.refreshPending());
     this.refreshPending();
     this.armed = true;
@@ -207,6 +216,7 @@ export class VoiceModeSession {
     this.stopWorkspaceWatch?.();
     this.stopWorkspaceWatch = null;
     this.interruptAll();
+    this.deps.onAudioCue?.("voice-mode-close");
     await this.deps.audio.close();
   }
 

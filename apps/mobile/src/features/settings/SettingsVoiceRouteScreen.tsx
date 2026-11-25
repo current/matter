@@ -41,6 +41,7 @@ import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActi
 import { SettingsDragHandle } from "./components/SettingsDragHandle";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
+import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 import {
   deviceMicrophoneOrder,
   localVoiceTranscriberAtom,
@@ -243,9 +244,10 @@ export function SettingsVoiceRouteScreen() {
   const preferencesResult = useAtomValue(mobilePreferencesAtom);
   const savePreferences = useAtomCommand(saveMobilePreferences);
   const ready = AsyncResult.isSuccess(preferencesResult) && !preferencesResult.waiting;
-  const entries = deviceMicrophoneOrder(
-    AsyncResult.isSuccess(preferencesResult) ? preferencesResult.value.microphones : undefined,
-  );
+  const preferences = AsyncResult.isSuccess(preferencesResult) ? preferencesResult.value : null;
+  const entries = deviceMicrophoneOrder(preferences?.microphones);
+  const soundCuesEnabled = preferences?.voiceSoundCuesEnabled !== false;
+  const thinkingCueEnabled = preferences?.voiceThinkingCueEnabled !== false;
   const { permission, request: requestPermission } = useMicrophonePermission();
   const [drag, setDrag] = useState<{ readonly key: string; readonly translation: number } | null>(
     null,
@@ -363,6 +365,34 @@ export function SettingsVoiceRouteScreen() {
             </Text>
           </>
         ) : null}
+        <SettingsSection title={gt("Sound cues")}>
+          <SettingsSwitchRow
+            label={gt("Voice & dictation sound cues")}
+            subtitle={gt(
+              "Play Lilt-style audio cues when starting or stopping dictation and opening or closing Voice Mode.",
+            )}
+            value={soundCuesEnabled}
+            disabled={!ready}
+            onValueChange={(value) => {
+              void savePreferences({ voiceSoundCuesEnabled: value });
+            }}
+          />
+          {soundCuesEnabled ? (
+            <View className="border-t border-border-subtle">
+              <SettingsSwitchRow
+                label={gt("Voice Mode thinking pulse")}
+                subtitle={gt(
+                  "Play a single subtle muted pulse when your turn finishes and mattr starts thinking.",
+                )}
+                value={thinkingCueEnabled}
+                disabled={!ready}
+                onValueChange={(value) => {
+                  void savePreferences({ voiceThinkingCueEnabled: value });
+                }}
+              />
+            </View>
+          ) : null}
+        </SettingsSection>
         <SettingsSection title={gt("Preferred order")}>
           {entries.map((entry, index) => {
             const key = microphoneEntryKey(entry);

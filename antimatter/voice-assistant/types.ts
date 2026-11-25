@@ -127,6 +127,10 @@ export interface VoiceAssistantSettings {
   readonly announceQuestions: boolean;
   readonly announceCompletions: boolean;
   readonly announceFailures: boolean;
+  /** Play Lilt-style audio cues for dictation start/stop and Voice Mode open/close. */
+  readonly soundCuesEnabled: boolean;
+  /** Play a single subtle muted pulse on transition to thinking in Voice Mode. */
+  readonly thinkingCueEnabled: boolean;
 }
 
 export const DEFAULT_VOICE_ASSISTANT_SETTINGS: VoiceAssistantSettings = {
@@ -151,6 +155,8 @@ export const DEFAULT_VOICE_ASSISTANT_SETTINGS: VoiceAssistantSettings = {
   announceQuestions: true,
   announceCompletions: true,
   announceFailures: true,
+  soundCuesEnabled: true,
+  thinkingCueEnabled: true,
 };
 
 export interface VoiceWorkspaceProjectSummary {

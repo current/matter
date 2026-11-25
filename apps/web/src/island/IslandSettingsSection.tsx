@@ -1124,6 +1124,40 @@ export function IslandSettingsSection() {
         </SettingsRow>
 
         <SettingsRow
+          title={gt("Voice & dictation sound cues")}
+          description={gt(
+            "Play Lilt-style audio cues when starting or stopping dictation and opening or closing Voice Mode.",
+          )}
+          control={
+            <Switch
+              checked={va.soundCuesEnabled}
+              onCheckedChange={(checked) =>
+                updateVoiceAssistantSettings({ soundCuesEnabled: checked })
+              }
+              aria-label={gt("Voice and dictation sound cues")}
+            />
+          }
+        />
+
+        {va.soundCuesEnabled ? (
+          <SettingsRow
+            title={gt("Voice Mode thinking pulse")}
+            description={gt(
+              "Play a single subtle muted pulse when your turn finishes and mattr starts thinking.",
+            )}
+            control={
+              <Switch
+                checked={va.thinkingCueEnabled}
+                onCheckedChange={(checked) =>
+                  updateVoiceAssistantSettings({ thinkingCueEnabled: checked })
+                }
+                aria-label={gt("Voice Mode thinking pulse")}
+              />
+            }
+          />
+        ) : null}
+
+        <SettingsRow
           title={gt("Speak assistant replies")}
           description={gt("Automatically speak mattr Assistant replies aloud.")}
           control={

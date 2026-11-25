@@ -23,6 +23,7 @@ import type {
   VoiceWorkspaceContext,
 } from "../../../../antimatter/voice-assistant/types";
 import { getIslandSettings } from "./islandSettingsStore";
+import { playMattrAudioCue } from "../speech/mattrAudioCues";
 import {
   createDeepgramFluxCapture,
   createHandsFreeVadCapture,
@@ -1204,12 +1205,17 @@ export function setVoiceAssistantMode(mode: IslandVoicePanelMode): void {
 
 export function setVoiceAssistantModalOpen(open: boolean): void {
   if (open) {
-    if (state.modalOpen && state.scopedThread === null && state.originThread === null) return;
+    const wasOpen = state.modalOpen;
+    if (wasOpen && state.scopedThread === null && state.originThread === null) return;
     emit({ modalOpen: true, scopedThread: null, originThread: null });
+    if (!wasOpen) {
+      playMattrAudioCue("voice-mode-open");
+    }
     return;
   }
   if (!state.modalOpen) return;
   emit({ modalOpen: false });
+  playMattrAudioCue("voice-mode-close");
 }
 
 /**
@@ -1220,6 +1226,7 @@ export function openThreadVoiceMode(
   scope: VoiceAssistantThreadScope,
   options?: { readonly autoStartHandsFree?: boolean },
 ): void {
+  const wasOpen = state.modalOpen;
   const switchingScope =
     state.scopedThread?.environmentId !== scope.environmentId ||
     state.scopedThread?.threadId !== scope.threadId;
@@ -1238,6 +1245,9 @@ export function openThreadVoiceMode(
         }
       : {}),
   });
+  if (!wasOpen) {
+    playMattrAudioCue("voice-mode-open");
+  }
   if (options?.autoStartHandsFree !== false && hostBridge !== null && !state.handsFreeActive) {
     void startHandsFree();
   }
@@ -1365,6 +1375,7 @@ async function startVadCapture(): Promise<void> {
 async function startHandsFree(): Promise<void> {
   if (state.handsFreeActive && vadCapture?.isActive()) return;
 
+  const playOpenCue = !state.modalOpen;
   vadCapture?.stop();
   emit({
     handsFreeActive: true,
@@ -1375,6 +1386,9 @@ async function startHandsFree(): Promise<void> {
     statusLabel: m(msg("Listening...")),
     error: null,
   });
+  if (playOpenCue) {
+    playMattrAudioCue("voice-mode-open");
+  }
 
   const shouldTryFlux =
     hostBridge?.createFluxCapture !== undefined || hostBridge?.createVadCapture === undefined;
@@ -1480,7 +1494,8 @@ async function startHandsFree(): Promise<void> {
   }
 }
 
-function stopHandsFree(): void {
+function stopHandsFree(options?: { readonly silent?: boolean }): void {
+  const playCloseCue = !options?.silent && state.handsFreeActive && !state.modalOpen;
   userSpeaking = false;
   if (vadCapture) {
     vadCapture.stop();
@@ -1510,6 +1525,9 @@ function stopHandsFree(): void {
     statusLabel: null,
     activeBriefingLabel: null,
   });
+  if (playCloseCue) {
+    playMattrAudioCue("voice-mode-close");
+  }
 }
 
 export function toggleVoiceAssistantHandsFree(): void {
@@ -1696,12 +1714,16 @@ export async function submitVoiceAssistantUtterance(
 
   const history = buildHistoryForRequest();
   appendTurn({ role: "user", text: utterance });
+  const enteredThinking = state.phase !== "thinking";
   emit({
     phase: "thinking",
     liveTranscript: utterance,
     statusLabel: m(msg("Thinking...")),
     error: null,
   });
+  if (enteredThinking && effectiveMode !== "dictation") {
+    playMattrAudioCue("voice-mode-thinking");
+  }
 
   const controller = new AbortController();
   activeAbortController = controller;
@@ -1811,7 +1833,7 @@ export function submitQuickBriefing(req: VoiceBriefingRequest): void {
 
 /** Resets module-level store state cleanly between unit tests. */
 export function resetVoiceAssistantStoreForTests(): void {
-  stopHandsFree();
+  stopHandsFree({ silent: true });
   briefingQueue = [];
   briefingSequence = 0;
   turnSequence = 0;

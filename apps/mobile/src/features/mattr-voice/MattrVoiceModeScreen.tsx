@@ -1,3 +1,4 @@
+import { AsyncResult } from "effect/reactivity";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useGT } from "gt-react-native";
 import * as Haptics from "expo-haptics";
@@ -17,7 +18,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
+import { playMobileAudioCue } from "../../lib/mattrAudioCues";
+import { appAtomRegistry } from "../../state/atom-registry";
 import { useVisibleThreadShells } from "../../state/entities";
+import { mobilePreferencesAtom } from "../../state/preferences";
 import { useOpenWorkspaceDetail } from "../layout/useOpenWorkspaceDetail";
 import { NativeVoiceAudio } from "./nativeVoiceAudio";
 import {
@@ -211,6 +215,16 @@ export function MattrVoiceModeScreen(
             },
           }),
         setLevel: (value) => level.set(value),
+        onAudioCue: (cue) => {
+          const current = appAtomRegistry.get(mobilePreferencesAtom);
+          const preferences = AsyncResult.isSuccess(current) ? current.value : null;
+          void playMobileAudioCue(cue, { preferences });
+          if (cue === "voice-mode-thinking") {
+            void Haptics.selectionAsync().catch(() => {});
+          } else {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          }
+        },
       }),
   );
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot);

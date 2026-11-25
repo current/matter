@@ -34,6 +34,7 @@ import {
   activateAudioSession,
   releaseAudioSession,
 } from "../../lib/audioSession";
+import { playMobileAudioCue } from "../../lib/mattrAudioCues";
 
 // The native constructor expects platform-flattened options, as built by useAudioRecorder.
 const { ios: IOS_RECORDING_OPTIONS, android: ANDROID_RECORDING_OPTIONS } =
@@ -163,6 +164,11 @@ export const voiceInputAtom = Atom.make((get) => {
     },
     publishAudioLevels: (levels) => audioLevels.set(levels),
     keepAwake: () => keepScreenAwake(`voice-input:${++keepAwakeSequence}`),
+    onAudioCue: (cue) => {
+      const current = registry.get(mobilePreferencesAtom);
+      const preferences = AsyncResult.isSuccess(current) ? current.value : null;
+      void playMobileAudioCue(cue, { preferences });
+    },
   });
   get.subscribe(voiceRouteAtom, () => session.controller.cancel());
   get.addFinalizer(() => {

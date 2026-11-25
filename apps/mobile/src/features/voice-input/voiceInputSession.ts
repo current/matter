@@ -45,6 +45,8 @@ export type VoiceInputSessionDependencies = Omit<
   readonly publishAudioLevels: (levels: ReadonlyArray<number>) => void;
   /** Holds the screen awake while recording; returns the release. */
   readonly keepAwake: () => () => void;
+  /** Optional Lilt-style audio cue hook on recording start/stop. */
+  readonly onAudioCue?: (cue: "dictation-start" | "dictation-stop") => void;
 };
 
 export function createVoiceInputTarget(
@@ -162,6 +164,9 @@ export class VoiceInputSession {
     });
     if (state.phase === "recording" && previousPhase !== "recording") {
       this.startRecordingActivity();
+      this.dependencies.onAudioCue?.("dictation-start");
+    } else if (previousPhase === "recording" && state.phase !== "recording") {
+      this.dependencies.onAudioCue?.("dictation-stop");
     }
   }
 
