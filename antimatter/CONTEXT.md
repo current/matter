@@ -6,7 +6,7 @@ Keep it current: when a task changes a decision, a workflow or the fork's state,
 
 ## What this is
 
-mattr is Chris's personal fork of T3 Code nightly (`pingdotgg/t3code`). The repo is `current/t3code` (remote `origin`, branch `main`; upstream is remote `upstream`). The fork used to be called Antimatter, so internal names (`antimatter/`, the workflow file, data folders, app id) still say antimatter. The user-facing name is **mattr**, always lowercase.
+mattr is Chris's personal fork of T3 Code nightly (`pingdotgg/t3code`). The repo is `current/mattr` (renamed from `current/t3code`; remote `origin`, branch `main`; upstream is remote `upstream`). The fork used to be called Antimatter, so internal names (`antimatter/`, the workflow file, data folders, app id) still say antimatter. The user-facing name is **mattr**, always lowercase.
 
 Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 
@@ -14,7 +14,8 @@ Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 
 - Keep fork changes small and in fork-only files (`antimatter/`) where possible. CI merges the newest upstream nightly at every build, so edits inside busy upstream files become merge conflicts.
 - Don't merge upstream into `main` by hand unless a build opens an "Antimatter: merge conflict" issue.
-- Only the lead pushes to `main`. Every push builds and publishes a release.
+- Only the lead pushes to `main`. Every push that changes more than Markdown builds and publishes a release.
+- Never create a new repo named `current/t3code`: installed builds from before the rename find updates through GitHub's redirect from that name.
 - Never write to `~/.antimatter/userdata`: it is the live app's database, and the chat you are running in lives there.
 
 ## Branding
