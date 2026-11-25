@@ -211,6 +211,7 @@ export const SF_SYMBOL_FOR_LUCIDE: Readonly<Record<string, string | null>> = {
   PlusIcon: "plus",
   Power: "power",
   PresentationIcon: "play.rectangle",
+  PuzzleIcon: "puzzlepiece.extension",
   QrCodeIcon: "qrcode",
   QuoteIcon: "quote.opening",
   RadioTower: "antenna.radiowaves.left.and.right",

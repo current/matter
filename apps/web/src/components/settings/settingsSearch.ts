@@ -22,6 +22,7 @@ export type SettingsPath =
   | "/settings/general"
   | "/settings/diagnostics"
   | "/settings/voice"
+  | "/settings/addons"
   | "/settings/appearance"
   | "/settings/chat"
   | "/settings/diffs"
@@ -119,6 +120,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/labs": msg("Labs"),
   "/settings/about": msg("About"),
   "/settings/voice": msg("Voice"),
+  "/settings/addons": msg("Add-ons"),
   "/settings/archived": msg("Archive"),
 };
 
@@ -149,6 +151,7 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
       "/settings/diffs",
       "/settings/keybindings",
       "/settings/voice",
+      "/settings/addons",
       "/settings/snap-shot",
     ],
   },
@@ -346,6 +349,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     desktopOnly: true,
     searchTerms: [
       msg("floating notch pill voice siri wave dictation control tap option tap shortcut"),
+    ],
+  },
+  {
+    id: "mattr-addons",
+    title: msg("Add-ons"),
+    to: "/settings/addons",
+    searchTerms: [
+      msg(
+        "add-ons addons integrations optional features enable disable grok bot voice assistant bots",
+      ),
     ],
   },
   {
@@ -1573,6 +1586,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/projects": "project",
   "/settings/general": null,
   "/settings/voice": null,
+  "/settings/addons": null,
   "/settings/appearance": null,
   "/settings/chat": null,
   "/settings/diffs": null,
