@@ -77,6 +77,7 @@ import {
   type ResponseContextRecord,
   type ChatFileAttachment,
   type EnvironmentId,
+  isOrchestrationV2WorkActive,
   type MessageId,
   type ModelSelection,
   type PreviewAnnotationPayload,
@@ -313,6 +314,7 @@ import { useCitedHistory } from "./chat/citationProcedure";
 import type { MessagesTimelineHistoryControls } from "./chat/MessagesTimeline";
 import { ThreadTimeline } from "./chat/ThreadTimeline";
 import { NativeChildWorkDialog } from "./chat/NativeChildWorkDialog";
+import { NativeChildWorkTimeline } from "./chat/NativeChildWorkTimeline";
 import { ProviderSubagentBar } from "./chat/ProviderSubagentBar";
 import { getTriggerDisplayModelName } from "./chat/providerIconUtils";
 import { resolveScrollToEndClearance } from "./composerFooterLayout";
@@ -3350,15 +3352,32 @@ export default function ChatView(props: ChatViewProps) {
     ]
       .filter((part) => part !== null)
       .join(" · ") || null;
+  const showNativeChildWorkInline =
+    showProviderSubagentBar &&
+    isServerThread &&
+    selectedProviderEntry?.driverKind === "antigravity";
+  const nativeChildWorkLive =
+    isWorking ||
+    (providerSubagentStatus !== null && isOrchestrationV2WorkActive(providerSubagentStatus.status));
   // The end of the timeline holds the thread's present and next turns: what it is doing now,
   // its lifecycle status, guest messages awaiting you, then your queued messages.
   const timelineFooter =
+    !showNativeChildWorkInline &&
     pendingHandoff === null &&
     !hasThreadNow &&
     threadStatusLine === null &&
     pendingGuestMessageCount === 0 &&
     !hasQueuedTurns ? null : (
       <>
+        {showNativeChildWorkInline ? (
+          <NativeChildWorkTimeline
+            key={`${environmentId}:${threadId}`}
+            environmentId={environmentId}
+            threadId={threadId}
+            isLive={nativeChildWorkLive}
+            workspaceRoot={activeWorkspaceRoot}
+          />
+        ) : null}
         {pendingHandoff === null ? null : (
           <div className="chat-content-lane">
             <HandoffRow

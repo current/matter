@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off -- Electron IPC hide-fallback timer runs outside Effect fibers.
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -9,20 +10,24 @@ import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
   ISLAND_ACTION_CHANNEL,
+  ISLAND_ANIMATION_IDLE_CHANNEL,
   ISLAND_CONTEXT_MENU_CHANNEL,
+  ISLAND_DISPLAY_METRICS_CHANNEL,
   ISLAND_EXPAND_REQUEST_CHANNEL,
   ISLAND_FOCUS_WINDOW_CHANNEL,
   ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL,
   ISLAND_SNAPSHOT_CHANNEL,
   type IslandAction,
+  type IslandDisplayMetrics,
   type IslandSettings,
   type IslandSnapshot,
   type IslandWindowCommand,
 } from "../../../../antimatter/island/types.ts";
 
-const ISLAND_WINDOW_WIDTH = 460;
-const ISLAND_WINDOW_HEIGHT = 540;
+const ISLAND_WINDOW_WIDTH = 560;
+const ISLAND_WINDOW_HEIGHT = 600;
 const ISLAND_FALLBACK_SHORTCUT = "CommandOrControl+Shift+Space";
+const HIDE_FALLBACK_TIMEOUT_MS = 420;
 
 export class DesktopIsland extends Context.Service<
   DesktopIsland,
@@ -37,26 +42,59 @@ export class DesktopIsland extends Context.Service<
   }
 >()("@t3tools/desktop/island/DesktopIsland") {}
 
-function computeNotchBounds(): Electron.Rectangle {
+interface ComputedNotchPlacement {
+  readonly bounds: Electron.Rectangle;
+  readonly metrics: IslandDisplayMetrics;
+}
+
+function computeNotchPlacement(isMac: boolean): ComputedNotchPlacement {
   const display =
     Electron.screen.getDisplayNearestPoint(Electron.screen.getCursorScreenPoint()) ??
     Electron.screen.getPrimaryDisplay();
   const { x, y, width } = display.bounds;
+  const topInset = Math.max(0, display.workArea.y - display.bounds.y);
+  // Notched MacBooks reserve 32-38pt at the top edge vs 24-25pt for standard macOS menu bars.
+  const hasNotch = isMac && topInset >= 30;
+  const notchHeight = hasNotch ? Math.min(40, Math.max(32, topInset)) : 34;
+  const notchWidth = hasNotch ? 188 : 168;
   return {
-    x: Math.round(x + (width - ISLAND_WINDOW_WIDTH) / 2),
-    y,
-    width: ISLAND_WINDOW_WIDTH,
-    height: ISLAND_WINDOW_HEIGHT,
+    bounds: {
+      x: Math.round(x + (width - ISLAND_WINDOW_WIDTH) / 2),
+      y,
+      width: ISLAND_WINDOW_WIDTH,
+      height: ISLAND_WINDOW_HEIGHT,
+    },
+    metrics: {
+      hasNotch,
+      notchWidth,
+      notchHeight,
+      windowWidth: ISLAND_WINDOW_WIDTH,
+    },
   };
 }
 
-function shouldShowWindowForSnapshot(
+function shouldKeepWindowAlive(
   snapshot: IslandSnapshot | null,
   forcedOpen: boolean,
+  hasNotch: boolean,
 ): boolean {
   if (!snapshot || !snapshot.settings.enabled) return false;
+  // On notched MacBooks, keep the transparent overlay docked invisibly inside the physical camera
+  // cutout so hover-to-peek and spring open/close transitions run on frame 1 with zero flash.
+  if (hasNotch) return true;
   if (forcedOpen) return true;
   if (snapshot.voice.phase !== "idle") return true;
+  if (snapshot.assistant?.handsFreeActive) return true;
+  if (
+    snapshot.assistant &&
+    (snapshot.assistant.phase === "listening" ||
+      snapshot.assistant.phase === "transcribing" ||
+      snapshot.assistant.phase === "thinking" ||
+      snapshot.assistant.phase === "acting" ||
+      snapshot.assistant.phase === "speaking")
+  ) {
+    return true;
+  }
   if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) return false;
   return (
     snapshot.pendingApprovals.length > 0 ||
@@ -74,13 +112,49 @@ export const layer = Layer.effect(
     let islandWindow: Electron.BrowserWindow | null = null;
     let islandReady = false;
     let latestSnapshot: IslandSnapshot | null = null;
+    let latestMetrics: IslandDisplayMetrics = {
+      hasNotch: isMac,
+      notchWidth: 188,
+      notchHeight: 37,
+      windowWidth: ISLAND_WINDOW_WIDTH,
+    };
     let currentSettings: IslandSettings = DEFAULT_ISLAND_SETTINGS;
     let shortcutsInitialized = false;
     let screenListenerAttached = false;
     let forcedOpen = false;
+    let pendingHide = false;
+    let pendingHideTimer: ReturnType<typeof setTimeout> | null = null;
     let mainWebContentsId: number | null = null;
     let stopModifierMonitor: (() => void) | null = null;
     let registeredGlobalShortcut: string | null = null;
+
+    const clearPendingHide = () => {
+      pendingHide = false;
+      if (pendingHideTimer !== null) {
+        clearTimeout(pendingHideTimer);
+        pendingHideTimer = null;
+      }
+    };
+
+    const completeDeferredHide = () => {
+      clearPendingHide();
+      if (islandWindow && !islandWindow.isDestroyed() && islandWindow.isVisible()) {
+        islandWindow.setIgnoreMouseEvents(true, { forward: true });
+        islandWindow.hide();
+      }
+    };
+
+    const scheduleDeferredHide = () => {
+      if (!islandWindow || islandWindow.isDestroyed() || !islandWindow.isVisible()) return;
+      islandWindow.setIgnoreMouseEvents(true, { forward: true });
+      if (pendingHide) return;
+      pendingHide = true;
+      pendingHideTimer = setTimeout(() => {
+        if (pendingHide) {
+          completeDeferredHide();
+        }
+      }, HIDE_FALLBACK_TIMEOUT_MS);
+    };
 
     const findMainWindow = (): Electron.BrowserWindow | null => {
       if (mainWebContentsId !== null) {
@@ -118,9 +192,19 @@ export const layer = Layer.effect(
       }
     };
 
+    const sendDisplayMetricsToIsland = (metrics: IslandDisplayMetrics) => {
+      latestMetrics = metrics;
+      if (islandWindow && !islandWindow.isDestroyed() && islandReady) {
+        islandWindow.webContents.send(ISLAND_DISPLAY_METRICS_CHANNEL, metrics);
+      }
+    };
+
     const repositionIsland = () => {
+      const placement = computeNotchPlacement(isMac);
+      latestMetrics = placement.metrics;
       if (!islandWindow || islandWindow.isDestroyed()) return;
-      islandWindow.setBounds(computeNotchBounds(), false);
+      islandWindow.setBounds(placement.bounds, false);
+      sendDisplayMetricsToIsland(placement.metrics);
     };
 
     const ensureScreenListener = () => {
@@ -135,9 +219,10 @@ export const layer = Layer.effect(
         return islandWindow;
       }
       const preloadPath = environment.path.join(environment.dirname, "island-preload.cjs");
-      const bounds = computeNotchBounds();
+      const placement = computeNotchPlacement(isMac);
+      latestMetrics = placement.metrics;
       const win = new Electron.BrowserWindow({
-        ...bounds,
+        ...placement.bounds,
         show: false,
         frame: false,
         transparent: true,
@@ -171,12 +256,16 @@ export const layer = Layer.effect(
       islandReady = false;
       win.webContents.once("did-finish-load", () => {
         islandReady = true;
-        if (latestSnapshot && !win.isDestroyed()) {
-          win.webContents.send(ISLAND_SNAPSHOT_CHANNEL, latestSnapshot);
+        if (!win.isDestroyed()) {
+          win.webContents.send(ISLAND_DISPLAY_METRICS_CHANNEL, latestMetrics);
+          if (latestSnapshot) {
+            win.webContents.send(ISLAND_SNAPSHOT_CHANNEL, latestSnapshot);
+          }
         }
       });
 
       win.on("closed", () => {
+        clearPendingHide();
         islandWindow = null;
         islandReady = false;
         forcedOpen = false;
@@ -191,13 +280,22 @@ export const layer = Layer.effect(
 
     const syncVisibility = () => {
       if (!currentSettings.enabled) {
+        clearPendingHide();
         if (islandWindow && !islandWindow.isDestroyed() && islandWindow.isVisible()) {
+          islandWindow.setIgnoreMouseEvents(true, { forward: true });
           islandWindow.hide();
         }
         return;
       }
-      const visible = shouldShowWindowForSnapshot(latestSnapshot, forcedOpen);
-      if (visible) {
+      const placement = computeNotchPlacement(isMac);
+      latestMetrics = placement.metrics;
+      const keepAlive = shouldKeepWindowAlive(
+        latestSnapshot,
+        forcedOpen,
+        placement.metrics.hasNotch,
+      );
+      if (keepAlive) {
+        clearPendingHide();
         const win = ensureIslandWindow();
         if (!win.isVisible()) {
           repositionIsland();
@@ -208,14 +306,14 @@ export const layer = Layer.effect(
             win.showInactive();
           }
         }
-      } else if (islandWindow && !islandWindow.isDestroyed() && islandWindow.isVisible()) {
-        islandWindow.setIgnoreMouseEvents(true, { forward: true });
-        islandWindow.hide();
+      } else {
+        scheduleDeferredHide();
       }
     };
 
     const triggerFromGlobalShortcut = () => {
       if (!currentSettings.enabled) return;
+      clearPendingHide();
       const win = ensureIslandWindow();
       forcedOpen = true;
       repositionIsland();
@@ -290,7 +388,8 @@ export const layer = Layer.effect(
       if (
         action.type === "open-thread" ||
         action.type === "open-voice-settings" ||
-        action.type === "open-island-settings"
+        action.type === "open-island-settings" ||
+        action.type === "assistant-open-voice-mode-modal"
       ) {
         forcedOpen = false;
         syncVisibility();
@@ -322,10 +421,24 @@ export const layer = Layer.effect(
       ) {
         return;
       }
+      clearPendingHide();
       forcedOpen = true;
       islandWindow.setIgnoreMouseEvents(false);
       islandWindow.show();
       islandWindow.focus();
+    };
+
+    const onAnimationIdle = (event: Electron.IpcMainEvent) => {
+      if (
+        !islandWindow ||
+        islandWindow.isDestroyed() ||
+        event.sender !== islandWindow.webContents
+      ) {
+        return;
+      }
+      if (pendingHide) {
+        completeDeferredHide();
+      }
     };
 
     const onContextMenu = (event: Electron.IpcMainEvent) => {
@@ -340,6 +453,15 @@ export const layer = Layer.effect(
         {
           label: "Open mattr",
           click: () => revealMainWindow(),
+        },
+        {
+          label: "Open Voice Mode",
+          click: () => {
+            forcedOpen = false;
+            syncVisibility();
+            revealMainWindow();
+            sendToMainRenderer({ type: "assistant-open-voice-mode-modal" });
+          },
         },
         {
           label: "Island settings…",
@@ -367,14 +489,17 @@ export const layer = Layer.effect(
     Electron.ipcMain.on(ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL, onMousePassthrough);
     Electron.ipcMain.on(ISLAND_FOCUS_WINDOW_CHANNEL, onFocusWindow);
     Electron.ipcMain.on(ISLAND_CONTEXT_MENU_CHANNEL, onContextMenu);
+    Electron.ipcMain.on(ISLAND_ANIMATION_IDLE_CHANNEL, onAnimationIdle);
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
+        clearPendingHide();
         stopShortcuts();
         Electron.ipcMain.removeListener(ISLAND_ACTION_CHANNEL, onIslandAction);
         Electron.ipcMain.removeListener(ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL, onMousePassthrough);
         Electron.ipcMain.removeListener(ISLAND_FOCUS_WINDOW_CHANNEL, onFocusWindow);
         Electron.ipcMain.removeListener(ISLAND_CONTEXT_MENU_CHANNEL, onContextMenu);
+        Electron.ipcMain.removeListener(ISLAND_ANIMATION_IDLE_CHANNEL, onAnimationIdle);
         if (screenListenerAttached) {
           Electron.screen.removeListener("display-metrics-changed", repositionIsland);
         }
@@ -420,6 +545,7 @@ export const layer = Layer.effect(
       openPanel: Effect.fn("desktop.island.openPanel")(function* (options) {
         yield* Effect.sync(() => {
           if (!currentSettings.enabled) return;
+          clearPendingHide();
           const win = ensureIslandWindow();
           forcedOpen = true;
           repositionIsland();

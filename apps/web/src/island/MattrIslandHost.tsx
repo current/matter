@@ -60,6 +60,7 @@ import {
   toggleVoiceAssistantMute,
   useVoiceAssistantState,
 } from "./voiceAssistantStore";
+import { encodeWav16k } from "./voiceModeAudio";
 import type {
   IslandAction,
   IslandApprovalOption,
@@ -71,6 +72,8 @@ import type {
 } from "../../../../antimatter/island/types";
 import type {
   VoiceAssistantClientAction,
+  VoiceAvailableTtsInfo,
+  VoiceTranscribeResponse,
   VoiceWorkspaceContext,
 } from "../../../../antimatter/voice-assistant/types";
 
@@ -226,6 +229,19 @@ export function MattrIslandHost() {
     [],
   );
   const [stateRevision, setStateRevision] = useState(0);
+  const [deepgramAvailable, setDeepgramAvailable] = useState(false);
+
+  const deepgramAvailableRef = useRef(deepgramAvailable);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps Deepgram availability fresh for Island IPC actions
+  useEffect(() => {
+    deepgramAvailableRef.current = deepgramAvailable;
+  }, [deepgramAvailable]);
+
+  const assistantHandsFreeRef = useRef(assistantState.handsFreeActive);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps hands-free state fresh for Island push-to-talk fallback
+  useEffect(() => {
+    assistantHandsFreeRef.current = assistantState.handsFreeActive;
+  }, [assistantState.handsFreeActive]);
 
   const draftRef = useRef(draftText);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps latest draft visible to async speech callbacks
@@ -710,7 +726,9 @@ export function MattrIslandHost() {
 
   const getApiBaseUrlAndHeaders = useStableCallback(() => {
     const conn = primaryPrepared;
-    const baseUrl = conn?.httpBaseUrl ?? window.location.origin;
+    const rawBase = conn?.httpBaseUrl?.trim();
+    const baseUrl =
+      rawBase && rawBase.length > 0 ? rawBase.replace(/\/+$/, "") : window.location.origin;
     const headers: Record<string, string> = {};
     if (conn?.httpAuthorization?._tag === "Bearer") {
       headers.authorization = `Bearer ${conn.httpAuthorization.token}`;
@@ -724,7 +742,72 @@ export function MattrIslandHost() {
     };
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- probes server TTS/STT availability once connected and refreshes when credentials change
+  useEffect(() => {
+    let disposed = false;
+    const rawBase = primaryPrepared?.httpBaseUrl?.trim();
+    const baseUrl =
+      rawBase && rawBase.length > 0 ? rawBase.replace(/\/+$/, "") : window.location.origin;
+    const headers: Record<string, string> = {};
+    if (primaryPrepared?.httpAuthorization?._tag === "Bearer") {
+      headers.authorization = `Bearer ${primaryPrepared.httpAuthorization.token}`;
+    } else if (primaryPrepared?.httpAuthorization?._tag === "Dpop") {
+      headers.authorization = `Bearer ${primaryPrepared.httpAuthorization.accessToken}`;
+    }
+    const probe = async () => {
+      try {
+        const response = await fetch(`${baseUrl}/api/mattr/voice-assistant/tts-info`, {
+          method: "GET",
+          headers,
+          credentials: "include",
+        });
+        if (!response.ok || disposed) return;
+        const info = (await response.json()) as Partial<VoiceAvailableTtsInfo>;
+        if (!disposed) {
+          setDeepgramAvailable(info.deepgramAvailable === true);
+        }
+      } catch {
+        // Ignore transient probe errors when server is starting or offline.
+      }
+    };
+    void probe();
+    const onCredentialsChanged = () => {
+      void probe();
+    };
+    window.addEventListener("mattr:voice-credentials-changed", onCredentialsChanged);
+    return () => {
+      disposed = true;
+      window.removeEventListener("mattr:voice-credentials-changed", onCredentialsChanged);
+    };
+  }, [primaryPrepared]);
+
   const transcribePcm = useStableCallback(async (pcm16k: Float32Array): Promise<string> => {
+    // Prefer server-side Deepgram Nova-3 STT first when configured.
+    try {
+      const apiConfig = getApiBaseUrlAndHeaders();
+      const base = apiConfig.baseUrl.replace(/\/+$/, "");
+      const langQuery =
+        speechLanguage && speechLanguage !== "auto"
+          ? `?language=${encodeURIComponent(speechLanguage)}`
+          : "";
+      const wavBlob = encodeWav16k(pcm16k);
+      const response = await fetch(`${base}/api/mattr/voice-assistant/transcribe${langQuery}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "audio/wav",
+          ...apiConfig.headers,
+        },
+        credentials: apiConfig.credentials,
+        body: wavBlob,
+      });
+      if (response.ok) {
+        const json = (await response.json()) as VoiceTranscribeResponse;
+        return (json.text ?? "").trim();
+      }
+    } catch {
+      // Fall through cleanly to Apple Speech, environment speech, or cloud speech.
+    }
+
     const pcmBytes = new Uint8Array(pcm16k.buffer, pcm16k.byteOffset, pcm16k.byteLength);
 
     // Prefer macOS 26 on-device Apple Speech when configured or available on desktop
@@ -833,18 +916,34 @@ export function MattrIslandHost() {
         return;
       }
       case "voice-start": {
+        if (!speechRef.current.available && deepgramAvailableRef.current) {
+          if (!assistantHandsFreeRef.current) toggleVoiceAssistantHandsFree();
+          return;
+        }
         void speechRef.current.start();
         return;
       }
       case "voice-stop": {
+        if (!speechRef.current.available && deepgramAvailableRef.current) {
+          if (assistantHandsFreeRef.current) toggleVoiceAssistantHandsFree();
+          return;
+        }
         void speechRef.current.stop();
         return;
       }
       case "voice-cancel": {
+        if (!speechRef.current.available && deepgramAvailableRef.current) {
+          if (assistantHandsFreeRef.current) toggleVoiceAssistantHandsFree();
+          return;
+        }
         speechRef.current.cancel();
         return;
       }
       case "voice-toggle": {
+        if (!speechRef.current.available && deepgramAvailableRef.current) {
+          toggleVoiceAssistantHandsFree();
+          return;
+        }
         const phase = speechRef.current.state.phase;
         if (phase === "recording") {
           void speechRef.current.stop();
@@ -958,7 +1057,7 @@ export function MattrIslandHost() {
           previewTentative: speech.preview?.tentative ?? "",
           draftText,
           error: speech.state.phase === "error" ? speech.state.error : null,
-          available: speech.available,
+          available: speech.available || deepgramAvailable,
         },
         assistant: toIslandVoiceAssistantState(assistantState),
       }

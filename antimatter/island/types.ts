@@ -10,6 +10,15 @@ export const ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL = "desktop:island-set-mouse-pa
 export const ISLAND_FOCUS_WINDOW_CHANNEL = "desktop:island-focus-window";
 export const ISLAND_EXPAND_REQUEST_CHANNEL = "desktop:island-expand-request";
 export const ISLAND_CONTEXT_MENU_CHANNEL = "desktop:island-context-menu";
+export const ISLAND_DISPLAY_METRICS_CHANNEL = "desktop:island-display-metrics";
+export const ISLAND_ANIMATION_IDLE_CHANNEL = "desktop:island-animation-idle";
+
+export interface IslandDisplayMetrics {
+  readonly hasNotch: boolean;
+  readonly notchWidth: number;
+  readonly notchHeight: number;
+  readonly windowWidth: number;
+}
 
 export interface IslandWindowCommand {
   readonly type: "toggle-voice-panel" | "open-voice-panel" | "close-panel";

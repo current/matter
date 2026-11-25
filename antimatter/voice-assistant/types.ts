@@ -1,15 +1,15 @@
 export type VoiceAssistantInteractionMode = "smart" | "assistant" | "dictation" | "voice-mode";
 
-export type VoiceTtsProvider = "auto" | "openai" | "macos" | "browser" | "off";
+export type VoiceTtsProvider = "auto" | "deepgram" | "openai" | "macos" | "browser" | "off";
 
 export interface VoiceAssistantSettings {
   /** Default mode when opening voice in Island or Voice Mode. */
   readonly defaultMode: "smart" | "assistant" | "dictation";
   /** Speak assistant responses aloud automatically in assistant/voice mode. */
   readonly speakReplies: boolean;
-  /** TTS engine preference. "auto" prefers OpenAI if key is configured, else macOS say, else browser speechSynthesis. */
+  /** TTS engine preference. "auto" prefers Deepgram Aura-2 if configured, else OpenAI, else macOS say, else browser speechSynthesis. */
   readonly ttsProvider: VoiceTtsProvider;
-  /** Voice name (e.g. "coral", "nova", "alloy" for OpenAI; "Samantha" for macOS; or empty for default). */
+  /** Voice name (e.g. "aura-2-thalia-en" for Deepgram; "coral" for OpenAI; "Samantha" for macOS; or empty for default). */
   readonly ttsVoice: string;
   /** Speech playback rate (0.8 to 1.5). */
   readonly ttsSpeed: number;
@@ -189,9 +189,20 @@ export interface VoiceSpeakRequest {
 }
 
 export interface VoiceAvailableTtsInfo {
+  readonly deepgramAvailable: boolean;
   readonly openaiAvailable: boolean;
   readonly macosAvailable: boolean;
   readonly defaultProvider: Exclude<VoiceTtsProvider, "auto" | "off">;
+  readonly deepgramVoices: ReadonlyArray<string>;
   readonly openaiVoices: ReadonlyArray<string>;
   readonly macosVoices: ReadonlyArray<string>;
+}
+
+export interface VoiceTranscribeResponse {
+  readonly text: string;
+  readonly provider: "deepgram";
+}
+
+export interface VoiceCredentialsStatus {
+  readonly deepgramAvailable: boolean;
 }

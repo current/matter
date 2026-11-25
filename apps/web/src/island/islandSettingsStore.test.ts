@@ -67,6 +67,24 @@ describe("islandSettingsStore", () => {
     });
   });
 
+  it("accepts deepgram as a valid ttsProvider in normalizeIslandSettings and updates", () => {
+    const normalized = normalizeIslandSettings({
+      voiceAssistant: {
+        ttsProvider: "deepgram",
+        ttsVoice: "aura-2-thalia-en",
+      },
+    });
+    expect(normalized.voiceAssistant.ttsProvider).toBe("deepgram");
+    expect(normalized.voiceAssistant.ttsVoice).toBe("aura-2-thalia-en");
+
+    const updated = updateVoiceAssistantSettings({
+      ttsProvider: "deepgram",
+      ttsVoice: "aura-2-apollo-en",
+    });
+    expect(updated.voiceAssistant.ttsProvider).toBe("deepgram");
+    expect(updated.voiceAssistant.ttsVoice).toBe("aura-2-apollo-en");
+  });
+
   it("falls back safely on invalid stored voiceAssistant fields", () => {
     const normalized = normalizeIslandSettings({
       shortcut: "invalid-shortcut",

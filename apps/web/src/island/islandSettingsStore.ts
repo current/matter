@@ -27,6 +27,7 @@ const VALID_VOICE_DEFAULT_MODES = new Set<VoiceAssistantSettings["defaultMode"]>
 
 const VALID_TTS_PROVIDERS = new Set<VoiceTtsProvider>([
   "auto",
+  "deepgram",
   "openai",
   "macos",
   "browser",

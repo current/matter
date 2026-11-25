@@ -21,6 +21,25 @@ describe("mattr Island HTML & Lilt Siri Wave shaders", () => {
     expect(SIRI_FLUID_DOTS_FRAG).toContain("max(c.r, max(c.g, c.b))");
   });
 
+  it("renders the concave-ear NotchShape SVG, coupled spring physics, and valid embedded JS", () => {
+    const html = buildIslandHtml();
+    expect(html).toContain('id="island-svg"');
+    expect(html).toContain('id="island-shape-path"');
+    expect(html).toContain('id="island-rim-path"');
+    expect(html).toContain('id="notch-clip"');
+    expect(html).toContain('id="island-clip-path"');
+    expect(html).toContain("buildNotchShapePath");
+    expect(html).toContain("buildCapsulePath");
+    expect(html).toContain("stepSpring");
+    expect(html).toContain("onDisplayMetrics");
+    expect(html).toContain("notifyAnimationIdle");
+    expect(html).toContain("prefers-reduced-motion");
+
+    const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    expect(() => new Function(scriptMatch![1]!)).not.toThrow();
+  });
+
   it("matches Lilt's state-to-stretch curve for Siri Wave", () => {
     expect(siriWaveStretch("idle", 0.9)).toBe(0.45);
     expect(siriWaveStretch("error", 0.9)).toBe(0.45);

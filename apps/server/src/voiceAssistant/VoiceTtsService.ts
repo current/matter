@@ -12,21 +12,60 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import type {
   VoiceAvailableTtsInfo,
+  VoiceCredentialsStatus,
   VoiceSpeakRequest,
+  VoiceTranscribeResponse,
 } from "../../../../antimatter/voice-assistant/types.ts";
+import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
+const DEEPGRAM_TTS_VOICES = [
+  "aura-2-thalia-en",
+  "aura-2-asteria-en",
+  "aura-2-apollo-en",
+  "aura-2-orion-en",
+  "aura-2-luna-en",
+  "aura-2-arcas-en",
+  "aura-2-helena-en",
+] as const;
+
 const OPENAI_TTS_VOICES = ["coral", "nova", "alloy", "ash", "sage", "onyx", "shimmer"] as const;
 
 const DEFAULT_MACOS_VOICES = ["Samantha", "Alex", "Karen", "Daniel", "Moira"] as const;
+
+const DEEPGRAM_SPEAK_URL = "https://api.deepgram.com/v1/speak";
+const DEEPGRAM_LISTEN_URL = "https://api.deepgram.com/v1/listen";
+const VOICE_SECRETS_FILENAME = "mattr-voice-secrets.json";
 
 const OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech";
 const OPENAI_TTS_INSTRUCTIONS =
   "Speak naturally, warmly, and concisely like a sharp engineering co-pilot in a car.";
 const MACOS_SAY_PATH = "/usr/bin/say";
 const DEFAULT_MAX_SPEECH_CHARS = 1200;
+
+const DeepgramListenResponseSchema = Schema.Struct({
+  results: Schema.optional(
+    Schema.Struct({
+      channels: Schema.optional(
+        Schema.Array(
+          Schema.Struct({
+            alternatives: Schema.optional(
+              Schema.Array(
+                Schema.Struct({
+                  transcript: Schema.optional(Schema.String),
+                }),
+              ),
+            ),
+          }),
+        ),
+      ),
+    }),
+  ),
+});
+
+const decodeDeepgramListenResponse = Schema.decodeUnknownEffect(DeepgramListenResponseSchema);
 
 export class VoiceTtsUnavailableError extends Schema.TaggedError<VoiceTtsUnavailableError>()(
   "VoiceTtsUnavailableError",
@@ -49,7 +88,7 @@ export class VoiceTtsUnavailableError extends Schema.TaggedError<VoiceTtsUnavail
 export class VoiceTtsSynthesisError extends Schema.TaggedError<VoiceTtsSynthesisError>()(
   "VoiceTtsSynthesisError",
   {
-    provider: Schema.Literals(["openai", "macos"]),
+    provider: Schema.Literals(["deepgram", "openai", "macos"]),
     status: Schema.optional(Schema.Number),
     cause: Schema.optional(Schema.Defect()),
   },
@@ -69,6 +108,24 @@ const readEnvOpenAiKey = Config.String("OPENAI_API_KEY").pipe(
   Effect.orElseSucceed(() => ""),
 );
 
+const readEnvDeepgramKey = Config.String("DEEPGRAM_API_KEY").pipe(
+  Config.withDefault(""),
+  Effect.map((value) => value.trim()),
+  Effect.orElseSucceed(() => ""),
+);
+
+const VoiceSecretsFileSchema = Schema.Struct({
+  deepgramApiKey: Schema.optional(Schema.String),
+});
+
+const VoiceSecretsJsonSchema = Schema.fromJsonString(VoiceSecretsFileSchema);
+const decodeVoiceSecretsJson = Schema.decodeUnknownEffect(VoiceSecretsJsonSchema);
+const encodeVoiceSecretsJson = Schema.encodeEffect(VoiceSecretsJsonSchema);
+
+interface VoiceSecretsFile {
+  readonly deepgramApiKey?: string;
+}
+
 export interface VoiceTtsSpeakResult {
   readonly bytes: Uint8Array;
   readonly contentType: string;
@@ -81,6 +138,11 @@ export class VoiceTtsService extends Context.Service<
     readonly speak: (
       req: VoiceSpeakRequest,
     ) => Effect.Effect<VoiceTtsSpeakResult, VoiceTtsUnavailableError | VoiceTtsSynthesisError>;
+    readonly transcribeDeepgram: (
+      wavBytes: Uint8Array,
+      language?: string,
+    ) => Effect.Effect<VoiceTranscribeResponse, VoiceTtsUnavailableError | VoiceTtsSynthesisError>;
+    readonly saveDeepgramApiKey: (apiKey: string) => Effect.Effect<VoiceCredentialsStatus>;
   }
 >()("t3/voiceAssistant/VoiceTtsService") {}
 
@@ -156,13 +218,31 @@ function sanitizeOpenAiVoice(voice: string | undefined): string {
   return OPENAI_TTS_VOICES[0];
 }
 
+function sanitizeDeepgramVoice(voice: string | undefined): string {
+  const candidate = voice?.trim().toLowerCase();
+  if (candidate && (DEEPGRAM_TTS_VOICES as ReadonlyArray<string>).includes(candidate)) {
+    return candidate;
+  }
+  return DEEPGRAM_TTS_VOICES[0];
+}
+
+function sanitizeLanguageParam(language: string | undefined): string {
+  const candidate = language?.trim();
+  if (!candidate || candidate.toLowerCase() === "auto") return "";
+  if (!/^[A-Za-z0-9-]{2,16}$/.test(candidate)) return "";
+  return `&language=${encodeURIComponent(candidate)}`;
+}
+
 const make = Effect.gen(function* () {
+  const serverConfig = yield* ServerConfig.ServerConfig;
   const settingsService = yield* ServerSettings.ServerSettingsService;
   const secretResolver = yield* SecretResolver.SecretResolver;
   const httpClient = yield* HttpClient.HttpClient;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const processRunner = yield* ProcessRunner.ProcessRunner;
+
+  const secretsPath = path.join(serverConfig.stateDir, VOICE_SECRETS_FILENAME);
 
   const platform = yield* HostProcess.Platform;
   const isMacosSayAvailable =
@@ -188,6 +268,44 @@ const make = Effect.gen(function* () {
     }),
   );
 
+  const readStoredVoiceSecrets = Effect.fn("VoiceTtsService.readStoredVoiceSecrets")(function* () {
+    const raw = yield* fileSystem
+      .readFileString(secretsPath)
+      .pipe(Effect.orElseSucceed(() => null));
+    if (!raw) return {} as VoiceSecretsFile;
+    const decoded = yield* decodeVoiceSecretsJson(raw).pipe(Effect.orElseSucceed(() => null));
+    const deepgramApiKey = decoded?.deepgramApiKey?.trim();
+    return deepgramApiKey ? ({ deepgramApiKey } satisfies VoiceSecretsFile) : {};
+  });
+
+  const resolveDeepgramKey = Effect.fn("VoiceTtsService.resolveDeepgramKey")(function* () {
+    const stored = yield* readStoredVoiceSecrets();
+    if (stored.deepgramApiKey) return stored.deepgramApiKey;
+    const envKey = yield* readEnvDeepgramKey;
+    return envKey.length > 0 ? envKey : null;
+  });
+
+  const hasDeepgramConfigured = Effect.fn("VoiceTtsService.hasDeepgramConfigured")(function* () {
+    return (yield* resolveDeepgramKey()) !== null;
+  });
+
+  const saveDeepgramApiKey: VoiceTtsService["Service"]["saveDeepgramApiKey"] = Effect.fn(
+    "VoiceTtsService.saveDeepgramApiKey",
+  )(function* (apiKey: string) {
+    const trimmed = apiKey.trim();
+    const payload: VoiceSecretsFile = trimmed.length > 0 ? { deepgramApiKey: trimmed } : {};
+    const encoded = yield* encodeVoiceSecretsJson(payload).pipe(Effect.orElseSucceed(() => "{}"));
+    yield* fileSystem
+      .makeDirectory(serverConfig.stateDir, { recursive: true })
+      .pipe(Effect.orElseSucceed(() => undefined));
+    yield* fileSystem
+      .writeFileString(secretsPath, `${encoded}\n`, { mode: 0o600 })
+      .pipe(Effect.orElseSucceed(() => undefined));
+    yield* fileSystem.chmod(secretsPath, 0o600).pipe(Effect.orElseSucceed(() => undefined));
+    const deepgramAvailable = yield* hasDeepgramConfigured();
+    return { deepgramAvailable } satisfies VoiceCredentialsStatus;
+  });
+
   const resolveOpenAiKey = Effect.fn("VoiceTtsService.resolveOpenAiKey")(function* () {
     const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
     const configured = settings?.cloudSpeechCredentials.openai;
@@ -209,24 +327,109 @@ const make = Effect.gen(function* () {
 
   const getAvailableTtsInfo: VoiceTtsService["Service"]["getAvailableTtsInfo"] = Effect.gen(
     function* () {
-      const [openaiAvailable, macosAvailable, macosVoices] = yield* Effect.all(
-        [hasOpenAiConfigured(), isMacosSayAvailable, loadMacosVoices],
+      const [deepgramAvailable, openaiAvailable, macosAvailable, macosVoices] = yield* Effect.all(
+        [hasDeepgramConfigured(), hasOpenAiConfigured(), isMacosSayAvailable, loadMacosVoices],
         { concurrency: "unbounded" },
       );
-      const defaultProvider: VoiceAvailableTtsInfo["defaultProvider"] = openaiAvailable
-        ? "openai"
-        : macosAvailable
-          ? "macos"
-          : "browser";
+      const defaultProvider: VoiceAvailableTtsInfo["defaultProvider"] = deepgramAvailable
+        ? "deepgram"
+        : openaiAvailable
+          ? "openai"
+          : macosAvailable
+            ? "macos"
+            : "browser";
       return {
+        deepgramAvailable,
         openaiAvailable,
         macosAvailable,
         defaultProvider,
+        deepgramVoices: DEEPGRAM_TTS_VOICES,
         openaiVoices: OPENAI_TTS_VOICES,
         macosVoices: macosAvailable ? macosVoices : [],
       } satisfies VoiceAvailableTtsInfo;
     },
   );
+
+  const speakWithDeepgram = Effect.fn("VoiceTtsService.speakWithDeepgram")(function* (input: {
+    readonly apiKey: string;
+    readonly text: string;
+    readonly voice: string | undefined;
+  }) {
+    const voice = sanitizeDeepgramVoice(input.voice);
+    const url = `${DEEPGRAM_SPEAK_URL}?model=${encodeURIComponent(voice)}&encoding=mp3`;
+    const request = HttpClientRequest.post(url).pipe(
+      HttpClientRequest.setHeader("authorization", `Token ${input.apiKey}`),
+      HttpClientRequest.bodyJsonUnsafe({ text: input.text }),
+    );
+    const response = yield* httpClient.execute(request).pipe(
+      Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
+      Effect.provideService(HttpClient.TracerPropagationEnabled, false),
+      Effect.timeoutOrElse({
+        duration: "20 seconds",
+        orElse: () => Effect.fail(new VoiceTtsSynthesisError({ provider: "deepgram" })),
+      }),
+      Effect.mapError((cause) =>
+        isVoiceTtsSynthesisError(cause)
+          ? cause
+          : new VoiceTtsSynthesisError({ provider: "deepgram", cause }),
+      ),
+    );
+    if (response.status < 200 || response.status >= 300) {
+      return yield* new VoiceTtsSynthesisError({ provider: "deepgram", status: response.status });
+    }
+    const arrayBuffer = yield* response.arrayBuffer.pipe(
+      Effect.mapError((cause) => new VoiceTtsSynthesisError({ provider: "deepgram", cause })),
+    );
+    return {
+      bytes: new Uint8Array(arrayBuffer),
+      contentType: "audio/mpeg",
+    } satisfies VoiceTtsSpeakResult;
+  });
+
+  const transcribeDeepgram: VoiceTtsService["Service"]["transcribeDeepgram"] = Effect.fn(
+    "VoiceTtsService.transcribeDeepgram",
+  )(function* (wavBytes: Uint8Array, language?: string) {
+    if (wavBytes.byteLength === 0) {
+      return yield* new VoiceTtsUnavailableError({ reason: "empty-text" });
+    }
+    const apiKey = yield* resolveDeepgramKey();
+    if (!apiKey) {
+      return yield* new VoiceTtsUnavailableError({ reason: "no-provider" });
+    }
+    const langParam = sanitizeLanguageParam(language);
+    const url = `${DEEPGRAM_LISTEN_URL}?model=nova-3&smart_format=true&punctuate=true${langParam}`;
+    const request = HttpClientRequest.post(url).pipe(
+      HttpClientRequest.setHeader("authorization", `Token ${apiKey}`),
+      HttpClientRequest.bodyUint8Array(wavBytes, "audio/wav"),
+    );
+    const response = yield* httpClient.execute(request).pipe(
+      Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
+      Effect.provideService(HttpClient.TracerPropagationEnabled, false),
+      Effect.timeoutOrElse({
+        duration: "25 seconds",
+        orElse: () => Effect.fail(new VoiceTtsSynthesisError({ provider: "deepgram" })),
+      }),
+      Effect.mapError((cause) =>
+        isVoiceTtsSynthesisError(cause)
+          ? cause
+          : new VoiceTtsSynthesisError({ provider: "deepgram", cause }),
+      ),
+    );
+    if (response.status < 200 || response.status >= 300) {
+      return yield* new VoiceTtsSynthesisError({ provider: "deepgram", status: response.status });
+    }
+    const rawJson = yield* response.json.pipe(
+      Effect.mapError((cause) => new VoiceTtsSynthesisError({ provider: "deepgram", cause })),
+    );
+    const parsed = yield* decodeDeepgramListenResponse(rawJson).pipe(
+      Effect.mapError((cause) => new VoiceTtsSynthesisError({ provider: "deepgram", cause })),
+    );
+    const transcript = parsed.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() ?? "";
+    return {
+      text: transcript,
+      provider: "deepgram",
+    } satisfies VoiceTranscribeResponse;
+  });
 
   const callOpenAiTts = Effect.fn("VoiceTtsService.callOpenAiTts")(function* (input: {
     readonly apiKey: string;
@@ -363,6 +566,42 @@ const make = Effect.gen(function* () {
     return { bytes, contentType: "audio/wav" } satisfies VoiceTtsSpeakResult;
   }, Effect.scoped);
 
+  const speakWithOpenAiOrMacos = Effect.fn("VoiceTtsService.speakWithOpenAiOrMacos")(
+    function* (input: {
+      readonly openAiKey: string | null;
+      readonly macosAvailable: boolean;
+      readonly text: string;
+      readonly voice: string | undefined;
+      readonly speed: number;
+    }): Effect.fn.Return<VoiceTtsSpeakResult, VoiceTtsUnavailableError | VoiceTtsSynthesisError> {
+      if (input.openAiKey) {
+        return yield* speakWithOpenAi({
+          apiKey: input.openAiKey,
+          text: input.text,
+          voice: input.voice,
+          speed: input.speed,
+        }).pipe(
+          Effect.catchTags({
+            VoiceTtsSynthesisError: (error) =>
+              input.macosAvailable
+                ? Effect.logWarning("OpenAI TTS failed; falling back to macOS say.", {
+                    status: error.status,
+                  }).pipe(
+                    Effect.andThen(
+                      speakWithMacos({ text: input.text, voice: input.voice, speed: input.speed }),
+                    ),
+                  )
+                : Effect.fail(error),
+          }),
+        );
+      }
+      if (input.macosAvailable) {
+        return yield* speakWithMacos({ text: input.text, voice: input.voice, speed: input.speed });
+      }
+      return yield* new VoiceTtsUnavailableError({ reason: "no-provider" });
+    },
+  );
+
   const speak: VoiceTtsService["Service"]["speak"] = Effect.fn("VoiceTtsService.speak")(
     function* (req) {
       const text = sanitizeSpeechText(req.text);
@@ -373,6 +612,13 @@ const make = Effect.gen(function* () {
       const requested = req.provider ?? "auto";
       if (requested === "off" || requested === "browser") {
         return yield* new VoiceTtsUnavailableError({ reason: "disabled" });
+      }
+      if (requested === "deepgram") {
+        const apiKey = yield* resolveDeepgramKey();
+        if (!apiKey) {
+          return yield* new VoiceTtsUnavailableError({ reason: "no-provider" });
+        }
+        return yield* speakWithDeepgram({ apiKey, text, voice: req.voice });
       }
       if (requested === "openai") {
         const apiKey = yield* resolveOpenAiKey();
@@ -388,30 +634,48 @@ const make = Effect.gen(function* () {
         return yield* speakWithMacos({ text, voice: req.voice, speed });
       }
 
-      const [apiKey, macosAvailable] = yield* Effect.all(
-        [resolveOpenAiKey(), isMacosSayAvailable],
+      const [deepgramKey, openAiKey, macosAvailable] = yield* Effect.all(
+        [resolveDeepgramKey(), resolveOpenAiKey(), isMacosSayAvailable],
         { concurrency: "unbounded" },
       );
-      if (apiKey) {
-        return yield* speakWithOpenAi({ apiKey, text, voice: req.voice, speed }).pipe(
+      if (deepgramKey) {
+        return yield* speakWithDeepgram({ apiKey: deepgramKey, text, voice: req.voice }).pipe(
           Effect.catchTags({
             VoiceTtsSynthesisError: (error) =>
-              macosAvailable
-                ? Effect.logWarning("OpenAI TTS failed; falling back to macOS say.", {
+              openAiKey || macosAvailable
+                ? Effect.logWarning("Deepgram Aura-2 TTS failed; falling back to next provider.", {
                     status: error.status,
-                  }).pipe(Effect.andThen(speakWithMacos({ text, voice: req.voice, speed })))
+                  }).pipe(
+                    Effect.andThen(
+                      speakWithOpenAiOrMacos({
+                        openAiKey,
+                        macosAvailable,
+                        text,
+                        voice: req.voice,
+                        speed,
+                      }),
+                    ),
+                  )
                 : Effect.fail(error),
           }),
         );
       }
-      if (macosAvailable) {
-        return yield* speakWithMacos({ text, voice: req.voice, speed });
-      }
-      return yield* new VoiceTtsUnavailableError({ reason: "no-provider" });
+      return yield* speakWithOpenAiOrMacos({
+        openAiKey,
+        macosAvailable,
+        text,
+        voice: req.voice,
+        speed,
+      });
     },
   );
 
-  return VoiceTtsService.of({ getAvailableTtsInfo, speak });
+  return VoiceTtsService.of({
+    getAvailableTtsInfo,
+    speak,
+    transcribeDeepgram,
+    saveDeepgramApiKey,
+  });
 });
 
 export const layer = Layer.effect(VoiceTtsService, make);

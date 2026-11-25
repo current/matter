@@ -12,16 +12,21 @@ import {
 } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as Config from "effect/Config";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import { FetchHttpClient } from "effect/http";
+import { vi } from "vite-plus/test";
 
 import type {
   VoiceAssistantTurnRequest,
   VoiceWorkspaceContext,
 } from "../../../../antimatter/voice-assistant/types.ts";
+import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
@@ -565,6 +570,7 @@ describe("VoiceTtsService", () => {
         return;
       }
       const ttsLayer = VoiceTtsService.layer.pipe(
+        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mattr-voice-tts-macos-" })),
         Layer.provide(ServerSettings.layerTest({})),
         Layer.provide(
           Layer.succeed(SecretResolver.SecretResolver, {
@@ -598,6 +604,170 @@ describe("VoiceTtsService", () => {
       const format = new TextDecoder().decode(audio.bytes.slice(8, 12));
       assert.strictEqual(header, "RIFF");
       assert.strictEqual(format, "WAVE");
+    }),
+  );
+
+  it.effect("synthesizes MP3 audio via Deepgram Aura-2 TTS with Token auth", () =>
+    Effect.gen(function* () {
+      const mp3Bytes = new Uint8Array([0x49, 0x44, 0x33, 0x03, 0x00, 0x01, 0x02]);
+      const upstream = vi.fn<typeof fetch>(
+        async () =>
+          new Response(mp3Bytes, {
+            status: 200,
+            headers: { "content-type": "audio/mpeg" },
+          }),
+      );
+      const ttsLayer = VoiceTtsService.layer.pipe(
+        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mattr-voice-dg-tts-" })),
+        Layer.provide(ServerSettings.layerTest({})),
+        Layer.provide(
+          Layer.succeed(SecretResolver.SecretResolver, {
+            read: () => Effect.succeed([]),
+            label: () => Effect.succeed("test"),
+            invalidate: () => Effect.void,
+          } as unknown as SecretResolver.SecretResolver["Service"]),
+        ),
+        Layer.provide(FetchHttpClient.layer),
+        Layer.provide(ProcessRunner.layer),
+        Layer.provide(NodeServices.layer),
+      );
+
+      const [info, audio] = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        const saved = yield* tts.saveDeepgramApiKey("test-deepgram-key-tts");
+        assert.strictEqual(saved.deepgramAvailable, true);
+        const available = yield* tts.getAvailableTtsInfo;
+        const spoken = yield* tts
+          .speak({
+            text: "Hello from Deepgram Aura two.",
+            provider: "deepgram",
+          })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+        return [available, spoken] as const;
+      }).pipe(Effect.provide(ttsLayer));
+
+      assert.strictEqual(info.deepgramAvailable, true);
+      assert.strictEqual(info.defaultProvider, "deepgram");
+      assert.include(info.deepgramVoices, "aura-2-thalia-en");
+      assert.strictEqual(audio.contentType, "audio/mpeg");
+      assert.deepStrictEqual(audio.bytes, mp3Bytes);
+
+      assert.strictEqual(upstream.mock.calls.length, 1);
+      const [url, init] = upstream.mock.calls[0]!;
+      assert.strictEqual(
+        String(url),
+        "https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=mp3",
+      );
+      assert.strictEqual(
+        new Headers(init?.headers).get("authorization"),
+        "Token test-deepgram-key-tts",
+      );
+      assert.deepStrictEqual(JSON.parse(String(init?.body)), {
+        text: "Hello from Deepgram Aura two.",
+      });
+    }),
+  );
+
+  it.effect("transcribes WAV audio via Deepgram Nova-3 STT with Token auth", () =>
+    Effect.gen(function* () {
+      const upstream = vi.fn<typeof fetch>(async () =>
+        Response.json({
+          results: {
+            channels: [
+              {
+                alternatives: [{ transcript: "Approve the iOS build." }],
+              },
+            ],
+          },
+        }),
+      );
+      const ttsLayer = VoiceTtsService.layer.pipe(
+        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mattr-voice-dg-stt-" })),
+        Layer.provide(ServerSettings.layerTest({})),
+        Layer.provide(
+          Layer.succeed(SecretResolver.SecretResolver, {
+            read: () => Effect.succeed([]),
+            label: () => Effect.succeed("test"),
+            invalidate: () => Effect.void,
+          } as unknown as SecretResolver.SecretResolver["Service"]),
+        ),
+        Layer.provide(FetchHttpClient.layer),
+        Layer.provide(ProcessRunner.layer),
+        Layer.provide(NodeServices.layer),
+      );
+
+      const fakeWav = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00]);
+      const result = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        yield* tts.saveDeepgramApiKey("test-deepgram-key-stt");
+        return yield* tts
+          .transcribeDeepgram(fakeWav, "en")
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+      }).pipe(Effect.provide(ttsLayer));
+
+      assert.deepStrictEqual(result, {
+        text: "Approve the iOS build.",
+        provider: "deepgram",
+      });
+      assert.strictEqual(upstream.mock.calls.length, 1);
+      const [url, init] = upstream.mock.calls[0]!;
+      assert.strictEqual(
+        String(url),
+        "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&language=en",
+      );
+      const headers = new Headers(init?.headers);
+      assert.strictEqual(headers.get("authorization"), "Token test-deepgram-key-stt");
+      assert.strictEqual(headers.get("content-type"), "audio/wav");
+    }),
+  );
+
+  it.effect("persists and clears the Deepgram API key in stateDir/mattr-voice-secrets.json", () =>
+    Effect.gen(function* () {
+      const configLayer = ServerConfig.layerTest(process.cwd(), {
+        prefix: "mattr-voice-dg-secrets-",
+      }).pipe(Layer.provide(NodeServices.layer));
+      const fullLayer = Layer.mergeAll(
+        configLayer,
+        NodeServices.layer,
+        VoiceTtsService.layer.pipe(
+          Layer.provide(configLayer),
+          Layer.provide(ServerSettings.layerTest({})),
+          Layer.provide(
+            Layer.succeed(SecretResolver.SecretResolver, {
+              read: () => Effect.succeed([]),
+              label: () => Effect.succeed("test"),
+              invalidate: () => Effect.void,
+            } as unknown as SecretResolver.SecretResolver["Service"]),
+          ),
+          Layer.provide(FetchHttpClient.layer),
+          Layer.provide(ProcessRunner.layer),
+          Layer.provide(NodeServices.layer),
+        ),
+      );
+
+      yield* Effect.gen(function* () {
+        const config = yield* ServerConfig.ServerConfig;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        const secretsPath = path.join(config.stateDir, "mattr-voice-secrets.json");
+
+        const saved = yield* tts.saveDeepgramApiKey("  dg-persisted-key  ");
+        assert.strictEqual(saved.deepgramAvailable, true);
+        const rawSaved = yield* fs.readFileString(secretsPath);
+        assert.deepStrictEqual(JSON.parse(rawSaved), { deepgramApiKey: "dg-persisted-key" });
+
+        const cleared = yield* tts.saveDeepgramApiKey("   ");
+        const rawCleared = yield* fs.readFileString(secretsPath);
+        assert.deepStrictEqual(JSON.parse(rawCleared), {});
+        const envKey = yield* Config.String("DEEPGRAM_API_KEY").pipe(
+          Config.withDefault(""),
+          Effect.orElseSucceed(() => ""),
+        );
+        if (!envKey.trim()) {
+          assert.strictEqual(cleared.deepgramAvailable, false);
+        }
+      }).pipe(Effect.provide(fullLayer));
     }),
   );
 });

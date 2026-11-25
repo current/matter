@@ -2,8 +2,9 @@ import { SIRI_FLUID_DOTS_FRAG, SIRI_WAVE_FRAG, SIRI_WAVE_VERT } from "./siriWave
 
 /**
  * Generates the self-contained HTML/CSS/JS document for the macOS Notch / mattr Island panel.
- * Loads instantaneously in Electron without booting the full web app, while embedding Lilt's
- * 1:1 Siri Wave (GLSL) WebGL shaders.
+ * Renders a native concave-ear NotchShape SVG (on notched MacBooks) or floating Dynamic Island
+ * capsule (on external / non-notched displays) driven by coupled mass-spring-damper physics,
+ * alongside Lilt's 1:1 Siri Wave (GLSL) WebGL shaders.
  */
 export function buildIslandHtml(): string {
   const shadersJson = JSON.stringify({
@@ -20,22 +21,22 @@ export function buildIslandHtml(): string {
 <title>mattr Island</title>
 <style>
   :root {
-    --island-bg: #070709;
-    --island-surface: rgba(255, 255, 255, 0.065);
-    --island-surface-hover: rgba(255, 255, 255, 0.11);
-    --island-surface-active: rgba(255, 255, 255, 0.16);
+    --island-bg: #000000;
+    --island-surface: rgba(255, 255, 255, 0.068);
+    --island-surface-hover: rgba(255, 255, 255, 0.115);
+    --island-surface-active: rgba(255, 255, 255, 0.17);
     --island-border: rgba(255, 255, 255, 0.09);
-    --island-border-strong: rgba(255, 255, 255, 0.18);
+    --island-border-strong: rgba(255, 255, 255, 0.19);
     --island-fg: #f5f5f7;
-    --island-fg-muted: rgba(245, 245, 247, 0.56);
+    --island-fg-muted: rgba(245, 245, 247, 0.58);
     --island-fg-subtle: rgba(245, 245, 247, 0.38);
-    --island-green: #34d399;
+    --island-green: #30d158;
     --island-amber: #fbbf24;
     --island-blue: #60a5fa;
-    --island-red: #f87171;
+    --island-red: #ff453a;
     --island-btn-primary-bg: #ffffff;
-    --island-btn-primary-fg: #09090b;
-    --island-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --island-btn-primary-fg: #000000;
+    --island-reveal-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   * { box-sizing: border-box; }
@@ -48,128 +49,324 @@ export function buildIslandHtml(): string {
     overflow: hidden;
     background: transparent;
     color: var(--island-fg);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     user-select: none;
   }
 
+  button,
+  .done-item {
+    transition: transform 90ms ease, background 130ms ease, color 130ms ease, border-color 130ms ease, opacity 130ms ease;
+  }
+  button:active:not(:disabled),
+  .done-item:active {
+    transform: scale(0.96);
+  }
+
   #stage {
+    position: relative;
     width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding-top: 0;
-    pointer-events: none;
-  }
-
-  #island-shell {
-    position: relative;
-    pointer-events: auto;
-    background: var(--island-bg);
-    color: var(--island-fg);
-    border: 1px solid var(--island-border);
-    border-top: none;
-    border-radius: 0 0 22px 22px;
-    box-shadow:
-      0 18px 46px rgba(0, 0, 0, 0.52),
-      0 4px 12px rgba(0, 0, 0, 0.34),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.05);
     overflow: hidden;
-    transform-origin: top center;
-    transition:
-      width 280ms var(--island-ease),
-      border-radius 280ms var(--island-ease),
-      opacity 180ms ease,
-      transform 240ms var(--island-ease);
-    will-change: transform, opacity, width;
+    pointer-events: auto;
   }
 
-  #island-shell.hidden {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.94);
+  #island-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    overflow: visible;
+    transform-origin: top center;
+  }
+
+  #island-content-clip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 188px;
+    height: 37px;
+    overflow: hidden;
+    pointer-events: auto;
+    transform-origin: top center;
+    will-change: transform, opacity;
+  }
+
+  #island-content-clip.is-inert {
     pointer-events: none;
   }
 
-  #island-shell.mode-pill {
-    width: auto;
-    min-width: 240px;
-    max-width: 410px;
-    border-radius: 0 0 18px 18px;
+  #island-measure {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 188px;
+    min-height: 37px;
+    color: var(--island-fg);
   }
 
-  #island-shell.mode-card {
-    width: 424px;
-    border-radius: 0 0 24px 24px;
+  @keyframes island-body-enter {
+    from {
+      opacity: 0;
+      filter: blur(5px);
+      transform: translateY(-6px) scale(0.965);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0px);
+      transform: translateY(0) scale(1);
+    }
   }
 
-  /* Compact notch pill */
-  .pill-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px 10px 14px;
-    min-height: 40px;
-    cursor: pointer;
+  @keyframes island-wing-enter {
+    from {
+      opacity: 0;
+      filter: blur(3px);
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0px);
+      transform: scale(1);
+    }
   }
 
+  .card-body.entering {
+    animation: island-body-enter 210ms var(--island-reveal-ease) both;
+  }
+
+  .pill-entering {
+    animation: island-wing-enter 180ms var(--island-reveal-ease) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes island-body-enter {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes island-wing-enter {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    button:active:not(:disabled),
+    .done-item:active {
+      transform: none;
+    }
+  }
+
+  /* Status beacons */
   .status-dot {
     width: 7px;
     height: 7px;
     border-radius: 999px;
     flex: none;
   }
-  .status-dot.done { background: var(--island-green); box-shadow: 0 0 8px rgba(52, 211, 153, 0.55); }
-  .status-dot.approval { background: var(--island-amber); box-shadow: 0 0 8px rgba(251, 191, 36, 0.55); }
-  .status-dot.input { background: var(--island-blue); box-shadow: 0 0 8px rgba(96, 165, 250, 0.55); }
-  .status-dot.running { background: var(--island-fg-muted); }
+  .status-dot.done {
+    background: var(--island-green);
+    box-shadow: 0 0 9px rgba(48, 209, 88, 0.72);
+  }
+  .status-dot.approval {
+    background: var(--island-amber);
+    box-shadow: 0 0 9px rgba(251, 191, 36, 0.72);
+  }
+  .status-dot.input {
+    background: var(--island-blue);
+    box-shadow: 0 0 9px rgba(96, 165, 250, 0.72);
+  }
+  .status-dot.running {
+    background: rgba(245, 245, 247, 0.72);
+    box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
+  }
+  .status-dot.idle {
+    background: rgba(245, 245, 247, 0.56);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.28);
+  }
+  .status-dot.error {
+    background: var(--island-red);
+    box-shadow: 0 0 9px rgba(255, 69, 58, 0.72);
+  }
+
+  /* Peek state (hovering physical MacBook notch) */
+  .peek-row {
+    display: grid;
+    align-items: center;
+    width: 100%;
+    cursor: pointer;
+  }
+  .peek-wing {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+  .peek-mic {
+    color: rgba(245, 245, 247, 0.76);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 130ms ease;
+  }
+  .peek-row:hover .peek-mic {
+    color: #ffffff;
+  }
+
+  /* Notch-flanking 3-column Live Activity Pill */
+  .pill-notched {
+    display: grid;
+    align-items: center;
+    width: 100%;
+    cursor: pointer;
+  }
+  .pill-wing {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  .pill-wing.left {
+    padding: 0 6px 0 14px;
+    justify-content: flex-start;
+  }
+  .pill-wing.right {
+    padding: 0 14px 0 6px;
+    justify-content: flex-end;
+  }
+  .notch-cutout {
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* Floating non-notched Live Activity Capsule */
+  .pill-capsule {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 38px;
+    padding: 0 10px 0 14px;
+    cursor: pointer;
+  }
 
   .pill-label {
-    font-size: 13px;
-    font-weight: 560;
-    letter-spacing: -0.01em;
+    font-size: 12.5px;
+    font-weight: 580;
+    letter-spacing: -0.015em;
+    color: var(--island-fg);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pill-label.flash-ok {
+    color: var(--island-green);
   }
 
   .pill-title {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--island-fg-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 170px;
+    min-width: 0;
+    flex: 1;
+    text-align: right;
+  }
+  .pill-capsule .pill-title {
+    text-align: left;
   }
 
   .pill-btn {
-    margin-left: auto;
+    flex: none;
     border: none;
-    background: rgba(255, 255, 255, 0.11);
-    color: var(--island-fg);
+    background: rgba(255, 255, 255, 0.13);
+    color: #ffffff;
     font: inherit;
-    font-size: 12px;
-    font-weight: 520;
-    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 560;
+    letter-spacing: -0.01em;
+    padding: 3.5px 9px;
     border-radius: 999px;
     cursor: pointer;
-    transition: background 140ms ease;
     white-space: nowrap;
   }
-  .pill-btn:hover { background: rgba(255, 255, 255, 0.19); }
-
-  /* Card header */
-  .card-inner {
-    padding: 14px 16px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  .pill-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
   }
 
-  .card-header {
+  /* 4-bar live reactive equalizer in Voice Mode pill */
+  .eq-bars {
+    display: inline-flex;
+    align-items: center;
+    gap: 2.5px;
+    height: 14px;
+    flex: none;
+    padding: 0 2px;
+  }
+  .eq-bar {
+    width: 2.5px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--island-green);
+    transition: height 75ms ease-out, opacity 140ms ease;
+  }
+  .eq-bars.muted .eq-bar {
+    background: var(--island-amber);
+    opacity: 0.65;
+  }
+  .eq-bars.thinking .eq-bar {
+    background: var(--island-blue);
+  }
+
+  /* Card layout with Notch-Safe Top Wing Header */
+  .card-root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .wing-header {
+    display: grid;
+    align-items: center;
+    width: 100%;
+    padding: 0 14px;
+    flex: none;
+  }
+  .wing-header-side {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  .wing-header-side.left {
+    padding-right: 4px;
+    justify-content: flex-start;
+  }
+  .wing-header-side.right {
+    padding-left: 4px;
+    justify-content: flex-end;
+    gap: 3px;
+  }
+
+  /* Non-notched card header */
+  .flat-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    padding: 13px 16px 2px;
+    min-height: 40px;
+    flex: none;
+  }
+
+  .card-body {
+    padding: 8px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .thread-picker-wrap {
@@ -178,25 +375,25 @@ export function buildIslandHtml(): string {
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
   }
 
   .thread-title-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
     max-width: 100%;
-    padding: 3px 7px 3px 0;
+    padding: 3px 5px 3px 0;
     border: none;
     background: transparent;
     color: var(--island-fg);
     font: inherit;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
-    letter-spacing: -0.012em;
+    letter-spacing: -0.015em;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 7px;
   }
   .thread-title-btn:hover { color: #ffffff; }
   .thread-title-text {
@@ -218,8 +415,8 @@ export function buildIslandHtml(): string {
   }
 
   .icon-btn {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 999px;
     border: none;
     background: transparent;
@@ -227,9 +424,15 @@ export function buildIslandHtml(): string {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    font-size: 12px;
     cursor: pointer;
-    transition: background 120ms ease, color 120ms ease;
     padding: 0;
+    flex: none;
+  }
+  .wing-header .icon-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 11.5px;
   }
   .icon-btn:hover {
     background: var(--island-surface-hover);
@@ -239,26 +442,57 @@ export function buildIslandHtml(): string {
   .badge-chip {
     font-size: 11px;
     font-weight: 560;
-    padding: 2px 7px;
+    padding: 2px 8px;
     border-radius: 999px;
     background: var(--island-surface);
     color: var(--island-fg-muted);
     white-space: nowrap;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .badge-chip.amber { background: rgba(251, 191, 36, 0.14); color: #fcd34d; }
-  .badge-chip.blue { background: rgba(96, 165, 250, 0.14); color: #93c5fd; }
-  .badge-chip.green { background: rgba(52, 211, 153, 0.14); color: #6ee7b7; }
+  .badge-chip.amber { background: rgba(251, 191, 36, 0.15); color: #fcd34d; }
+  .badge-chip.blue { background: rgba(96, 165, 250, 0.15); color: #93c5fd; }
+  .badge-chip.green { background: rgba(48, 209, 88, 0.15); color: #6ee7b7; }
+
+  /* Voice Mode Live toggle chip */
+  .handsfree-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--island-border);
+    background: var(--island-surface);
+    color: var(--island-fg-muted);
+    font: inherit;
+    font-size: 10.5px;
+    font-weight: 580;
+    letter-spacing: -0.01em;
+    padding: 3px 7.5px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: none;
+  }
+  .handsfree-chip:hover {
+    color: var(--island-fg);
+    background: var(--island-surface-hover);
+  }
+  .handsfree-chip.live {
+    background: rgba(48, 209, 88, 0.16);
+    border-color: rgba(48, 209, 88, 0.44);
+    color: var(--island-green);
+  }
 
   /* Thread switcher list */
   .thread-list {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    max-height: 190px;
+    gap: 2px;
+    max-height: 176px;
     overflow-y: auto;
     padding: 4px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.045);
     border: 1px solid var(--island-border);
   }
   .thread-list-item {
@@ -273,9 +507,8 @@ export function buildIslandHtml(): string {
     font: inherit;
     font-size: 12.5px;
     padding: 7px 9px;
-    border-radius: 8px;
+    border-radius: 9px;
     cursor: pointer;
-    transition: background 120ms ease;
   }
   .thread-list-item:hover { background: var(--island-surface-hover); }
   .thread-list-item.active { background: var(--island-surface-active); }
@@ -293,16 +526,25 @@ export function buildIslandHtml(): string {
   }
 
   /* Conversation preview inside voice panel */
-  .messages-box {
+  .messages-box,
+  .assistant-feed {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    max-height: 170px;
+    gap: 7px;
+    max-height: 162px;
     overflow-y: auto;
     padding-right: 2px;
   }
-  .messages-box::-webkit-scrollbar { width: 4px; }
-  .messages-box::-webkit-scrollbar-thumb {
+  .messages-box::-webkit-scrollbar,
+  .assistant-feed::-webkit-scrollbar,
+  .thread-list::-webkit-scrollbar,
+  .approval-detail::-webkit-scrollbar {
+    width: 4px;
+  }
+  .messages-box::-webkit-scrollbar-thumb,
+  .assistant-feed::-webkit-scrollbar-thumb,
+  .thread-list::-webkit-scrollbar-thumb,
+  .approval-detail::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.14);
     border-radius: 999px;
   }
@@ -310,8 +552,8 @@ export function buildIslandHtml(): string {
   .user-bubble {
     align-self: flex-end;
     max-width: 88%;
-    background: rgba(255, 255, 255, 0.09);
-    color: rgba(245, 245, 247, 0.92);
+    background: rgba(255, 255, 255, 0.095);
+    color: rgba(245, 245, 247, 0.94);
     font-size: 12.5px;
     line-height: 1.42;
     padding: 6px 12px;
@@ -335,10 +577,82 @@ export function buildIslandHtml(): string {
     user-select: text;
   }
 
+  .assistant-reply {
+    font-size: 12.5px;
+    line-height: 1.46;
+    color: var(--island-fg);
+    background: var(--island-surface);
+    border: 1px solid var(--island-border);
+    border-radius: 13px;
+    padding: 8px 11px;
+    user-select: text;
+  }
+  .assistant-reply.briefing {
+    border-color: rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.08);
+  }
+  .tool-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .tool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-weight: 540;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(48, 209, 88, 0.14);
+    color: var(--island-green);
+  }
+  .tool-chip.fail {
+    background: rgba(255, 69, 58, 0.14);
+    color: var(--island-red);
+  }
+
   .empty-hint {
     font-size: 12.5px;
+    line-height: 1.45;
     color: var(--island-fg-subtle);
-    padding: 4px 0;
+    padding: 2px 0;
+  }
+
+  /* Mode switcher bar */
+  .mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .mode-pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--island-surface);
+    border: 1px solid var(--island-border);
+  }
+  .mode-pill-btn {
+    border: none;
+    background: transparent;
+    color: var(--island-fg-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 550;
+    padding: 3.5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .mode-pill-btn:hover {
+    color: var(--island-fg);
+  }
+  .mode-pill-btn.active {
+    background: var(--island-btn-primary-bg);
+    color: var(--island-btn-primary-fg);
   }
 
   /* Lilt Siri Wave stage */
@@ -349,7 +663,7 @@ export function buildIslandHtml(): string {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 4px 0 2px;
+    padding: 2px 0;
   }
 
   .transcript-pill {
@@ -357,7 +671,7 @@ export function buildIslandHtml(): string {
     max-width: 100%;
     padding: 5px 12px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.075);
+    background: rgba(255, 255, 255, 0.08);
     font-size: 12.5px;
     line-height: 1.35;
     color: #ffffff;
@@ -372,8 +686,8 @@ export function buildIslandHtml(): string {
 
   .wave-trigger {
     position: relative;
-    width: 196px;
-    height: 86px;
+    width: 210px;
+    height: 84px;
     border: none;
     background: transparent;
     padding: 0;
@@ -408,7 +722,14 @@ export function buildIslandHtml(): string {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding-top: 2px;
+    padding: 3px 4px 3px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid var(--island-border);
+  }
+  .composer-row:focus-within {
+    border-color: var(--island-border-strong);
+    background: rgba(255, 255, 255, 0.075);
   }
 
   .shortcut-hint {
@@ -419,13 +740,12 @@ export function buildIslandHtml(): string {
     background: transparent;
     color: var(--island-fg-subtle);
     font: inherit;
-    font-size: 12px;
-    padding: 4px 6px 4px 2px;
-    border-radius: 8px;
+    font-size: 11.5px;
+    padding: 4px 7px;
+    border-radius: 999px;
     cursor: pointer;
     white-space: nowrap;
     flex: none;
-    transition: color 140ms ease, background 140ms ease;
   }
   .shortcut-hint:hover {
     color: var(--island-fg-muted);
@@ -443,7 +763,7 @@ export function buildIslandHtml(): string {
     color: var(--island-fg);
     font: inherit;
     font-size: 13px;
-    padding: 6px 4px;
+    padding: 5px 4px;
     outline: none;
   }
   .draft-input::placeholder {
@@ -455,28 +775,33 @@ export function buildIslandHtml(): string {
     height: 28px;
     border-radius: 999px;
     border: none;
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.13);
     color: var(--island-fg-muted);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex: none;
-    transition: background 140ms ease, color 140ms ease, transform 120ms ease;
   }
   .send-circle-btn.ready {
     background: var(--island-btn-primary-bg);
     color: var(--island-btn-primary-fg);
   }
   .send-circle-btn:hover.ready { transform: scale(1.04); }
-  .send-circle-btn:disabled { opacity: 0.45; cursor: default; }
+  .send-circle-btn:disabled { opacity: 0.42; cursor: default; }
 
-  /* Question & Approval options (matching Dray screenshot 3) */
+  /* Question & Approval cards */
+  .card-submeta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   .prompt-heading {
     font-size: 14px;
     font-weight: 600;
     letter-spacing: -0.015em;
-    line-height: 1.35;
+    line-height: 1.36;
     color: var(--island-fg);
     margin: 0;
   }
@@ -485,12 +810,12 @@ export function buildIslandHtml(): string {
     font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 12px;
     line-height: 1.45;
-    color: rgba(245, 245, 247, 0.82);
+    color: rgba(245, 245, 247, 0.84);
     background: rgba(255, 255, 255, 0.055);
     border: 1px solid var(--island-border);
-    border-radius: 10px;
-    padding: 8px 10px;
-    max-height: 92px;
+    border-radius: 11px;
+    padding: 8px 11px;
+    max-height: 96px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-word;
@@ -514,9 +839,8 @@ export function buildIslandHtml(): string {
     color: var(--island-fg);
     font: inherit;
     padding: 10px 12px;
-    border-radius: 12px;
+    border-radius: 13px;
     cursor: pointer;
-    transition: background 120ms ease, border-color 120ms ease;
   }
   .option-card:hover {
     background: var(--island-surface-hover);
@@ -557,18 +881,17 @@ export function buildIslandHtml(): string {
   .custom-answer-input {
     width: 100%;
     border: 1px solid var(--island-border);
-    background: rgba(255, 255, 255, 0.045);
+    background: rgba(255, 255, 255, 0.048);
     color: var(--island-fg);
     font: inherit;
     font-size: 13px;
     padding: 9px 12px;
     border-radius: 11px;
     outline: none;
-    transition: border-color 140ms ease, background 140ms ease;
   }
   .custom-answer-input:focus {
     border-color: var(--island-border-strong);
-    background: rgba(255, 255, 255, 0.075);
+    background: rgba(255, 255, 255, 0.08);
   }
   .custom-answer-input::placeholder {
     color: var(--island-fg-subtle);
@@ -587,12 +910,11 @@ export function buildIslandHtml(): string {
     background: transparent;
     color: var(--island-fg-muted);
     font: inherit;
-    font-size: 12.5px;
-    font-weight: 520;
-    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 530;
+    padding: 5px 10px;
     border-radius: 999px;
     cursor: pointer;
-    transition: color 120ms ease, background 120ms ease;
   }
   .ghost-btn:hover {
     color: var(--island-fg);
@@ -612,7 +934,6 @@ export function buildIslandHtml(): string {
     padding: 7px 14px;
     border-radius: 999px;
     cursor: pointer;
-    transition: opacity 120ms ease, transform 120ms ease;
   }
   .primary-pill-btn:disabled {
     opacity: 0.4;
@@ -628,139 +949,68 @@ export function buildIslandHtml(): string {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 10px;
-    border-radius: 11px;
+    padding: 8.5px 11px;
+    border-radius: 12px;
     background: var(--island-surface);
     cursor: pointer;
-    transition: background 120ms ease;
   }
   .done-item:hover { background: var(--island-surface-hover); }
-
-  .flash-banner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 10px 14px;
-    font-size: 13px;
-    font-weight: 540;
-    color: var(--island-green);
-  }
-
-  .mode-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-  }
-  .mode-pills {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px;
-    border-radius: 999px;
-    background: var(--island-surface);
-    border: 1px solid var(--island-border);
-  }
-  .mode-pill-btn {
-    border: none;
-    background: transparent;
-    color: var(--island-fg-muted);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 540;
-    padding: 3.5px 9px;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: background 120ms ease, color 120ms ease;
-  }
-  .mode-pill-btn:hover {
-    color: var(--island-fg);
-  }
-  .mode-pill-btn.active {
-    background: var(--island-btn-primary-bg);
-    color: var(--island-btn-primary-fg);
-  }
-  .handsfree-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    border: 1px solid var(--island-border);
-    background: var(--island-surface);
-    color: var(--island-fg-muted);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 560;
-    padding: 4px 9px;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-  .handsfree-chip:hover {
-    color: var(--island-fg);
-    background: var(--island-surface-hover);
-  }
-  .handsfree-chip.live {
-    background: rgba(52, 211, 153, 0.14);
-    border-color: rgba(52, 211, 153, 0.42);
-    color: var(--island-green);
-  }
-  .assistant-feed {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    max-height: 156px;
-    overflow-y: auto;
-    padding: 2px 0;
-  }
-  .assistant-reply {
-    font-size: 12.5px;
-    line-height: 1.45;
-    color: var(--island-fg);
-    background: var(--island-surface);
-    border: 1px solid var(--island-border);
-    border-radius: 12px;
-    padding: 8px 10px;
-  }
-  .assistant-reply.briefing {
-    border-color: rgba(251, 191, 36, 0.35);
-    background: rgba(251, 191, 36, 0.08);
-  }
-  .tool-chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 6px;
-  }
-  .tool-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 10.5px;
-    font-weight: 540;
-    padding: 2px 7px;
-    border-radius: 999px;
-    background: rgba(52, 211, 153, 0.14);
-    color: var(--island-green);
-  }
-  .tool-chip.fail {
-    background: rgba(248, 113, 113, 0.14);
-    color: var(--island-red);
-  }
 </style>
 </head>
 <body>
 <div id="stage">
-  <div id="island-shell" class="hidden mode-pill">
-    <div id="island-content"></div>
+  <svg id="island-svg" width="560" height="600" viewBox="0 0 560 600" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="island-rim-grad" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0" />
+        <stop offset="35%" stop-color="#ffffff" stop-opacity="0" />
+        <stop offset="78%" stop-color="#ffffff" stop-opacity="0.065" />
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.135" />
+      </linearGradient>
+      <clipPath id="notch-clip">
+        <path id="island-clip-path" d="" />
+      </clipPath>
+    </defs>
+    <g id="island-shape-group">
+      <path id="island-shape-path" d="" fill="#000000" />
+      <path id="island-rim-path" d="" fill="none" stroke="url(#island-rim-grad)" stroke-width="1" stroke-opacity="0" />
+    </g>
+  </svg>
+  <div id="island-content-clip" class="is-inert">
+    <div id="island-measure">
+      <div id="island-content"></div>
+    </div>
   </div>
 </div>
 <script>
 (() => {
   const SHADERS = ${shadersJson};
   const bridge = window.mattrIsland;
-  const shell = document.getElementById("island-shell");
+  const stage = document.getElementById("stage");
+  const svgEl = document.getElementById("island-svg");
+  const shapeGroupEl = document.getElementById("island-shape-group");
+  const shapePathEl = document.getElementById("island-shape-path");
+  const rimPathEl = document.getElementById("island-rim-path");
+  const clipPathEl = document.getElementById("island-clip-path");
+  const contentClipEl = document.getElementById("island-content-clip");
+  const measureEl = document.getElementById("island-measure");
   const content = document.getElementById("island-content");
+
+  const STAGE_HEIGHT = 600;
+  const CARD_WIDTH = 472;
+  const NOTCH_PILL_WIDTH = 456;
+  const CAPSULE_PILL_WIDTH = 320;
+  const CAPSULE_FLASH_WIDTH = 228;
+  const CAPSULE_Y = 8;
+  let lastStageW = 0;
+  let lastStageH = 0;
+
+  let metrics = {
+    hasNotch: true,
+    notchWidth: 188,
+    notchHeight: 37,
+    windowWidth: 560,
+  };
 
   let snapshot = null;
   let uiMode = "auto"; // "auto" | "voice" | "approval" | "question" | "done-list"
@@ -771,8 +1021,35 @@ export function buildIslandHtml(): string {
   let activeRequestId = null;
   let flashMessage = null;
   let flashTimer = null;
-  let isHovering = false;
+
+  // Hover & pointer state
+  let isPointerInside = false;
+  let isNotchPeeking = false;
+  let peekEnterTimer = null;
+  let peekLeaveTimer = null;
   let hoverExpandTimer = null;
+  let lastPassthrough = true;
+
+  // Current geometric mode ("hidden" | "docked" | "peek" | "pill" | "card")
+  let geomState = "docked";
+  let lastViewKind = "hidden";
+  let lastRenderedSignature = "";
+  let targetContentWidth = 188;
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Coupled mass-spring-damper physics state
+  const springs = {
+    w: { pos: 188, vel: 0, target: 188, openK: 375, openD: 24.5, closeK: 440, closeD: 33, eps: 0.08 },
+    h: { pos: 37, vel: 0, target: 37, openK: 315, openD: 25.5, closeK: 440, closeD: 33, eps: 0.08 },
+    topR: { pos: 6, vel: 0, target: 6, openK: 340, openD: 27, closeK: 440, closeD: 33, eps: 0.08 },
+    botR: { pos: 11, vel: 0, target: 11, openK: 340, openD: 27, closeK: 440, closeD: 33, eps: 0.08 },
+    expand: { pos: 0, vel: 0, target: 0, openK: 340, openD: 28, closeK: 440, closeD: 33, eps: 0.002 },
+    presence: { pos: 1, vel: 0, target: 1, openK: 380, openD: 28, closeK: 440, closeD: 33, eps: 0.002 },
+  };
+  let springRaf = 0;
+  let springLastTime = 0;
+  let notifiedIdleForRest = false;
 
   // Persistent WebGL state for 1:1 Lilt Siri Wave (GLSL)
   let waveGl = null;
@@ -784,7 +1061,10 @@ export function buildIslandHtml(): string {
   let waveVariant = "wave";
   let waveState = "idle";
   let waveLevel = 0;
-  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -800,6 +1080,264 @@ export function buildIslandHtml(): string {
     if (mode === "command-shift-space") return "⌘⇧Space to speak";
     if (mode === "off") return "Click to speak";
     return "⌃ to speak";
+  }
+
+  function setPassthrough(ignore) {
+    if (lastPassthrough === ignore) return;
+    lastPassthrough = ignore;
+    bridge.setMousePassthrough(ignore);
+  }
+
+  function notifyIdleIfResting() {
+    if (notifiedIdleForRest) return;
+    if (geomState === "docked" || geomState === "hidden") {
+      notifiedIdleForRest = true;
+      destroyWaveGl();
+      if (lastRenderedSignature !== "hidden") {
+        content.innerHTML = "";
+        lastRenderedSignature = "hidden";
+      }
+      measureEl.style.width = (metrics.hasNotch ? metrics.notchWidth : 220) + "px";
+      if (typeof bridge.notifyAnimationIdle === "function") {
+        bridge.notifyAnimationIdle();
+      }
+    }
+  }
+
+  // Exact boring.notch concave-ear SVG NotchShape path
+  function buildNotchShapePath(cx, w, h, topR, botR, inset) {
+    const pad = inset || 0;
+    const effW = Math.max(2, w - pad * 2);
+    const effH = Math.max(2, h - pad);
+    const xL0 = cx - effW / 2 - topR;
+    const xL = cx - effW / 2;
+    const xR = cx + effW / 2;
+    const xR0 = cx + effW / 2 + topR;
+    const rB = Math.max(0, Math.min(botR - pad * 0.5, effH / 2, effW / 2));
+    const rT = Math.max(0, Math.min(topR, Math.max(0, effH - rB)));
+    const y0 = pad ? 0.5 : 0;
+    const yEnd = effH;
+    const base =
+      \`M \${xL0.toFixed(2)},\${y0} \` +
+      \`Q \${xL.toFixed(2)},\${y0} \${xL.toFixed(2)},\${(y0 + rT).toFixed(2)} \` +
+      \`L \${xL.toFixed(2)},\${(yEnd - rB).toFixed(2)} \` +
+      \`Q \${xL.toFixed(2)},\${yEnd.toFixed(2)} \${(xL + rB).toFixed(2)},\${yEnd.toFixed(2)} \` +
+      \`L \${(xR - rB).toFixed(2)},\${yEnd.toFixed(2)} \` +
+      \`Q \${xR.toFixed(2)},\${yEnd.toFixed(2)} \${xR.toFixed(2)},\${(yEnd - rB).toFixed(2)} \` +
+      \`L \${xR.toFixed(2)},\${(y0 + rT).toFixed(2)} \` +
+      \`Q \${xR.toFixed(2)},\${y0} \${xR0.toFixed(2)},\${y0}\`;
+    return pad ? base : base + " Z";
+  }
+
+  function buildCapsulePath(cx, y, w, h, r, inset) {
+    const pad = inset || 0;
+    const effW = Math.max(2, w - pad * 2);
+    const effH = Math.max(2, h - pad * 2);
+    const x = cx - effW / 2;
+    const yTop = y + pad;
+    const cr = Math.max(0, Math.min(r - pad * 0.5, effW / 2, effH / 2));
+    return (
+      \`M \${(x + cr).toFixed(2)},\${yTop.toFixed(2)} \` +
+      \`L \${(x + effW - cr).toFixed(2)},\${yTop.toFixed(2)} \` +
+      \`Q \${(x + effW).toFixed(2)},\${yTop.toFixed(2)} \${(x + effW).toFixed(2)},\${(yTop + cr).toFixed(2)} \` +
+      \`L \${(x + effW).toFixed(2)},\${(yTop + effH - cr).toFixed(2)} \` +
+      \`Q \${(x + effW).toFixed(2)},\${(yTop + effH).toFixed(2)} \${(x + effW - cr).toFixed(2)},\${(yTop + effH).toFixed(2)} \` +
+      \`L \${(x + cr).toFixed(2)},\${(yTop + effH).toFixed(2)} \` +
+      \`Q \${x.toFixed(2)},\${(yTop + effH).toFixed(2)} \${x.toFixed(2)},\${(yTop + effH - cr).toFixed(2)} \` +
+      \`L \${x.toFixed(2)},\${(yTop + cr).toFixed(2)} \` +
+      \`Q \${x.toFixed(2)},\${yTop.toFixed(2)} \${(x + cr).toFixed(2)},\${yTop.toFixed(2)} Z\`
+    );
+  }
+
+  function syncStageSize() {
+    const w = Math.round(stage.clientWidth || window.innerWidth || metrics.windowWidth || 560);
+    const h = Math.round(stage.clientHeight || window.innerHeight || STAGE_HEIGHT);
+    if (w !== lastStageW || h !== lastStageH) {
+      lastStageW = w;
+      lastStageH = h;
+      svgEl.setAttribute("width", String(w));
+      svgEl.setAttribute("height", String(h));
+      svgEl.setAttribute("viewBox", \`0 0 \${w} \${h}\`);
+      svgEl.style.width = w + "px";
+      svgEl.style.height = h + "px";
+    }
+    return { stageW: w, stageH: h };
+  }
+
+  function getEffectiveCardWidth() {
+    const { stageW } = syncStageSize();
+    const margin = metrics.hasNotch ? 36 : 24;
+    return Math.min(CARD_WIDTH, Math.max(320, stageW - margin));
+  }
+
+  function getEffectiveNotchPillWidth() {
+    const { stageW } = syncStageSize();
+    return Math.min(NOTCH_PILL_WIDTH, Math.max(metrics.notchWidth + 120, stageW - 28));
+  }
+
+  function applyGeometryFrame() {
+    const { stageW } = syncStageSize();
+    const cx = stageW / 2;
+    const w = Math.max(24, springs.w.pos);
+    const h = Math.max(24, springs.h.pos);
+    const topR = Math.max(0, springs.topR.pos);
+    const botR = Math.max(0, springs.botR.pos);
+    const e = clamp(springs.expand.pos, 0, 1);
+    const p = clamp(springs.presence.pos, 0, 1);
+
+    if (metrics.hasNotch) {
+      const d = buildNotchShapePath(cx, w, h, topR, botR, 0);
+      const rimD = buildNotchShapePath(cx, w, h, topR, botR, 0.5);
+      shapePathEl.setAttribute("d", d);
+      clipPathEl.setAttribute("d", d);
+      rimPathEl.setAttribute("d", rimD);
+      rimPathEl.setAttribute("stroke", "url(#island-rim-grad)");
+      rimPathEl.setAttribute("stroke-opacity", e.toFixed(3));
+
+      // Invisible when fully docked inside the hardware notch so it never protrudes on any MacBook size
+      const silhouetteAlpha = geomState === "hidden" ? 0 : clamp(e / 0.06, 0, 1);
+      svgEl.style.opacity = silhouetteAlpha.toFixed(3);
+      svgEl.style.transform = "";
+
+      if (e > 0.01 && geomState !== "hidden") {
+        const s1y = (14 * e).toFixed(1);
+        const s1b = (32 * e).toFixed(1);
+        const s1a = (0.56 * e).toFixed(3);
+        const s2y = (3 * e).toFixed(1);
+        const s2b = (10 * e).toFixed(1);
+        const s2a = (0.34 * e).toFixed(3);
+        shapeGroupEl.style.filter = \`drop-shadow(0 \${s1y}px \${s1b}px rgba(0,0,0,\${s1a})) drop-shadow(0 \${s2y}px \${s2b}px rgba(0,0,0,\${s2a}))\`;
+      } else {
+        shapeGroupEl.style.filter = "none";
+      }
+
+      const rB = Math.max(0, Math.min(botR, h / 2, w / 2));
+      const xL = cx - w / 2;
+      contentClipEl.style.left = xL.toFixed(2) + "px";
+      contentClipEl.style.top = "0px";
+      contentClipEl.style.width = w.toFixed(2) + "px";
+      contentClipEl.style.height = h.toFixed(2) + "px";
+      contentClipEl.style.borderRadius = \`0 0 \${rB.toFixed(2)}px \${rB.toFixed(2)}px\`;
+      contentClipEl.style.transform = "";
+      const contentAlpha =
+        geomState === "hidden"
+          ? 0
+          : geomState === "docked"
+            ? clamp((e - 0.1) / 0.4, 0, 1)
+            : geomState === "peek"
+              ? clamp(e / 0.2, 0, 1)
+              : clamp(e / 0.18, 0, 1);
+      contentClipEl.style.opacity = contentAlpha.toFixed(3);
+      contentClipEl.classList.toggle("is-inert", geomState === "docked" || geomState === "hidden");
+    } else {
+      const yTop = -4 + (CAPSULE_Y + 4) * p;
+      const scale = 0.92 + 0.08 * p;
+      const d = buildCapsulePath(cx, yTop, w, h, botR, 0);
+      const rimD = buildCapsulePath(cx, yTop, w, h, botR, 0.5);
+      shapePathEl.setAttribute("d", d);
+      clipPathEl.setAttribute("d", d);
+      rimPathEl.setAttribute("d", rimD);
+      rimPathEl.setAttribute("stroke", "rgba(255, 255, 255, 0.12)");
+      rimPathEl.setAttribute("stroke-opacity", p.toFixed(3));
+
+      svgEl.style.opacity = p.toFixed(3);
+      svgEl.style.transform = p < 0.999 ? \`scale(\${scale.toFixed(4)})\` : "";
+
+      if (p > 0.02) {
+        const s1y = (12 * p).toFixed(1);
+        const s1b = (28 * p).toFixed(1);
+        const s1a = (0.52 * p).toFixed(3);
+        const s2y = (3 * p).toFixed(1);
+        const s2b = (9 * p).toFixed(1);
+        const s2a = (0.32 * p).toFixed(3);
+        shapeGroupEl.style.filter = \`drop-shadow(0 \${s1y}px \${s1b}px rgba(0,0,0,\${s1a})) drop-shadow(0 \${s2y}px \${s2b}px rgba(0,0,0,\${s2a}))\`;
+      } else {
+        shapeGroupEl.style.filter = "none";
+      }
+
+      const rB = Math.max(0, Math.min(botR, h / 2, w / 2));
+      const xL = cx - w / 2;
+      contentClipEl.style.left = xL.toFixed(2) + "px";
+      contentClipEl.style.top = yTop.toFixed(2) + "px";
+      contentClipEl.style.width = w.toFixed(2) + "px";
+      contentClipEl.style.height = h.toFixed(2) + "px";
+      contentClipEl.style.borderRadius = \`\${rB.toFixed(2)}px\`;
+      contentClipEl.style.transform = p < 0.999 ? \`scale(\${scale.toFixed(4)})\` : "";
+      contentClipEl.style.opacity = p.toFixed(3);
+      contentClipEl.classList.toggle("is-inert", geomState === "hidden" || p < 0.05);
+    }
+  }
+
+  function stepSpring(s, dt) {
+    const opening = s.target >= s.pos;
+    const k = opening ? s.openK : s.closeK;
+    const d = opening ? s.openD : s.closeD;
+    const substeps = dt > 0.016 ? 2 : 1;
+    const step = dt / substeps;
+    for (let i = 0; i < substeps; i++) {
+      const disp = s.pos - s.target;
+      const acc = -k * disp - d * s.vel;
+      s.vel += acc * step;
+      s.pos += s.vel * step;
+    }
+    if (Math.abs(s.pos - s.target) < s.eps && Math.abs(s.vel) < s.eps) {
+      s.pos = s.target;
+      s.vel = 0;
+      return true;
+    }
+    return false;
+  }
+
+  function tickSprings(now) {
+    const dt = springLastTime ? clamp((now - springLastTime) / 1000, 0.001, 0.032) : 1 / 60;
+    springLastTime = now;
+
+    let allSettled = true;
+    for (const key in springs) {
+      if (!stepSpring(springs[key], dt)) {
+        allSettled = false;
+      }
+    }
+
+    applyGeometryFrame();
+
+    if (allSettled) {
+      springRaf = 0;
+      springLastTime = 0;
+      notifyIdleIfResting();
+    } else {
+      springRaf = requestAnimationFrame(tickSprings);
+    }
+  }
+
+  function setSpringTargets(targets, immediate) {
+    notifiedIdleForRest = false;
+    let needsAnim = false;
+    for (const key in targets) {
+      const s = springs[key];
+      if (!s) continue;
+      s.target = targets[key];
+      if (immediate || prefersReducedMotion) {
+        s.pos = s.target;
+        s.vel = 0;
+      } else if (Math.abs(s.pos - s.target) >= s.eps || Math.abs(s.vel) >= s.eps) {
+        needsAnim = true;
+      }
+    }
+    if (immediate || prefersReducedMotion || !needsAnim) {
+      if (springRaf) {
+        cancelAnimationFrame(springRaf);
+        springRaf = 0;
+        springLastTime = 0;
+      }
+      applyGeometryFrame();
+      notifyIdleIfResting();
+      return;
+    }
+    if (!springRaf) {
+      springLastTime = performance.now();
+      springRaf = requestAnimationFrame(tickSprings);
+    }
   }
 
   function showFlash(text) {
@@ -854,6 +1392,9 @@ export function buildIslandHtml(): string {
       if (assistantActive) {
         return { kind: "pill", pillKind: "voice-mode", assistant };
       }
+      if (metrics.hasNotch && isNotchPeeking) {
+        return { kind: "peek" };
+      }
       return { kind: "hidden" };
     }
 
@@ -869,6 +1410,9 @@ export function buildIslandHtml(): string {
     }
     if (done.length > 0) {
       return { kind: "pill", pillKind: "done", count: done.length, done };
+    }
+    if (metrics.hasNotch && isNotchPeeking) {
+      return { kind: "peek" };
     }
     return { kind: "hidden" };
   }
@@ -972,6 +1516,38 @@ export function buildIslandHtml(): string {
     }
   }
 
+  function updatePillEqualizer() {
+    const eq = document.getElementById("pill-eq");
+    if (!eq) return;
+    const assistant = snapshot?.assistant;
+    const voice = snapshot?.voice;
+    const muted = Boolean(assistant?.muted);
+    const speaking = Boolean(assistant?.speaking || assistant?.phase === "speaking");
+    const listening = voice?.phase === "recording" || assistant?.phase === "listening";
+    const thinking =
+      assistant?.phase === "thinking" ||
+      assistant?.phase === "acting" ||
+      assistant?.phase === "transcribing";
+    const rawLevel = speaking
+      ? Math.max(0.22, assistant?.outputLevel ?? 0)
+      : listening
+        ? Math.max(0.14, voice?.level ?? 0)
+        : thinking
+          ? 0.35
+          : 0.08;
+    const lvl = clamp(rawLevel, 0, 1);
+    const now = performance.now() / 170;
+    const weights = [0.68, 1.0, 0.84, 0.56];
+    const bars = eq.querySelectorAll(".eq-bar");
+    for (let i = 0; i < bars.length; i++) {
+      const wave = muted || (!speaking && !listening && !thinking)
+        ? 0.25
+        : 0.45 + 0.55 * Math.abs(Math.sin(now + i * 1.15));
+      const hPx = muted ? 4 : Math.round(3.5 + 10.5 * lvl * weights[i % weights.length] * wave);
+      bars[i].style.height = hPx + "px";
+    }
+  }
+
   function updateWaveVisuals() {
     const phase = snapshot?.voice?.phase ?? "idle";
     const assistant = snapshot?.assistant;
@@ -1015,7 +1591,7 @@ export function buildIslandHtml(): string {
     if (waveCanvasEl) {
       const stretch =
         waveState === "listening" || waveState === "speaking"
-          ? 0.55 + 0.9 * Math.min(1, Math.max(0, waveLevel))
+          ? 0.55 + 0.9 * clamp(waveLevel, 0, 1)
           : waveState === "idle" || waveState === "error"
             ? 0.45
             : 1;
@@ -1025,6 +1601,7 @@ export function buildIslandHtml(): string {
       waveCanvasEl.style.filter =
         waveState === "error" ? "sepia(1) saturate(6) hue-rotate(-40deg)" : "";
     }
+    updatePillEqualizer();
   }
 
   function selectedThread() {
@@ -1033,82 +1610,194 @@ export function buildIslandHtml(): string {
     return list.find((t) => t.key === snapshot.selectedThreadKey) ?? list[0];
   }
 
-  function renderPill(view) {
-    if (view.pillKind === "voice-mode") {
-      const a = view.assistant || {};
-      const statusText = a.muted
-        ? "Voice Mode · Muted"
-        : a.speaking || a.phase === "speaking"
-          ? a.activeBriefingLabel || "Speaking…"
-          : a.phase === "thinking" || a.phase === "acting"
-            ? a.statusLabel || "Working…"
-            : a.phase === "listening"
-              ? "Listening…"
-              : "Voice Mode";
-      return \`
-        <div class="pill-row" data-action="expand-voice">
-          <span class="status-dot \${a.muted ? "approval" : "done"}"></span>
-          <span class="pill-label">mattr</span>
-          <span class="pill-title">\${escapeHtml(statusText)}</span>
-          <button class="pill-btn" data-action="assistant-toggle-hands-free">\${a.handsFreeActive ? "Stop" : "Open"}</button>
-        </div>
-      \`;
-    }
-    if (view.pillKind === "done") {
-      const items = view.done;
-      if (items.length === 1) {
-        const item = items[0];
-        return \`
-          <div class="pill-row" data-action="expand-done">
-            <span class="status-dot done"></span>
-            <span class="pill-label">Done</span>
-            <span class="pill-title">\${escapeHtml(item.threadTitle)}</span>
-            <button class="pill-btn" data-action="open-thread" data-env="\${escapeHtml(item.environmentId)}" data-thread="\${escapeHtml(item.threadId)}">Open in app</button>
-          </div>
-        \`;
-      }
-      return \`
-        <div class="pill-row" data-action="expand-done">
-          <span class="status-dot done"></span>
-          <span class="pill-label">\${items.length} tasks finished</span>
-          <button class="pill-btn" data-action="expand-done">View</button>
-        </div>
-      \`;
-    }
-
-    const total = view.count;
-    if (total === 1 && view.approvals.length === 1) {
-      const item = view.approvals[0];
-      return \`
-        <div class="pill-row" data-action="expand-approval">
-          <span class="status-dot approval"></span>
-          <span class="pill-label">Approve</span>
-          <span class="pill-title">\${escapeHtml(item.threadTitle)}</span>
-          <button class="pill-btn" data-action="expand-approval">Review</button>
-        </div>
-      \`;
-    }
-    if (total === 1 && view.inputs.length === 1) {
-      const item = view.inputs[0];
-      return \`
-        <div class="pill-row" data-action="expand-question">
-          <span class="status-dot input"></span>
-          <span class="pill-label">Question</span>
-          <span class="pill-title">\${escapeHtml(item.threadTitle)}</span>
-          <button class="pill-btn" data-action="expand-question">Answer</button>
-        </div>
-      \`;
-    }
+  function renderPeek() {
+    const notchW = metrics.notchWidth;
+    const h = metrics.notchHeight + 2;
+    const approvals = snapshot?.pendingApprovals?.length ?? 0;
+    const inputs = snapshot?.pendingUserInputs?.length ?? 0;
+    const hasRunning = (snapshot?.recentThreads ?? []).some((t) => t.status === "running" || t.isStreaming);
+    const dotClass = approvals > 0 ? "approval" : inputs > 0 ? "input" : hasRunning ? "done" : "idle";
     return \`
-      <div class="pill-row" data-action="expand-attention">
-        <span class="status-dot \${view.approvals.length > 0 ? "approval" : "input"}"></span>
-        <span class="pill-label">\${total} tasks need attention</span>
-        <button class="pill-btn" data-action="expand-attention">Open</button>
+      <div class="peek-row pill-entering" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="expand-voice" title="Open mattr Island">
+        <div class="peek-wing">
+          <span class="status-dot \${dotClass}"></span>
+        </div>
+        <div class="notch-cutout"></div>
+        <div class="peek-wing">
+          <span class="peek-mic" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <rect x="5.75" y="2" width="4.5" height="7.5" rx="2.25" stroke="currentColor" stroke-width="1.5" />
+              <path d="M3.5 7.75a4.5 4.5 0 0 0 9 0M8 12.25V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </span>
+        </div>
       </div>
     \`;
   }
 
-  function renderDoneList() {
+  function renderFlash() {
+    if (metrics.hasNotch) {
+      const notchW = metrics.notchWidth;
+      const h = metrics.notchHeight + 2;
+      return \`
+        <div class="pill-notched pill-entering" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px">
+          <div class="pill-wing left">
+            <span class="status-dot done"></span>
+            <span class="pill-label flash-ok">\${escapeHtml(flashMessage)}</span>
+          </div>
+          <div class="notch-cutout"></div>
+          <div class="pill-wing right">
+            <span class="pill-title" style="color:var(--island-green)">✓</span>
+          </div>
+        </div>
+      \`;
+    }
+    return \`
+      <div class="pill-capsule pill-entering" style="justify-content:center">
+        <span class="status-dot done"></span>
+        <span class="pill-label flash-ok">✓ \${escapeHtml(flashMessage)}</span>
+      </div>
+    \`;
+  }
+
+  function renderPill(view) {
+    let dotClass = "done";
+    let leftLabel = "mattr";
+    let rightTitle = "";
+    let ctaLabel = "";
+    let ctaAction = "";
+    let ctaExtraAttrs = "";
+    let rowAction = "expand-voice";
+    let showEq = false;
+    let eqClass = "";
+
+    if (view.pillKind === "voice-mode") {
+      const a = view.assistant || {};
+      const speaking = Boolean(a.speaking || a.phase === "speaking");
+      const thinking = a.phase === "thinking" || a.phase === "acting" || a.phase === "transcribing";
+      const listening = a.phase === "listening" || snapshot?.voice?.phase === "recording";
+      dotClass = a.muted ? "approval" : thinking ? "input" : "done";
+      leftLabel = a.muted
+        ? "Muted"
+        : speaking
+          ? a.activeBriefingLabel || "Speaking"
+          : thinking
+            ? a.statusLabel || "Working"
+            : listening
+              ? "Listening"
+              : "Voice Mode";
+      ctaLabel = a.handsFreeActive ? "Stop" : "Open";
+      ctaAction = a.handsFreeActive ? "assistant-toggle-hands-free" : "expand-voice";
+      rowAction = "expand-voice";
+      showEq = true;
+      eqClass = a.muted ? "muted" : thinking ? "thinking" : "";
+    } else if (view.pillKind === "done") {
+      const items = view.done;
+      dotClass = "done";
+      rowAction = "expand-done";
+      if (items.length === 1) {
+        const item = items[0];
+        leftLabel = "Done";
+        rightTitle = item.threadTitle;
+        ctaLabel = "Open";
+        ctaAction = "open-thread";
+        ctaExtraAttrs = \`data-env="\${escapeHtml(item.environmentId)}" data-thread="\${escapeHtml(item.threadId)}"\`;
+      } else {
+        leftLabel = \`\${items.length} done\`;
+        ctaLabel = "View";
+        ctaAction = "expand-done";
+      }
+    } else {
+      const total = view.count;
+      if (total === 1 && view.approvals.length === 1) {
+        const item = view.approvals[0];
+        dotClass = "approval";
+        leftLabel = "Approve";
+        rightTitle = item.threadTitle;
+        ctaLabel = "Review";
+        ctaAction = "expand-approval";
+        rowAction = "expand-approval";
+      } else if (total === 1 && view.inputs.length === 1) {
+        const item = view.inputs[0];
+        dotClass = "input";
+        leftLabel = "Question";
+        rightTitle = item.threadTitle;
+        ctaLabel = "Answer";
+        ctaAction = "expand-question";
+        rowAction = "expand-question";
+      } else {
+        dotClass = view.approvals.length > 0 ? "approval" : "input";
+        leftLabel = \`\${total} pending\`;
+        ctaLabel = "Open";
+        ctaAction = "expand-attention";
+        rowAction = "expand-attention";
+      }
+    }
+
+    const eqHtml = showEq
+      ? \`<span id="pill-eq" class="eq-bars \${eqClass}" aria-hidden="true"><span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span></span>\`
+      : "";
+    const ctaHtml = ctaLabel
+      ? \`<button class="pill-btn" data-action="\${ctaAction}" \${ctaExtraAttrs}>\${escapeHtml(ctaLabel)}</button>\`
+      : "";
+
+    if (metrics.hasNotch) {
+      const notchW = metrics.notchWidth;
+      const h = metrics.notchHeight + 2;
+      return \`
+        <div class="pill-notched pill-entering" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="\${rowAction}">
+          <div class="pill-wing left">
+            <span class="status-dot \${dotClass}"></span>
+            <span class="pill-label">\${escapeHtml(leftLabel)}</span>
+          </div>
+          <div class="notch-cutout"></div>
+          <div class="pill-wing right">
+            \${showEq ? eqHtml : rightTitle ? \`<span class="pill-title">\${escapeHtml(rightTitle)}</span>\` : ""}
+            \${ctaHtml}
+          </div>
+        </div>
+      \`;
+    }
+
+    return \`
+      <div class="pill-capsule pill-entering" data-action="\${rowAction}">
+        <span class="status-dot \${dotClass}"></span>
+        <span class="pill-label">\${escapeHtml(leftLabel)}</span>
+        \${rightTitle ? \`<span class="pill-title">\${escapeHtml(rightTitle)}</span>\` : \`<span style="flex:1"></span>\`}
+        \${eqHtml}
+        \${ctaHtml}
+      </div>
+    \`;
+  }
+
+  const ICON_EXPAND =
+    '<svg width="11.5" height="11.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 2.5H13.5V6.5M13.5 2.5L9 7M6.5 13.5H2.5V9.5M2.5 13.5L7 9" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_OPEN_APP =
+    '<svg width="11.5" height="11.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5H12.5V10M12.5 3.5L4 12" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_CLOSE =
+    '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+
+  function renderCardHeader(leftHtml, rightHtml) {
+    if (metrics.hasNotch) {
+      const notchW = metrics.notchWidth;
+      const h = metrics.notchHeight;
+      return \`
+        <div class="wing-header" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px">
+          <div class="wing-header-side left">\${leftHtml}</div>
+          <div class="notch-cutout"></div>
+          <div class="wing-header-side right">\${rightHtml}</div>
+        </div>
+      \`;
+    }
+    return \`
+      <div class="flat-header">
+        <div class="thread-picker-wrap">\${leftHtml}</div>
+        <div class="header-actions">\${rightHtml}</div>
+      </div>
+    \`;
+  }
+
+  function renderDoneList(entering) {
     const approvals = snapshot?.pendingApprovals ?? [];
     const inputs = snapshot?.pendingUserInputs ?? [];
     const done = snapshot?.doneNotifications ?? [];
@@ -1140,21 +1829,21 @@ export function buildIslandHtml(): string {
         </div>
       \`);
     }
+    const headerHtml = renderCardHeader(
+      \`<span class="status-dot \${approvals.length > 0 ? "approval" : inputs.length > 0 ? "input" : "done"}"></span><span class="thread-title-text" style="font-size:13px;font-weight:600">Attention</span>\`,
+      \`<button class="ghost-btn" style="padding:3px 8px;font-size:11px" data-action="dismiss-done">Clear</button><button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`,
+    );
     return \`
-      <div class="card-inner">
-        <div class="card-header">
-          <span style="font-size:13px;font-weight:600">Attention</span>
-          <div class="header-actions">
-            <button class="ghost-btn" style="padding:3px 8px;font-size:11.5px" data-action="dismiss-done">Clear</button>
-            <button class="icon-btn" data-action="close-panel" title="Close">✕</button>
-          </div>
+      <div class="card-root">
+        \${headerHtml}
+        <div class="card-body \${entering ? "entering" : ""}">
+          <div class="done-list">\${rows.join("")}</div>
         </div>
-        <div class="done-list">\${rows.join("")}</div>
       </div>
     \`;
   }
 
-  function renderApproval(approval) {
+  function renderApproval(approval, entering) {
     const opts = approval.options.map((opt, idx) => \`
       <button class="option-card" data-action="pick-approval" data-decision="\${escapeHtml(opt.decision)}">
         <span class="option-num">\${idx + 1}</span>
@@ -1165,27 +1854,28 @@ export function buildIslandHtml(): string {
       </button>
     \`).join("");
 
+    const headerHtml = renderCardHeader(
+      \`<span class="status-dot approval"></span><span class="thread-title-text" style="font-size:13px;font-weight:600">Approve</span>\`,
+      \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(approval.environmentId)}" data-thread="\${escapeHtml(approval.threadId)}" title="Open in mattr">\${ICON_OPEN_APP}</button><button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`,
+    );
+
     return \`
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="thread-picker-wrap">
-            <span class="status-dot approval"></span>
-            <span class="thread-title-text" style="font-size:13px;font-weight:600">\${escapeHtml(approval.title)}</span>
+      <div class="card-root">
+        \${headerHtml}
+        <div class="card-body \${entering ? "entering" : ""}">
+          <div class="card-submeta">
+            <p class="prompt-heading">\${escapeHtml(approval.title)}</p>
             <span class="badge-chip">\${escapeHtml(approval.threadTitle)}</span>
           </div>
-          <div class="header-actions">
-            <button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(approval.environmentId)}" data-thread="\${escapeHtml(approval.threadId)}" title="Open in mattr">↗</button>
-            <button class="icon-btn" data-action="close-panel" title="Close">✕</button>
-          </div>
+          \${approval.detail ? \`<div class="approval-detail">\${escapeHtml(approval.detail)}</div>\` : ""}
+          \${approval.reason ? \`<div class="tool-meta">\${escapeHtml(approval.reason)}</div>\` : ""}
+          <div class="option-list">\${opts}</div>
         </div>
-        \${approval.detail ? \`<div class="approval-detail">\${escapeHtml(approval.detail)}</div>\` : ""}
-        \${approval.reason ? \`<div class="tool-meta">\${escapeHtml(approval.reason)}</div>\` : ""}
-        <div class="option-list">\${opts}</div>
       </div>
     \`;
   }
 
-  function renderQuestion(input) {
+  function renderQuestion(input, entering) {
     if (activeRequestId !== input.requestId) {
       activeRequestId = input.requestId;
       questionIndex = 0;
@@ -1218,42 +1908,42 @@ export function buildIslandHtml(): string {
     );
     const isLast = questionIndex >= input.questions.length - 1;
 
+    const headerHtml = renderCardHeader(
+      \`<span class="status-dot input"></span><span class="thread-title-text" style="font-size:13px;font-weight:600">Question</span>\${input.questions.length > 1 ? \`<span class="badge-chip blue">\${questionIndex + 1}/\${input.questions.length}</span>\` : ""}\`,
+      \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(input.environmentId)}" data-thread="\${escapeHtml(input.threadId)}" title="Open in mattr">\${ICON_OPEN_APP}</button><button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`,
+    );
+
     return \`
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="thread-picker-wrap">
-            <span class="status-dot input"></span>
+      <div class="card-root">
+        \${headerHtml}
+        <div class="card-body \${entering ? "entering" : ""}">
+          <div class="card-submeta">
+            <p class="prompt-heading">\${escapeHtml(q.question || q.header)}</p>
             <span class="badge-chip">\${escapeHtml(input.threadTitle)}</span>
-            \${input.questions.length > 1 ? \`<span class="badge-chip blue">\${questionIndex + 1}/\${input.questions.length}</span>\` : ""}
           </div>
-          <div class="header-actions">
-            <button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(input.environmentId)}" data-thread="\${escapeHtml(input.threadId)}" title="Open in mattr">↗</button>
-            <button class="icon-btn" data-action="close-panel" title="Close">✕</button>
+          <div class="option-list">\${opts}</div>
+          \${q.allowCustomAnswer !== false ? \`
+            <input
+              id="question-custom-input"
+              class="custom-answer-input"
+              type="text"
+              placeholder="Something else…"
+              value="\${escapeHtml(questionCustomText)}"
+            />
+          \` : ""}
+          <div class="card-footer">
+            \${input.dismissible ? \`<button class="ghost-btn" data-action="dismiss-question">Skip</button>\` : ""}
+            <button class="primary-pill-btn" data-action="submit-question" \${canSend ? "" : "disabled"}>
+              <span>\${isLast ? "Send" : "Next"}</span>
+              <span style="opacity:0.7">↵</span>
+            </button>
           </div>
-        </div>
-        <p class="prompt-heading">\${escapeHtml(q.question || q.header)}</p>
-        <div class="option-list">\${opts}</div>
-        \${q.allowCustomAnswer !== false ? \`
-          <input
-            id="question-custom-input"
-            class="custom-answer-input"
-            type="text"
-            placeholder="Something else…"
-            value="\${escapeHtml(questionCustomText)}"
-          />
-        \` : ""}
-        <div class="card-footer">
-          \${input.dismissible ? \`<button class="ghost-btn" data-action="dismiss-question">Skip</button>\` : ""}
-          <button class="primary-pill-btn" data-action="submit-question" \${canSend ? "" : "disabled"}>
-            <span>\${isLast ? "Send" : "Next"}</span>
-            <span style="opacity:0.7">↵</span>
-          </button>
         </div>
       </div>
     \`;
   }
 
-  function renderVoicePanel() {
+  function renderVoicePanel(entering) {
     const thread = selectedThread();
     const threads = snapshot?.recentThreads ?? [];
     const voice = snapshot?.voice ?? {
@@ -1303,13 +1993,37 @@ export function buildIslandHtml(): string {
       : draftText.length > 0 || isRecording;
 
     const statusDotClass =
-      thread?.status === "approval"
-        ? "approval"
-        : thread?.status === "input"
-          ? "input"
-          : thread?.status === "done"
-            ? "done"
-            : "running";
+      assistant.handsFreeActive
+        ? assistant.muted
+          ? "approval"
+          : "done"
+        : thread?.status === "approval"
+          ? "approval"
+          : thread?.status === "input"
+            ? "input"
+            : thread?.status === "done"
+              ? "done"
+              : "running";
+
+    const leftWingHtml = \`
+      <span class="status-dot \${statusDotClass}"></span>
+      <button class="thread-title-btn" data-action="toggle-thread-switcher" title="\${escapeHtml(thread?.title ?? "mattr")}">
+        <span class="thread-title-text">\${escapeHtml(isDictationOnly ? (thread?.title ?? "mattr") : "mattr")}</span>
+        \${threads.length > 1 ? \`<span class="thread-chevron">▾</span>\` : ""}
+      </button>
+    \`;
+
+    const rightWingHtml = \`
+      <button class="handsfree-chip \${assistant.handsFreeActive ? "live" : ""}" data-action="assistant-toggle-hands-free" title="Hands-free conversational Voice Mode">
+        <span class="status-dot \${assistant.handsFreeActive ? "done" : "running"}" style="width:5.5px;height:5.5px"></span>
+        <span>\${assistant.handsFreeActive ? "Live" : "Voice"}</span>
+      </button>
+      <button class="icon-btn" data-action="assistant-open-voice-mode-modal" title="Open full Voice Mode">\${ICON_EXPAND}</button>
+      \${thread ? \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(thread.environmentId)}" data-thread="\${escapeHtml(thread.threadId)}" title="Open in mattr">\${ICON_OPEN_APP}</button>\` : ""}
+      <button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>
+    \`;
+
+    const headerHtml = renderCardHeader(leftWingHtml, rightWingHtml);
 
     const switcherHtml = threadSwitcherOpen
       ? \`
@@ -1376,7 +2090,7 @@ export function buildIslandHtml(): string {
         : isRecording
           ? assistant.handsFreeActive
             ? "Hands-free listening…"
-            : "Listening… tap again to send"
+            : "Listening… tap to send"
           : voice.phase === "preparing"
             ? "Starting mic…"
             : voice.phase === "transcribing" ||
@@ -1384,6 +2098,15 @@ export function buildIslandHtml(): string {
                 assistant.phase === "transcribing"
               ? "Transcribing…"
               : shortcutLabel();
+
+    const attentionChipHtml =
+      (snapshot?.pendingApprovals?.length ?? 0) > 0
+        ? \`<button class="badge-chip amber" style="border:none;cursor:pointer" data-action="expand-approval">Approve</button>\`
+        : (snapshot?.pendingUserInputs?.length ?? 0) > 0
+          ? \`<button class="badge-chip blue" style="border:none;cursor:pointer" data-action="expand-question">Question</button>\`
+          : assistant.handsFreeActive
+            ? \`<button class="badge-chip \${assistant.muted ? "amber" : "green"}" style="border:none;cursor:pointer" data-action="assistant-toggle-mute">\${assistant.muted ? "Unmute" : "Mute"}</button>\`
+            : "";
 
     const modeBarHtml = \`
       <div class="mode-bar">
@@ -1393,11 +2116,7 @@ export function buildIslandHtml(): string {
           <button class="mode-pill-btn \${activeMode === "dictation" ? "active" : ""}" data-action="assistant-set-mode" data-mode="dictation">Dictate</button>
         </div>
         <div class="header-actions">
-          <button class="handsfree-chip \${assistant.handsFreeActive ? "live" : ""}" data-action="assistant-toggle-hands-free" title="Hands-free conversational Voice Mode">
-            <span class="status-dot \${assistant.handsFreeActive ? "done" : "running"}" style="width:6px;height:6px"></span>
-            <span>\${assistant.handsFreeActive ? "Live" : "Voice Mode"}</span>
-          </button>
-          <button class="icon-btn" data-action="assistant-open-voice-mode-modal" title="Open full Voice Mode">⤢</button>
+          \${attentionChipHtml}
         </div>
       </div>
     \`;
@@ -1405,131 +2124,238 @@ export function buildIslandHtml(): string {
     const combinedError = assistant.error || voice.error;
 
     return \`
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="thread-picker-wrap">
-            <span class="status-dot \${statusDotClass}"></span>
-            <button class="thread-title-btn" data-action="toggle-thread-switcher">
-              <span class="thread-title-text">\${escapeHtml(isDictationOnly ? (thread?.title ?? "mattr") : "mattr Assistant")}</span>
-              \${threads.length > 1 ? \`<span class="thread-chevron">▾</span>\` : ""}
+      <div class="card-root">
+        \${headerHtml}
+        <div class="card-body \${entering ? "entering" : ""}">
+          \${modeBarHtml}
+          \${switcherHtml}
+          \${messagesHtml}
+          <div class="voice-stage">
+            \${livePreview ? \`
+              <div class="transcript-pill">
+                <span>\${escapeHtml(assistant.liveTranscript || voice.previewCommitted)}<span class="tentative">\${escapeHtml(assistant.liveTranscript ? "" : voice.previewTentative)}</span></span>
+              </div>
+            \` : ""}
+            <button class="wave-trigger" data-action="\${isSpeaking ? "assistant-barge-in" : "voice-toggle"}" title="\${escapeHtml(hintText)}">
+              <canvas id="siri-wave-canvas" style="width:132px;height:132px"></canvas>
+            </button>
+            \${combinedError ? \`<div class="voice-error">\${escapeHtml(combinedError)}</div>\` : ""}
+          </div>
+          <div class="composer-row">
+            <button class="shortcut-hint \${isRecording || isBusy || isSpeaking ? "active" : ""}" data-action="\${isSpeaking ? "assistant-barge-in" : "voice-toggle"}">
+              \${escapeHtml(hintText)}
+            </button>
+            <input
+              id="island-draft-input"
+              class="draft-input"
+              type="text"
+              placeholder="\${isDictationOnly ? (thread ? "Reply…" : "") : "Ask mattr anything…"}"
+              value="\${escapeHtml(voice.draftText || "")}"
+              \${isDictationOnly && !thread ? "disabled" : ""}
+            />
+            <button
+              class="send-circle-btn \${canSend ? "ready" : ""}"
+              data-action="send-reply"
+              \${canSend ? "" : "disabled"}
+              title="\${isDictationOnly ? "Send reply (↵)" : "Ask mattr (↵)"}"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M8 12.5V3.5M8 3.5L4 7.5M8 3.5L12 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </button>
           </div>
-          <div class="header-actions">
-            \${(snapshot?.pendingApprovals?.length ?? 0) > 0
-              ? \`<button class="badge-chip amber" style="border:none;cursor:pointer" data-action="expand-approval">Approve</button>\`
-              : (snapshot?.pendingUserInputs?.length ?? 0) > 0
-                ? \`<button class="badge-chip blue" style="border:none;cursor:pointer" data-action="expand-question">Question</button>\`
-                : ""}
-            \${thread ? \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(thread.environmentId)}" data-thread="\${escapeHtml(thread.threadId)}" title="Open in mattr">↗</button>\` : ""}
-            <button class="icon-btn" data-action="close-panel" title="Close (Esc)">✕</button>
-          </div>
-        </div>
-        \${modeBarHtml}
-        \${switcherHtml}
-        \${messagesHtml}
-        <div class="voice-stage">
-          \${livePreview ? \`
-            <div class="transcript-pill">
-              <span>\${escapeHtml(assistant.liveTranscript || voice.previewCommitted)}<span class="tentative">\${escapeHtml(assistant.liveTranscript ? "" : voice.previewTentative)}</span></span>
-            </div>
-          \` : ""}
-          <button class="wave-trigger" data-action="\${isSpeaking ? "assistant-barge-in" : "voice-toggle"}" title="\${escapeHtml(hintText)}">
-            <canvas id="siri-wave-canvas" style="width:132px;height:132px"></canvas>
-          </button>
-          \${combinedError ? \`<div class="voice-error">\${escapeHtml(combinedError)}</div>\` : ""}
-        </div>
-        <div class="composer-row">
-          <button class="shortcut-hint \${isRecording || isBusy || isSpeaking ? "active" : ""}" data-action="\${isSpeaking ? "assistant-barge-in" : "voice-toggle"}">
-            \${escapeHtml(hintText)}
-          </button>
-          <input
-            id="island-draft-input"
-            class="draft-input"
-            type="text"
-            placeholder="\${isDictationOnly ? (thread ? "Reply…" : "") : "Ask mattr anything…"}"
-            value="\${escapeHtml(voice.draftText || "")}"
-            \${isDictationOnly && !thread ? "disabled" : ""}
-          />
-          <button
-            class="send-circle-btn \${canSend ? "ready" : ""}"
-            data-action="send-reply"
-            \${canSend ? "" : "disabled"}
-            title="\${isDictationOnly ? "Send reply (↵)" : "Ask mattr (↵)"}"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M8 12.5V3.5M8 3.5L4 7.5M8 3.5L12 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
         </div>
       </div>
     \`;
   }
 
-  let lastRenderedSignature = "";
+  function syncCardHeightTarget() {
+    if (geomState !== "card") return;
+    const { stageH } = syncStageSize();
+    const cardW = getEffectiveCardWidth();
+    targetContentWidth = cardW;
+    measureEl.style.width = cardW + "px";
+    const rectH = Math.ceil(measureEl.getBoundingClientRect().height || 0);
+    const scrollH = Math.ceil(measureEl.scrollHeight || 0);
+    const measured = Math.max(rectH, scrollH, 220) + 4;
+    const maxH = Math.max(200, Math.min(540, stageH - 16));
+    const clampedH = clamp(measured, 160, maxH);
+    setSpringTargets({
+      w: cardW,
+      h: clampedH,
+      topR: metrics.hasNotch ? 16 : 0,
+      botR: 26,
+      expand: 1,
+      presence: 1,
+    });
+  }
+
+  function syncGeometryForView(view) {
+    if (view.kind === "hidden") {
+      if (metrics.hasNotch && snapshot?.settings?.enabled !== false) {
+        geomState = "docked";
+        targetContentWidth = metrics.notchWidth;
+        setSpringTargets({
+          w: metrics.notchWidth,
+          h: metrics.notchHeight,
+          topR: 6,
+          botR: 11,
+          expand: 0,
+          presence: 1,
+        });
+      } else {
+        geomState = "hidden";
+        targetContentWidth = 220;
+        setSpringTargets({
+          w: 220,
+          h: 34,
+          topR: 0,
+          botR: 17,
+          expand: 0,
+          presence: 0,
+        });
+      }
+      return;
+    }
+
+    if (view.kind === "peek") {
+      geomState = "peek";
+      const peekW = metrics.notchWidth + 68;
+      targetContentWidth = peekW;
+      measureEl.style.width = peekW + "px";
+      setSpringTargets({
+        w: peekW,
+        h: metrics.notchHeight + 2,
+        topR: 9,
+        botR: 15,
+        expand: 0.28,
+        presence: 1,
+      });
+      return;
+    }
+
+    if (view.kind === "pill" || view.kind === "flash") {
+      geomState = "pill";
+      const pillW = metrics.hasNotch
+        ? getEffectiveNotchPillWidth()
+        : view.kind === "flash"
+          ? CAPSULE_FLASH_WIDTH
+          : CAPSULE_PILL_WIDTH;
+      const pillH = metrics.hasNotch ? metrics.notchHeight + 2 : 38;
+      targetContentWidth = pillW;
+      measureEl.style.width = pillW + "px";
+      setSpringTargets({
+        w: pillW,
+        h: pillH,
+        topR: metrics.hasNotch ? 11 : 0,
+        botR: metrics.hasNotch ? 16 : 19,
+        expand: 0.52,
+        presence: 1,
+      });
+      return;
+    }
+
+    geomState = "card";
+    syncCardHeightTarget();
+  }
 
   function render() {
     const view = resolveEffectiveView();
+    const enteringCard = view.kind !== lastViewKind && (
+      view.kind === "voice" ||
+      view.kind === "approval" ||
+      view.kind === "question" ||
+      view.kind === "done-list"
+    );
+    lastViewKind = view.kind;
+
     if (view.kind === "hidden") {
-      shell.className = "hidden mode-pill";
-      destroyWaveGl();
-      if (lastRenderedSignature !== "hidden") {
-        content.innerHTML = "";
-        lastRenderedSignature = "hidden";
+      stopWaveLoop();
+      syncGeometryForView(view);
+      if (!isPointerInside) {
+        setPassthrough(true);
       }
-      bridge.setMousePassthrough(true);
+      return;
+    }
+
+    if (view.kind === "peek") {
+      destroyWaveGl();
+      const sig =
+        "peek:" +
+        metrics.notchWidth +
+        ":" +
+        metrics.notchHeight +
+        ":" +
+        (snapshot?.pendingApprovals?.length ?? 0) +
+        ":" +
+        (snapshot?.pendingUserInputs?.length ?? 0);
+      if (sig !== lastRenderedSignature) {
+        content.innerHTML = renderPeek();
+        lastRenderedSignature = sig;
+      }
+      syncGeometryForView(view);
       return;
     }
 
     if (view.kind === "flash") {
-      shell.className = "mode-pill";
       destroyWaveGl();
-      const sig = "flash:" + flashMessage;
+      const sig = "flash:" + metrics.hasNotch + ":" + flashMessage;
       if (sig !== lastRenderedSignature) {
-        content.innerHTML = \`<div class="flash-banner">✓ \${escapeHtml(flashMessage)}</div>\`;
+        content.innerHTML = renderFlash();
         lastRenderedSignature = sig;
       }
+      syncGeometryForView(view);
       return;
     }
 
     if (view.kind === "pill") {
-      shell.className = "mode-pill";
       destroyWaveGl();
       const html = renderPill(view);
-      if (html !== lastRenderedSignature) {
+      const sig = "pill:" + metrics.hasNotch + ":" + metrics.notchWidth + ":" + html;
+      if (sig !== lastRenderedSignature) {
         content.innerHTML = html;
-        lastRenderedSignature = html;
+        lastRenderedSignature = sig;
       }
+      updatePillEqualizer();
+      syncGeometryForView(view);
       return;
     }
 
-    shell.className = "mode-card";
     if (view.kind === "done-list") {
       destroyWaveGl();
-      const html = renderDoneList();
-      if (html !== lastRenderedSignature) {
+      const html = renderDoneList(enteringCard);
+      const sig = "done-list:" + metrics.hasNotch + ":" + html;
+      if (sig !== lastRenderedSignature) {
         content.innerHTML = html;
-        lastRenderedSignature = html;
+        lastRenderedSignature = sig;
       }
+      syncGeometryForView(view);
       return;
     }
+
     if (view.kind === "approval") {
       destroyWaveGl();
-      const html = renderApproval(view.approval);
-      if (html !== lastRenderedSignature) {
+      const html = renderApproval(view.approval, enteringCard);
+      const sig = "approval:" + metrics.hasNotch + ":" + html;
+      if (sig !== lastRenderedSignature) {
         content.innerHTML = html;
-        lastRenderedSignature = html;
+        lastRenderedSignature = sig;
       }
+      syncGeometryForView(view);
       return;
     }
+
     if (view.kind === "question") {
       destroyWaveGl();
-      const html = renderQuestion(view.input);
-      if (html !== lastRenderedSignature) {
+      const html = renderQuestion(view.input, enteringCard);
+      const sig = "question:" + metrics.hasNotch + ":" + html;
+      if (sig !== lastRenderedSignature) {
         const prevFocused = document.activeElement?.id === "question-custom-input";
         content.innerHTML = html;
-        lastRenderedSignature = html;
+        lastRenderedSignature = sig;
         if (prevFocused) document.getElementById("question-custom-input")?.focus();
       }
+      syncGeometryForView(view);
       return;
     }
 
@@ -1539,9 +2365,11 @@ export function buildIslandHtml(): string {
     const selStart = prevDraftInput?.selectionStart ?? null;
     const selEnd = prevDraftInput?.selectionEnd ?? null;
 
-    // Build structural signature ignoring high-frequency audio level
     const structuralSnapshot = {
       view: "voice",
+      hasNotch: metrics.hasNotch,
+      notchWidth: metrics.notchWidth,
+      notchHeight: metrics.notchHeight,
       switcher: threadSwitcherOpen,
       thread: selectedThread(),
       threadsCount: snapshot?.recentThreads?.length ?? 0,
@@ -1566,7 +2394,7 @@ export function buildIslandHtml(): string {
     };
     const sig = JSON.stringify(structuralSnapshot);
     if (sig !== lastRenderedSignature) {
-      content.innerHTML = renderVoicePanel();
+      content.innerHTML = renderVoicePanel(enteringCard);
       lastRenderedSignature = sig;
       if (draftFocused) {
         const nextInput = document.getElementById("island-draft-input");
@@ -1579,6 +2407,7 @@ export function buildIslandHtml(): string {
       }
     }
     ensureWaveMounted();
+    syncGeometryForView(view);
   }
 
   function submitCurrentQuestion() {
@@ -1642,20 +2471,22 @@ export function buildIslandHtml(): string {
 
   function closeIsland() {
     threadSwitcherOpen = false;
+    isNotchPeeking = false;
     uiMode = "auto";
     bridge.sendAction({ type: "voice-cancel" });
     bridge.sendAction({ type: "close-panel" });
     render();
   }
 
-  // Click delegation
-  shell.addEventListener("click", (event) => {
+  // Click delegation on active Island content
+  contentClipEl.addEventListener("click", (event) => {
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
     if (action === "open-thread") {
       event.stopPropagation();
       uiMode = "auto";
+      isNotchPeeking = false;
       bridge.sendAction({
         type: "open-thread",
         environmentId: target.dataset.env,
@@ -1666,19 +2497,25 @@ export function buildIslandHtml(): string {
     }
     if (action === "expand-done") {
       uiMode = "done-list";
+      isNotchPeeking = false;
       bridge.focusWindow();
+      lastPassthrough = false;
       render();
       return;
     }
     if (action === "expand-approval") {
       uiMode = "approval";
+      isNotchPeeking = false;
       bridge.focusWindow();
+      lastPassthrough = false;
       render();
       return;
     }
     if (action === "expand-question") {
       uiMode = "question";
+      isNotchPeeking = false;
       bridge.focusWindow();
+      lastPassthrough = false;
       render();
       return;
     }
@@ -1686,7 +2523,9 @@ export function buildIslandHtml(): string {
       if ((snapshot?.pendingApprovals?.length ?? 0) > 0) uiMode = "approval";
       else if ((snapshot?.pendingUserInputs?.length ?? 0) > 0) uiMode = "question";
       else uiMode = "done-list";
+      isNotchPeeking = false;
       bridge.focusWindow();
+      lastPassthrough = false;
       render();
       return;
     }
@@ -1721,8 +2560,11 @@ export function buildIslandHtml(): string {
     }
     if (action === "expand-voice") {
       uiMode = "voice";
+      isNotchPeeking = false;
       bridge.focusWindow();
+      lastPassthrough = false;
       render();
+      setTimeout(() => document.getElementById("island-draft-input")?.focus(), 60);
       return;
     }
     if (action === "assistant-set-mode") {
@@ -1737,12 +2579,18 @@ export function buildIslandHtml(): string {
       bridge.sendAction({ type: "assistant-toggle-hands-free" });
       return;
     }
+    if (action === "assistant-toggle-mute") {
+      event.stopPropagation();
+      bridge.sendAction({ type: "assistant-toggle-mute" });
+      return;
+    }
     if (action === "assistant-barge-in") {
       bridge.sendAction({ type: "assistant-barge-in" });
       return;
     }
     if (action === "assistant-open-voice-mode-modal") {
       uiMode = "auto";
+      isNotchPeeking = false;
       bridge.sendAction({ type: "assistant-open-voice-mode-modal" });
       render();
       return;
@@ -1812,11 +2660,29 @@ export function buildIslandHtml(): string {
     }
   });
 
+  // Clicking transparent margin outside an expanded card dismisses it;
+  // clicking directly inside the docked notch immediately opens Voice Assistant
+  stage.addEventListener("click", (event) => {
+    if (event.target !== stage) return;
+    if (geomState === "docked" && metrics.hasNotch && isPointInsideIsland(event.clientX, event.clientY)) {
+      isNotchPeeking = false;
+      uiMode = "voice";
+      bridge.focusWindow();
+      lastPassthrough = false;
+      render();
+      setTimeout(() => document.getElementById("island-draft-input")?.focus(), 60);
+      return;
+    }
+    if (geomState === "card") {
+      closeIsland();
+    }
+  });
+
   // Live input sync
-  shell.addEventListener("input", (event) => {
+  contentClipEl.addEventListener("input", (event) => {
     if (event.target.id === "island-draft-input") {
       bridge.sendAction({ type: "update-draft", text: event.target.value });
-      const btn = shell.querySelector('[data-action="send-reply"]');
+      const btn = contentClipEl.querySelector('[data-action="send-reply"]');
       if (btn) {
         const hasText = event.target.value.trim().length > 0;
         btn.disabled = !hasText;
@@ -1824,7 +2690,7 @@ export function buildIslandHtml(): string {
       }
     } else if (event.target.id === "question-custom-input") {
       questionCustomText = event.target.value;
-      const btn = shell.querySelector('[data-action="submit-question"]');
+      const btn = contentClipEl.querySelector('[data-action="submit-question"]');
       if (btn) btn.disabled = questionCustomText.trim().length === 0;
     }
   });
@@ -1858,7 +2724,6 @@ export function buildIslandHtml(): string {
         return;
       }
     }
-    // Number keys 1-9 select approval or question options when not typing in text field
     if (
       !event.metaKey &&
       !event.ctrlKey &&
@@ -1882,9 +2747,11 @@ export function buildIslandHtml(): string {
             showFlash(
               opt.decision === "accept"
                 ? "Allowed once"
-                : opt.decision === "acceptForSession"
-                  ? "Allowed for session"
-                  : "Denied",
+                : opt.decision === "acceptAlways"
+                  ? "Always allowed"
+                  : opt.decision === "acceptForSession"
+                    ? "Allowed for session"
+                    : "Denied",
             );
           }
         } else if (view.kind === "question") {
@@ -1912,43 +2779,124 @@ export function buildIslandHtml(): string {
   });
 
   // Right-click menu on Island
-  shell.addEventListener("contextmenu", (event) => {
+  contentClipEl.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     bridge.showContextMenu();
   });
 
-  // Mouse passthrough toggling so transparent area never intercepts OS clicks
-  shell.addEventListener("pointerenter", () => {
-    isHovering = true;
-    bridge.setMousePassthrough(false);
-    const view = resolveEffectiveView();
-    if (view.kind === "pill" && (view.pillKind === "approval" || view.pillKind === "input")) {
-      if (hoverExpandTimer) clearTimeout(hoverExpandTimer);
-      hoverExpandTimer = setTimeout(() => {
-        if (!isHovering) return;
-        const cur = resolveEffectiveView();
-        if (cur.kind === "pill") {
-          uiMode = cur.pillKind === "approval" ? "approval" : "question";
-          bridge.focusWindow();
-          render();
-        }
-      }, 220);
+  // Precise geometric hit-testing for notch hover-to-peek & zero menu-bar interference
+  function isPointInsideIsland(x, y) {
+    if (!snapshot || !snapshot.settings.enabled) return false;
+    const { stageW } = syncStageSize();
+    const cx = stageW / 2;
+
+    if (geomState === "hidden") return false;
+
+    if (geomState === "docked") {
+      if (!metrics.hasNotch) return false;
+      // Strictly confined to the 184 x notchHeight physical camera cutout
+      const halfHitW = Math.min(92, metrics.notchWidth / 2);
+      return x >= cx - halfHitW && x <= cx + halfHitW && y >= 0 && y <= metrics.notchHeight;
     }
-  });
-  shell.addEventListener("pointerleave", () => {
-    isHovering = false;
+
+    const liveW = Math.max(springs.w.pos, springs.w.target * 0.85);
+    const liveH = Math.max(springs.h.pos, springs.h.target * 0.85);
+    const earPad = metrics.hasNotch ? springs.topR.pos * 0.45 : 0;
+    const yTop = metrics.hasNotch ? 0 : CAPSULE_Y;
+    return (
+      x >= cx - liveW / 2 - earPad &&
+      x <= cx + liveW / 2 + earPad &&
+      y >= yTop &&
+      y <= yTop + liveH
+    );
+  }
+
+  function clearHoverTimers() {
+    if (peekEnterTimer) {
+      clearTimeout(peekEnterTimer);
+      peekEnterTimer = null;
+    }
+    if (peekLeaveTimer) {
+      clearTimeout(peekLeaveTimer);
+      peekLeaveTimer = null;
+    }
     if (hoverExpandTimer) {
       clearTimeout(hoverExpandTimer);
       hoverExpandTimer = null;
     }
-    const view = resolveEffectiveView();
-    if (view.kind === "pill" || view.kind === "hidden") {
-      bridge.setMousePassthrough(true);
+  }
+
+  function handlePointerOutside() {
+    isPointerInside = false;
+    if (peekEnterTimer) {
+      clearTimeout(peekEnterTimer);
+      peekEnterTimer = null;
     }
+    if (hoverExpandTimer) {
+      clearTimeout(hoverExpandTimer);
+      hoverExpandTimer = null;
+    }
+    if (isNotchPeeking && !peekLeaveTimer) {
+      peekLeaveTimer = setTimeout(() => {
+        peekLeaveTimer = null;
+        if (!isPointerInside && isNotchPeeking) {
+          isNotchPeeking = false;
+          render();
+        }
+      }, 110);
+    }
+    setPassthrough(true);
+  }
+
+  window.addEventListener("pointermove", (event) => {
+    const inside = isPointInsideIsland(event.clientX, event.clientY);
+    if (inside) {
+      const wasInside = isPointerInside;
+      isPointerInside = true;
+      if (peekLeaveTimer) {
+        clearTimeout(peekLeaveTimer);
+        peekLeaveTimer = null;
+      }
+      setPassthrough(false);
+
+      if (geomState === "docked" && metrics.hasNotch && !isNotchPeeking && !peekEnterTimer) {
+        peekEnterTimer = setTimeout(() => {
+          peekEnterTimer = null;
+          if (isPointerInside && geomState === "docked" && !isNotchPeeking) {
+            isNotchPeeking = true;
+            render();
+          }
+        }, 55);
+      } else if (!wasInside) {
+        const view = resolveEffectiveView();
+        if (view.kind === "pill" && (view.pillKind === "approval" || view.pillKind === "input")) {
+          if (hoverExpandTimer) clearTimeout(hoverExpandTimer);
+          hoverExpandTimer = setTimeout(() => {
+            hoverExpandTimer = null;
+            if (!isPointerInside) return;
+            const cur = resolveEffectiveView();
+            if (cur.kind === "pill") {
+              uiMode = cur.pillKind === "approval" ? "approval" : "question";
+              bridge.focusWindow();
+              lastPassthrough = false;
+              render();
+            }
+          }, 220);
+        }
+      }
+    } else if (isPointerInside || !lastPassthrough) {
+      handlePointerOutside();
+    }
+  });
+
+  document.addEventListener("mouseleave", () => {
+    handlePointerOutside();
   });
 
   // Collapse card when clicking outside the Island window
   window.addEventListener("blur", () => {
+    clearHoverTimers();
+    isNotchPeeking = false;
     const voiceActive = snapshot?.voice && snapshot.voice.phase !== "idle";
     if (!voiceActive && uiMode !== "auto") {
       uiMode = "auto";
@@ -1957,11 +2905,61 @@ export function buildIslandHtml(): string {
     }
   });
 
+  // Display metrics from DesktopIsland (notched vs external monitor)
+  function applyDisplayMetrics(next) {
+    if (!next || typeof next !== "object") return;
+    const changedNotch = next.hasNotch !== metrics.hasNotch;
+    metrics = {
+      hasNotch: Boolean(next.hasNotch),
+      notchWidth: Number(next.notchWidth) || 188,
+      notchHeight: Number(next.notchHeight) || 37,
+      windowWidth: Number(next.windowWidth) || 560,
+    };
+    syncStageSize();
+    if (!metrics.hasNotch) {
+      isNotchPeeking = false;
+    }
+    if (changedNotch && geomState !== "card") {
+      setSpringTargets(
+        metrics.hasNotch
+          ? { w: metrics.notchWidth, h: metrics.notchHeight, topR: 6, botR: 11, expand: 0, presence: 1 }
+          : { w: 220, h: 34, topR: 0, botR: 17, expand: 0, presence: 0 },
+        true,
+      );
+    }
+    render();
+  }
+
+  // Continuously track card height changes (messages, transcripts, switcher, fonts)
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => {
+      if (geomState === "card") {
+        syncCardHeightTarget();
+      }
+    });
+    ro.observe(measureEl);
+  }
+
+  window.addEventListener("resize", () => {
+    syncStageSize();
+    if (geomState === "card") {
+      syncCardHeightTarget();
+    } else if (geomState === "pill" && metrics.hasNotch) {
+      const pillW = getEffectiveNotchPillWidth();
+      targetContentWidth = pillW;
+      measureEl.style.width = pillW + "px";
+      setSpringTargets({ w: pillW }, true);
+    }
+    applyGeometryFrame();
+  });
+
+  if (typeof bridge.onDisplayMetrics === "function") {
+    bridge.onDisplayMetrics((next) => applyDisplayMetrics(next));
+  }
+
   bridge.onSnapshot((next) => {
     snapshot = next;
-    if (waveCanvasEl) {
-      updateWaveVisuals();
-    }
+    updateWaveVisuals();
     render();
   });
 
@@ -1971,37 +2969,43 @@ export function buildIslandHtml(): string {
       return;
     }
     if (command.type === "open-voice-panel") {
+      isNotchPeeking = false;
       uiMode = "voice";
       bridge.focusWindow();
+      lastPassthrough = false;
       render();
       if (command.startVoice && snapshot?.voice?.available && snapshot?.voice?.phase === "idle") {
         bridge.sendAction({ type: "voice-start" });
       } else {
-        setTimeout(() => document.getElementById("island-draft-input")?.focus(), 40);
+        setTimeout(() => document.getElementById("island-draft-input")?.focus(), 50);
       }
       return;
     }
     if (command.type === "toggle-voice-panel") {
       const view = resolveEffectiveView();
       if (view.kind === "voice") {
-        // Pressing shortcut again while open toggles dictation (matching Dray Island)
         if (snapshot?.voice?.available) {
           bridge.sendAction({ type: "voice-toggle" });
         } else {
           closeIsland();
         }
       } else {
+        isNotchPeeking = false;
         uiMode = "voice";
         bridge.focusWindow();
+        lastPassthrough = false;
         render();
         if (command.startVoice && snapshot?.voice?.available) {
           bridge.sendAction({ type: "voice-start" });
         } else {
-          setTimeout(() => document.getElementById("island-draft-input")?.focus(), 40);
+          setTimeout(() => document.getElementById("island-draft-input")?.focus(), 50);
         }
       }
     }
   });
+
+  // Paint initial resting frame (docked invisibly inside hardware notch)
+  applyGeometryFrame();
 })();
 </script>
 </body>

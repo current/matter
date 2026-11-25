@@ -17,7 +17,9 @@ import {
 import type {
   VoiceAssistantTurnRequest,
   VoiceBriefingRequest,
+  VoiceCredentialsStatus,
   VoiceSpeakRequest,
+  VoiceTranscribeResponse,
 } from "../../../../antimatter/voice-assistant/types.ts";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import {
@@ -115,14 +117,21 @@ const VoiceBriefingRequestSchema = Schema.Struct({
 
 const VoiceSpeakRequestSchema = Schema.Struct({
   text: Schema.String,
-  provider: Schema.optional(Schema.Literals(["auto", "openai", "macos", "browser", "off"])),
+  provider: Schema.optional(
+    Schema.Literals(["auto", "deepgram", "openai", "macos", "browser", "off"]),
+  ),
   voice: Schema.optional(Schema.String),
   speed: Schema.optional(Schema.Number),
+});
+
+const VoiceCredentialsRequestSchema = Schema.Struct({
+  deepgramApiKey: Schema.String,
 });
 
 const decodeTurnRequest = Schema.decodeUnknownEffect(VoiceTurnRequestSchema);
 const decodeBriefingRequest = Schema.decodeUnknownEffect(VoiceBriefingRequestSchema);
 const decodeSpeakRequest = Schema.decodeUnknownEffect(VoiceSpeakRequestSchema);
+const decodeCredentialsRequest = Schema.decodeUnknownEffect(VoiceCredentialsRequestSchema);
 
 const authenticateOperate = Effect.fnUntraced(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -282,6 +291,94 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
       }).pipe(catchAuthErrors),
     );
 
-    return Layer.mergeAll(turnRoute, briefingRoute, speakRoute, ttsInfoRoute);
+    const transcribeRoute = HttpRouter.add(
+      "POST",
+      "/api/mattr/voice-assistant/transcribe",
+      Effect.gen(function* () {
+        yield* authenticateOperate();
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const buf = yield* request.arrayBuffer.pipe(Effect.option);
+        if (buf._tag === "None" || buf.value.byteLength === 0) {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_audio" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const queryIndex = request.url.indexOf("?");
+        const langQuery =
+          queryIndex === -1
+            ? undefined
+            : (new URLSearchParams(request.url.slice(queryIndex + 1)).get("language") ?? undefined);
+        return yield* tts.transcribeDeepgram(new Uint8Array(buf.value), langQuery).pipe(
+          Effect.map((result) =>
+            HttpServerResponse.jsonUnsafe(result satisfies VoiceTranscribeResponse, {
+              headers: NO_STORE_HEADERS,
+            }),
+          ),
+          Effect.catchTags({
+            VoiceTtsUnavailableError: (error) =>
+              Effect.succeed(
+                HttpServerResponse.jsonUnsafe(
+                  {
+                    error: error.reason === "empty-text" ? "invalid_audio" : "stt_unavailable",
+                    fallback: "client",
+                  },
+                  {
+                    status: error.reason === "empty-text" ? 400 : 501,
+                    headers: NO_STORE_HEADERS,
+                  },
+                ),
+              ),
+            VoiceTtsSynthesisError: (error) =>
+              Effect.succeed(
+                HttpServerResponse.jsonUnsafe(
+                  {
+                    error: "stt_failed",
+                    provider: error.provider,
+                    fallback: "client",
+                  },
+                  { status: 502, headers: NO_STORE_HEADERS },
+                ),
+              ),
+          }),
+        );
+      }).pipe(catchAuthErrors),
+    );
+
+    const credentialsRoute = HttpRouter.add(
+      "POST",
+      "/api/mattr/voice-assistant/credentials",
+      Effect.gen(function* () {
+        yield* authenticateOperate();
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const raw = yield* request.json.pipe(Effect.option);
+        if (raw._tag === "None") {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_json" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const decoded = yield* decodeCredentialsRequest(raw.value).pipe(Effect.option);
+        if (decoded._tag === "None") {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_request" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const status: VoiceCredentialsStatus = yield* tts.saveDeepgramApiKey(
+          decoded.value.deepgramApiKey,
+        );
+        return HttpServerResponse.jsonUnsafe(status, { headers: NO_STORE_HEADERS });
+      }).pipe(catchAuthErrors),
+    );
+
+    return Layer.mergeAll(
+      turnRoute,
+      briefingRoute,
+      speakRoute,
+      ttsInfoRoute,
+      transcribeRoute,
+      credentialsRoute,
+    );
   }),
 );
