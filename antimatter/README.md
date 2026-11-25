@@ -4,7 +4,7 @@ Antimatter is a personal fork of [T3 Code](https://github.com/pingdotgg/t3code) 
 
 ## How updates work
 
-`.github/workflows/antimatter-nightly.yml` checks for a new T3 Code nightly every hour. Pushes to `main` don't build on their own; they ship with the next upstream nightly. To build right away, put `[build]` in the commit message or run the workflow by hand (Actions → Antimatter nightly → Run workflow). Each build:
+`.github/workflows/antimatter-nightly.yml` checks for a new T3 Code nightly every 30 minutes, and also runs on every push to `main`. When either one has changed, it:
 
 1. merges the newest upstream nightly tag into `main` (in CI only, nothing is pushed back);
 2. builds the macOS arm64 app;
