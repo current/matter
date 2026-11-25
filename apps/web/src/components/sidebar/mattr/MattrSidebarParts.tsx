@@ -1,7 +1,7 @@
 import type { BotIdentity } from "@t3tools/contracts";
 import { Link, useLocation } from "@tanstack/react-router";
 import { useGT, useMessages } from "gt-react";
-import { ChevronDownIcon, ChevronRightIcon, RadioIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, InboxIcon, LayoutGridIcon } from "lucide-react";
 import {
   useEffect,
   type MouseEvent as ReactMouseEvent,
@@ -18,18 +18,25 @@ import { formatRelativeTime } from "../../../timestampFormat";
 import { BotAvatar } from "../../bots/BotAvatarRenderer";
 import { BOT_ACTIVITY_DOT, BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
 import { retainBotsSync, useBotsState } from "../../bots/botsStore";
-import { Toggle, ToggleGroup } from "../../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../../ui/tooltip";
 import type { MattrThreadItem } from "./mattrSidebar.logic";
-import type { MattrSidebarActions } from "./useMattrSidebarModel";
 import { useMattrSidebarLayout } from "./mattrSidebarStore";
+import type { MattrSidebarActions } from "./useMattrSidebarModel";
 
 /** A hover label for an icon-only control. */
-export function MattrTip({ label, children }: { label: string; children: ReactElement }) {
+export function MattrTip({
+  label,
+  side = "bottom",
+  children,
+}: {
+  label: string;
+  side?: "top" | "bottom" | "left" | "right";
+  children: ReactElement;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger render={children} />
-      <TooltipPopup side="bottom">{label}</TooltipPopup>
+      <TooltipPopup side={side}>{label}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -40,7 +47,13 @@ export function compactAge(iso: string | null, nowMs: number): string {
   return formatRelativeTime(iso, nowMs)?.value ?? "";
 }
 
-function MattrStatusDot({ item }: { item: MattrThreadItem }) {
+function MattrStatusDot({
+  item,
+  className,
+}: {
+  item: MattrThreadItem;
+  className?: string | undefined;
+}) {
   const gt = useGT();
   const tone =
     item.attention === "needs"
@@ -59,7 +72,7 @@ function MattrStatusDot({ item }: { item: MattrThreadItem }) {
     <span
       role="img"
       aria-label={tone.label}
-      className={cn("size-1.5 shrink-0 rounded-full", tone.className)}
+      className={cn("size-[7px] shrink-0 rounded-full", tone.className, className)}
     />
   );
 }
@@ -87,35 +100,57 @@ export function MattrThreadRow({
       contextMenuSourceOf(event),
     );
   };
+  const hasTrailing = trailing !== undefined && trailing !== null;
   return (
-    <li className="flex items-center gap-1" data-mattr-thread-row={item.key}>
+    <li
+      data-mattr-thread-row={item.key}
+      className={cn(
+        "flex items-center rounded-md transition-colors",
+        hasTrailing
+          ? active
+            ? "bg-sidebar-row-active text-sidebar-foreground"
+            : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover"
+          : undefined,
+      )}
+    >
       <button
         type="button"
         aria-current={active ? "page" : undefined}
         onClick={() => actions.openThread(item)}
         onContextMenu={onContextMenu}
         className={cn(
-          "flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset",
-          subtitle ? "py-1.5" : "h-7",
-          active
-            ? "bg-sidebar-row-active text-sidebar-foreground"
-            : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover",
+          "flex min-w-0 flex-1 cursor-pointer gap-2 rounded-md px-2 text-left text-sm leading-snug outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset",
+          subtitle ? "items-start py-1.5" : "h-7 items-center",
+          hasTrailing
+            ? "pr-1.5"
+            : active
+              ? "bg-sidebar-row-active text-sidebar-foreground transition-colors"
+              : "text-sidebar-foreground/90 transition-colors hover:bg-sidebar-row-hover",
         )}
       >
-        <MattrStatusDot item={item} />
+        <MattrStatusDot item={item} className={subtitle ? "mt-[5px]" : undefined} />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className={cn("truncate", item.unread && "font-medium")}>{item.title}</span>
+          <span
+            className={cn(
+              "truncate",
+              (item.unread || active) && "font-medium text-sidebar-foreground",
+            )}
+          >
+            {item.title}
+          </span>
           {subtitle ? (
-            <span className="truncate text-xs text-sidebar-muted-foreground">{subtitle}</span>
+            <span className="mt-0.5 truncate text-2xs leading-tight text-sidebar-muted-foreground">
+              {subtitle}
+            </span>
           ) : null}
         </span>
         {meta ? (
-          <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground">
+          <span className="shrink-0 text-2xs tabular-nums text-sidebar-muted-foreground/85">
             {meta}
           </span>
         ) : null}
       </button>
-      {trailing}
+      {hasTrailing ? <div className="shrink-0 pr-1.5">{trailing}</div> : null}
     </li>
   );
 }
@@ -125,6 +160,7 @@ export function MattrSectionHeader({
   label,
   count,
   tone = "muted",
+  ruled = false,
   expanded,
   onToggle,
 }: {
@@ -132,39 +168,43 @@ export function MattrSectionHeader({
   label: string;
   count?: number;
   tone?: "muted" | "attention";
+  ruled?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
   const content = (
     <>
       {icon}
-      <span>{label}</span>
-      {count !== undefined ? <span className="tabular-nums">{count}</span> : null}
+      <span className="shrink-0">{label}</span>
+      {count !== undefined ? (
+        <span className="shrink-0 tabular-nums opacity-75">{count}</span>
+      ) : null}
+      {ruled ? <span aria-hidden className="ml-1 h-px flex-1 bg-sidebar-border/60" /> : null}
       {onToggle ? (
-        <span className="ml-auto">
+        <span className="ml-auto opacity-75">
           {expanded ? (
-            <ChevronDownIcon aria-hidden className="size-3.5" />
+            <ChevronDownIcon aria-hidden className="size-3" />
           ) : (
-            <ChevronRightIcon aria-hidden className="size-3.5" />
+            <ChevronRightIcon aria-hidden className="size-3" />
           )}
         </span>
       ) : null}
     </>
   );
   const className = cn(
-    "flex w-full items-center gap-1.5 px-2 pt-3 pb-1 text-xs font-medium [&_svg]:size-3.5",
+    "flex w-full items-center gap-1.5 px-2 pt-3 pb-1 text-2xs font-medium [&_svg]:size-3 [&_svg]:shrink-0",
     tone === "attention" ? "text-warning-foreground" : "text-sidebar-muted-foreground",
   );
   if (!onToggle) return <h3 className={className}>{content}</h3>;
   return (
-    <h3>
+    <h3 className="pt-2">
       <button
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
         className={cn(
-          className,
-          "cursor-pointer rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset",
+          "flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-2xs font-medium outline-hidden ring-ring transition-colors hover:bg-sidebar-row-hover/70 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset [&_svg]:size-3 [&_svg]:shrink-0",
+          tone === "attention" ? "text-warning-foreground" : "text-sidebar-muted-foreground",
         )}
       >
         {content}
@@ -173,24 +213,51 @@ export function MattrSectionHeader({
   );
 }
 
-/** Inbox / Spaces switch shown inside the rail; Classic lives in Settings. */
+/** Full-width recessed Inbox / Spaces switch anchored in the rail chrome; Classic lives in Settings. */
 export function MattrLayoutSwitcher() {
   const gt = useGT();
   const [layout, setLayout] = useMattrSidebarLayout();
+  const options: ReadonlyArray<{
+    readonly value: "inbox" | "spaces";
+    readonly label: string;
+    readonly icon: ReactNode;
+  }> = [
+    { value: "inbox", label: gt("Inbox"), icon: <InboxIcon aria-hidden className="size-3" /> },
+    {
+      value: "spaces",
+      label: gt("Spaces"),
+      icon: <LayoutGridIcon aria-hidden className="size-3" />,
+    },
+  ];
   return (
-    <ToggleGroup
+    <div
+      role="group"
       aria-label={gt("Sidebar layout")}
-      variant="segmented"
-      size="xs"
-      value={[layout]}
-      onValueChange={(next) => {
-        const value = next[0];
-        if (value === "inbox" || value === "spaces") setLayout(value);
-      }}
+      className="grid w-full grid-cols-2 gap-0.5 rounded-lg bg-sidebar-row-hover/55 p-0.5 ring-1 ring-inset ring-sidebar-border/55"
     >
-      <Toggle value="inbox">{gt("Inbox")}</Toggle>
-      <Toggle value="spaces">{gt("Spaces")}</Toggle>
-    </ToggleGroup>
+      {options.map((option) => {
+        const selected = layout === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => setLayout(option.value)}
+            className={cn(
+              "inline-flex h-6 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 text-xs leading-none outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
+              selected
+                ? "bg-sidebar-row-active font-medium text-sidebar-foreground shadow-2xs ring-1 ring-inset ring-sidebar-border/75"
+                : "text-sidebar-muted-foreground hover:text-sidebar-foreground",
+            )}
+          >
+            <span className={cn("inline-flex shrink-0", selected ? "opacity-95" : "opacity-70")}>
+              {option.icon}
+            </span>
+            <span>{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -235,47 +302,150 @@ function MattrBotsSlotContent({
   return children(bots);
 }
 
+function MattrBotBadge({ bot }: { bot: BotIdentity }) {
+  const hasUnread = bot.unreadCount > 0;
+  const needsUser = bot.status === "waiting_for_user" || bot.status === "waiting_for_approval";
+  // Grok Bot renders its own bottom-right activity badge; surface unread/waiting cleanly at top-right.
+  const dot = hasUnread
+    ? "bg-info"
+    : needsUser
+      ? "bg-warning"
+      : bot.providerId === "grok-bot"
+        ? null
+        : BOT_ACTIVITY_DOT[bot.status];
+  if (!dot) return null;
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-sidebar",
+        dot,
+      )}
+    />
+  );
+}
+
 export function MattrBotLink({
   bot,
-  size,
+  variant = "crew",
   className,
-  children,
 }: {
   bot: BotIdentity;
-  size: number;
+  variant?: "crew" | "tile";
   className?: string;
-  children?: ReactNode;
 }) {
+  const gt = useGT();
   const m = useMessages();
   const pathname = useLocation({ select: (location) => location.pathname });
   const href = `/bots/${encodeURIComponent(bot.providerId)}/${encodeURIComponent(bot.remoteBotId)}`;
   const active = pathname === href;
-  const dot = BOT_ACTIVITY_DOT[bot.status];
+  const statusLabel = m(BOT_ACTIVITY_LABELS[bot.status]);
+  const tipLabel =
+    bot.unreadCount > 0
+      ? `${bot.name} · ${gt("{count, plural, one {# unread} other {# unread}}", {
+          count: bot.unreadCount,
+        })}`
+      : `${bot.name} · ${statusLabel}`;
+
   return (
-    <MattrTip label={bot.name}>
+    <MattrTip label={tipLabel} side={variant === "crew" ? "top" : "bottom"}>
       <Link
         to="/bots/$providerId/$botId"
         params={{ providerId: bot.providerId, botId: bot.remoteBotId }}
         aria-current={active ? "page" : undefined}
-        aria-label={`${bot.name}, ${m(BOT_ACTIVITY_LABELS[bot.status])}`}
+        aria-label={`${bot.name}, ${statusLabel}`}
         className={cn(
-          "relative inline-flex shrink-0 items-center justify-center outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset",
+          "group/bot relative flex cursor-pointer flex-col items-center justify-center outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
+          variant === "tile"
+            ? cn(
+                "h-12 w-full gap-1 rounded-lg px-1 ring-1 ring-inset",
+                active
+                  ? "bg-sidebar-row-active text-sidebar-foreground shadow-2xs ring-sidebar-border"
+                  : "bg-sidebar-row-hover/40 text-sidebar-muted-foreground ring-sidebar-border/45 hover:bg-sidebar-row-hover/85 hover:text-sidebar-foreground hover:ring-sidebar-border/75",
+              )
+            : cn(
+                "min-w-11 max-w-14 shrink-0 gap-1 rounded-lg px-1.5 py-1",
+                active
+                  ? "bg-sidebar-row-active text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/75"
+                  : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+              ),
           className,
         )}
       >
-        <BotAvatar bot={bot} size={size} activity={bot.status} />
-        {dot || bot.unreadCount > 0 ? (
-          <span
-            aria-hidden
-            className={cn(
-              "absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-sidebar",
-              dot ?? "bg-info",
-            )}
-          />
-        ) : null}
-        {children}
+        <span
+          className={cn(
+            "relative inline-flex shrink-0 items-center justify-center rounded-full",
+            bot.status === "working" && "ring-1 ring-success/80 ring-offset-1 ring-offset-sidebar",
+          )}
+        >
+          {/* 24px maps GrokBotCharacter to "sm" (size-6) with full face details instead of 16px "xs". */}
+          <BotAvatar bot={bot} size={24} activity={bot.status} />
+          <MattrBotBadge bot={bot} />
+        </span>
+        <span className="max-w-full truncate text-3xs leading-none">{bot.name}</span>
       </Link>
     </MattrTip>
+  );
+}
+
+/** Full-row Needs You entry for a Bot that has unread briefings or is waiting for approval. */
+export function MattrBotAttentionRow({ bot }: { bot: BotIdentity }) {
+  const gt = useGT();
+  const m = useMessages();
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const href = `/bots/${encodeURIComponent(bot.providerId)}/${encodeURIComponent(bot.remoteBotId)}`;
+  const active = pathname === href;
+  const statusLabel = m(BOT_ACTIVITY_LABELS[bot.status]);
+
+  return (
+    <li>
+      <Link
+        to="/bots/$providerId/$botId"
+        params={{ providerId: bot.providerId, botId: bot.remoteBotId }}
+        aria-current={active ? "page" : undefined}
+        aria-label={`${bot.name}, ${statusLabel}`}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm leading-snug outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
+          active
+            ? "bg-sidebar-row-active text-sidebar-foreground"
+            : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover",
+        )}
+      >
+        <span className="relative inline-flex shrink-0 items-center justify-center">
+          <BotAvatar bot={bot} size={24} activity={bot.status} />
+          <MattrBotBadge bot={bot} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate font-medium text-sidebar-foreground">{bot.name}</span>
+          <span className="mt-0.5 truncate text-2xs leading-tight text-sidebar-muted-foreground">
+            {statusLabel}
+          </span>
+        </span>
+        {bot.unreadCount > 0 ? (
+          <span className="shrink-0 rounded-full bg-sidebar-row-active px-1.5 py-0.5 text-2xs font-medium tabular-nums text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65">
+            {gt("{count, plural, one {# unread} other {# unread}}", {
+              count: bot.unreadCount,
+            })}
+          </span>
+        ) : null}
+      </Link>
+    </li>
+  );
+}
+
+function MattrVoiceWaveformGlyph({ className }: { className?: string | undefined }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 14"
+      className={cn("h-3.5 w-4 shrink-0 fill-current", className)}
+    >
+      <rect x="0.5" y="4.5" width="1.8" height="5" rx="0.9" />
+      <rect x="3.8" y="2" width="1.8" height="10" rx="0.9" />
+      <rect x="7.1" y="0.5" width="1.8" height="13" rx="0.9" />
+      <rect x="10.4" y="3" width="1.8" height="8" rx="0.9" />
+      <rect x="13.7" y="5" width="1.8" height="4" rx="0.9" />
+    </svg>
   );
 }
 
@@ -285,20 +455,24 @@ export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" }) {
   const enabled = useIsAddonEnabled("voice-assistant");
   if (!enabled) return null;
   return (
-    <MattrTip label={gt("Voice Mode")}>
+    <MattrTip label={gt("Voice Mode")} side={variant === "pill" ? "top" : "bottom"}>
       <button
         type="button"
         onClick={() => setVoiceAssistantModalOpen(true)}
         aria-label={gt("Voice Mode")}
         className={cn(
-          "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 text-xs text-sidebar-foreground outline-hidden ring-ring hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset",
+          "inline-flex shrink-0 cursor-pointer items-center justify-center outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
           variant === "pill"
-            ? "h-6.5 rounded-full bg-sidebar-row-hover/60 px-2.5"
-            : "h-10 rounded-lg bg-sidebar-row-hover/40",
+            ? "ml-auto h-7 gap-1.5 rounded-full bg-sidebar-row-active/85 px-2.5 text-xs font-medium text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65 hover:bg-sidebar-row-active"
+            : "h-12 w-full flex-col gap-1 rounded-lg bg-sidebar-row-hover/40 px-1 text-sidebar-muted-foreground ring-1 ring-inset ring-sidebar-border/45 hover:bg-sidebar-row-hover/85 hover:text-sidebar-foreground hover:ring-sidebar-border/75",
         )}
       >
-        <RadioIcon aria-hidden className="size-3.5" />
-        {variant === "pill" ? <span>{gt("Voice")}</span> : null}
+        <MattrVoiceWaveformGlyph
+          className={variant === "tile" ? "h-4 w-4.5 text-sidebar-foreground" : undefined}
+        />
+        <span className={variant === "tile" ? "text-3xs leading-none" : undefined}>
+          {gt("Voice")}
+        </span>
       </button>
     </MattrTip>
   );

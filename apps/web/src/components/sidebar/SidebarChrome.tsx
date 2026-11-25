@@ -12,6 +12,7 @@ import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 
 import { useAtomValue } from "@effect/atom-react";
+import { useThreadUndoNotice } from "../../hooks/showThreadUndoNotice";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { shortcutLabelForCommand } from "../../keybindings";
 import {
@@ -204,20 +205,23 @@ function SidebarUtilityItem({
   label,
   onClick,
   isActive = false,
+  compact = false,
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
   isActive?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <SidebarMenuItem className="shrink-0">
+    <SidebarMenuItem className={compact ? "shrink-0" : "flex-1"}>
       <Tooltip>
         <TooltipTrigger
           render={
             <SidebarMenuButton
               aria-label={label}
               aria-current={isActive ? "page" : undefined}
+              className={compact ? undefined : "w-full justify-center"}
               isActive={isActive}
               onClick={onClick}
               size="icon"
@@ -232,11 +236,16 @@ function SidebarUtilityItem({
   );
 }
 
-const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
+const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
+  hideVoice = false,
+}: {
+  hideVoice?: boolean;
+}) {
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
   const gt = useGT();
   const { isMobile, setOpenMobile } = useSidebar();
+  const hasUndoNotice = useThreadUndoNotice((state) => state.notice !== null);
   const isOnUtilityPage = useLocation({
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
@@ -296,12 +305,14 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label={gt("Settings")}
             onClick={handleSettingsClick}
             isActive={isOnSettingsPage}
+            compact={hasUndoNotice}
           />
           {pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}
               label={gt("Pull requests")}
               onClick={handlePullRequestsClick}
+              compact={hasUndoNotice}
             />
           ) : null}
           {issuesSupported ? (
@@ -309,21 +320,26 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               icon={<IssueGlyph.issue />}
               label={gt("Issues", { $context: "sidebar link to the list of issues" })}
               onClick={handleIssuesClick}
+              compact={hasUndoNotice}
             />
           ) : null}
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label={gt("Usage")}
             onClick={handleUsageClick}
+            compact={hasUndoNotice}
           />
-          <SidebarUtilityItem
-            icon={<RadioIcon />}
-            label={gt("Voice Mode")}
-            onClick={() => {
-              closeMobileSidebar();
-              setVoiceAssistantModalOpen(true);
-            }}
-          />
+          {hideVoice ? null : (
+            <SidebarUtilityItem
+              icon={<RadioIcon />}
+              label={gt("Voice Mode")}
+              onClick={() => {
+                closeMobileSidebar();
+                setVoiceAssistantModalOpen(true);
+              }}
+              compact={hasUndoNotice}
+            />
+          )}
         </>
       )}
       <SidebarThreadUndoNotice />
@@ -332,12 +348,16 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   );
 });
 
-export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
+export const SidebarChromeFooter = memo(function SidebarChromeFooter({
+  hideVoice = false,
+}: {
+  hideVoice?: boolean;
+} = {}) {
   return (
     <SidebarFooter>
       <SidebarProviderUpdatePill />
       <SidebarUpdateArchitectureWarning />
-      <SidebarUtilityMenu />
+      <SidebarUtilityMenu hideVoice={hideVoice} />
     </SidebarFooter>
   );
 });

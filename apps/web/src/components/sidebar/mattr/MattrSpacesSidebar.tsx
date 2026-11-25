@@ -2,10 +2,12 @@ import { useGT } from "gt-react";
 import { ArchiveIcon, PinIcon, PlusIcon } from "lucide-react";
 import { useEffect } from "react";
 
+import { useEnabledBotProviderAddons, useIsAddonEnabled } from "../../../addons/useAddonRegistry";
 import { isCommandPaletteOpen } from "../../../commandPaletteBus";
 import { resolveShortcutCommand, threadJumpIndexFromCommand } from "../../../keybindings";
-import { cn } from "../../../lib/utils";
+import { cn, isMacPlatform } from "../../../lib/utils";
 import { isModelPickerOpen } from "../../../modelPickerVisibility";
+import { useBotsState } from "../../bots/botsStore";
 import { ProjectFavicon } from "../../ProjectFavicon";
 import { threadShortcutContext } from "../../Sidebar.logic";
 import { Button } from "../../ui/button";
@@ -36,16 +38,31 @@ const ATTENTION_DOT: Record<MattrThreadAttention, string | null> = {
   idle: null,
 };
 
+function useHasConnectedBots(): boolean {
+  const providers = useEnabledBotProviderAddons();
+  const state = useBotsState();
+  if (providers.length === 0) return false;
+  return state.providers.some(
+    (provider) =>
+      provider.status.kind === "connected" &&
+      (state.botsByProvider[provider.providerId]?.length ?? 0) > 0,
+  );
+}
+
 export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
   const gt = useGT();
   const { items, projects, activeThreadKey, nowMs, keybindings, actions } = model;
   const [storedSpace, setActiveSpace] = useMattrActiveSpace();
   const [earlierExpanded, setEarlierExpanded] = useMattrEarlierExpanded();
+  const hasConnectedBots = useHasConnectedBots();
+  const voiceEnabled = useIsAddonEnabled("voice-assistant");
   const projectKeys = projects.map((project) => project.key);
   const activeKey = resolveActiveSpaceKey(storedSpace, projectKeys);
   const activeProject = projects.find((project) => project.key === activeKey) ?? null;
   const sections = buildSpaceSections(items, activeKey, nowMs);
   const favorites = projects.slice(0, MAX_FAVORITES);
+  const shortcutPrefix =
+    typeof navigator !== "undefined" && isMacPlatform(navigator.platform) ? "⌘" : "Ctrl+";
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- listens on window so the thread jump shortcuts switch spaces while Spaces is shown
   useEffect(() => {
@@ -85,7 +102,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-mattr-sidebar="spaces">
-      <div className="flex shrink-0 flex-col gap-1.5 px-2 pt-0.5">
+      <div className="flex shrink-0 flex-col gap-1.5 px-2 pt-1">
         <div role="group" aria-label={gt("Spaces")} className="grid grid-cols-4 gap-1.5">
           {favorites.map((project, index) => {
             const dot = ATTENTION_DOT[resolveProjectAttention(items, project.key) ?? "idle"];
@@ -93,7 +110,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
             return (
               <MattrTip
                 key={project.key}
-                label={index < 9 ? `${project.name} (${index + 1})` : project.name}
+                label={index < 9 ? `${project.name} (${shortcutPrefix}${index + 1})` : project.name}
               >
                 <button
                   type="button"
@@ -101,13 +118,13 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
                   aria-label={project.name}
                   onClick={() => setActiveSpace(project.key)}
                   className={cn(
-                    "relative grid h-10 cursor-pointer place-items-center rounded-lg outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset",
+                    "relative grid h-10 cursor-pointer place-items-center rounded-lg outline-hidden ring-1 ring-inset transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                     selected
-                      ? "bg-sidebar-row-active ring-1 ring-sidebar-border"
-                      : "bg-sidebar-row-hover/40 hover:bg-sidebar-row-hover",
+                      ? "bg-sidebar-row-active shadow-2xs ring-sidebar-border"
+                      : "bg-sidebar-row-hover/40 ring-sidebar-border/45 hover:bg-sidebar-row-hover/85 hover:ring-sidebar-border/75",
                   )}
                 >
-                  <ProjectFavicon project={project.group} className="size-4.5" />
+                  <ProjectFavicon project={project.group} className="size-5" />
                   {dot ? (
                     <span
                       aria-hidden
@@ -122,34 +139,38 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
         <MattrBotsSlot>
           {(bots) => (
             <div role="group" aria-label={gt("Bots")} className="grid grid-cols-4 gap-1.5">
-              {bots.slice(0, 3).map((bot) => (
+              {bots.slice(0, voiceEnabled ? 3 : 4).map((bot) => (
                 <MattrBotLink
                   key={`${bot.providerId}:${bot.remoteBotId}`}
                   bot={bot}
-                  size={20}
-                  className="h-10 rounded-lg bg-sidebar-row-hover/40 hover:bg-sidebar-row-hover"
+                  variant="tile"
                 />
               ))}
               <MattrVoiceTrigger variant="tile" />
             </div>
           )}
         </MattrBotsSlot>
+        {!hasConnectedBots && voiceEnabled ? (
+          <div className="flex justify-end">
+            <MattrVoiceTrigger variant="pill" />
+          </div>
+        ) : null}
       </div>
 
       {activeProject ? (
-        <div className="flex shrink-0 items-center gap-2 px-4 pt-3 pb-1">
+        <div className="flex shrink-0 items-center gap-2 px-3 pt-3 pb-1">
           <ProjectFavicon project={activeProject.group} className="size-4 shrink-0" />
-          <h2 className="min-w-0 truncate text-sm font-semibold text-sidebar-foreground">
+          <h2 className="min-w-0 truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
             {activeProject.name}
           </h2>
-          <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground">
+          <span className="shrink-0 text-2xs tabular-nums text-sidebar-muted-foreground">
             {gt("{count, plural, one {# thread} other {# threads}}", {
               count: sections.liveCount,
             })}
           </span>
           <span className="flex-1" />
           <Button
-            size="icon-sm"
+            size="icon-xs"
             variant="ghost"
             aria-label={gt("New thread in {project}", { project: activeProject.name })}
             onClick={() => actions.newThread(activeProject.key)}
@@ -159,7 +180,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 [scrollbar-width:none]">
         {activeProject === null ? (
           <p className="px-2 py-3 text-xs text-sidebar-muted-foreground">
             {gt("Add a project to start a space.")}
@@ -168,15 +189,15 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
           <>
             {sections.pinned.length > 0 ? (
               <section aria-label={gt("Pinned")}>
-                <MattrSectionHeader icon={<PinIcon aria-hidden />} label={gt("Pinned")} />
-                <ul className="flex flex-col gap-px">{sections.pinned.map(row)}</ul>
+                <MattrSectionHeader icon={<PinIcon aria-hidden />} label={gt("Pinned")} ruled />
+                <ul className="flex flex-col gap-0.5">{sections.pinned.map(row)}</ul>
               </section>
             ) : null}
             <section aria-label={gt("Today")}>
-              <MattrSectionHeader label={gt("Today")} />
-              <ul className="flex flex-col gap-px">{sections.today.map(row)}</ul>
+              <MattrSectionHeader label={gt("Today")} ruled />
+              <ul className="flex flex-col gap-0.5">{sections.today.map(row)}</ul>
               {sections.today.length === 0 ? (
-                <p className="px-2 py-1 text-xs text-sidebar-muted-foreground">
+                <p className="px-2 py-1.5 text-xs text-sidebar-muted-foreground">
                   {gt("No threads today.")}
                 </p>
               ) : null}
@@ -191,7 +212,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
                   onToggle={() => setEarlierExpanded((value) => !value)}
                 />
                 {earlierExpanded ? (
-                  <ul className="flex flex-col gap-px">{sections.earlier.map(row)}</ul>
+                  <ul className="flex flex-col gap-0.5">{sections.earlier.map(row)}</ul>
                 ) : null}
               </section>
             ) : null}
@@ -203,7 +224,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
         <div
           role="group"
           aria-label={gt("Switch space")}
-          className="flex shrink-0 items-center justify-center gap-1 px-2 pt-1"
+          className="flex shrink-0 items-center justify-center gap-1 px-2 pt-1 pb-1.5"
         >
           {favorites.map((project) => (
             <button
@@ -217,8 +238,10 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
               <span
                 aria-hidden
                 className={cn(
-                  "h-1.5 rounded-full bg-sidebar-muted-foreground",
-                  project.key === activeKey ? "w-4 bg-sidebar-foreground" : "w-1.5 opacity-50",
+                  "h-1.5 rounded-full transition-all",
+                  project.key === activeKey
+                    ? "w-4 bg-sidebar-foreground/85"
+                    : "w-1.5 bg-sidebar-muted-foreground/45 hover:bg-sidebar-muted-foreground/75",
                 )}
               />
             </button>

@@ -21,10 +21,12 @@ export function MattrCustomSidebarHost({
       ) : (
         <MattrAttentionInboxSidebar model={model} />
       )}
-      <div className="flex shrink-0 justify-center px-2 pt-2">
-        <MattrLayoutSwitcher />
+      <div className="shrink-0 border-t border-sidebar-border/60 pt-1.5">
+        <div className="px-2 pb-0.5">
+          <MattrLayoutSwitcher />
+        </div>
+        <SidebarChromeFooter hideVoice />
       </div>
-      <SidebarChromeFooter />
     </div>
   );
 }

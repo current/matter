@@ -294,6 +294,21 @@ describe("MattrSpacesSidebar", () => {
     expect(screen.container.querySelector('[role="group"][aria-label="Bots"]')).toBeNull();
   });
 
+  it("shows the Bots favorites row with full character tiles when the Grok Bot add-on is on", async () => {
+    using _server = useServer(true);
+    await using _screen = await render(
+      <SidebarProvider>
+        <MattrSpacesSidebar model={model()} />
+      </SidebarProvider>,
+    );
+    const botsGroup = page.getByRole("group", { name: "Bots" });
+    await expect.element(botsGroup).toBeVisible();
+    await expect
+      .element(botsGroup.getByRole("link", { name: /Scout/ }))
+      .toHaveAttribute("href", "/bots/grok-bot/scout");
+    await expect.element(botsGroup.getByText("Scout")).toBeVisible();
+  });
+
   it("switches spaces with the thread jump shortcuts", async () => {
     using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
     using _server = useServer(false);
