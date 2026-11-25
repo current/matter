@@ -1,0 +1,133 @@
+# Meta Muse: integration feasibility (Phase 0)
+
+Research only, as of 2026-11-25. Nothing here is implemented. Spec: sections 5, 16 and 23 of the Bots Platform brief.
+
+**Bottom line.** Meta has **no official API for controlling a user's Muse agent**. The only official way in is the **Muse Gadget SDK's Link API**. It is real, open source and capable: send to the main chat or side chats, subscribe to live events, read limited history, send images and voice, and realtime voice. But it is a *device* channel. Pairing goes over Bluetooth from the Muse phone app to a Linux host. The token terms are personal and non-commercial ("not a developer platform"), and there is no way to list, rename or archive chats. Full chat management exists only through the **unofficial internal web gateway** (`muse-cli`), which is brittle and carries ToS risk. Recommendation: **defer**. When Muse is picked up, build a personal-use experimental adapter on the Link API behind a sidecar, with a local registry of known chat IDs.
+
+Evidence tiers used below: **[O]** verified official (Meta source or docs read), **[C]** shown in community source code, **[L]** tested live against the service (**none**: no Muse account or pairing was used in this research), **[U]** unverified, **[✗]** unsupported.
+
+## 1. What Muse is (identity and conversation model)
+
+- [O] Muse is Meta's consumer personal agent (launched 2026-09-08, code name "Hatch"). It runs on web (muse.ai), iOS and Android. Each user's agent runs in its **own cloud VM** with a built-in browser. A permission layer ("Sentinel") gates connected-app actions and outbound network requests. Plans: Free, Power $20/mo, Maximum $100/mo. ([Axios](https://www.axios.com/2026/09/08/meta-debuts-muse-personal-ai-agent), [CNBC](https://www.cnbc.com/2026/09/08/meta-personal-ai-agents-public-reckoning-privacy-safety.html), [CNBC Wonder](https://www.cnbc.com/2026/10/12/meta-muse-wonder-ai-model-agent.html))
+- [O] **One named persistent agent per account.** The Link client reads "the Muse's name" from `GET /api/gadget/me` (`muse_name`) and the agent's current avatar still image (ESP32 `CONFIG_MUSE_AVATAR_SYNC`, experimental). `GET https://api.muse.ai/fetch_vms` returns a `vm_list` with an `is_default` flag, so an account *can* have more than one leased VM. Treat that as plumbing, not as multiple agents. [U] what several VMs mean to the user.
+- [O] Conversations are a **main chat** plus any number of **side chats**, keyed by `session_id` (UUID). Sending to an unseen `session_id` creates a side chat. Messages from a gadget are attributed to that device (`device_id`).
+- [C] The web gateway also exposes `session.start {origin:"fresh", lifecycle:"persistent"}`, rename, pin, archive, delete, plus feed, goals, idea cards, tasks, approvals (`egress.approvals`), subagents, spaces, memory and connectors (402 routes in `muse-cli`'s `routes.json`).
+
+**Bots Platform consequence:** Muse is *1 agent → N conversations*, with one distinguished "main" conversation. Conversation IDs can be **minted by the client**. Side chats are not separate agents and must never appear as separate Bots in the sidebar.
+
+## 2. Official resources
+
+| Resource | What it is | Relevant to "connect my existing agent"? |
+|---|---|---|
+| [facebookincubator/muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk) (Apache-2.0, ~2.9k★, inspected at `e8d2c98`, 2026-11-25) | ESP32 firmware plus **Linux Device SDK** (`musegadget` Python package, `linux/src/musegadget/`) | **Yes**: the only official channel into a user's live agent |
+| [gadgets.muse.ai](https://gadgets.muse.ai) / [SDK terms](https://gadgets.muse.ai/sdk-terms) | SDK tokens (`mgst_…`), terms | Gating (see §6) |
+| muse.ai/platform (connector program, 2026-09-18) | Third parties submit MCP servers or APIs that **Muse calls** ([Stacktree write-up](https://stacktr.ee/blog/muse-connector-platform)) | Inbound only. Could later let Muse call into mattr. Not a way to drive Muse |
+| [dev.meta.ai](https://dev.meta.ai/docs/overview): Meta Model API, **Muse Code**, `@muse-code/sdk` | Model inference API and a terminal coding agent | **No.** It is a model API and coding sessions, with no access to the personal agent's memory or VM. mattr **already ships Muse Code** as a coding provider (`docs/user/providers-muse.md`, `MuseAdapterV2`). Keep the two separate |
+
+### Official Link API surface (read from source: `linux/src/musegadget/link_client.py`, `muse_api.py`, `muse_turn.py`, README)
+
+Transport: device token → `GET api.muse.ai/fetch_vms` → Noise XX encrypted WebSocket to the VM (`noise_url(vm_id, app_id)`). HTTP-style requests and streams are multiplexed inside it. Device tokens are refreshed by `POST /device_token/refresh`. `service.Service` reconnects with backoff and rotates tokens.
+
+| Spec question (§16) | Answer | Tier |
+|---|---|---|
+| External device pairing | BLE GATT (BlueZ) from the **Muse phone app** (Settings → Devices → Developer mode → Add Device). Requires an SDK token. The pairing window lasts 10 min, has no MITM protection, and is a one-time step. Pairing state can be copied to another host (`docs/raspberry-pi-2-headless.md`) | O |
+| Connect an existing Muse account | Yes. Pairing binds the device to the phone user's account and agent | O |
+| Message existing conversations | `send_chat(message, session_id=None)` goes to the main chat or a side chat (`POST /chat/stream`), returning an ack with message IDs | O |
+| Create conversations | Implicitly only: send to a new `session_id`. No title. No rename, archive or delete | O / ✗ |
+| Discover conversations | **No list API.** `open_side_chat(id)` only checks whether an ID exists (200/404) | ✗ (official) |
+| History | `GET /chat/history?limit=N[&session_id=]` "on servers that enable these device-token operations". Returns canonical events only (`message.user`, `message.assistant`, `delta.presentation`), with a 1 MiB buffered limit | O (server-gated) |
+| Live responses / activity | `subscribe_chat(session_id?)` gives an NDJSON stream: `delta.message_start`, `delta.text_append`, `delta.message_done`, `message.assistant`, `agent.status`, `task.status`. Includes messages sent from the phone or web app. No resume cursor: reconnecting means re-subscribing | O |
+| Attachments | In: `send_image` (JPEG/PNG/GIF/WebP ≤2 MiB) and `send_voice` (WAV note). Out: `delta.presentation` events (images, files, links, html, browser_task). VM files via `POST /fs/read` and `/fs/write` (no list, stat or delete) | O |
+| Voice | `stream_tts(message_id)` (needs `output_modality="voice"`). Realtime `voice-call` over `/voice/realtime` (PCM16 24 kHz, half duplex by default, barge-in). Video calls (H.264 over SRTP). Optional "Hey Muse" wake word | O |
+| Auth suitable for desktop | The token is a **device** credential stored root-only in `/var/lib/musegadget`. There is no OAuth and no user login in the desktop app. The device acts *as a device*, not as the user | O |
+| Long-running desktop client | Designed for it: `musegadget run` as a systemd service with reconnect and token rotation. **Linux only.** Pairing needs BlueZ. The runtime itself is pure Python (`cryptography`, `websockets`), but macOS is not supported | O; macOS [U] |
+| Third-party distribution | Code: Apache-2.0. **Token: personal, non-commercial, own account only, ≤50 devices, no marketplace or app-store distribution, "not a supported product and not a developer platform", must not "enable functionality that Meta has disabled", revocable at any time** | O |
+| Device commands (Muse → host) | `system.run`, `file.read/write`, `device.health`, plus custom JSON-defined commands in `/etc/musegadget/commands.d/`. **Muse gets shell access as the install account** | O |
+| Approvals / interactive questions | Not in the Link API. Approvals exist only in the web gateway (`egress.approvals`), and quick-reply widgets (`hatch_widget`) appear in history payloads | ✗ official / C |
+
+## 3. Community projects (source inspected)
+
+| Project | Mechanism | What it shows | Notes |
+|---|---|---|---|
+| [niclydon/muse-mcp](https://github.com/niclydon/muse-mcp) (Apache-2.0, `43299b2`, server 0.4.6) | **Official Link API** + MCP (39 tools) | send, ask, history (session scoping "live-verified"), events, voice, TTS, fs, link status. Chat **create, rename, archive, read and delete go through a "bridge chat"**: a dedicated Muse chat told to run queued requests with Muse's *own* chat tools. A local `directory.json` allowlist stands in for discovery | The best model for a compliant adapter. It confirms the gaps: "The Link cannot enumerate, create, rename, archive, or delete chats" |
+| [nikships/muse-cli](https://github.com/nikships/muse-cli) (MIT, 127★, `ddd0167`) | **Unofficial web gateway**: browser cookies (read from the Chromium keychain) → `/api/auth/check` → `/api/hatch/token` → Noise XX WS to `hatch.metaaivm.com`, protobuf envelopes, **Chrome TLS fingerprint impersonation required** | Full surface: 402 methods (sessions list/start/rename/pin/archive, feed, goals, approvals, subagents, files, media download). `docs/PROTOCOL.md` documents quirks: live `chat.subscribe` covers only the **main chat**, and side-chat replies arrive only as `sessions.updated` snippets, so it **polls history** | "Internal APIs are unversioned and can change without notice." Forks: [kleprevost/muse-mcp](https://github.com/kleprevost/muse-mcp), daijiong1977/muse-mcp |
+| [puyokura/muse-cli](https://github.com/puyokura/muse-cli) (Rust, **AGPL-3.0**) | Web gateway | Terminal client + MCP | AGPL: do not copy code |
+| [dtthaison/muse-mcp](https://github.com/dtthaison/muse-mcp) (Go) | Own muse.ai login | Images, voice, chat | Not inspected in depth |
+| [arinnem/Muse-Chat-MCP](https://github.com/arinnem/Muse-Chat-MCP), [degokisss/muse-mcp](https://github.com/degokisss/muse-mcp) | Playwright drives the logged-in Chrome | Chat only | Rejected: fragile |
+| [useapi/muse-api](https://github.com/useapi/muse-api) | Hosted third-party proxy ($15/mo) holding the user's Muse session | 37 tools | Rejected: third-party credential custody |
+
+The "muse-mcp" named in the brief is ambiguous: at least six repos share the name. **niclydon/muse-mcp is the only one built on the official SDK.**
+
+## 4. Supported vs unsupported operations (for capability declaration)
+
+| Capability | Official Link | Unofficial gateway |
+|---|---|---|
+| Agent discovery (name, avatar) | ✓ name; avatar experimental | ✓ |
+| Conversation discovery | ✗ (local registry or bridge-chat workaround) | ✓ `sessions` |
+| History | ✓ limited, server-gated | ✓ |
+| Send message | ✓ (attributed to the device) | ✓ (as the user) |
+| Create conversation | ~ (mint an ID, no title) | ✓ |
+| Rename / archive / delete | ✗ | ✓ |
+| Streaming / live events | ✓ main + side via `subscribe_chat` | ✓ main; side via polling |
+| Attachments in / out | ✓ image + WAV in; presentations out | ✓ |
+| Voice | ✓ TTS, realtime calls | partial |
+| Approvals / questions | ✗ | ✓ (`egress.approvals`, widgets) |
+| Cancel task | ✗ | [U] |
+| Routines / goals / feed | ✗ | ✓ |
+| Computer / browser activity | `delta.presentation browser_task` only | ✓ `browser_activity`, `browser_stream` [U] |
+
+## 5. Cost
+
+- [O] No separate API billing for the Link API. Usage counts against the user's Muse plan. Gadget SDK tokens are free.
+- [O] Muse Code and Model API billing are **separate** (pay-as-you-go `MODEL_API_KEY` or Muse Code subscriptions) and irrelevant to the personal agent.
+
+## 6. Security and authorization
+
+- **Shell exposure.** A paired `musegadget` service gives Muse `system.run` as the install account, sudo included. mattr must **not** install the stock service on Chris's Mac or server. Any adapter should register as a device with **no commands** or a minimal allowlist. [U] whether `link.register` with an empty command set is accepted. The source suggests built-ins are always kept, so a custom `Service` subclass or executor is needed.
+- **Token terms.** Fine for Chris's personal fork with his own token and account. **Not distributable**: mattr cannot ship a token, list a Muse integration in a store, or broker other users' accounts. Each user would need their own token, Linux pairing and phone. "Must not enable functionality Meta has disabled" rules out using the Link to reach the internal gateway.
+- **Unofficial gateway.** It means reading browser cookie stores (keychain prompt) and impersonating Chrome's TLS fingerprint. That is plausibly against Muse's consumer ToS and an account-ban risk. Keep it out of anything enabled by default.
+- **Pairing.** No MITM protection, so pair only on a trusted network. Pairing state (`identity.json`, `pairing.json`, `sdk_token`) is a long-lived bearer credential: root-only, and never synced through mattr's remote, relay or tunnel paths.
+- **Attribution.** Messages arrive as from a device. The agent's reply style can depend on device class (`device="mcu-wearable"`). Echo suppression uses acked message IDs.
+
+## 7. Platform compatibility
+
+| Surface | Official Link |
+|---|---|
+| Linux server (mattr `t3` host) | ✓ native (systemd, BlueZ for pairing) |
+| macOS desktop | Pairing ✗ (BlueZ). Runtime [U]; it would need a ported TS client or Python in a sidecar, with pairing done on Linux and state copied |
+| Windows | ✗ / [U] |
+| Web, mobile clients | Via the mattr server only. No direct client connection |
+| Remote / relay / tunnel | Fine, because the adapter lives server-side. Credentials never leave the host |
+
+## 8. Recommended approach
+
+1. **Now:** nothing. Grok Bot first. Don't build Muse placeholders (spec §5).
+2. **When Muse starts (experimental, personal use):** a server-side `muse` Bots provider that talks to a **sidecar process** speaking the Link protocol. Option a: run the official `musegadget` package (pinned commit) with a custom executor that exposes no commands, bridged over a local socket. Option b: port the Link client to TypeScript (Noise XX + framing + NDJSON streams, roughly 1.5k lines of Python to mirror). Start with option a.
+   - Capabilities: `agentDiscovery` (single agent, name and avatar), `conversation.send`, `conversation.createByMintedId`, `history.limited`, `events.live`, `attachments.in(image, wav)`, `attachments.out(presentation)`, `voice.tts`. Declare **no** `conversationDiscovery`, `rename`, `archive`, `approvals` or `cancel`.
+   - Conversation discovery: a local per-account registry of known `session_id`s (as niclydon does), filled by mattr-created chats and IDs the user pastes in. Optionally, a "bridge chat" like niclydon's. That is clever but routes management through the LLM; don't adopt it by default.
+3. **Optional, flagged "unsupported / may break":** a read-only web-gateway enrichment for chat listing. Ship it only if Chris explicitly accepts the ToS risk. Isolate it in its own module so it can be removed.
+4. **Muse → mattr direction (later):** a mattr MCP endpoint registered as a Muse connector (muse.ai/platform needs review) or a custom gadget command. That could let Muse hand work to mattr coding threads (spec §18).
+
+**Complexity:** official-Link experimental adapter **M** (about 1–2 weeks with sidecar, pairing UX docs and registry). Adding a TS port is **L**. The unofficial gateway is **M**, with ongoing maintenance high.
+
+## 9. Unresolved blockers
+
+1. **No official conversation listing.** The sidebar can't show the user's existing Muse chats without the unofficial gateway or a bridge chat.
+2. Pairing needs **Linux + Bluetooth + the phone app** and Developer mode. That is unusual onboarding for a desktop app.
+3. Terms forbid distribution beyond personal use. A mattr-wide feature needs Meta's written permission.
+4. Whether a device can register without exposing `system.run` (needs code reading and a live test).
+5. Whether `/chat/history` and the fs operations are enabled for every account ("on servers that enable these").
+6. Side-chat live-event coverage: the SDK subscribes per `session_id`, but muse-cli reports that side-chat replies don't stream on the web gateway. Needs a live test.
+7. Nothing live-tested ([L] = none). The first implementation step must be a live spike with Chris's account on a Linux host.
+
+## 10. Requirements for the shared Bots Platform (from Muse)
+
+- `Agent` and `Conversation` are separate entities. A provider can be **single-agent** (Muse), and the sidebar shows one agent with a conversation list, not one Bot per chat.
+- A conversation carries `isPrimary` (Muse's main chat) and may have **no title**.
+- **Conversation discovery is optional** per provider. The platform keeps a local "known conversations" registry for providers that can't list.
+- Conversation IDs can be minted by the client.
+- Messages carry an origin/attribution (`device`, `user`, `other client`), because Muse echoes phone and web traffic into the same stream.
+- History capability levels: `none | recentOnly(limit) | paged`. Live events have no replay cursor, so reconcile after reconnect by refetching history.
+- Rich output items (presentation kinds: image, file, link, html, browser task) map to shared renderers with a text fallback (`fallback_text`).
+- A voice capability that is separate from text chat (realtime call vs TTS).
+- Connection state is per provider account, with credential material kept server-side only.
