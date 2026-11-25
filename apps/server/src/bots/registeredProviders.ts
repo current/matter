@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as BotsPlatformService from "./BotsPlatformService.ts";
+import * as DevinBotAdapter from "./providers/devinBot/DevinBotAdapter.ts";
 import * as GrokBotAdapter from "./providers/grokBot/GrokBotAdapter.ts";
 
 /**
@@ -12,5 +13,6 @@ export const layerRegisteredBotProviders = Layer.effectDiscard(
   Effect.gen(function* () {
     const platform = yield* BotsPlatformService.BotsPlatformService;
     yield* platform.register(yield* GrokBotAdapter.make());
+    yield* platform.register(yield* DevinBotAdapter.make());
   }),
 );

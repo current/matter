@@ -23,6 +23,16 @@ const ADDON_PRESENTATION: Readonly<Record<string, AddonPresentation>> = {
       app_unavailable: msg("Grok Bot app not installed"),
     },
   },
+  "devin-bot": {
+    title: msg("Devin Bot"),
+    description: msg("Talk to your Devin Bots and answer what they need from the mattr sidebar."),
+    Icon: BotIcon,
+    statusLabels: {
+      connected: msg("Connected"),
+      enabled_unconfigured: msg("Needs debug port"),
+      app_unavailable: msg("Devin app not installed"),
+    },
+  },
   "voice-assistant": {
     title: msg("Voice Assistant"),
     description: msg(

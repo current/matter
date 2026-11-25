@@ -35,6 +35,7 @@ describe("AddonConfigService", () => {
         all.map(({ id, enabled, enablementSource }) => ({ id, enabled, enablementSource })),
         [
           { id: "grok-bot", enabled: false, enablementSource: "default" },
+          { id: "devin-bot", enabled: false, enablementSource: "default" },
           { id: "voice-assistant", enabled: false, enablementSource: "default" },
           { id: "claude-cloud", enabled: false, enablementSource: "default" },
         ],

@@ -180,7 +180,8 @@ describe("AddonsSettingsPanel", () => {
     await expect
       .element(page.getByText("Offload heavy work to Claude Cloud VMs", { exact: false }))
       .toBeVisible();
-    expect(page.getByText("Experimental").elements()).toHaveLength(2);
+    await expect.element(page.getByText("Talk to your Devin Bots", { exact: false })).toBeVisible();
+    expect(page.getByText("Experimental").elements()).toHaveLength(3);
     await expect.element(page.getByRole("switch", { name: "Enable Grok Bot" })).not.toBeChecked();
     await expect
       .element(page.getByRole("switch", { name: "Enable Voice Assistant" }))

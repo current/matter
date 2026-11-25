@@ -7,7 +7,7 @@ import { TrimmedNonEmptyString } from "./baseSchemas.ts";
  * user's choice) is separate from runtime status (whether an enabled add-on is actually usable).
  */
 
-export type KnownAddonId = "grok-bot" | "voice-assistant" | "claude-cloud";
+export type KnownAddonId = "grok-bot" | "devin-bot" | "voice-assistant" | "claude-cloud";
 export type AddonId = KnownAddonId | (string & {});
 
 export const AddonIdSchema = TrimmedNonEmptyString.check(
@@ -182,6 +182,29 @@ export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
     experimental: true,
   },
   {
+    id: "devin-bot",
+    displayName: "Devin Bot",
+    description: "Talk to your Devin Bots and answer what they need from the mattr sidebar.",
+    icon: "bot",
+    category: "bots",
+    platformRequirements: {
+      surfaces: ["desktop", "web", "mobile"],
+      hostOs: ["darwin"],
+      requiresLocalApp: "Devin",
+    },
+    dependencies: [],
+    defaultEnabled: false,
+    onboarding: {
+      prompt:
+        "Do you use Devin Bots and want to chat with them and answer their requests from this application?",
+      enableLabel: "Enable Devin Bot",
+      skipLabel: "Skip",
+    },
+    settingsRoute: "/settings/addons#addon-devin-bot",
+    contributions: ["settings", "sidebar-section", "routes", "network", "bots-provider"],
+    experimental: true,
+  },
+  {
     id: "voice-assistant",
     displayName: "Voice Assistant",
     description:
@@ -234,13 +257,31 @@ export const GROK_BOT_DEFAULT_CDP_PORT = 9222;
 const isValidPort = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65_535;
 
-export function grokBotCdpPortFromConfig(config: AddonConfig): number {
-  const raw = config[GROK_BOT_CDP_PORT_CONFIG_KEY];
+const portFromConfig = (config: AddonConfig, key: string, fallback: number): number => {
+  const raw = config[key];
   const port = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
-  return isValidPort(port) ? port : GROK_BOT_DEFAULT_CDP_PORT;
+  return isValidPort(port) ? port : fallback;
+};
+
+export function grokBotCdpPortFromConfig(config: AddonConfig): number {
+  return portFromConfig(config, GROK_BOT_CDP_PORT_CONFIG_KEY, GROK_BOT_DEFAULT_CDP_PORT);
 }
 
 /** The command a user runs to reopen Grok Bot with its debug port; mattr never runs it. */
 export function grokBotLaunchCommand(port: number = GROK_BOT_DEFAULT_CDP_PORT): string {
   return `open -a "Grok Bot" --args --remote-debugging-port=${isValidPort(port) ? port : GROK_BOT_DEFAULT_CDP_PORT}`;
+}
+
+/** Devin's loopback debug port; its default differs from Grok Bot's so both apps can run at once. */
+export const DEVIN_BOT_CDP_PORT_CONFIG_KEY = "cdpPort";
+export const DEVIN_BOT_DEFAULT_CDP_PORT = 9223;
+
+export function devinBotCdpPortFromConfig(config: AddonConfig): number {
+  return portFromConfig(config, DEVIN_BOT_CDP_PORT_CONFIG_KEY, DEVIN_BOT_DEFAULT_CDP_PORT);
+}
+
+/** The command a user runs to reopen Devin with a loopback-only debug port; mattr never runs it. */
+export function devinBotLaunchCommand(port: number = DEVIN_BOT_DEFAULT_CDP_PORT): string {
+  const safePort = isValidPort(port) ? port : DEVIN_BOT_DEFAULT_CDP_PORT;
+  return `open -a "Devin" --args --remote-debugging-port=${safePort} --remote-debugging-address=127.0.0.1`;
 }

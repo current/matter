@@ -12,6 +12,7 @@ import {
 } from "../components/settings/settingsLayout";
 import { ADDON_STATUS_LABELS, addonPresentation } from "./addonRegistry";
 import { ClaudeCloudAddonSettings } from "./ClaudeCloudAddonSettings";
+import { DevinBotAddonSettings } from "./DevinBotAddonSettings";
 import { GrokBotAddonSettings } from "./GrokBotAddonSettings";
 import { useAddonRegistry } from "./useAddonRegistry";
 
@@ -91,6 +92,7 @@ function AddonRow({
     state.enabled && configurePath !== undefined && configurePath !== ADDONS_PAGE;
   const showGrokBotSettings = state.enabled && manifest.id === "grok-bot";
   const showClaudeCloudSettings = state.enabled && manifest.id === "claude-cloud";
+  const showDevinBotSettings = state.enabled && manifest.id === "devin-bot";
   return (
     <SettingsRow
       id={`addon-${manifest.id}`}
@@ -108,7 +110,7 @@ function AddonRow({
       description={
         <>
           {m(presentation.description)}
-          {state.enabled && !showGrokBotSettings && state.status.detail ? (
+          {state.enabled && !showGrokBotSettings && !showDevinBotSettings && state.status.detail ? (
             <span className="mt-1 block text-muted-foreground">{state.status.detail}</span>
           ) : null}
         </>
@@ -152,6 +154,14 @@ function AddonRow({
         />
       ) : null}
       {showClaudeCloudSettings ? <ClaudeCloudAddonSettings canWrite={canWrite} /> : null}
+      {showDevinBotSettings ? (
+        <DevinBotAddonSettings
+          status={state.status}
+          busy={pending}
+          canWrite={canWrite}
+          onReconnect={onReconnect}
+        />
+      ) : null}
     </SettingsRow>
   );
 }
