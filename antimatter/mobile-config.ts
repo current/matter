@@ -21,8 +21,8 @@ const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
 const MATTR_APP_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng);
 const MATTR_IOS_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIconComposerProject);
 
-// Chris's free Apple ID team; `T3CODE_IOS_APPLE_TEAM_ID` signs with another one.
-const MATTR_PERSONAL_TEAM_ID = "RMAD3349Z8";
+// Chris's free Apple ID Personal Team OU; `T3CODE_IOS_APPLE_TEAM_ID` signs with another one.
+const MATTR_PERSONAL_TEAM_ID = "5PS35RR9RY";
 const PERSONAL_TEAM_CAPABILITIES_PLUGIN = "./plugins/withoutIosPersonalTeamCapabilities.cjs";
 
 const PERSONAL_TEAM_BUNDLE_IDENTIFIERS: Record<AppVariant, string> = {

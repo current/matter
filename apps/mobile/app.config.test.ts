@@ -92,7 +92,7 @@ it.each([
 ])("signs Personal Team builds for APP_VARIANT=%j without paid capabilities", async (value, id) => {
   const config = await loadConfig(value, { T3CODE_IOS_PERSONAL_TEAM: "1" });
   expect(config.ios?.bundleIdentifier).toBe(id);
-  expect(config.ios?.appleTeamId).toBe("RMAD3349Z8");
+  expect(config.ios?.appleTeamId).toBe("5PS35RR9RY");
   expect(config.ios).not.toHaveProperty("associatedDomains");
   expect(config.ios?.entitlements?.["keychain-access-groups"]).toEqual([
     `$(AppIdentifierPrefix)${id}`,
