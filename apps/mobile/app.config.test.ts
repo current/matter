@@ -132,3 +132,10 @@ it("rejects an invalid Personal Team bundle id", async () => {
     }),
   ).rejects.toThrow("T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID");
 });
+
+it("defaults relay and Clerk config from antimatter/build-env.mjs when unset", async () => {
+  const config = await loadConfig(undefined, { T3CODE_IOS_PERSONAL_TEAM: "1" });
+  expect(config.extra?.relay?.url).toBe("https://relay.t3.codes");
+  expect(config.extra?.clerk?.publishableKey).toBe("pk_live_Y2xlcmsudDMuY29kZXMk");
+  expect(config.extra?.clerk?.jwtTemplate).toBe("t3-relay");
+});

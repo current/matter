@@ -1,4 +1,5 @@
 import { BRAND_ASSET_PATHS } from "../scripts/lib/brand-assets.ts";
+import { BUILD_ENV } from "./build-env.mjs";
 
 // Fork-only mobile config: mattr branding and free Apple ID ("Personal Team") signing, applied
 // on top of upstream's app.config.ts so upstream merges stay a three-line conflict at most.
@@ -63,7 +64,53 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
   },
 ): Config {
   const { extra, ...rest } = config;
-  const branded = { ...rebrandDeep(rest), extra };
+  const extraRecord = (extra !== null && typeof extra === "object" ? extra : {}) as Record<
+    string,
+    unknown
+  >;
+  const existingRelay = (
+    extraRecord.relay !== null && typeof extraRecord.relay === "object" ? extraRecord.relay : {}
+  ) as Record<string, unknown>;
+  const existingClerk = (
+    extraRecord.clerk !== null && typeof extraRecord.clerk === "object" ? extraRecord.clerk : {}
+  ) as Record<string, unknown>;
+  const existingEas = (
+    extraRecord.eas !== null && typeof extraRecord.eas === "object" ? extraRecord.eas : {}
+  ) as Record<string, unknown>;
+  const existingObserve = (
+    existingEas.observe !== null && typeof existingEas.observe === "object"
+      ? existingEas.observe
+      : {}
+  ) as Record<string, unknown>;
+  const relayUrl =
+    (typeof existingRelay.url === "string" && existingRelay.url.trim()) ||
+    BUILD_ENV.T3CODE_RELAY_URL;
+  const mergedExtra = {
+    ...extraRecord,
+    relay: {
+      ...existingRelay,
+      url: relayUrl,
+    },
+    clerk: {
+      ...existingClerk,
+      publishableKey:
+        (typeof existingClerk.publishableKey === "string" && existingClerk.publishableKey.trim()) ||
+        BUILD_ENV.T3CODE_CLERK_PUBLISHABLE_KEY,
+      jwtTemplate:
+        (typeof existingClerk.jwtTemplate === "string" && existingClerk.jwtTemplate.trim()) ||
+        BUILD_ENV.T3CODE_CLERK_JWT_TEMPLATE,
+    },
+    eas: {
+      ...existingEas,
+      observe: {
+        ...existingObserve,
+        endpointUrl:
+          (typeof existingObserve.endpointUrl === "string" && existingObserve.endpointUrl.trim()) ||
+          new URL("/v1/mobile/observe", relayUrl).toString(),
+      },
+    },
+  };
+  const branded = { ...rebrandDeep(rest), extra: mergedExtra };
 
   // Voice Mode keeps listening and speaking with the screen locked.
   const audioPlugins = branded.plugins?.map((plugin) =>
