@@ -1,6 +1,8 @@
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import {
+  ANTIGRAVITY_DEFAULT_MODEL,
   AntigravitySettings,
+  type ModelSelection,
   ProviderDriverKind,
   ProviderSetupError,
   RuntimeMode,
@@ -51,7 +53,6 @@ import {
 import {
   antigravityModelOptions,
   antigravitySessionMode,
-  antigravityThinkingConfig,
   makeAntigravityAcpRuntime,
   type AntigravityAcpRuntimeInput,
 } from "../acp/AntigravityAcpSupport.ts";
@@ -217,7 +218,23 @@ export const AntigravityDriver: ProviderDriver<
     });
     const classifyModels = (draft: ServerProviderDraft) =>
       currentCatalog.pipe(
-        Effect.map((catalog) => stampIdentity(ModelCatalog.applyModelCatalog(draft, catalog))),
+        Effect.map((catalog) => {
+          const classified = ModelCatalog.applyModelCatalog(draft, catalog);
+          if (catalog === undefined) return stampIdentity(classified);
+          const withFallbackCapabilities = {
+            ...classified,
+            models: classified.models.map((model) => {
+              if (model.isCustom || (model.capabilities?.optionDescriptors?.length ?? 0) > 0) {
+                return model;
+              }
+              const entry = catalog.models.find((candidate) => candidate.slug === model.slug);
+              return (entry?.capabilities?.optionDescriptors?.length ?? 0) > 0
+                ? { ...model, capabilities: entry!.capabilities }
+                : model;
+            }),
+          } satisfies ServerProviderDraft;
+          return stampIdentity(withFallbackCapabilities);
+        }),
       );
 
     const prepareSpawn = Effect.fn("AntigravityDriver.prepareSpawn")(function* (
@@ -509,11 +526,16 @@ export const AntigravityDriver: ProviderDriver<
           ? provider.onAvailableCommands(event.availableCommands)
           : Effect.void;
       }).pipe(Effect.forkScoped);
-      // Thinking levels differ per model and are reported only for the selected one.
+      // Thinking levels differ per model and are reported only for the selected one; probe every
+      // advertised model even when the initial default model reports no thinking option.
       const configOptions = started.sessionSetupResult.configOptions ?? [];
+      const modelOptions = antigravityModelOptions(configOptions);
       const current = configOptions.find((option) => option.id === "model")?.currentValue;
-      if (antigravityThinkingConfig(configOptions) !== undefined && typeof current === "string") {
-        for (const model of [...antigravityModelOptions(configOptions), { value: current }]) {
+      const otherModels = modelOptions.filter((model) => model.value !== current);
+      if (otherModels.length > 0) {
+        const modelsToProbe =
+          typeof current === "string" ? [...otherModels, { value: current }] : otherModels;
+        for (const model of modelsToProbe) {
           yield* runtime.setModel(model.value).pipe(Effect.ignore);
         }
       }
@@ -600,12 +622,37 @@ export const AntigravityDriver: ProviderDriver<
       ),
     );
     const defaultModel = currentCatalog.pipe(Effect.map((catalog) => catalog?.defaultChatModel));
+    const unsetOptionDefaults = Effect.fn("AntigravityDriver.unsetOptionDefaults")(function* (
+      modelSelection: ModelSelection,
+    ) {
+      const catalog = yield* currentCatalog;
+      const snapshot = yield* provider.snapshot.getSnapshot;
+      const requestedSlug =
+        modelSelection.model === ANTIGRAVITY_DEFAULT_MODEL
+          ? (catalog?.defaultChatModel ?? snapshot.models.find((model) => model.isDefault)?.slug)
+          : modelSelection.model;
+      if (!requestedSlug) return [];
+      const catalogEntry = catalog?.models.find((model) => model.slug === requestedSlug);
+      const snapshotEntry = snapshot.models.find((model) => model.slug === requestedSlug);
+      const descriptors =
+        (catalogEntry?.capabilities?.optionDescriptors?.length ?? 0) > 0
+          ? catalogEntry!.capabilities!.optionDescriptors!
+          : (snapshotEntry?.capabilities?.optionDescriptors ?? []);
+      return descriptors.flatMap((descriptor) => {
+        if (descriptor.type !== "select" || descriptor.role !== "reasoning") return [];
+        const defaultValue =
+          descriptor.options.find((option) => option.isDefault === true)?.id ??
+          descriptor.currentValue;
+        return defaultValue === undefined ? [] : [{ id: descriptor.id, value: defaultValue }];
+      });
+    });
     const orchestrationAdapter = yield* makeAntigravityAdapterV2({
       instanceId,
       selfInvocation,
       makeRuntime,
       withProcess: authFlow.withProcess,
       defaultModel,
+      unsetOptionDefaults,
       supportsNativeGoals: provider.snapshot.getSnapshot.pipe(
         Effect.map(
           (snapshot) => snapshot.slashCommands?.some((command) => command.name === "goal") === true,

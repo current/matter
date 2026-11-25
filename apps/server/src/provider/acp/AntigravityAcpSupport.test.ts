@@ -84,6 +84,13 @@ describe("Antigravity release gates", () => {
           ? { antigravity: { systemPrompt: { append: "<pull_request_linking/>" } } }
           : undefined,
       );
+      expect(
+        antigravitySessionMeta(initialize, (init) => `v=${init.agentInfo?.version ?? "none"}`),
+      ).toEqual(
+        advertisedAppend
+          ? { antigravity: { systemPrompt: { append: `v=${version ?? "none"}` } } }
+          : undefined,
+      );
       expect(antigravityClientInfo(version).name).toBe(ownName ? "t3-code" : "zed");
     },
   );
@@ -148,7 +155,9 @@ describe("Antigravity Auto", () => {
       });
       for (const t3Call of [
         request("Run mcp_t3-code_t3_thread_list?"),
+        request("Run mcp_t3-code_tool_search?"),
         request("MCP Tool delegate_task", { ServerName: "t3-code", ToolName: "delegate_task" }),
+        request("MCP Tool tool_search", { ServerName: "t3-code", ToolName: "tool_search" }),
       ]) {
         expect(antigravityPermissionDisposition(policy, t3Call)).toBe("allow");
         expect(

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-20T23:50:00Z",
+  "updatedAt": "2026-11-25T23:00:00Z",
   "compatibility": [
     {
       "driver": "codex",
@@ -141,6 +141,7 @@
     ],
     "claudeAgent": ["claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
     "antigravity": [
+      "gemini-4-neon",
       "gemini-4-carbon",
       "gemini-4-argon",
       "gemini-3.8-flash",
@@ -952,8 +953,34 @@
       "defaults": {
         "chat": "gemini-3.8-flash-high"
       },
-      "profiles": {},
+      "profiles": {
+        "gemini-4-neon": {
+          "capabilities": {
+            "optionDescriptors": [
+              {
+                "id": "thought_level",
+                "label": "Thinking Level",
+                "type": "select",
+                "role": "reasoning",
+                "currentValue": "high",
+                "options": [
+                  { "id": "low", "label": "Low" },
+                  { "id": "medium", "label": "Medium" },
+                  { "id": "high", "label": "High", "isDefault": true },
+                  { "id": "xhigh", "label": "Extra High" }
+                ]
+              }
+            ]
+          }
+        }
+      },
       "models": [
+        {
+          "slug": "gemini-4-neon",
+          "name": "Gemini 4 Neon",
+          "status": "current",
+          "profile": "gemini-4-neon"
+        },
         {
           "slug": "gemini-4-carbon",
           "name": "Gemini 4 Carbon",

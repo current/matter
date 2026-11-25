@@ -16,7 +16,8 @@ import * as Scope from "effect/Scope";
 import * as EffectAcpErrors from "effect-acp/errors";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
-import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
+import { buildT3AcpInstructions } from "@t3tools/provider-core/server/orchestrationInstructions";
+import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import type { AntigravityAuth } from "../../provider/AntigravityAuth.ts";
 import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
 import {
@@ -98,6 +99,7 @@ export interface AntigravityAdapterV2Options {
   >;
   readonly withProcess: AntigravityAuth["withProcess"];
   readonly defaultModel: Effect.Effect<string | undefined>;
+  readonly unsetOptionDefaults?: AcpAdapterV2Flavor["unsetOptionDefaults"];
   readonly supportsNativeGoals?: Effect.Effect<boolean>;
   readonly onSessionStarted?: (
     started: AcpSessionRuntime.AcpSessionRuntimeStartResult,
@@ -153,18 +155,44 @@ export function makeAntigravityAcpAdapterFlavor(
   options: AntigravityAdapterV2Options & AntigravityFlavorServices,
 ): AcpAdapterV2Flavor {
   const { profileDirectory } = options;
-  const antigravityClientFileRoots = (cwd: string | null) =>
-    cwd === null ? [options.host.paths.attachmentsDir] : [cwd, options.host.paths.attachmentsDir];
+  const antigravityClientFileRoots = (
+    cwd: string | null,
+    extraRoots: ReadonlyArray<string> = [],
+  ) => [...(cwd === null ? [] : [cwd]), ...extraRoots, options.host.paths.attachmentsDir];
   const makeRuntime = Effect.fn("AntigravityAdapterV2.makeRuntime")(
     function* (input: AcpAdapterV2RuntimeInput) {
       const scope = yield* Scope.fork(yield* Effect.scope);
+      const hasT3Mcp =
+        input.mcpServers.length > 0 ||
+        (input.httpMcpServers?.length ?? 0) > 0 ||
+        (input.acpMcpServers?.length ?? 0) > 0;
       const runtime = yield* options
         .withProcess(
           Scope.close(scope, Exit.void),
           options.makeRuntime({
             ...input,
             clientFileReads: true,
-            sessionSystemPromptAppend: PULL_REQUEST_LINKING_INSTRUCTIONS,
+            sessionSystemPromptAppend: (initializeResult) => {
+              const httpMcpConnected =
+                hasT3Mcp &&
+                (input.httpMcpServers?.length ?? 0) > 0 &&
+                initializeResult.agentCapabilities?.mcpCapabilities?.http === true;
+              return [
+                buildRuntimeInstructions({
+                  harness: "Antigravity",
+                  runtimePolicy: input.runtimePolicy,
+                  pullRequestLinking: true,
+                }),
+                buildT3AcpInstructions({
+                  interactionMode: input.runtimePolicy.interactionMode,
+                  hasT3Mcp,
+                  hasDeviceTools: hasT3Mcp && input.hasDeviceTools === true,
+                  includeMcpFallback: !httpMcpConnected,
+                }),
+              ]
+                .filter((part) => part.trim().length > 0)
+                .join("\n\n");
+            },
           }),
         )
         .pipe(Effect.provideService(Scope.Scope, scope));
@@ -234,7 +262,12 @@ export function makeAntigravityAcpAdapterFlavor(
     supportsNativeGoals: options.supportsNativeGoals ?? Effect.succeed(false),
     // Agents that advertise HTTP MCP skip the stdio bridge process; others keep stdio.
     mcpOverHttp: true,
+    deferMcpTools: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
+    sessionCarriesSystemInstructions: antigravityAppendsSystemPrompt,
+    ...(options.unsetOptionDefaults === undefined
+      ? {}
+      : { unsetOptionDefaults: options.unsetOptionDefaults }),
     makeRuntime,
     buildAttachmentPrompt: ({ text, attachments, resolveAttachmentPath, promptCapabilities }) =>
       buildAntigravityPrompt({
@@ -284,11 +317,11 @@ export function makeAntigravityAcpAdapterFlavor(
     sessionModeForPolicy: (policy) => antigravityPermissionMode(policy.runtimeMode),
     runtimeModeForSessionMode: antigravityRuntimeModeForSessionMode,
     clientFileSystem: {
-      readTextFile: (request, cwd) =>
+      readTextFile: (request, cwd, policy) =>
         readAntigravityClientTextFile({
           fileSystem: options.fileSystem,
           path: options.path,
-          allowedRoots: antigravityClientFileRoots(cwd),
+          allowedRoots: antigravityClientFileRoots(cwd, policy?.workspace?.extraRoots),
           request,
         }),
     },

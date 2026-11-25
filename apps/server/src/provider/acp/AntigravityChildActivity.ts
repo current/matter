@@ -6,7 +6,9 @@ import type {
 import * as Effect from "effect/Effect";
 
 import {
+  areAntigravityChildrenIdle,
   readAntigravityChildWork,
+  statAntigravityChildIdleInputs,
   statAntigravityChildTranscripts,
 } from "./AntigravityChildWork.ts";
 
@@ -170,6 +172,8 @@ export function watchAntigravityChildActivity(input: {
 }): AcpNativeSubagentWatcher {
   let conversationIds: ReadonlyArray<string> = [];
   let lastStamp: string | undefined;
+  let lastIdleStamp: string | undefined;
+  let lastIdle = false;
   const stat = (ids: ReadonlyArray<string>) =>
     statAntigravityChildTranscripts({
       profileDirectory: input.profileDirectory,
@@ -189,9 +193,31 @@ export function watchAntigravityChildActivity(input: {
       });
       if (children.length === 0) return undefined;
       const ids = children.map((child) => child.conversationId);
-      lastStamp = ids.join("\0") === conversationIds.join("\0") ? stamp : undefined;
+      const sameIds = ids.join("\0") === conversationIds.join("\0");
+      lastStamp = sameIds ? stamp : undefined;
+      if (!sameIds) {
+        lastIdleStamp = undefined;
+        lastIdle = false;
+      }
       conversationIds = ids;
       return antigravityChildActivity(children);
     }).pipe(Effect.orElseSucceed(() => undefined)),
+    isIdle: Effect.gen(function* () {
+      if (conversationIds.length === 0) return false;
+      const idleStamp = yield* statAntigravityChildIdleInputs({
+        profileDirectory: input.profileDirectory,
+        rootSessionId: input.rootSessionId,
+        conversationIds,
+      });
+      if (idleStamp.length > 0 && idleStamp === lastIdleStamp) return lastIdle;
+      const idle = yield* areAntigravityChildrenIdle({
+        profileDirectory: input.profileDirectory,
+        rootSessionId: input.rootSessionId,
+        conversationIds,
+      });
+      lastIdleStamp = idleStamp.length > 0 ? idleStamp : undefined;
+      lastIdle = idle;
+      return idle;
+    }).pipe(Effect.orElseSucceed(() => false)),
   };
 }

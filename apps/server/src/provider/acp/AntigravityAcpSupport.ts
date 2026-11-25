@@ -55,7 +55,9 @@ export interface AntigravityAcpRuntimeInput extends Omit<
   /** The installed version, known before `initialize`; it picks the client name. */
   readonly runtimeVersion?: string | null;
   /** Conversational sessions only; helpers and probes leave the system prompt untouched. */
-  readonly sessionSystemPromptAppend?: string;
+  readonly sessionSystemPromptAppend?:
+    | string
+    | ((initializeResult: EffectAcpSchema.InitializeResponse) => string | undefined);
   readonly authMethod?: AntigravityAuthMethod;
 }
 
@@ -97,10 +99,17 @@ export const antigravityAppendsSystemPrompt = (
 
 export function antigravitySessionMeta(
   initializeResult: EffectAcpSchema.InitializeResponse,
-  systemPromptAppend?: string,
+  systemPromptAppend?:
+    | string
+    | ((initializeResult: EffectAcpSchema.InitializeResponse) => string | undefined),
 ): EffectAcpSchema.NewSessionRequest["_meta"] | undefined {
-  return systemPromptAppend !== undefined && antigravityAppendsSystemPrompt(initializeResult)
-    ? { antigravity: { systemPrompt: { append: systemPromptAppend } } }
+  if (!antigravityAppendsSystemPrompt(initializeResult)) return undefined;
+  const append =
+    typeof systemPromptAppend === "function"
+      ? systemPromptAppend(initializeResult)
+      : systemPromptAppend;
+  return append !== undefined && append.length > 0
+    ? { antigravity: { systemPrompt: { append } } }
     : undefined;
 }
 
@@ -192,6 +201,9 @@ const ANTIGRAVITY_T3_MCP_TITLE = /^Run mcp_t3-code_(?<tool>[A-Za-z0-9_]+)\??$/;
 // rawInput is the tool's own arguments.
 const ANTIGRAVITY_PROXIED_MCP_TITLE = /^MCP Tool (?<tool>[A-Za-z0-9_]+)\??$/;
 
+const isKnownAntigravityT3McpTool = (tool: string): boolean =>
+  T3_MCP_TOOL_NAMES.has(tool) || tool === "tool_search";
+
 function isAntigravityT3McpRequest(request: EffectAcpSchema.RequestPermissionRequest): boolean {
   const title = request.toolCall.title?.trim() ?? "";
   const rawInput = unknownRecord(request.toolCall.rawInput);
@@ -200,12 +212,12 @@ function isAntigravityT3McpRequest(request: EffectAcpSchema.RequestPermissionReq
     return (
       rawInput?.ServerName === "t3-code" &&
       rawInput.ToolName === proxiedTool &&
-      T3_MCP_TOOL_NAMES.has(proxiedTool)
+      isKnownAntigravityT3McpTool(proxiedTool)
     );
   }
   if (typeof rawInput?.CommandLine === "string") return false;
   const tool = ANTIGRAVITY_T3_MCP_TITLE.exec(title)?.groups?.tool;
-  return tool !== undefined && T3_MCP_TOOL_NAMES.has(tool);
+  return tool !== undefined && isKnownAntigravityT3McpTool(tool);
 }
 
 export function antigravityPermissionDisposition(

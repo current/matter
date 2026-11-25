@@ -75,9 +75,9 @@ function mergeLiveThinkingConfig(
   existing: ThinkingConfig | null | undefined,
   next: ThinkingConfig | null,
 ): ThinkingConfig | null | undefined {
-  if (existing === undefined) return undefined;
+  if (existing === undefined) return next;
   if (next === null) return null;
-  if (existing === null) return undefined;
+  if (existing === null) return next;
   return selectOptionValues(next).includes(existing.currentValue)
     ? { ...next, currentValue: existing.currentValue }
     : next;

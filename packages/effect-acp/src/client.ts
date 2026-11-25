@@ -624,6 +624,7 @@ function normalizeInitializeResponse(
       ...(response.authMethods === undefined || response.authMethods.length === 0
         ? {}
         : { auth: { logout: {} } }),
+      ...(response.capabilities?._meta == null ? {} : { _meta: response.capabilities._meta }),
     },
     ...(response.authMethods === undefined
       ? {}

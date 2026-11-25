@@ -107,6 +107,8 @@ const terminalOutputBytes = Number(process.env.T3_ACP_EMIT_TERMINAL_OUTPUT_BYTES
 const supportsSessionLifecycle = process.env.T3_ACP_SESSION_LIFECYCLE === "1";
 const supportsAcpMcp = process.env.T3_ACP_MCP_ACP === "1";
 const supportsHttpMcp = process.env.T3_ACP_MCP_HTTP === "1";
+const supportsAntigravitySystemPromptAppend =
+  process.env.T3_ACP_ANTIGRAVITY_SYSTEM_PROMPT_APPEND === "1";
 const supportsV2Management = process.env.T3_ACP_V2_MANAGEMENT === "1";
 const failDeleteSession = process.env.T3_ACP_FAIL_DELETE_SESSION === "1";
 const advertisedAuthMethodId = process.env.T3_ACP_AUTH_METHOD_ID?.trim();
@@ -125,8 +127,10 @@ let currentModeId = antigravityProfile
   : copilotModesProfile
     ? copilotModeId("agent")
     : "ask";
-let currentModelId = antigravityProfile ? "gemini-test-low" : "default";
-let currentAntigravityThoughtLevel = "high";
+let currentModelId = antigravityProfile
+  ? (process.env.T3_ACP_INITIAL_MODEL ?? "gemini-test-low")
+  : "default";
+let currentAntigravityThoughtLevel = process.env.T3_ACP_INITIAL_THOUGHT_LEVEL ?? "high";
 let parameterizedModelPicker = false;
 let currentReasoning = "medium";
 let currentContext = "272k";
@@ -586,6 +590,9 @@ const program = Effect.gen(function* () {
         info: { name: "t3-acp-mock-agent", version: agentVersion },
         ...(omitInitializeModelState ? {} : { _meta: { modelState: modelState() } }),
         capabilities: {
+          ...(supportsAntigravitySystemPromptAppend
+            ? { _meta: { antigravity: { systemPrompt: { append: true } } } }
+            : {}),
           session: {
             ...(supportsSessionLifecycle ? { fork: {}, additionalDirectories: {} } : {}),
             ...(supportsV2Management ? { delete: {} } : {}),

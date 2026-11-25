@@ -361,9 +361,13 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
           "initialize",
           "auth/login",
           "session/new",
+          "session/set_config_option",
+          "session/set_config_option",
           "initialize",
           "auth/login",
           "session/new",
+          "session/set_config_option",
+          "session/set_config_option",
         ]);
         expect(
           requests
@@ -859,6 +863,191 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
         );
         expect(levelOf(yield* h.instance.snapshot.getSnapshot, "gemini-test-low")).toBe("high");
         yield* h.assertClosed;
+      }),
+  );
+
+  it.effect.skipIf(windowsHost)(
+    "exposes gemini-4-neon manifest thinking capabilities and applies default thought_level when unset",
+    () =>
+      Effect.gen(function* () {
+        const bundled = ModelManifest.resolveProviderCatalog(
+          ModelManifest.BUNDLED_MODEL_MANIFEST,
+          ProviderDriverKind.make("antigravity"),
+        );
+        const neon = bundled?.models.find((model) => model.slug === "gemini-4-neon");
+        expect(neon?.status).toBe("current");
+        expect(neon?.capabilities?.optionDescriptors?.[0]).toMatchObject({
+          id: "thought_level",
+          role: "reasoning",
+          currentValue: "high",
+          options: [
+            { id: "low" },
+            { id: "medium" },
+            { id: "high", isDefault: true },
+            { id: "xhigh" },
+          ],
+        });
+
+        const h = yield* makeHarness({
+          environment: [
+            { name: "T3_ACP_ANTIGRAVITY_THOUGHT_LEVEL", value: "1" },
+            { name: "T3_ACP_INITIAL_THOUGHT_LEVEL", value: "high" },
+          ],
+        });
+        yield* h.refresh();
+        // Now simulate a fresh session where agy starts at medium instead of the catalog default high.
+        h.controls.selected = yield* h.makeExecutable("runtime medium-start", {
+          agentVersion: "1.5.12",
+        });
+        const requestsBefore = (yield* h.readRequests).length;
+        const threadId = ThreadId.make("thread-antigravity-unset-thought-default");
+        const unsetSelection = {
+          instanceId: h.instance.instanceId,
+          model: "gemini-test-high",
+        };
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const workspace = yield* h.fs.makeTempDirectoryScoped({ prefix: "t3-ag-default-" });
+            const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+              runtimeMode: "approval-required",
+              interactionMode: "default",
+              cwd: workspace,
+            });
+            const session = yield* h.instance.orchestrationAdapter.openSession({
+              threadId,
+              providerSessionId: ProviderSessionId.make("provider-session-antigravity-default"),
+              modelSelection: unsetSelection,
+              runtimePolicy,
+            });
+            yield* session.ensureThread({
+              threadId,
+              modelSelection: unsetSelection,
+              runtimePolicy,
+            });
+            // Switching mid-session to gemini-test-low (whose probed default is high) from gemini-test-high (medium)
+            // applies high via unsetOptionDefaults instead of leaving agy at medium.
+            const switchSelection = {
+              instanceId: h.instance.instanceId,
+              model: "gemini-test-low",
+            };
+            const providerThread = yield* session.ensureThread({
+              threadId,
+              modelSelection: unsetSelection,
+              runtimePolicy,
+            });
+            const now = yield* DateTime.now;
+            yield* session.startTurn({
+              appThread: {
+                createdBy: "user",
+                creationSource: "web",
+                id: threadId,
+                projectId: ProjectId.make("project-antigravity-unset-default"),
+                title: "Antigravity unset default",
+                providerInstanceId: h.instance.instanceId,
+                modelSelection: switchSelection,
+                runtimeMode: "approval-required",
+                interactionMode: "default",
+                branch: null,
+                worktreePath: null,
+                activeProviderThreadId: providerThread.id,
+                lineage: {
+                  parentThreadId: null,
+                  relationshipToParent: null,
+                  rootThreadId: threadId,
+                },
+                forkedFrom: null,
+                createdAt: now,
+                updatedAt: now,
+                archivedAt: null,
+                settledOverride: null,
+                settledAt: null,
+                lastVisitedAt: null,
+                deletedAt: null,
+              },
+              threadId,
+              runId: RunId.make("run-antigravity-unset-default"),
+              runOrdinal: 1,
+              providerTurnOrdinal: 1,
+              attemptId: RunAttemptId.make("attempt-antigravity-unset-default"),
+              rootNodeId: NodeId.make("node-antigravity-unset-default"),
+              providerThread,
+              message: {
+                createdBy: "user",
+                creationSource: "web",
+                messageId: MessageId.make("message-antigravity-unset-default"),
+                text: "Say ok.",
+                attachments: [],
+              },
+              modelSelection: switchSelection,
+              runtimePolicy,
+            });
+            yield* session.events.pipe(
+              Stream.takeUntil((event) => event.type === "turn.terminal"),
+              Stream.runDrain,
+            );
+          }),
+        );
+        expect(
+          (yield* h.readRequests)
+            .slice(requestsBefore)
+            .filter(
+              (request) =>
+                request.method === "session/set_config_option" &&
+                request.params?.configId === "thought_level",
+            )
+            .map((request) => request.params?.value),
+        ).toEqual([]);
+        // Switching to gemini-test-low resets agy's mock default to high (matching probed default);
+        // verify a fresh session where agy starts at medium explicitly overrides to high.
+        const hMedium = yield* makeHarness({
+          environment: [
+            { name: "T3_ACP_ANTIGRAVITY_THOUGHT_LEVEL", value: "1" },
+            { name: "T3_ACP_INITIAL_THOUGHT_LEVEL", value: "medium" },
+          ],
+        });
+        yield* hMedium.refresh();
+        const mediumBefore = (yield* hMedium.readRequests).length;
+        // On gemini-test-low, refresh switched to gemini-test-high (medium) and back to gemini-test-low (high),
+        // so the catalog recorded high while a fresh session opens with T3_ACP_INITIAL_THOUGHT_LEVEL=medium.
+        const mediumSelection = {
+          instanceId: hMedium.instance.instanceId,
+          model: "gemini-test-low",
+        };
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const workspace = yield* hMedium.fs.makeTempDirectoryScoped({
+              prefix: "t3-ag-medium-override-",
+            });
+            const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+              runtimeMode: "approval-required",
+              interactionMode: "default",
+              cwd: workspace,
+            });
+            const session = yield* hMedium.instance.orchestrationAdapter.openSession({
+              threadId: ThreadId.make("thread-antigravity-medium-override"),
+              providerSessionId: ProviderSessionId.make("provider-session-medium-override"),
+              modelSelection: mediumSelection,
+              runtimePolicy,
+            });
+            yield* session.ensureThread({
+              threadId: ThreadId.make("thread-antigravity-medium-override"),
+              modelSelection: mediumSelection,
+              runtimePolicy,
+            });
+          }),
+        );
+        expect(
+          (yield* hMedium.readRequests)
+            .slice(mediumBefore)
+            .filter(
+              (request) =>
+                request.method === "session/set_config_option" &&
+                request.params?.configId === "thought_level",
+            )
+            .map((request) => request.params?.value),
+        ).toEqual(["high"]);
+        yield* h.assertClosed;
+        yield* hMedium.assertClosed;
       }),
   );
 });

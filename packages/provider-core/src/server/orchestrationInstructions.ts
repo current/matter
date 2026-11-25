@@ -71,6 +71,35 @@ export interface T3AcpInstructionState {
   readonly interactionMode: ProviderInteractionMode;
   readonly hasT3Mcp: boolean;
   readonly hasDeviceTools: boolean;
+  /** False when T3 MCP is connected directly over HTTP, so the shell fallback is inapplicable. */
+  readonly includeMcpFallback?: boolean;
+}
+
+const acpInstructionStatesEqual = (
+  left: T3AcpInstructionState | undefined,
+  right: T3AcpInstructionState,
+): boolean =>
+  left !== undefined &&
+  left.interactionMode === right.interactionMode &&
+  left.hasT3Mcp === right.hasT3Mcp &&
+  left.hasDeviceTools === right.hasDeviceTools &&
+  (left.includeMcpFallback ?? true) === (right.includeMcpFallback ?? true);
+
+export function buildT3AcpInstructions(state: T3AcpInstructionState): string {
+  const instructions = [
+    state.interactionMode === "plan"
+      ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
+      : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
+    ...(state.hasT3Mcp
+      ? [
+          T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
+          ...(state.hasDeviceTools ? [T3_CODE_DEVICE_TOOL_INSTRUCTIONS] : []),
+          T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
+          ...(state.includeMcpFallback === false ? [] : [T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]),
+        ]
+      : []),
+  ];
+  return instructions.join("\n\n");
 }
 
 /** ACP lacks system/developer fields; inject context on first prompt and tool/mode changes. */
@@ -78,30 +107,45 @@ export function t3AcpPromptWithInstructions(input: {
   readonly prompt: string;
   readonly state: T3AcpInstructionState;
   readonly previousState?: T3AcpInstructionState;
+  /** Session-invariant state already delivered in the agent's native system prompt. */
+  readonly systemPromptState?: T3AcpInstructionState;
 }): string {
   // Native slash commands must remain at the start of the prompt.
   if (input.prompt.trimStart().startsWith("/")) return input.prompt;
-  if (
-    input.previousState?.interactionMode === input.state.interactionMode &&
-    input.previousState.hasT3Mcp === input.state.hasT3Mcp &&
-    input.previousState.hasDeviceTools === input.state.hasDeviceTools
-  ) {
+  if (acpInstructionStatesEqual(input.previousState, input.state)) {
     return input.prompt;
   }
-  const instructions = [
-    input.state.interactionMode === "plan"
-      ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
-      : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
-    ...(input.state.hasT3Mcp
-      ? [
-          T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
-          ...(input.state.hasDeviceTools ? [T3_CODE_DEVICE_TOOL_INSTRUCTIONS] : []),
-          T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
-          T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS,
-        ]
-      : []),
-  ];
-  return `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
+  if (input.systemPromptState !== undefined) {
+    const baseline = input.previousState ?? input.systemPromptState;
+    const delta: Array<string> = [];
+    if (baseline.interactionMode !== input.state.interactionMode) {
+      delta.push(
+        input.state.interactionMode === "plan"
+          ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
+          : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
+      );
+    }
+    const mcpAlreadyDelivered =
+      input.systemPromptState.hasT3Mcp || input.previousState?.hasT3Mcp === true;
+    const devicesAlreadyDelivered =
+      (input.systemPromptState.hasT3Mcp && input.systemPromptState.hasDeviceTools) ||
+      (input.previousState?.hasT3Mcp === true && input.previousState.hasDeviceTools);
+    if (input.state.hasT3Mcp && !mcpAlreadyDelivered) {
+      delta.push(
+        T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
+        ...(input.state.hasDeviceTools ? [T3_CODE_DEVICE_TOOL_INSTRUCTIONS] : []),
+        T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
+        ...(input.state.includeMcpFallback === false
+          ? []
+          : [T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]),
+      );
+    } else if (input.state.hasT3Mcp && input.state.hasDeviceTools && !devicesAlreadyDelivered) {
+      delta.push(T3_CODE_DEVICE_TOOL_INSTRUCTIONS);
+    }
+    if (delta.length === 0) return input.prompt;
+    return `<t3_code_instructions>\n${delta.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
+  }
+  return `<t3_code_instructions>\n${buildT3AcpInstructions(input.state)}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
 }
 
 const orchestrationInstructions = (hasDeviceTools: boolean) =>

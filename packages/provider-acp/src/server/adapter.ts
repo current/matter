@@ -120,13 +120,18 @@ import {
   ACP_EMPTY_OPTION_VALUE,
   ACP_SESSION_MODE_OPTION_ID,
   flattenSelectChoices,
+  isAcpThoughtLevelOption,
 } from "./sessionConfig.ts";
 import * as AcpSessionRuntime from "./AcpSessionRuntime.ts";
 import {
   t3AcpPromptWithInstructions,
   type T3AcpInstructionState,
 } from "@t3tools/provider-core/server/orchestrationInstructions";
-import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
+import {
+  AGENT_FEEDBACK_INSTRUCTIONS,
+  buildRuntimeInstructions,
+  buildWorkspaceInstructions,
+} from "@t3tools/provider-core/server/runtimeInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import type * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
 import {
@@ -256,6 +261,7 @@ export interface AcpAdapterV2RuntimeInput {
   readonly mcpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly hasDeviceTools?: boolean;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly resumeSessionId?: string;
   readonly interruptPromptOnCancel?: boolean;
@@ -516,7 +522,9 @@ export interface AcpAdapterV2Flavor {
   /** The agent may run another model than session/new reports, so the model is always written. */
   readonly alwaysSetModel?: boolean;
   /** Values the client shows for options a new session's selection leaves unset. */
-  readonly unsetOptionDefaults?: Effect.Effect<NonNullable<ModelSelection["options"]>>;
+  readonly unsetOptionDefaults?:
+    | Effect.Effect<NonNullable<ModelSelection["options"]>>
+    | ((modelSelection: ModelSelection) => Effect.Effect<NonNullable<ModelSelection["options"]>>);
   readonly resolveModelId?: (selection: ModelSelection) => string | undefined;
   /**
    * The agent advertises its model option only after `session/new` returns
@@ -560,10 +568,12 @@ export interface AcpAdapterV2Flavor {
     readonly readTextFile: (
       request: EffectAcpSchema.ReadTextFileRequest,
       cwd: string | null,
+      policy?: ProviderAdapter.ProviderAdapterV2RuntimePolicy,
     ) => Effect.Effect<EffectAcpSchema.ReadTextFileResponse, EffectAcpErrors.AcpError>;
     readonly writeTextFile?: (
       request: EffectAcpSchema.WriteTextFileRequest,
       cwd: string | null,
+      policy?: ProviderAdapter.ProviderAdapterV2RuntimePolicy,
     ) => Effect.Effect<EffectAcpSchema.WriteTextFileResponse, EffectAcpErrors.AcpError>;
   };
   readonly extractPermissionQuestion?: (request: EffectAcpSchema.RequestPermissionRequest) =>
@@ -783,6 +793,14 @@ export interface AcpAdapterV2Flavor {
   readonly sessionCarriesPullRequestLinking?: (
     initializeResult: EffectAcpSchema.InitializeResponse,
   ) => boolean;
+  /**
+   * True when this session's native system prompt carries the opening T3 instructions
+   * (interaction mode, browser/device/orchestration, PR linking, and base runtime info),
+   * so turns keep the user's prompt clean and skip re-injection after compaction.
+   */
+  readonly sessionCarriesSystemInstructions?: (
+    initializeResult: EffectAcpSchema.InitializeResponse,
+  ) => boolean;
 }
 
 /**
@@ -852,6 +870,8 @@ export type AcpNativeSubagentActivity =
 export interface AcpNativeSubagentWatcher {
   /** Everything the child did so far, or undefined when nothing changed since the last poll. */
   readonly poll: Effect.Effect<ReadonlyArray<AcpNativeSubagentActivity> | undefined>;
+  /** Positive proof that every child in this batch has finished its work and gone idle. */
+  readonly isIdle?: Effect.Effect<boolean>;
 }
 
 export interface AcpAdapterV2SubagentUpdate {
@@ -1101,6 +1121,7 @@ interface AcpMcpContext {
   readonly servers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly hasDeviceTools: boolean;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
@@ -1147,7 +1168,7 @@ function acpMcpContext(
   callLauncher: string | undefined,
 ): AcpMcpContext {
   if (session === undefined) {
-    return { servers: [], acpServers: [], httpServers: [] };
+    return { servers: [], acpServers: [], httpServers: [], hasDeviceTools: false };
   }
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
@@ -1180,6 +1201,7 @@ function acpMcpContext(
             },
           ]
         : [],
+    hasDeviceTools: session.capabilities?.has("device") === true,
     endpoint: session.endpoint,
     authorization: session.authorizationHeader,
     processEnvironment: {
@@ -1202,6 +1224,123 @@ function acpMcpActivation(context: AcpMcpContext) {
     mcpServers: context.servers,
     acpMcpServers: context.acpServers,
     httpMcpServers: context.httpServers,
+  };
+}
+
+const THOUGHT_LEVEL_OPTION_ALIASES: ReadonlySet<string> = new Set([
+  "thought_level",
+  "thinking_level",
+]);
+
+const THOUGHT_LEVEL_ORDER: Readonly<Record<string, number>> = {
+  none: 0,
+  off: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  "extra-high": 5,
+  extra_high: 5,
+  max: 6,
+};
+
+function thoughtLevelRank(value: string): number | undefined {
+  return THOUGHT_LEVEL_ORDER[value.trim().toLowerCase()];
+}
+
+function findAcpConfigOptionForSelection(
+  configOptions: ReadonlyArray<EffectAcpSchema.SessionConfigOption>,
+  selectionId: string,
+): EffectAcpSchema.SessionConfigOption | undefined {
+  const exact = configOptions.find((candidate) => candidate.id === selectionId);
+  if (exact !== undefined) return exact;
+  if (!THOUGHT_LEVEL_OPTION_ALIASES.has(selectionId)) return undefined;
+  return configOptions.find(
+    (candidate) =>
+      isAcpThoughtLevelOption(candidate) || THOUGHT_LEVEL_OPTION_ALIASES.has(candidate.id),
+  );
+}
+
+function fallbackThoughtLevelValue(
+  requestedValue: string,
+  advertisedValues: ReadonlyArray<string>,
+): string | undefined {
+  if (advertisedValues.length === 0) return undefined;
+  const requestedRank = thoughtLevelRank(requestedValue);
+  const ranked = advertisedValues
+    .map((value, index) => ({ value, index, rank: thoughtLevelRank(value) }))
+    .filter(
+      (entry): entry is { value: string; index: number; rank: number } => entry.rank !== undefined,
+    );
+  if (ranked.length === 0) return advertisedValues.at(-1);
+  if (requestedRank !== undefined) {
+    const atOrBelow = ranked
+      .filter((entry) => entry.rank <= requestedRank)
+      .toSorted((left, right) => right.rank - left.rank || right.index - left.index);
+    if (atOrBelow[0] !== undefined) return atOrBelow[0].value;
+  }
+  const highest = ranked.toSorted(
+    (left, right) => right.rank - left.rank || right.index - left.index,
+  );
+  return highest[0]?.value ?? advertisedValues.at(-1);
+}
+
+export type ResolvedAcpConfigOptionSelection =
+  | { readonly kind: "unsupported" }
+  | {
+      readonly kind: "unadvertised";
+      readonly option: EffectAcpSchema.SessionConfigOption;
+      readonly requestedValue: string;
+      readonly advertisedValues: ReadonlyArray<string>;
+    }
+  | {
+      readonly kind: "apply";
+      readonly option: EffectAcpSchema.SessionConfigOption;
+      readonly value: string | boolean;
+      readonly mappedFromId?: string;
+      readonly fallbackFromValue?: string;
+      readonly advertisedValues?: ReadonlyArray<string>;
+    };
+
+export function resolveAcpConfigOptionSelection(
+  configOptions: ReadonlyArray<EffectAcpSchema.SessionConfigOption>,
+  selection: { readonly id: string; readonly value: string | boolean },
+): ResolvedAcpConfigOptionSelection {
+  const option = findAcpConfigOptionForSelection(configOptions, selection.id);
+  if (option === undefined) return { kind: "unsupported" };
+  const mappedFromId = option.id === selection.id ? undefined : selection.id;
+  if (option.type === "select" && typeof selection.value === "string") {
+    const advertisedValues = option.options.flatMap((entry) =>
+      "value" in entry ? [entry.value] : entry.options.map((choice) => choice.value),
+    );
+    if (!advertisedValues.includes(selection.value)) {
+      if (isAcpThoughtLevelOption(option) || THOUGHT_LEVEL_OPTION_ALIASES.has(option.id)) {
+        const fallback = fallbackThoughtLevelValue(selection.value, advertisedValues);
+        if (fallback !== undefined) {
+          return {
+            kind: "apply",
+            option,
+            value: fallback,
+            ...(mappedFromId === undefined ? {} : { mappedFromId }),
+            fallbackFromValue: selection.value,
+            advertisedValues,
+          };
+        }
+      }
+      return {
+        kind: "unadvertised",
+        option,
+        requestedValue: selection.value,
+        advertisedValues,
+      };
+    }
+  }
+  return {
+    kind: "apply",
+    option,
+    value: selection.value,
+    ...(mappedFromId === undefined ? {} : { mappedFromId }),
   };
 }
 
@@ -2480,6 +2619,17 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         >(null);
         const promptInstructionStates = yield* Ref.make(new Map<string, T3AcpInstructionState>());
         const promptRuntimeInstructions = yield* Ref.make(new Map<string, string>());
+        let sessionSystemPromptContext: {
+          readonly interactionMode: ProviderInteractionMode;
+          readonly hasT3Mcp: boolean;
+          readonly hasDeviceTools: boolean;
+          readonly workspaceText: string;
+        } = {
+          interactionMode: input.runtimePolicy.interactionMode,
+          hasT3Mcp: false,
+          hasDeviceTools: false,
+          workspaceText: buildWorkspaceInstructions(input.runtimePolicy),
+        };
         const deliveredAppContext = yield* Ref.make(new Map<string, ReadonlyMap<string, string>>());
         // Unique markers keep delayed prompt completions from clearing later compactions.
         const compactionMarkers = yield* Ref.make(new Map<string, symbol>());
@@ -3074,6 +3224,16 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           onTermination: AcpAdapterV2RuntimeInput["onTermination"] = () =>
             handleRuntimeTerminationAtGeneration(runtimeGeneration),
         ): AcpAdapterV2RuntimeInput => {
+          const hasT3Mcp =
+            mcpContext.servers.length > 0 ||
+            mcpContext.httpServers.length > 0 ||
+            mcpContext.acpServers.length > 0;
+          sessionSystemPromptContext = {
+            interactionMode: input.runtimePolicy.interactionMode,
+            hasT3Mcp,
+            hasDeviceTools: hasT3Mcp && mcpContext.hasDeviceTools,
+            workspaceText: buildWorkspaceInstructions(input.runtimePolicy),
+          };
           return {
             cwd: input.runtimePolicy.cwd ?? process.cwd(),
             runtimePolicy: input.runtimePolicy,
@@ -3083,6 +3243,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             mcpServers: mcpContext.servers,
             acpMcpServers: mcpContext.acpServers,
             httpMcpServers: mcpContext.httpServers,
+            hasDeviceTools: mcpContext.hasDeviceTools,
             ...(mcpContext.processEnvironment === undefined
               ? {}
               : { processEnvironment: mcpContext.processEnvironment }),
@@ -4197,7 +4358,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
          * Polls the provider's records of a subagent that reports no child session, until it ends
          * or reports one, then reads once more so its last tool results and reply are kept.
          */
-        const watchNativeSubagentActivity = Effect.fnUntraced(function* (
+        const watchNativeSubagentActivity: (
+          owner: ActiveAcpTurn,
+          subagent: ActiveAcpSubagent,
+        ) => Effect.Effect<void> = Effect.fnUntraced(function* (
           owner: ActiveAcpTurn,
           subagent: ActiveAcpSubagent,
         ) {
@@ -4270,6 +4434,32 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             ) {
               yield* Effect.sleep(ACP_NATIVE_SUBAGENT_POLL_INTERVAL);
               yield* project(false);
+              if (
+                subagent.childSessionId === null &&
+                !owner.finalized &&
+                !acpSubagentStatusIsTerminal(subagent.task.status) &&
+                watcher.isIdle !== undefined
+              ) {
+                const idle = yield* watcher.isIdle;
+                if (
+                  idle &&
+                  subagent.childSessionId === null &&
+                  !owner.finalized &&
+                  !acpSubagentStatusIsTerminal(subagent.task.status)
+                ) {
+                  yield* emitSubagent(owner, {
+                    nativeTaskId,
+                    prompt: subagent.task.prompt,
+                    title: subagent.task.title,
+                    model: subagent.task.model,
+                    status: "idle",
+                    childSessionId: subagent.childSessionId,
+                    result: null,
+                  });
+                  yield* rearmDeferredFinalize(owner);
+                  break;
+                }
+              }
             }
             if (subagent.childSessionId === null) {
               yield* project(true);
@@ -7715,14 +7905,16 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           if (clientFileSystem !== undefined) {
             yield* targetRuntime.handleReadTextFile((request) =>
               clientPolicyContext.pipe(
-                Effect.flatMap(({ policy }) => clientFileSystem.readTextFile(request, policy.cwd)),
+                Effect.flatMap(({ policy }) =>
+                  clientFileSystem.readTextFile(request, policy.cwd, policy),
+                ),
               ),
             );
             const writeTextFile = clientFileSystem.writeTextFile;
             if (writeTextFile !== undefined) {
               yield* targetRuntime.handleWriteTextFile((request) =>
                 clientPolicyContext.pipe(
-                  Effect.flatMap(({ policy }) => writeTextFile(request, policy.cwd)),
+                  Effect.flatMap(({ policy }) => writeTextFile(request, policy.cwd, policy)),
                 ),
               );
             }
@@ -8421,8 +8613,15 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           },
         );
 
+        const resolveUnsetOptionDefaults = (modelSelection: ModelSelection) =>
+          flavor.unsetOptionDefaults === undefined
+            ? Effect.succeed([] as NonNullable<ModelSelection["options"]>)
+            : typeof flavor.unsetOptionDefaults === "function"
+              ? flavor.unsetOptionDefaults(modelSelection)
+              : flavor.unsetOptionDefaults;
+
         // Read before the session exists: its own config updates replace what the client showed.
-        const unsetOptionDefaults = yield* flavor.unsetOptionDefaults ?? Effect.succeed([]);
+        const unsetOptionDefaults = yield* resolveUnsetOptionDefaults(input.modelSelection);
         const initialStart = yield* Effect.result(
           startAcpRuntime(input.threadId, input.initialNativeThreadId),
         );
@@ -8633,9 +8832,20 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             return granted !== undefined && !isRuntimeModeAbove(granted, ceiling);
           };
           const explicitSelections = modelSelection.options ?? [];
-          const implicitSelections = unsetOptionDefaults.filter(
-            (implicit) => !explicitSelections.some((selection) => selection.id === implicit.id),
+          const explicitResolvedIds = new Set(
+            explicitSelections.map(
+              (selection) =>
+                findAcpConfigOptionForSelection(configOptions, selection.id)?.id ?? selection.id,
+            ),
           );
+          const implicitSelections = unsetOptionDefaults.filter((implicit) => {
+            const resolvedId =
+              findAcpConfigOptionForSelection(configOptions, implicit.id)?.id ?? implicit.id;
+            return (
+              !explicitSelections.some((selection) => selection.id === implicit.id) &&
+              !explicitResolvedIds.has(resolvedId)
+            );
+          });
           const optionSelections = [...explicitSelections, ...implicitSelections].flatMap(
             (selection) => {
               if (flavor.ownedModelOptionIds?.includes(selection.id) === true) return [];
@@ -8657,10 +8867,14 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const configSelections = hasNativeConfigWithSyntheticModeId
             ? optionSelections
             : optionSelections.filter((selection) => selection.id !== ACP_SESSION_MODE_OPTION_ID);
+          const resolvedSelections = configSelections.map((selection) => ({
+            selection,
+            resolved: resolveAcpConfigOptionSelection(configOptions, selection),
+          }));
           // Probe descriptors union models; skip options absent from the live session and use agent defaults.
-          const unsupportedConfigIds = configSelections
-            .map((selection) => selection.id)
-            .filter((id) => !availableConfigIds.has(id));
+          const unsupportedConfigIds = resolvedSelections
+            .filter(({ resolved }) => resolved.kind === "unsupported")
+            .map(({ selection }) => selection.id);
           if (unsupportedConfigIds.length > 0) {
             yield* Effect.logWarning(
               "ACP session does not expose requested configuration option(s)",
@@ -8671,28 +8885,48 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               },
             );
           }
-          for (const selection of configSelections) {
-            if (!availableConfigIds.has(selection.id)) continue;
-            // Advertised values union models; skip per-model rejections instead of failing session open.
-            const option = configOptions.find((candidate) => candidate.id === selection.id);
-            if (
-              option !== undefined &&
-              option.type === "select" &&
-              typeof selection.value === "string"
-            ) {
-              const advertisedValues = option.options.flatMap((entry) =>
-                "value" in entry ? [entry.value] : entry.options.map((choice) => choice.value),
+          for (const { selection, resolved } of resolvedSelections) {
+            if (resolved.kind === "unsupported") continue;
+            if (resolved.kind === "unadvertised") {
+              yield* Effect.logWarning(
+                "ACP session does not advertise requested configuration option value",
+                {
+                  driver,
+                  sessionId: startResult.sessionId,
+                  optionId: resolved.option.id,
+                  requestedValue: resolved.requestedValue,
+                  advertisedValues: resolved.advertisedValues,
+                },
               );
-              if (!advertisedValues.includes(selection.value)) continue;
+              continue;
             }
-            yield* runtime.setConfigOption(selection.id, selection.value).pipe(
+            if (resolved.fallbackFromValue !== undefined) {
+              yield* Effect.logWarning(
+                "ACP thought_level value not advertised; falling back to closest valid level",
+                {
+                  driver,
+                  sessionId: startResult.sessionId,
+                  optionId: resolved.option.id,
+                  requestedValue: resolved.fallbackFromValue,
+                  fallbackValue: resolved.value,
+                  advertisedValues: resolved.advertisedValues,
+                },
+              );
+            }
+            yield* runtime.setConfigOption(resolved.option.id, resolved.value).pipe(
               Effect.catchTags({
                 AcpRequestError: (error) =>
                   error.code === -32602
                     ? Effect.logWarning("ACP session rejected a configuration option value", {
-                        optionId: selection.id,
-                        value: selection.value,
-                        detail: error.message,
+                        driver,
+                        sessionId: startResult.sessionId,
+                        optionId: resolved.option.id,
+                        ...(resolved.mappedFromId === undefined
+                          ? {}
+                          : { requestedOptionId: resolved.mappedFromId }),
+                        value: resolved.value,
+                        requestedValue: selection.value,
+                        detail: error.errorMessage || error.message,
                       })
                     : Effect.fail(error),
               }),
@@ -9475,11 +9709,28 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           sessionId: string,
         ) {
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          const sessionSetup = yield* Ref.get(activeSessionSetup);
+          const httpMcpConnected =
+            flavor.mcpOverHttp === true &&
+            sessionSetup?.initializeResult.agentCapabilities?.mcpCapabilities?.http === true &&
+            mcpSession !== undefined;
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
             hasT3Mcp: mcpSession !== undefined,
             hasDeviceTools: mcpSession?.capabilities?.has("device") === true,
+            includeMcpFallback: !httpMcpConnected,
           } satisfies T3AcpInstructionState;
+          const carriesSystemInstructions =
+            sessionSetup !== null &&
+            flavor.sessionCarriesSystemInstructions?.(sessionSetup.initializeResult) === true;
+          const systemPromptState: T3AcpInstructionState | undefined = carriesSystemInstructions
+            ? {
+                interactionMode: sessionSystemPromptContext.interactionMode,
+                hasT3Mcp: sessionSystemPromptContext.hasT3Mcp,
+                hasDeviceTools: sessionSystemPromptContext.hasDeviceTools,
+                includeMcpFallback: !httpMcpConnected,
+              }
+            : undefined;
           const userText =
             flavor.rewriteUserText === undefined
               ? turnInput.message.text
@@ -9518,20 +9769,35 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             ...(previousInstructionState === undefined || compactionMarker !== undefined
               ? {}
               : { previousState: previousInstructionState }),
+            ...(systemPromptState === undefined ? {} : { systemPromptState }),
           });
-          const sessionSetup = yield* Ref.get(activeSessionSetup);
-          const runtimeInstructions = buildRuntimeInstructions({
-            agentFeedback: instructionState.hasT3Mcp ? (turnInput.agentFeedback ?? "off") : "off",
-            harness: flavor.runtimeHarness ?? driver,
-            model: turnInput.modelSelection.model,
-            runtimePolicy: turnInput.runtimePolicy,
-            pullRequestLinking:
-              sessionSetup === null ||
-              flavor.sessionCarriesPullRequestLinking?.(sessionSetup.initializeResult) !== true,
-          });
+          let runtimeInstructions: string;
+          if (carriesSystemInstructions) {
+            const feedback =
+              instructionState.hasT3Mcp && turnInput.agentFeedback !== undefined
+                ? AGENT_FEEDBACK_INSTRUCTIONS[turnInput.agentFeedback]
+                : "";
+            const workspace = buildWorkspaceInstructions(turnInput.runtimePolicy);
+            const workspaceDelta =
+              workspace !== sessionSystemPromptContext.workspaceText ? workspace : "";
+            runtimeInstructions = [feedback, workspaceDelta]
+              .filter((part) => part.length > 0)
+              .join("\n\n");
+          } else {
+            runtimeInstructions = buildRuntimeInstructions({
+              agentFeedback: instructionState.hasT3Mcp ? (turnInput.agentFeedback ?? "off") : "off",
+              harness: flavor.runtimeHarness ?? driver,
+              model: turnInput.modelSelection.model,
+              runtimePolicy: turnInput.runtimePolicy,
+              pullRequestLinking:
+                sessionSetup === null ||
+                flavor.sessionCarriesPullRequestLinking?.(sessionSetup.initializeResult) !== true,
+            });
+          }
           // The agent keeps its own history, so resend only after compaction or when the text changes.
           const sendRuntimeInstructions =
             !isNativeSlashCommand &&
+            runtimeInstructions.length > 0 &&
             (compactionMarker !== undefined ||
               (yield* Ref.get(promptRuntimeInstructions)).get(sessionId) !== runtimeInstructions);
           const promptText = flavor.buildAttachmentPrompt ? text.trim() : text;
@@ -9940,10 +10206,17 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     detail: `ACP session ${requestedSessionId} has no active setup metadata`,
                   });
                 }
+                const switchedModel =
+                  configuredSelection !== null &&
+                  configuredSelection.model !== turnInput.modelSelection.model;
+                const turnUnsetOptionDefaults = switchedModel
+                  ? yield* resolveUnsetOptionDefaults(turnInput.modelSelection)
+                  : [];
                 yield* configureSession(
                   currentSessionSetup,
                   turnInput.modelSelection,
                   turnInput.runtimePolicy,
+                  turnUnsetOptionDefaults,
                 );
                 yield* Ref.set(activeSelection, turnInput.modelSelection);
                 yield* Ref.set(activeInteractionMode, turnInput.runtimePolicy.interactionMode);

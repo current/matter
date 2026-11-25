@@ -800,6 +800,47 @@ it.layer(NodeServices.layer)("Antigravity profile preparation", (it) => {
     }),
   );
 
+  it.effect("merges existing user settings in settings.json instead of clobbering them", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const temporaryDirectory = yield* fs.makeTempDirectoryScoped();
+      const settingsPath = path.join(temporaryDirectory, "antigravity-acp", "settings.json");
+      yield* fs.makeDirectory(path.dirname(settingsPath), { recursive: true });
+      yield* fs.writeFileString(
+        settingsPath,
+        JSON.stringify({
+          theme: "dark",
+          experimental: { nativeTools: true },
+          auth: { type: "stale" },
+          gcp: { project: "stale-project" },
+        }),
+      );
+
+      yield* prepareAntigravityProfile({
+        profileDirectory: temporaryDirectory,
+        auth: {
+          authMethod: "oauth-personal",
+          apiKey: "",
+          gcpProject: "",
+          gcpLocation: "",
+        },
+      });
+      expect(decodeJson(yield* fs.readFileString(settingsPath))).toEqual({
+        theme: "dark",
+        experimental: { nativeTools: true },
+        auth: { type: "oauth-personal" },
+      });
+
+      // Malformed JSON falls back cleanly without breaking session launch.
+      yield* fs.writeFileString(settingsPath, "{not-valid-json");
+      yield* prepareAntigravityProfile({ profileDirectory: temporaryDirectory });
+      expect(decodeJson(yield* fs.readFileString(settingsPath))).toEqual({
+        auth: { type: "oauth-personal" },
+      });
+    }),
+  );
+
   const preflightHelper = (exitDelay: Effect.Effect<void>) => {
     const spawns = { count: 0 };
     const started = Deferred.makeUnsafe<void>();

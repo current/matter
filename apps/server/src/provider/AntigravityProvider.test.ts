@@ -647,7 +647,25 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
           currentValue: "high",
         });
         expect(carbon?.isDefault).toBeUndefined();
-        expect(carbon?.capabilities?.optionDescriptors).toEqual([]);
+        // A newly observed model immediately exposes its live thinking options without a manual refresh.
+        expect(carbon?.capabilities?.optionDescriptors?.[0]).toMatchObject({
+          id: "thought_level",
+          currentValue: "low",
+          options: [{ id: "low" }, { id: "medium" }, { id: "high" }],
+        });
+        // Subsequent live overrides on that model preserve its first recorded default.
+        yield* harness.provider.onConfigOptionsUpdated([
+          switchedToCarbon,
+          thinking("high", ["low", "medium", "high"]),
+        ]);
+        expect(
+          (yield* harness.provider.snapshot.getSnapshot).models.find(
+            (model) => model.slug === "carbon",
+          )?.capabilities?.optionDescriptors?.[0],
+        ).toMatchObject({
+          id: "thought_level",
+          currentValue: "low",
+        });
 
         // Updating an observed model's choices keeps its recorded default while still offered,
         // and falls back if the agent removes that default.
@@ -724,9 +742,10 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
         });
         expect(mergedCarbon?.isDefault).toBeUndefined();
         expect(mergedCarbon?.aliases).toBeUndefined();
+        // The resumed model records its observed live options while unobserved models keep cached defaults.
         expect(mergedCarbon?.capabilities?.optionDescriptors?.[0]).toMatchObject({
           id: "thought_level",
-          currentValue: "medium",
+          currentValue: "xhigh",
         });
 
         // A later authoritative session start replaces the cached default model.

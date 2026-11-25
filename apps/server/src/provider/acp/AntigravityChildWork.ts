@@ -35,7 +35,7 @@ const TRANSCRIPT_BYTE_CAP = 256 * 1024;
 const BATCH_TRANSCRIPT_BYTES = 512 * 1024;
 const STEP_TEXT_CAP = 4_000;
 const TOOL_INPUT_CAP = 1_000;
-const MAX_MESSAGE_FILES = 256;
+const MAX_MESSAGE_FILES = 2_048;
 const MAX_DETACHED_CHILDREN = 64;
 
 /** T3's title for a batch whose launch text it never saw. */
@@ -580,6 +580,77 @@ export const statAntigravityChildTranscripts = Effect.fn("statAntigravityChildTr
   },
 );
 
+/** Stamps all files whose change can transition a child batch to idle. */
+export const statAntigravityChildIdleInputs = Effect.fn("statAntigravityChildIdleInputs")(
+  function* (input: {
+    readonly profileDirectory: string;
+    readonly rootSessionId: string;
+    readonly conversationIds: ReadonlyArray<string>;
+  }) {
+    if (!NATIVE_ID.test(input.rootSessionId) || input.conversationIds.length === 0) return "";
+    return yield* Effect.promise(async () => {
+      const profileRoot = await antigravityProfileRoot(input.profileDirectory);
+      if (profileRoot === undefined) return "";
+      const stampOf = async (segments: ReadonlyArray<string>, type: "file" | "directory") => {
+        const entry = await antigravityManagedPath(profileRoot, segments, type).catch(
+          () => undefined,
+        );
+        return entry === undefined ? "-" : `${entry.info.size}:${entry.info.mtimeMs}`;
+      };
+      const [rootInbox, swarmMembers, ...children] = await Promise.all([
+        stampOf(
+          ["antigravity-acp", "brain", input.rootSessionId, ".system_generated", "messages"],
+          "directory",
+        ),
+        stampOf(
+          [
+            "antigravity-acp",
+            "brain",
+            input.rootSessionId,
+            ".system_generated",
+            "swarm",
+            "members.json",
+          ],
+          "file",
+        ),
+        ...input.conversationIds.map(async (conversationId) => {
+          if (!NATIVE_ID.test(conversationId)) return `${conversationId}:-`;
+          const [transcript, record, childInbox] = await Promise.all([
+            stampOf(
+              [
+                "antigravity-acp",
+                "brain",
+                conversationId,
+                ".system_generated",
+                "logs",
+                "transcript.jsonl",
+              ],
+              "file",
+            ),
+            stampOf(
+              [
+                "antigravity-acp",
+                "brain",
+                input.rootSessionId,
+                ".system_generated",
+                "subagents",
+                `${conversationId}.json`,
+              ],
+              "file",
+            ),
+            stampOf(
+              ["antigravity-acp", "brain", conversationId, ".system_generated", "messages"],
+              "directory",
+            ),
+          ]);
+          return `${conversationId}:${transcript}:${record}:${childInbox}`;
+        }),
+      ]);
+      return `${rootInbox}|${swarmMembers}|${children.join("|")}`;
+    });
+  },
+);
+
 const decodeChildMessage = Schema.decodeUnknownOption(
   Schema.fromJsonString(
     Schema.Struct({
@@ -944,11 +1015,115 @@ export const readAntigravityPendingReply = Effect.fn("readAntigravityPendingRepl
   },
 );
 
+const SUBAGENT_RUNNING_STEP_STATUSES: ReadonlySet<string> = new Set([
+  "RUNNING",
+  "PENDING",
+  "IN_PROGRESS",
+  "GENERATING",
+]);
+
+function isTerminalPlannerResponse(
+  step: Schema.Schema.Type<typeof TranscriptLine> | undefined,
+): boolean {
+  return (
+    step !== undefined &&
+    step.type === "PLANNER_RESPONSE" &&
+    step.status === "DONE" &&
+    (step.tool_calls?.length ?? 0) === 0
+  );
+}
+
+function isStepIdleAfterReport(
+  step: Schema.Schema.Type<typeof TranscriptLine> | undefined,
+): boolean {
+  if (step === undefined) return true;
+  if (step.type === "SYSTEM_MESSAGE") return false;
+  if (step.status !== undefined && SUBAGENT_RUNNING_STEP_STATUSES.has(step.status)) return false;
+  return (step.tool_calls?.length ?? 0) === 0;
+}
+
+async function isDetachedChildIdle(input: {
+  readonly profileRoot: string;
+  readonly rootSessionId: string;
+  readonly childId: string;
+  readonly reported: ReadonlySet<string>;
+  readonly swarmMembers: ReadonlyMap<string, DiskSwarmMember>;
+}): Promise<boolean> {
+  const swarmMember = input.swarmMembers.get(input.childId);
+  if (swarmMember !== undefined) {
+    if (swarmMember.killed || swarmMember.parked) return true;
+    const subagent = await readDetachedSubagent(
+      input.profileRoot,
+      input.rootSessionId,
+      input.childId,
+    );
+    return subagent?.state === "SUBAGENT_STATE_KILLED" || input.reported.has(input.childId);
+  }
+  const subagent = await readDetachedSubagent(
+    input.profileRoot,
+    input.rootSessionId,
+    input.childId,
+  );
+  if (subagent?.state !== undefined && subagent.state !== "SUBAGENT_STATE_ALIVE") {
+    return true;
+  }
+  if (await hasUnreadWakingInboxMessage(input.profileRoot, input.childId)) {
+    return false;
+  }
+  const lastStep = await readLastTranscriptLine(input.profileRoot, input.childId);
+  if (input.reported.has(input.childId)) {
+    return isStepIdleAfterReport(lastStep);
+  }
+  return isTerminalPlannerResponse(lastStep);
+}
+
+/**
+ * Positive proof that every proven child conversation in a subagent batch has finished its work
+ * and gone idle (reported to the parent, finished its final assistant response, or was killed).
+ * Returns false until children are proven on disk so newly spawned subagents never idle early.
+ */
+export const areAntigravityChildrenIdle = Effect.fn("areAntigravityChildrenIdle")(
+  function* (input: {
+    readonly profileDirectory: string;
+    readonly rootSessionId: string;
+    readonly conversationIds: ReadonlyArray<string>;
+  }) {
+    if (!NATIVE_ID.test(input.rootSessionId) || input.conversationIds.length === 0) return false;
+    const check = async (): Promise<boolean> => {
+      const profileRoot = await antigravityProfileRoot(input.profileDirectory);
+      if (profileRoot === undefined) return false;
+      const reported = new Set(
+        (await readInbox(profileRoot, input.rootSessionId)).map((message) => message.sender),
+      );
+      const swarmMembers = await readDiskSwarmMembersByConversationId(
+        profileRoot,
+        input.rootSessionId,
+      );
+      for (const childId of input.conversationIds) {
+        if (!NATIVE_ID.test(childId)) return false;
+        const idle = await isDetachedChildIdle({
+          profileRoot,
+          rootSessionId: input.rootSessionId,
+          childId,
+          reported,
+          swarmMembers,
+        });
+        if (!idle) return false;
+      }
+      return true;
+    };
+    return yield* Effect.tryPromise({
+      try: check,
+      catch: (cause) => new AntigravityChildWorkReadError({ cause }),
+    }).pipe(Effect.orElseSucceed(() => false));
+  },
+);
+
 /**
  * agy 1.5 children outlive their `invoke_subagent` call and the agent reports no end for them:
- * a child is done, or waits for guidance, once its message is in the parent's inbox or its record
- * says it was killed. Returns the launching tool call ids of children with neither; none when the
- * records prove nothing.
+ * a child is done, or waits for guidance, once its message is in the parent's inbox, its
+ * transcript ends with a final assistant reply, or its record says it was killed. Returns the
+ * launching tool call ids of children still at work; none when the records prove nothing.
  */
 export const readAntigravityChildrenAtWork = Effect.fn("readAntigravityChildrenAtWork")(
   function* (input: {
@@ -973,12 +1148,17 @@ export const readAntigravityChildrenAtWork = Effect.fn("readAntigravityChildrenA
       );
       const atWork = new Set<string>();
       for (const childId of childIds) {
-        if (reported.has(childId)) continue;
-        const swarmMember = swarmMembers.get(childId);
-        if (swarmMember?.killed === true || swarmMember?.parked === true) continue;
-        // `manage_subagents` kill only marks the record; a killed child never reports.
-        const subagent = await readDetachedSubagent(profileRoot, input.rootSessionId, childId);
-        if (subagent?.state === "SUBAGENT_STATE_KILLED") continue;
+        if (
+          await isDetachedChildIdle({
+            profileRoot,
+            rootSessionId: input.rootSessionId,
+            childId,
+            reported,
+            swarmMembers,
+          })
+        ) {
+          continue;
+        }
         const directTaskId = `swarm:${childId}`;
         if (input.toolCallIds.includes(directTaskId)) {
           atWork.add(directTaskId);

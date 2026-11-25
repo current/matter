@@ -39,16 +39,11 @@ const maxStdoutLineBytes = 16 * 1024 * 1024;
 const authPrefixBytes = new TextEncoder().encode(ANTIGRAVITY_AUTH_STDOUT_PREFIX);
 const decodeUrl = Schema.decodeUnknownEffect(Schema.URLFromString);
 const decodeBrowserHelperUrl = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.String));
-const ProfileSettingsFile = Schema.Struct({
-  auth: Schema.Struct({ type: Schema.String }),
-  gcp: Schema.optional(
-    Schema.Struct({
-      project: Schema.optional(Schema.String),
-      location: Schema.optional(Schema.String),
-    }),
-  ),
-});
-const encodeProfileSettings = Schema.encodeSync(Schema.fromJsonString(ProfileSettingsFile));
+const ProfileSettingsRecord = Schema.Record(Schema.String, Schema.Unknown);
+const decodeProfileSettingsRecord = Schema.decodeUnknownOption(
+  Schema.fromJsonString(ProfileSettingsRecord),
+);
+const encodeProfileSettingsRecord = Schema.encodeSync(Schema.fromJsonString(ProfileSettingsRecord));
 const isAcpRequestError = Schema.is(AcpErrors.AcpRequestError);
 const isAcpTransportError = Schema.is(AcpErrors.AcpTransportError);
 
@@ -141,14 +136,25 @@ export function antigravityAuthConfigIssue(auth: AntigravityAuthConfig): string 
 
 /**
  * `auth.type` names the selected method so a native logout clears only that method's credentials
- * instead of every stored token. Never holds a credential.
+ * instead of every stored token. Never holds a credential; preserves unrelated user settings.
  */
-function antigravityProfileSettings(auth: AntigravityAuthConfig): string {
+function antigravityProfileSettings(auth: AntigravityAuthConfig, existingRaw?: string): string {
+  const existing =
+    existingRaw === undefined
+      ? undefined
+      : Option.getOrUndefined(decodeProfileSettingsRecord(existingRaw));
+  const preserved: Record<string, unknown> = {};
+  if (existing !== undefined && !Array.isArray(existing)) {
+    for (const [key, value] of Object.entries(existing)) {
+      if (key !== "auth" && key !== "gcp") preserved[key] = value;
+    }
+  }
   const gcp = {
     ...(auth.gcpProject ? { project: auth.gcpProject } : {}),
     ...(auth.gcpLocation ? { location: auth.gcpLocation } : {}),
   };
-  return `${encodeProfileSettings({
+  return `${encodeProfileSettingsRecord({
+    ...preserved,
     auth: { type: auth.authMethod },
     ...(Object.keys(gcp).length > 0 ? { gcp } : {}),
   })}\n`;
@@ -530,8 +536,12 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
         );
     }
   }
+  const settingsPath = path.join(acpDirectory, "settings.json");
+  const existingSettings = Option.getOrUndefined(
+    yield* fs.readFileString(settingsPath).pipe(Effect.option),
+  );
   yield* fs
-    .writeFileString(path.join(acpDirectory, "settings.json"), antigravityProfileSettings(auth))
+    .writeFileString(settingsPath, antigravityProfileSettings(auth, existingSettings))
     .pipe(
       Effect.mapError(() =>
         authSupportError("The Antigravity profile settings could not be written."),

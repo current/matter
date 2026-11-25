@@ -160,6 +160,24 @@ it.layer(NodeServices.layer)("watchAntigravityChildActivity", (it) => {
         title: "Run vp test",
         status: "inProgress",
       });
+      expect(yield* watcher.isIdle!).toBe(false);
+
+      // Once the child completes its final reply, isIdle flips to true without needing a kill record.
+      yield* fs.writeFileString(
+        transcriptPath,
+        [
+          ...transcriptLines,
+          {
+            step_index: 4,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            content: "Report sent to parent agent.",
+          },
+        ]
+          .map((line) => JSON.stringify(line))
+          .join("\n") + "\n",
+      );
+      expect(yield* watcher.isIdle!).toBe(true);
     }),
   );
 

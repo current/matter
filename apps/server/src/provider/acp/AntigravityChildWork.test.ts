@@ -10,6 +10,7 @@ import * as Path from "effect/Path";
 import {
   ANTIGRAVITY_SUBAGENT_BATCH_TITLE,
   antigravitySubagentLaunches,
+  areAntigravityChildrenIdle,
   describeAntigravitySubagentLaunches,
   readAntigravityChildrenAtWork,
   readAntigravityChildWork,
@@ -538,6 +539,72 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
           toolCallIds: ["call_alive", "call_killed"],
         }),
       ).toEqual(["call_alive"]);
+      expect(
+        yield* areAntigravityChildrenIdle({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          conversationIds: [CHILD],
+        }),
+      ).toBe(false);
+      expect(
+        yield* areAntigravityChildrenIdle({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          conversationIds: [killed],
+        }),
+      ).toBe(true);
+
+      // A child that finishes its final PLANNER_RESPONSE (status=DONE, no tool calls) is idle even while state stays ALIVE.
+      const transcriptPath = path.join(
+        profile,
+        "antigravity-acp",
+        "brain",
+        CHILD,
+        ".system_generated",
+        "logs",
+        "transcript.jsonl",
+      );
+      yield* fs.makeDirectory(path.dirname(transcriptPath), { recursive: true });
+      yield* fs.writeFileString(
+        transcriptPath,
+        `${JSON.stringify({
+          step_index: 1,
+          type: "PLANNER_RESPONSE",
+          status: "DONE",
+          tool_calls: [{ name: "read_file", args: {} }],
+        })}\n`,
+      );
+      expect(
+        yield* areAntigravityChildrenIdle({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          conversationIds: [CHILD],
+        }),
+      ).toBe(false);
+
+      yield* fs.writeFileString(
+        transcriptPath,
+        `${JSON.stringify({
+          step_index: 2,
+          type: "PLANNER_RESPONSE",
+          status: "DONE",
+          content: "Report sent to parent agent.",
+        })}\n`,
+      );
+      expect(
+        yield* areAntigravityChildrenIdle({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          conversationIds: [CHILD],
+        }),
+      ).toBe(true);
+      expect(
+        yield* readAntigravityChildrenAtWork({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          toolCallIds: ["call_alive"],
+        }),
+      ).toEqual([]);
     }),
   );
 

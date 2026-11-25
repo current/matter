@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import {
+  buildT3AcpInstructions,
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS,
   T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH,
   T3_CODE_ORCHESTRATION_INSTRUCTIONS,
@@ -96,5 +97,57 @@ describe("T3 device instructions", () => {
       "Again.",
     );
     assert.notInclude(t3AcpPromptWithInstructions({ prompt: "Hi.", state }), "## T3 Code devices");
+  });
+
+  it("omits ACP shell fallback when HTTP MCP is active and keeps prompts clean when system prompt carries instructions", () => {
+    const httpState = {
+      interactionMode: "default",
+      hasT3Mcp: true,
+      hasDeviceTools: false,
+      includeMcpFallback: false,
+    } as const;
+    const stdioState = {
+      interactionMode: "default",
+      hasT3Mcp: true,
+      hasDeviceTools: false,
+      includeMcpFallback: true,
+    } as const;
+
+    assert.notInclude(buildT3AcpInstructions(httpState), "acp-mcp-call");
+    assert.include(buildT3AcpInstructions(httpState), "## T3 Code orchestration");
+    assert.include(buildT3AcpInstructions(stdioState), "acp-mcp-call");
+    assert.notInclude(
+      t3AcpPromptWithInstructions({ prompt: "Hello.", state: httpState }),
+      "acp-mcp-call",
+    );
+
+    // When systemPromptState already matches, the prompt stays unwrapped (including after compaction).
+    assert.equal(
+      t3AcpPromptWithInstructions({
+        prompt: "Hello.",
+        state: httpState,
+        systemPromptState: httpState,
+      }),
+      "Hello.",
+    );
+
+    // Switching interaction mode mid-session injects only the mode delta, not browser/orchestration.
+    const switchedToPlan = t3AcpPromptWithInstructions({
+      prompt: "Make a plan.",
+      state: { ...httpState, interactionMode: "plan" },
+      systemPromptState: httpState,
+    });
+    assert.include(switchedToPlan, "## T3 Code interaction mode: Plan");
+    assert.notInclude(switchedToPlan, "## T3 Code orchestration");
+    assert.notInclude(switchedToPlan, "## T3 Code browser");
+
+    // Enabling device tools mid-session injects only the device section.
+    const gainedDevices = t3AcpPromptWithInstructions({
+      prompt: "Boot iOS.",
+      state: { ...httpState, hasDeviceTools: true },
+      systemPromptState: httpState,
+    });
+    assert.include(gainedDevices, "## T3 Code devices");
+    assert.notInclude(gainedDevices, "## T3 Code orchestration");
   });
 });

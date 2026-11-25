@@ -421,6 +421,11 @@ describe("AntigravityAdapterV2 client file system", () => {
       const workspace = yield* fileSystem.makeTempDirectoryScoped({
         prefix: "t3-antigravity-workspace-",
       });
+      const extraRoot = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "t3-antigravity-extra-",
+      });
+      const extraRootFile = path.join(extraRoot, "shared.ts");
+      yield* fileSystem.writeFileString(extraRootFile, "from extra root");
       const outside = yield* fileSystem.makeTempDirectoryScoped({
         prefix: "t3-antigravity-outside-",
       });
@@ -434,6 +439,7 @@ describe("AntigravityAdapterV2 client file system", () => {
         runtimeMode: "full-access",
         interactionMode: "default",
         cwd: workspace,
+        workspace: { folders: [], extraRoots: [extraRoot] },
       });
       const modelSelection = { instanceId, model: "gemini-test-low" } as const;
       const session = yield* adapter.openSession({
@@ -482,6 +488,11 @@ describe("AntigravityAdapterV2 client file system", () => {
         context("fs/read_text_file"),
       );
       assert.equal(pasted.content, "pasted");
+      const fromExtraRoot = yield* readTextFile(
+        { sessionId: "mock-session-1", path: extraRootFile },
+        context("fs/read_text_file"),
+      );
+      assert.equal(fromExtraRoot.content, "from extra root");
       yield* fileSystem.writeFileString(insidePath, "\uFEFFfirst\né中🙂\nlast");
       const sliced = yield* readTextFile(
         { sessionId: "mock-session-1", path: insidePath, line: 2, limit: 1 },
@@ -2398,6 +2409,104 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
     }).pipe(Effect.provide(layerSession)),
   );
 
+  it.effect(
+    "transitions a finished detached subagent to idle on poll even before a parent usage_update",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "t3-antigravity-idle-poll-",
+        });
+        const records = (conversationId: string, kind: string) =>
+          path.join(profile, "antigravity-acp", "brain", conversationId, ".system_generated", kind);
+        const write = (directory: string, name: string, value: string) =>
+          fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(Effect.andThen(fileSystem.writeFileString(path.join(directory, name), value)));
+        const transcript = (lines: ReadonlyArray<unknown>) =>
+          write(
+            records("child-1", "logs"),
+            "transcript.jsonl",
+            lines.map((line) => JSON.stringify(line)).join("\n") + "\n",
+          );
+        yield* write(
+          records("mock-session-1", "subagents"),
+          "child-1.json",
+          JSON.stringify({ conversationId: "child-1", state: "SUBAGENT_STATE_ALIVE" }),
+        );
+        yield* write(
+          records("child-1", "messages"),
+          "launch.json",
+          JSON.stringify({
+            sender: "mock-session-1",
+            sourceMetadata: {
+              tool: { toolCall: { id: "call_research", name: "invoke_subagent" } },
+            },
+          }),
+        );
+        yield* transcript([
+          {
+            step_index: 1,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            tool_calls: [{ name: "read_file", args: { Path: '"/repo/README.md"' } }],
+          },
+        ]);
+
+        const { startTurn, until, throughPromptSettled } = yield* openSessionWithRunningCommand(
+          {},
+          profile,
+        );
+        yield* startTurn(1, false);
+        const prompt = yield* throughPromptSettled;
+        assert.equal(
+          prompt
+            .flatMap((event) => (event.type === "subagent.updated" ? [event.subagent.status] : []))
+            .at(-1),
+          "running",
+        );
+
+        // First poll proves child-1 and sees it is still running.
+        yield* TestClock.adjust("2 seconds");
+        yield* until(
+          (event) =>
+            event.type === "subagent.updated" && event.subagent.progress === "Read README.md",
+        );
+
+        // Child finishes its report without any parent usage_update arriving yet.
+        yield* write(
+          records("mock-session-1", "messages"),
+          "report.json",
+          JSON.stringify({ sender: "child-1" }),
+        );
+        yield* transcript([
+          {
+            step_index: 1,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            tool_calls: [{ name: "read_file", args: { Path: '"/repo/README.md"' } }],
+          },
+          {
+            step_index: 2,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            content: "Report sent to parent agent.",
+          },
+        ]);
+
+        yield* TestClock.adjust("2 seconds");
+        const idled = yield* until(
+          (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
+        );
+        assert.isTrue(
+          idled.some(
+            (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
+          ),
+        );
+      }).pipe(Effect.provide(layerSession)),
+  );
+
   // agy reports no child session for `invoke_subagent`, so the child's work streams from its
   // transcript into the child thread and the parent's subagent row.
   it.effect("streams a detached subagent's transcript into its child thread", () =>
@@ -3047,6 +3156,170 @@ describe("AntigravityAdapterV2 session system prompt", () => {
         assert.include(sent, "through the Antigravity harness, as gemini-test-low");
         assert.notInclude(append, "systemPrompt");
         assert.include(sent, "<pull_request_linking>");
+      }).pipe(Effect.provide(layerSession)),
+  );
+
+  it.effect(
+    "moves T3 instructions into systemPrompt.append, defers HTTP MCP tools, and omits ACP shell fallback",
+    () =>
+      Effect.gen(function* () {
+        const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const crypto = yield* SecureRandom.SecureRandom;
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+        const mockAgentPath = yield* path.fromFileUrl(
+          new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
+        );
+        const logs = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-antigravity-log-" });
+        const requestLog = path.join(logs, "requests.ndjson");
+        type RuntimeService = AcpSessionRuntime.AcpSessionRuntime["Service"];
+        const promptReceived = yield* Deferred.make<Parameters<RuntimeService["prompt"]>[0]>();
+        const instanceId = ProviderInstanceId.make("antigravity-system-prompt-http-test");
+        const threadId = ThreadId.make("thread-antigravity-system-prompt-http");
+        assert.isTrue(flavor.deferMcpTools);
+        yield* mcpSessions.set({
+          environmentId: "env-antigravity-test" as never,
+          threadId,
+          providerSessionId: "mcp-session-antigravity-system-prompt",
+          providerInstanceId: instanceId,
+          endpoint: "http://127.0.0.1:43127/mcp",
+          authorizationHeader: "Bearer test-token",
+          browserToolsAvailable: true,
+        });
+        const adapter = yield* makeAntigravityAdapterV2({
+          instanceId,
+          selfInvocation: yield* resolveSelfInvocation(),
+          makeRuntime: (input) =>
+            makeAntigravityAcpRuntime({
+              ...input,
+              childProcessSpawner,
+              spawn: {
+                command: process.execPath,
+                args: [mockAgentPath],
+                cwd: input.cwd,
+                env: {
+                  T3_ACP_ANTIGRAVITY: "1",
+                  T3_ACP_AGENT_VERSION: "1.5.12",
+                  T3_ACP_ANTIGRAVITY_SYSTEM_PROMPT_APPEND: "1",
+                  T3_ACP_MCP_HTTP: "1",
+                  T3_ACP_REQUEST_LOG_PATH: requestLog,
+                  T3_ACP_HANG_PROMPT_FOREVER: "1",
+                },
+              },
+            }).pipe(
+              Effect.provideService(SecureRandom.SecureRandom, crypto),
+              Effect.map((runtime): RuntimeService => ({
+                ...runtime,
+                prompt: (request) =>
+                  Deferred.succeed(promptReceived, request).pipe(
+                    Effect.andThen(runtime.prompt(request)),
+                  ),
+              })),
+            ),
+          withProcess: (_stop, task) => task,
+          defaultModel: Effect.undefined,
+        });
+        const workspace = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-ag-sp-http-" });
+        const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          cwd: workspace,
+        });
+        const modelSelection = { instanceId, model: "gemini-test-low" } as const;
+        const session = yield* adapter.openSession({
+          threadId,
+          providerSessionId: ProviderSessionId.make("provider-session-antigravity-sp-http"),
+          modelSelection,
+          runtimePolicy,
+        });
+        const providerThread = yield* session.ensureThread({
+          threadId,
+          modelSelection,
+          runtimePolicy,
+        });
+        const now = yield* DateTime.now;
+        yield* session
+          .startTurn({
+            appThread: {
+              createdBy: "user",
+              creationSource: "web",
+              id: threadId,
+              projectId: ProjectId.make("project-antigravity-sp-http"),
+              title: "Antigravity system prompt HTTP",
+              providerInstanceId: instanceId,
+              modelSelection,
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              branch: null,
+              worktreePath: null,
+              activeProviderThreadId: providerThread.id,
+              lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+              forkedFrom: null,
+              createdAt: now,
+              updatedAt: now,
+              archivedAt: null,
+              settledOverride: null,
+              settledAt: null,
+              lastVisitedAt: null,
+              deletedAt: null,
+            },
+            threadId,
+            runId: RunId.make("run-antigravity-sp-http"),
+            runOrdinal: 1,
+            providerTurnOrdinal: 1,
+            attemptId: RunAttemptId.make("attempt-antigravity-sp-http"),
+            rootNodeId: NodeId.make("node-antigravity-sp-http"),
+            providerThread,
+            message: {
+              createdBy: "user",
+              creationSource: "web",
+              messageId: MessageId.make("message-antigravity-sp-http"),
+              text: "open a PR",
+              attachments: [],
+            },
+            modelSelection,
+            runtimePolicy,
+          })
+          .pipe(Effect.forkScoped);
+        const sentPrompt = (yield* Deferred.await(promptReceived)).prompt;
+        const sessionNew = (yield* fileSystem.readFileString(requestLog))
+          .trim()
+          .split("\n")
+          .map(
+            (line) =>
+              JSON.parse(line) as {
+                method?: string;
+                params?: {
+                  _meta?: { antigravity?: { systemPrompt?: { append?: string } } };
+                  mcpServers?: ReadonlyArray<{
+                    type?: string;
+                    name?: string;
+                    headers?: ReadonlyArray<{ name: string; value: string }>;
+                  }>;
+                };
+              },
+          )
+          .find((request) => request.method === "session/new");
+        const append = sessionNew?.params?._meta?.antigravity?.systemPrompt?.append ?? "";
+        assert.include(append, "<runtime_info>");
+        assert.include(append, "<pull_request_linking>");
+        assert.include(append, "## T3 Code interaction mode: Default");
+        assert.include(append, "## T3 Code orchestration");
+        assert.include(append, "## T3 Code browser");
+        assert.notInclude(append, "acp-mcp-call");
+        // User prompt stays clean without <t3_code_instructions> or <runtime_info>.
+        assert.deepEqual(sentPrompt, [{ type: "text", text: "open a PR" }]);
+        // HTTP MCP server requests deferred tool exposure so only core tools + tool_search load eagerly.
+        const httpServer = sessionNew?.params?.mcpServers?.find(
+          (server) => server.type === "http" && server.name === "t3-code",
+        );
+        assert.isDefined(httpServer);
+        assert.isTrue(
+          httpServer?.headers?.some(
+            (header) => header.name === "t3-tool-exposure" && header.value === "deferred",
+          ),
+        );
       }).pipe(Effect.provide(layerSession)),
   );
 });
