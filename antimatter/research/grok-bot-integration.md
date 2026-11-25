@@ -1,0 +1,229 @@
+# Phase 0 Technical Feasibility Research: Native Grok Bot Integration for `mattr`
+
+**Date:** 2026-11-25  
+**Scope:** Phase 0 feasibility research only (no production code). Informs Phase 1 (Modular Add-on Registry + Provider-Independent Bots Platform) and Phase 2 (Smallest Viable Grok Bot PoC).  
+**Target Fork:** `mattr` (`current/mattr`, fork of `pingdotgg/t3code` nightly).
+
+---
+
+## Executive Summary
+
+1. **What Grok Bot actually is under the hood (Verified):** xAI's **Grok Bot** desktop app is an Electron application built on Cursor/Anysphere infrastructure (`CFBundleIdentifier: com.anysphere.sand`, installed locally on this Mac at `/Applications/Grok Bot.app` v`1.3.0`, URL schemes `grokbot://` and `sand://`). It signs in with a Cursor account (`api2.cursor.sh`) and routes agent operations to an account-scoped persistent cloud sandbox ("box") gateway. It is **not** the `grok.com` chat app or the xAI model API.
+2. **No official third-party client API exists for native Bot chat (Verified):** Official xAI docs (`docs.x.ai/grok-bot/*`, `docs.x.ai/grok/connectors`) provide **Custom MCP Connectors**, **Webhook-triggered Routines**, **Deep Links** (`grokbot://app/v1/prompt`), and **Enterprise Inference Hooks** — but **no official REST/WebSocket/SDK API** to list Bots, read conversation histories, stream responses, or retrieve avatar metadata.
+3. **Transport verdict:**
+   - **Approach C (Official MCP + Webhooks + Deep Links):** Officially supported and already partially wired in `mattr` (`apps/web/src/components/mcp/mcpApps.ts` + `McpHttpServer.ts` + `McpWebhookTransport.ts`), **but cannot power a native Bots chat UI**. Reserve Approach C for **Phase 6 bidirectional coding-agent orchestration** and **"Open in Grok Bot" fallback links**.
+   - **Approach A (Local Companion via opt-in loopback CDP, modeled on `TheSethRose/grokbot-bridge`):** Reuses the signed-in desktop session with zero credential handling and event-driven store subscriptions, **but** requires explicit user consent to launch `Grok Bot.app` with `--remote-debugging-port` on `127.0.0.1` and depends on internal React Fiber store names observed in v`0.71.x` (**unverified on installed v`1.3.0`**).
+   - **Approach B1 (Independent Client via Cursor Browser PKCE → `EnsureSandBox` → Gateway HTTP, modeled on `Jahquan/grok-bot-raycast`):** Cleanest HTTP JSON surface (roster, paginated history, reply threads, attachments, widgets/approvals, avatars, headless/remote/PWA compatible), **but** uses undocumented endpoints + first-party `client_id` / desktop headers (observed in v`0.43.0`, **unverified on v`1.3.0`**), polls instead of streaming, and carries ToS/distribution restrictions (personal-fork experimental use only, not store/public distribution).
+   - **Approach B2 (Desktop Keychain/SafeStorage extraction, e.g. `grok-bot-cli` / `Kuanyeah/grok-bot-tui`) and macOS Accessibility JXA (`rthomas24/grok-bot-mcp`):** **Rejected** (B2 violates credential-boundary rules; Accessibility scripting is too fragile and macOS-only).
+4. **Asset & license provenance red flags (Verified):** Both `RongleCat/grok-bot-avatar-engine` (618 declarations lifted verbatim from `app.asar` of v`0.78.1`) and `lenML/gbot-ui` (proprietary `CursorGothic`/`XVF` fonts, cloud-agent wallpapers, and extracted persona paths) **redistribute proprietary xAI/Cursor assets under MIT notices and MUST NOT be imported or bundled**. Use sanitized user `avatarDataUrl` images when present, and a clean-room parametric SVG character renderer inspired by `Dkrillex/grok-icon` (MIT, frame-measured SVG) and `Kuanyeah/grok-bot-tui` (MIT, clean-room math silhouettes).
+5. **Recommended Phase 2 PoC:** Build a server-side `GrokBotTransport` interface behind an explicit opt-in flag. Run a short live verification probe against installed `Grok Bot.app` v`1.3.0` to confirm whether **Approach A (opt-in loopback CDP)** stores still work on v`1.3.0`; if broken or if Chris approves personal-fork direct gateway use for remote/PWA access, use **Approach B1 (Cursor PKCE + OS-keychain token storage)** behind the same replaceable `GrokBotTransport` abstraction.
+
+---
+
+## 1. Local Environment Check (Read-Only)
+
+Verified directly on this Mac without restarting, modifying, or extracting credentials from any app:
+
+| Item | Observed Fact |
+| --- | --- |
+| App location | `/Applications/Grok Bot.app` (installed, mtime `2026-11-20 12:19`) |
+| Bundle ID | `com.anysphere.sand` |
+| Version | `CFBundleShortVersionString = 1.3.0` (`CFBundleVersion = 1.3.0`) |
+| Runtime framework | Electron (`Electron Framework.framework`, `Squirrel.framework`, `Resources/app.asar` ~61 MB) |
+| Registered URL schemes | `grokbot://`, `sand://` |
+| Minimum macOS | `12.0` |
+| Running state | Running (`PID 93572`, `/Applications/Grok Bot.app/Contents/MacOS/Grok Bot` + 7 Helper processes) |
+| Debug port flag | **Not set** — launched normally with no `--remote-debugging-port` argument |
+
+**Implication:** Any CDP companion transport must treat an already-running `Grok Bot.app` without a debug port as the default state and show an explicit, user-confirmed opt-in action (never silently kill or relaunch the app).
+
+---
+
+## 2. Grok Bot Integration Approaches & Feasibility Matrix
+
+### Architecture Discovery Across Inspected Repositories
+
+Community implementations reveal two internal layers behind Grok Bot:
+1. **Desktop Electron Renderer Layer (Approach A):** React context stores (`roster`, `transcript`, `accountSlot`, `boxHostPhase`) and Electron preload bridge (`window.desktop.main.*`, `window.desktop.local.*`, `desktop.agent.*`).
+2. **Cloud Sandbox Gateway Layer (Approach B):** Cursor backend Connect-RPC `POST https://api2.cursor.sh/aiserver.v1.GrokBotService/EnsureSandBox` returns `{ gatewayUrl, gatewayToken, networkToken }`; subsequent operations are authenticated JSON `POST {gatewayUrl}/api/{method}` calls carrying `Authorization: Bearer <gatewayToken>` and `x-anyrun-network-token: <networkToken>`.
+
+### Feasibility Matrix: Approaches A, B, and C
+
+| Dimension | Approach A: Local Companion (CDP) | Approach A-Fallback: macOS Accessibility (JXA) | Approach B1: Direct PKCE → Cloud Gateway | Approach B2: Local SafeStorage / Keychain Extraction | Approach C: Official MCP + Webhooks + Deep Links |
+| --- | --- | --- | --- | --- | --- |
+| **Reference repos inspected** | `TheSethRose/grokbot-bridge` (MIT, `v0.71.x`), `TysikGG/grokbot-export` (No license) | `rthomas24/grok-bot-mcp` (MIT) | `Jahquan/grok-bot-raycast` (MIT, `v0.43.0`), `MaisonnatM/grok-bot` (MIT, manual env) | `Kuanyeah/grok-bot-tui` (MIT, vendors `ScriptedAlchemy/grok-bot-cli`), `niharnm/grok-bridge` (MIT, shells out to `gbot`) | `docs.x.ai/grok-bot/*`, `docs.x.ai/grok/connectors`, `DoubleDipCode/grokbot-t3-bridge` (MIT), `Deepusleepy/t3-tots` (MIT), `gavasques/grok-bot-t3-code-superpowers` (MIT) |
+| **Actual supported ops (in code)** | List Bots, read transcripts, send text + files, watch store events, stop turn, download box files, CRUD Bots, list/run/edit routines, Cursor usage summary | List Bots, read visible chat text, send message, click widget/approval buttons via macOS UI tree | `listAgents`, `getAgentTranscriptTail`, `getAgentTranscriptPage` (`beforeSeq`), `getAgentThread`, `sendPrompt`, `interruptAgentRun`, `reactToMessage`, `respondToWidget`, `resolveAutoReviewApproval`, `uploadAttachment`/`Chunk`, `readAttachmentChunk`, `getAgentAutomations`, `getAgentWorkflows`, `setAgentAutomationEnabled` | Same Gateway `/api/*` surface as B1 (via decrypted desktop gateway descriptor) | Grok Bot calls `mattr` MCP tools (`t3_thread_*`, `t3_project_*`); `mattr` wakes Grok Bot via per-Bot Routine webhook (`200/hr` per routine, `300/hr` account); prefill composer via `grokbot://app/v1/prompt?id=...&text=...` |
+| **Verified current functionality (v`1.3.0`)** | **Unverified live** against v`1.3.0` (built for v`0.71.x`; local app lacks CDP flag) | **Unverified live** against v`1.3.0` | **Unverified live** against v`1.3.0` (built for v`0.43.0`) | **Rejected on policy** (not tested) | **Verified in official docs** (`docs.x.ai`, fetched 2026-11-25) and existing `mattr` MCP code |
+| **Conversation sync** | Authoritative via live desktop stores; instant sync with official app | Scrapes current visible window only; switches active UI focus | Authoritative cloud gateway; bidirectional sync with official desktop & mobile apps | Same as B1 | **None** (no transcript read API; one-way webhook wakes & MCP tool calls only) |
+| **Bot identity & avatar metadata** | Roster rows in store (`id`, `name`, `description`, `isHiddenFromSidebar`, `isRunning`, `unreadCount`, `awaitingUserResponse`; avatar fields **unverified** in v`1.3.0` store) | Display name only (no shape, color, or image metadata) | **Full metadata** from `listAgents`: `id`, `name`, `title`, `description`, `avatarShape`, `avatarColor`, `avatarDataUrl`, `isGroup`, `isRunning`, `hasUnread`, `awaitingUserResponse` | Same as B1 | Bot ID manual copy only; no discovery or avatar metadata |
+| **Activity events / streaming** | **Event-driven** via React store subscriptions (`working`, `idle`, `needs_input`, live message updates) | None (manual snapshot polling) | **Polling only** (no verified WS/SSE in inspected repos; `Kuanyeah` polls 1.5s active / 5s roster; `listAgents` ~15s on wake; `pod_hibernated` retry) | Polling only | Asynchronous webhook callback on turn completion / Enterprise Inference Hooks (Enterprise-only) |
+| **Authentication** | Reuses signed-in `Grok Bot.app` session; zero credentials stored in `mattr` | Reuses signed-in `Grok Bot.app` + macOS Accessibility grant | Cursor browser PKCE (`cursor.com/loginDeepControl` → `api2.cursor.sh/auth/poll` + `/oauth/token` refresh with first-party `client_id`) | Reads `~/Library/Application Support/Grok Bot/gateway-descriptor.json` & decrypts Electron `safeStorage` via OS Keychain | OAuth 2.1 PKCE on `mattr` MCP server + per-Bot Routine webhook Bearer key |
+| **Platform compatibility** | macOS / Windows / Linux **where `Grok Bot.app` is installed & running**; remote PWA works only when proxied via host `mattr` server | **macOS only** (JXA + Accessibility) | **All platforms** (macOS, Windows, Linux, headless servers, remote Tailscale/PWA) — no `Grok Bot.app` needed | macOS/Linux (Windows DPAPI untested in inspected repos) | **All platforms** (requires public or tunneled HTTPS URL for `mattr` MCP, e.g., Tailscale HTTPS / T3 Connect) |
+| **Security implications** | **High if misconfigured:** `--remote-debugging-port` exposes full renderer JS eval on `127.0.0.1` to any same-user local process. Must stay loopback-only & explicit opt-in | Broad macOS Accessibility permission can read/drive arbitrary UI | Tokens must stay server-side in OS secure store (never renderer/logs); redirects disabled (`redirect: "error"`); `avatarDataUrl` payloads can be huge (need size caps & streaming parser like `MaisonnatM`) | **Unacceptable:** extracts another app's encrypted Keychain secrets — violates Section 13 & 21 | **Cleanest boundary:** scoped OAuth (`orchestration:read` / `orchestration:operate`), SSRF-safe `McpWebhookTransport`, Standard Webhooks / Bearer auth |
+| **Provider authorization / ToS** | Unofficial local automation of user's own desktop app; no credential extraction or client impersonation, still unsupported by xAI | Unofficial UI automation | **High risk:** reuses Cursor's first-party `client_id` (`KbZUR41cY7W6zRSdpSUJ7I7mLYBKOCmB`) and `x-cursor-client-source: sand-desktop`; `Jahquan/SECURITY.md` explicitly notes no provider authorization & Grok Bot ToS risk | **Hard violation** of access-control & credential-extraction policy | **100% officially sanctioned** by xAI |
+| **Maintenance burden** | **High:** React Fiber selectors (`.sand-agent-item`), internal store names (`roster`, `transcript`), and `window.desktop` methods break across Electron releases | **Very High:** breaks on any UI/DOM/Accessibility tree redesign | **Medium:** Gateway `/api/*` & Connect-RPC schemas are undocumented and can change (headers/versions), though typically stabler than React Fiber internals | **Very High:** breaks on both gateway schema and Electron `safeStorage` descriptor changes | **Low:** documented standards (MCP Streamable HTTP, OAuth 2.1, Webhooks, `grokbot://` v1) |
+| **Distribution limits** | Personal/power-user opt-in only; cannot silently relaunch `Grok Bot.app`; `SAND_AWAY_PARK` parks box after 10 min background idle | Personal macOS hack only | **Personal fork / experimental only** — cannot distribute in public app stores or branded releases without xAI/Cursor authorization | **Cannot ship** | Fully distributable |
+| **Startup & runtime overhead** | Zero when disabled; low when active (1 loopback WS + store subscriptions); requires `Grok Bot.app` (~hundreds of MB Electron) running | Zero when disabled; spawns `osascript` per call (high latency, disrupts focus) | Zero when disabled; minimal memory (HTTP client + bounded active-view polling); no second Electron app needed | N/A (rejected) | Zero when disabled; reuses existing `mattr` HTTP/MCP server |
+
+### Notable Technical Nuances Verified in Community Source Code
+
+- **`TysikGG/grokbot-export` (No license — read-only architectural reference):** Confirms local Electron storage blobs (`transcript.replicas.<agentId>`, `roster.last-roster`) cap at ~200 entries/chat, and the desktop's `desktop.agent.readTranscriptStoreTail` RPC (`ListGrokBotTranscriptEntries`) is gated behind Statsig flag `sand_transcript_store_read` (off in prod). Therefore, full history pagination requires either the renderer store's history loader (Approach A) or Gateway `getAgentTranscriptPage` with `beforeSeq` (Approach B1).
+- **`TheSethRose/grokbot-bridge` (`src/page.ts`):** Documents **`SAND_AWAY_PARK`** — Grok Bot puts the cloud computer to sleep when its desktop window is unfocused for 10 minutes or the Mac locks; calling `window.desktop.main.signalBoxIntent({ agentId, intent: "composer_focus" })` wakes normal sleep, but `SAND_AWAY_PARK` requires bringing the Grok Bot window forward (cloud turns and routines still run in the background).
+- **`MaisonnatM/grok-bot` (`src/lib/strip-json-string-field.ts`):** `listAgents` embeds full base64 `avatarDataUrl` payloads inline in the JSON array; naive `response.json()` can spike memory or stall when users have uploaded multi-MB avatars (Grok Bot permits uploads up to 25 MB per `docs.x.ai/grok-bot/bots.md`). Server-side streaming/stripping and thumbnail resizing (e.g. 128px cached thumbnails) is essential if calling `listAgents`.
+- **`niharnm/grok-bridge`:** Despite positioning itself as an orchestration bridge, its forward path (`src/grok.js`) invokes `grok-bot-cli@0.2.3 --gateway --json` (Approach B2 SafeStorage extraction). Do not treat it as an Approach C implementation.
+- **`Deepusleepy/t3-tots` (MIT, 220 stars) & `DoubleDipCode/grokbot-t3-bridge` (MIT) & `gavasques/grok-bot-t3-code-superpowers` (MIT):** All three prove that **Grok Bot → `mattr`** works today via `mattr`'s existing Streamable HTTP MCP + OAuth server (reachable via Tailscale HTTPS or T3 Connect), and **`mattr` → Grok Bot wakeups** work via per-Bot Routine webhooks (at the cost of routine hourly rate limits: 200/hr per routine, 300/hr across all routines, plus weekly usage consumption per `docs.x.ai/grok-bot/skills-routines-and-automations.md`).
+
+---
+
+## 3. Verified License & Asset Provenance Audit (Avatar & UI Repos)
+
+> **Policy reminder (Section 11 & 21):** An open-source `LICENSE` file in a third-party repo does **not** grant redistribution rights to proprietary xAI/Cursor code, vector paths, fonts, or wallpapers extracted from `Grok Bot.app`.
+
+| Repository | Inspected Commit | Declared License | Verified Asset / Code Provenance | Verdict for `mattr` |
+| --- | --- | --- | --- | --- |
+| **`RongleCat/grok-bot-avatar-engine`** | `HEAD` (pushed 2026-11-04) | `MIT` | **PROPRIETARY EXTRACTION CONFIRMED.** `package.json` explicitly says *"lifted verbatim from the shipped app."* `README.md` and `data/extracted/manifest.json` confirm `data/extracted/src/avatar-engine.js` (226 KB, 618 declarations) was extracted byte-for-byte from `Grok Bot.app` v`0.78.1` (`app.asar!dist/renderer/assets/index.eager-common-DbK3Oi_r.js`) with bundle offsets and SHA-1 hashes. | **DO NOT USE / DO NOT IMPORT.** Cannot legally redistribute or bundle. Reference conceptually only (confirms deterministic `agentId` → shape/color fallback, ~26 shapes, main-bot star, and pinned-color rules). |
+| **`lenML/gbot-ui`** | `HEAD` (pushed 2026-10-18) | `MIT` | **PROPRIETARY ASSETS CONFIRMED.** Ships `public/fonts/CursorGothic-Regular.woff2`, `public/fonts/XVF-Variable.woff2`, `public/fonts/cursor-icons-16.woff2`, and `public/wallpapers/cloud-agents-1..4.webp`. `src/components/grok-bot/avatarShapeData.ts` header explicitly states: `// Generated from the compact 0.18 persona renderer; paths stay literal so the 255 KB source is not shipped.` | **DO NOT COPY ASSETS, SHAPES, OR THEME.** Violates both asset provenance and Section 9 (single design system). Study **only** its transport-agnostic React adapter interfaces (`GrokBotReplyAdapter`, `GrokBotComputerAdapter`, `GrokBotAsrAdapter`, `src/lib/grok-bot/types.ts`). |
+| **`Coiggahou2002/grokbot-web`** | `616c1dd` (pushed 2026-09-09) | `BSD-3-Clause` (GitHub shows `NOASSERTION` due to added attribution header) | TypeScript / Canvas 2D port of `nasawz/GrokBot` (Flutter, BSD-3-Clause, 23 stars). Carries over 25 expressions (2×48-point eye rings), 18 shapes, 39 states, spherical turn projection, and spring/blink math. **Provenance gap:** `nasawz/GrokBot` contains high-precision float coordinate tables (`Offset(130.36, 45.98)` in `expression_data.dart`) with **no documented clean-room origin**; also renders via `<canvas>` rather than lightweight SVG. | **CAUTION (YELLOW).** Do not copy `expressions.ts` coordinate tables without verifying clean-room provenance; prefer clean-room SVG. Its spring/gaze/blink state-machine architecture is clean to learn from. |
+| **`Dkrillex/grok-icon`** | `HEAD` (pushed 2026-08-17) | `MIT` | **Clean-room measurement.** `README.md` documents paths & timing were independently measured frame-by-frame off a public reference video at 10 fps. Pure SVG (1 body path + 2 eye paths, 8 shapes, 12 colors, 16 rest expressions, 14 morph states, zero animation dependencies, Vue 3 + TypeScript engine in `src/bot/`). No extracted bundle code, fonts, or bitmaps. | **CLEANEST SVG REFERENCE (GREEN-YELLOW).** Pure TS SVG morphing engine (`src/bot/engine.ts`, `shape.ts`, `eyefit.ts`) is MIT-licensed and free of extracted code. Note: covers 8 shapes (not full 18–26 desktop catalog) and still evokes xAI's character silhouette; pair with clean-room extensions for additional `avatarShape` IDs. |
+| **`Kuanyeah/grok-bot-tui`** | `HEAD` (pushed 2026-11-16) | `MIT` | **Avatar math is clean-room** (`src/tui/Avatar.js`: *"Independently drawn 2D faces, tuned per silhouette against the desktop UI"* — 13 parametric silhouettes via signed-distance formulas, built on MIT `smarzban/grokbot-tui`). **Transport is RED:** vendors `ScriptedAlchemy/grok-bot-cli` SafeStorage/Keychain decryption (`src/client/vendor/gbot/app-session.js`). | **SPLIT VERDICT:** Safe reference for parametric clean-room silhouette math & color tables (`Avatar.js`, `bot-colors.js`); **STRICTLY REJECT** its vendored `app-session.js` credential extractor. |
+| **`TysikGG/grokbot-export`** | `HEAD` (pushed 2026-10-03) | **None** (All rights reserved) | Reference for transcript entry schema & local replica blob cap (~200 entries). | **DO NOT COPY CODE.** Schema documentation reference only. |
+
+### Recommended Grok Character Rendering Strategy (Phase 4)
+
+1. **Custom uploaded/generated Bot pictures first:** Per `docs.x.ai/grok-bot/bots.md`, users can upload or AI-generate custom pictures per Bot. When the transport returns a valid `avatarDataUrl`, sanitize and resize it server-side (bounded byte cap, PNG/JPEG/WEBP whitelist, cached thumbnail) and render it directly — it belongs to the user's account.
+2. **Clean-room SVG character engine for vector Bots:** Build a small, zero-dependency, reduced-motion-aware SVG renderer in `antimatter/bots/grok/GrokAvatar.tsx` accepting normalized `{ shape, color, state, size, isVisible }`:
+   - Maps verified remote `avatarShape` + `avatarColor` (falling back to deterministic hash of `remoteBotId` only when remote metadata is absent).
+   - Uses clean-room parametric SVG geometry (extending `Dkrillex/grok-icon`'s SVG morphing approach + `Kuanyeah`'s clean-room silhouette catalog for shapes like `blob`, `circle`, `capsule`, `square`, `star`, `flower`, `clover`, `heart`, `egg`, `triangle`, `gem`, `sun`, `hex`, `pebble`) with CSS/SMIL or paused-offscreen `IntersectionObserver` animation (respecting `prefers-reduced-motion` and `AGENTS.md`'s no-continuously-repainting-GPU-spike rule).
+   - Maps **only verified remote activity states** (`idle`, `working`, `attention`/`needs_input`, `error`, `offline`) — never fabricates fake sub-tool animations when only coarse `isRunning` is known.
+
+---
+
+## 4. Up.computer Architecture Reference (`krl-gr/upcomputer`)
+
+Inspected `krl-gr/upcomputer` (MIT, HEAD `714b9ec`, 2026-11-25) strictly for **structural and coexistence patterns** (excluding its local Bot runtime, portrait art, and visual theme):
+
+### Patterns to Adopt & Adapt for `mattr`
+
+1. **Narrow Host Extension Contract (`apps/web/src/product/WebFeature.ts` + `packages/tasks-web/src/feature.tsx`):**
+   - `upcomputer` registers its entire Tasks/Bots UI via a single declarative object (`defineExperimentalWebFeature`) exposing typed slots: `rpcGroups`, `sidebarSection`, `routes`, `settings`, `navigation`, `threadRowAccessory`, `chatHeaderAccessory`, `threadActions`, `composerRecipients`, `notificationCard`, and `coordinator`.
+   - Every slot wraps a `React.lazy(...)` + `<Suspense>` boundary so core T3 Code boots without importing feature bundles until needed.
+   - **Why this fits `mattr`:** `antimatter/CONTEXT.md` mandates keeping fork edits minimal in upstream files so CI merges of `pingdotgg/t3code` nightly stay conflict-free. A declarative `MattrAddonManifest` with 1-line slot mounts in `Sidebar.tsx`, `_chat.tsx` routes, and `SettingsSidebarNav.tsx` achieves clean upstream coexistence and guarantees disabled add-ons load zero code.
+2. **Clean Separation of Bots from Ordinary Coding Threads:**
+   - `upcomputer` models its local bots as special T3 threads, so it needed `apps/web/src/product/sidebarThreadClaims.ts` + `rememberedBotChats.ts` (`localStorage` hold while lazy code loads) to stop bot threads from flashing in the regular Threads list.
+   - **Better design for `mattr`:** External Grok Bots are **not** T3 coding threads and never live in T3's `ProjectionStore` thread table. Keep Bots in a separate namespace (`/bots/$providerId/$botId`, dedicated `SidebarBotsSection` rendered above/distinct from Projects/Threads only when ≥1 Bot provider add-on is enabled, separate server `BotsService` + RPC/HTTP namespace). Zero thread-leakage hazard, zero claim-registry flicker.
+3. **Deterministic Status Priority Ladder (`packages/tasks-web/src/bots/botStatus.ts`):**
+   - Resolves competing signals in strict priority order: `approval / input / request` (`attention`) → `preparing / working` (`working`) → `waiting` → `failed` → `limited` → `done` (unread completion) → `idle`.
+   - Cleanly decouples provider status fields (`isRunning`, `awaitingUserResponse`, `hasUnread`) from presentation and character animation states.
+4. **Reuse of Upstream Row & Menu Primitives (`packages/tasks-web/src/bots/Bots.tsx`):**
+   - Reuses upstream `Collapsible`, `SidebarMenu`, `SidebarMenuItem`, `MenuPopup`, `Tooltip`, and `WorkspacePageContainer` rather than inventing parallel component primitives — directly aligning with `mattr`'s single-design-system rule (Section 9) and `shadcn/no-restyle`.
+
+### Patterns Explicitly NOT to Copy
+- Do **not** port `packages/tasks-server`, local bot memory, worker/planner/automation engines, `bot-character-configurable`, `portraits/art/*.svg`, or Up.computer's visual styling/CSS tokens.
+
+---
+
+## 5. Existing `mattr` / T3 Code Hooks Ready for Reuse
+
+Verified directly in this worktree:
+
+| Capability Area | Existing `mattr` / T3 Code Files | How Phase 1–6 Should Hook In |
+| --- | --- | --- |
+| **MCP Server & OAuth (Grok Bot already listed!)** | `apps/server/src/mcp/McpHttpServer.ts`, `OrchestratorMcpService.ts`, `McpToolAccess.ts`, `McpWebhookTransport.ts`, `apps/web/src/components/mcp/mcpApps.ts` (`id: "grok-bot"`, `grokbot://app/v1/prompt?text=...`, `logos/grokbot.png`) | Reuse directly for Phase 6 bidirectional orchestration. `McpWebhookTransport.ts` already implements SSRF-safe DNS-rebinding-protected webhook delivery. Expose Bot capabilities through `OrchestratorMcpService` only when a Bot add-on is enabled & authorized. |
+| **Remote Reachability (Tailscale HTTPS / T3 Connect)** | `apps/server/src/cloud/` (`CloudLink.ts`, `ManagedEndpointRuntime.ts`, `ConnectReachability.ts`), `mattr` Tailscale HTTPS pairing (`antimatter/CONTEXT.md`) | Enables Grok Bot's cloud computer to reach `mattr`'s MCP server over HTTPS without manual `ngrok` setup, and allows phone PWA clients to talk to Bots hosted through the user's Mac `mattr` server. |
+| **Voice Assistant (First Add-on Migration Target)** | `apps/server/src/voiceAssistant/` (`VoiceAssistantService.ts`, `VoiceTtsService.ts`, `voiceAssistantHttp.ts`, `voiceAssistantFluxWs.ts`), `antimatter/voice-assistant/types.ts`, `apps/web/src/island/` (`islandSettingsStore.ts` key `mattr:island:settings:v1`, `voiceAssistantStore.ts`, `MattrIslandHost.tsx`, `MattrVoiceModeModal.tsx`, `VoiceBriefingCoordinator.tsx`, `IslandSettingsSection.tsx`) | Migrate Voice Assistant into the Phase 1 Add-on Registry while preserving existing `mattr:island:settings:v1` preferences. Route its workspace actions (and future Bot voice commands in Phase 6) through the Shared Capability Layer rather than hardcoding Grok Bot into `VoiceAssistantService`. |
+| **Sidebar, Shell & Navigation** | `antimatter/shell.css`, `antimatter/shell.ts`, `apps/web/src/components/sidebar/MattrCollapsedSidebarHeader.tsx`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/AppSidebarLayout.tsx` | Mount a single `<AddonSidebarSections />` slot in `Sidebar.tsx` (1-line upstream touch) that renders nothing when no add-ons with sidebar contributions are enabled. Preserve `antimatter/shell.css` 38pt topbar & inset card frame. |
+| **Routes & Settings** | `apps/web/src/routes/_chat.tsx`, `_chat.settings.tsx`, `_chat.settings.integrations.tsx`, `_chat.settings.voice.tsx`, `apps/web/src/components/settings/SettingsSidebarNav.tsx`, `settingsSearch.ts` | Add a centralized **Add-ons** settings route (`_chat.settings.addons.tsx` or section under Integrations) backed by the Add-on Registry, plus dedicated `_chat.bots.$providerId.$botId.tsx` (or lazy route registry) guarded by add-on enablement. |
+
+---
+
+## 6. Concrete Recommendation: Smallest Viable Phase 2 PoC
+
+### Guiding Rule
+Do **not** build Phase 3 sidebar/chat polish until a server-side PoC proves end-to-end live communication against **one real existing Grok Bot** on Chris's account.
+
+### Recommended PoC Architecture & Decision Gate
+
+Keep all Grok Bot transport code behind a single server-side Effect service interface (`GrokBotTransport` in `apps/server/src/bots/grok/` or `antimatter/bots/grok/`), keeping credentials and network/CDP sockets **out of the renderer process**.
+
+1. **Step 2.0 — 15-Minute Live Compatibility Probe (Mandatory Gate before coding full transport):**
+   - **Probe A (CDP Companion on v`1.3.0`):** With Chris's explicit consent to restart `Grok Bot.app` once with `--remote-debugging-port=9333 --remote-debugging-address=127.0.0.1`, inspect whether v`1.3.0` still exposes `.sand-agent-item`, React context stores (`roster`, `transcript`, `boxHostPhase`), `window.desktop.main.*`, and avatar fields (`avatarShape`, `avatarColor`, `avatarDataUrl`).
+   - **Probe B1 (Only if Probe A fails or Chris explicitly opts into personal-fork direct gateway for headless/remote/PWA parity):** Verify whether Cursor browser PKCE + `POST https://api2.cursor.sh/aiserver.v1.GrokBotService/EnsureSandBox` still succeeds with current client version headers (`1.3.0`) and returns `listAgents` + `getAgentTranscriptTail` + `sendPrompt`.
+2. **Primary PoC Choice:**
+   - **Prefer Approach A (Opt-in Loopback CDP)** if Probe A passes **and** Chris is comfortable keeping `Grok Bot.app` running locally with an opt-in loopback debug flag: zero credential handling, no Cursor `client_id` impersonation, true push event subscriptions, and Bot CRUD/routines/usage included.
+   - **Fall back to Approach B1 (Direct PKCE → Gateway HTTP)** behind an explicit `experimentalDirectGateway` toggle with OS-keychain token storage if Probe A fails on v`1.3.0` or if headless/remote PWA use without `Grok Bot.app` is a hard requirement — explicitly labeled experimental/personal-use-only and using honest bounded polling (never faked as token streaming).
+3. **Minimal Phase 2 PoC Scope (vertical slice, no polished UI yet):**
+   - Server-side `GrokBotTransport` + `GrokBotProviderAdapter` (Effect service, thin authenticated RPC/HTTP endpoints under `/api/mattr/bots/*` or T3 RPC group).
+   - Minimal smoke harness (CLI script or bare developer panel behind the disabled-by-default `grok-bot` add-on flag) demonstrating against one real existing Bot:
+     1. Availability & connection state reporting (`app_unavailable` / `disconnected` / `connected` / `incompatible_version`).
+     2. `listBots()` returning real `remoteBotId`, `name`, `isRunning`, `hasUnread`, `awaitingUserResponse`, and verified avatar fields.
+     3. `getHistory(botId, cursor)` returning real existing messages with deduplicated IDs/seq.
+     4. `sendMessage(botId, text, clientNonce)` + receiving the actual remote reply + confirming the message & reply appear in the official `Grok Bot.app`.
+     5. Clean teardown on disable (zero sockets, timers, or listeners left running).
+
+---
+
+## 7. Concrete Architectural Inputs for Phase 1
+
+These constraints come directly from Grok Bot's real capabilities plus anticipated future providers (Muse = 1 persistent agent with N conversations; Devin Bots = cloud coding bots/sessions; OpenClaw/Hermes = local/remote gateways):
+
+1. **Centralized Add-on Registry (`antimatter/addons/`):**
+   - Single typed `MattrAddonDefinition` shared by Settings, future Onboarding, Sidebar, Routes, Command Palette, and Server lifecycle:
+     - `id`, `name`, `description`, `icon`, `defaultEnabled: false`, `platformRequirements`, `dependencies`, `permissions`, `onboarding` metadata.
+     - Explicit state separation: `enabled: boolean` (persisted) vs. `runtimeState: "disabled" | "unconfigured" | "app_unavailable" | "auth_required" | "connecting" | "connected" | "disconnected" | "incompatible_version" | "error"`.
+     - Lazy-loaded UI contributions (`sidebarSection`, `routes`, `settingsPage`, `commands`, `coordinator`) so disabled add-ons execute zero module imports, zero React effects, and zero server fibers.
+     - Disabling preserves persisted config and never cancels remote cloud work.
+   - Initial add-ons registered in Phase 1: `voice-assistant` (migrated preserving existing `mattr:island:settings:v1` state) and `grok-bot` (default disabled).
+2. **Provider-Independent Bots Platform (`antimatter/bots/` + server `BotsService`):**
+   - **Decouple `BotIdentity` from `BotConversation`:** Grok Bot DMs are 1:1 (`botId === conversationId`), while Grok Bot groups, Muse, and Devin can be 1:N or N:M. Model `Bot` (identity + avatar + status) and `BotConversation` (messages + cursor + unread) as distinct types with a convenience default conversation ID for 1:1 Bots.
+   - **Explicit Capability Discovery (`BotProviderCapabilities`):** Declare booleans for `discoverBots`, `multiConversation`, `historyPagination`, `replyThreads`, `pushEvents`, `boundedPolling`, `attachmentsUpload`, `attachmentsDownload`, `interrupt`, `interactiveWidgets`, `approvals`, `routines`, `botCrud`, `customAvatarImage`, `parametricCharacterAvatar`, `deepLinkUrl`. UI hides or offers "Open in official app" for unsupported ops rather than rendering broken buttons.
+   - **Normalized Message & Sync Contract:**
+     - Authoritative remote state; local cache is read-through only (never an independent diverging store).
+     - Every message carries `remoteId`, optional monotonic `seq`, `clientNonce` (optimistic send deduplication), `replyToId`, `timestampMs`, and typed content blocks (`markdown`, `attachment`, `widget`, `approval`, `system`).
+     - Explicit `syncMode: "push" | "poll"` so UI accurately renders streaming vs. refreshed updates.
+   - **Provider-Pluggable Identity Renderer:** `BotAvatarRenderer` registered per provider; Grok Bot supplies its custom-image + clean-room SVG character renderer, while future providers supply their own without inheriting Grok characters.
+   - **Shared Capability Layer:** Expose `bots.list`, `bots.readHistory`, `bots.sendMessage`, `bots.status` as Effect service operations registered dynamically when enabled & permitted, so Native UI, `VoiceAssistantService` (Phase 6), and `OrchestratorMcpService` share one permission-checked path.
+3. **Minimal Upstream Touch Footprint:**
+   - Keep new code under `antimatter/addons/`, `antimatter/bots/`, and `apps/server/src/bots/` (or dedicated workspace packages), limiting edits in upstream `apps/web/src/components/Sidebar.tsx`, `SettingsSidebarNav.tsx`, and `apps/server/src/http.ts` to thin registration hooks.
+
+---
+
+## 8. Evidence Classification Summary
+
+### Verified Official Capabilities (Direct from `docs.x.ai`, 2026-11-25)
+- Grok Bot runs on macOS/Windows/Linux desktop + iOS/Android, signs in with a Cursor account, and shares one persistent cloud computer per user across all Bots (`docs.x.ai/grok-bot/faq.md`, `how-grok-bot-works.md`).
+- Custom MCP connectors are officially supported over public/tunneled HTTPS (`docs.x.ai/grok/connectors.md`, `custom-mcp-tunneling.md`, `grok-bot/computer-and-apps.md`).
+- Official deep links exist: `grokbot://app/v1/prompt?id=<bot-id>&text=<message>` (prefills empty box up to 1,000 chars; does not auto-send) and `grokbot://app/v1/plugin/add?id=<plugin-id>` (`docs.x.ai/grok-bot/deep-links.md`).
+- Official Routine webhooks exist (per-Bot URL + Bearer key, up to 50 routines/Bot, 200 runs/hr per routine, 300 runs/hr account-wide, consumes weekly usage) (`docs.x.ai/grok-bot/skills-routines-and-automations.md`).
+- Official Bot avatar modes include character shape/color, AI-generated picture, or user-uploaded image up to 25 MB (`docs.x.ai/grok-bot/bots.md`).
+- Official Enterprise Inference Hooks exist for Enterprise team security inspection (`docs.x.ai/grok-bot/inference-hooks.md`).
+- `mattr` already ships `grok-bot` MCP setup handoff (`apps/web/src/components/mcp/mcpApps.ts`), Streamable HTTP OAuth MCP (`McpHttpServer.ts`), and SSRF-safe webhook transport (`McpWebhookTransport.ts`).
+
+### Demonstrated by Community Code (Source Inspected, Not Live-Executed Here)
+- **Approach A (CDP):** `TheSethRose/grokbot-bridge` (MIT, `v0.71.x`) walks React Fiber from `.sand-agent-item[data-agent-id]` to drive `roster`, `transcript`, `boxHostPhase`, and `window.desktop.main.*` for listing, reading, sending, watching store events, uploading/downloading files, Bot CRUD, routines, and usage; documents `SAND_AWAY_PARK`.
+- **Approach A (JXA):** `rthomas24/grok-bot-mcp` (MIT) drives macOS Accessibility tree via `osascript` JXA.
+- **Approach B1 (Direct Gateway):** `Jahquan/grok-bot-raycast` (MIT, `v0.43.0`) implements Cursor browser PKCE (`cursor.com/loginDeepControl` → `api2.cursor.sh/auth/poll` → `EnsureSandBox`) and calls 14 Gateway `/api/*` endpoints including pagination, reply threads, widgets, approvals, attachments, routines, and avatar metadata (`avatarShape`, `avatarColor`, `avatarDataUrl`). `MaisonnatM/grok-bot` (MIT) demonstrates streaming JSON stripping of large `avatarDataUrl` fields.
+- **Approach C (Orchestration):** `DoubleDipCode/grokbot-t3-bridge` (MIT), `Deepusleepy/t3-tots` (MIT), and `gavasques/grok-bot-t3-code-superpowers` (MIT) demonstrate Grok Bot ↔ T3 Code orchestration over T3 MCP + Routine webhooks.
+- **Avatar provenance:** Confirmed verbatim app bundle extraction in `RongleCat/grok-bot-avatar-engine` and proprietary fonts/wallpapers/paths in `lenML/gbot-ui`; confirmed clean-room SVG measurement in `Dkrillex/grok-icon` and clean-room parametric math in `Kuanyeah/grok-bot-tui`.
+
+### Tested Locally (Read-Only on This Mac)
+- Verified `/Applications/Grok Bot.app` exists, is Electron v`1.3.0`, bundle ID `com.anysphere.sand`, schemes `grokbot://` & `sand://`, currently running (`PID 93572`) without `--remote-debugging-port`.
+- Verified existing `mattr` MCP, Voice Assistant, Sidebar, Settings, and `antimatter/shell.css` hooks in this worktree.
+
+### Unverified (Must Test in Phase 2 Gate)
+- Whether `Grok Bot.app` v`1.3.0` still exposes the v`0.71.x` React Fiber store names (`roster`, `transcript`, `boxHostPhase`) and avatar metadata over CDP.
+- Whether `api2.cursor.sh/aiserver.v1.GrokBotService/EnsureSandBox` and Gateway `/api/*` endpoints observed in v`0.43.0` still accept requests with current v`1.3.0` client headers, and whether any undocumented WebSocket/SSE stream exists on the gateway in v`1.3.0`.
+- Exact list of `avatarShape` and `avatarColor` string values returned by v`1.3.0` for live Bots.
+- Clean-room provenance of coordinate tables inside `nasawz/GrokBot` (upstream of `Coiggahou2002/grokbot-web`).
+
+### Unsupported (Confirmed Absent Officially)
+- Official xAI/Cursor public API or OAuth app registration for third-party Grok Bot chat clients.
+- Official API for listing Bots, reading conversation history, streaming replies, or reading avatar metadata.
+- Real-time token streaming over Gateway `/api/*` (polling only in all inspected Approach B clients).
+- Reading full server history via `desktop.agent.readTranscriptStoreTail` on production builds (gated behind `sand_transcript_store_read` per `grokbot-export`).
+
+### Unresolved Blockers Requiring Chris's Decision Before Phase 2
+1. **Transport policy decision (Approach A vs. Approach B1):**
+   - Approve an explicit opt-in loopback CDP probe/relaunch of `/Applications/Grok Bot.app` v`1.3.0` (Approach A), **and/or**
+   - Decide whether Chris wants Approach B1 (direct Cursor PKCE → `EnsureSandBox` gateway) available behind an explicit personal-fork experimental flag (accepting undocumented-API breakage & Grok Bot ToS risk in exchange for headless/remote/PWA support without keeping `Grok Bot.app` open).
+2. **v`1.3.0` live wire check:** Cannot finalize `GrokBotTransport` method mappings until either Probe A or Probe B1 runs once against live v`1.3.0`.
+3. **Avatar fidelity boundary:** Confirm acceptance of clean-room SVG silhouettes + exact user-uploaded `avatarDataUrl` images (strictly avoiding proprietary extracted assets from `RongleCat` and `lenML`).
