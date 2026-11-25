@@ -16,7 +16,7 @@ const { values } = NodeUtil.parseArgs({
     "release-dir": { type: "string" },
     identity: { type: "string" },
     keychain: { type: "string" },
-    "product-name": { type: "string", default: "Antimatter" },
+    "product-name": { type: "string", default: "mattr" },
   },
 });
 const releaseDir = NodePath.resolve(values["release-dir"] ?? "");

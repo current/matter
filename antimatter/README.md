@@ -19,11 +19,15 @@ If upstream changes conflict with yours, that build fails and the workflow opens
 
 Edit on `main` and push. Keep the changes small and in their own files where possible, so upstream merges stay clean.
 
+Agents read `antimatter/CONTEXT.md` (linked from the top of `AGENTS.md`) for the fork's rules, branding, testing and parallel-work conventions. Keep it current.
+
 Fork-only files:
 
-- `antimatter/`
+- `antimatter/` (including `rebrand.ts`, the build-time "T3 Code" → "mattr" rename)
 - `.github/workflows/antimatter-nightly.yml`
-- the placeholder branding in `assets/nightly/*`, `scripts/build-desktop-artifact.ts` (`DESKTOP_APP_ID`, product name, artifact name), `apps/desktop/src/app/DesktopEnvironment.ts` (`APP_BASE_NAME`), `apps/web/src/branding.ts` and `apps/web/src/components/sidebar/SidebarChrome.tsx`.
+- the branding in `assets/nightly/*` and the files listed under Branding in `antimatter/CONTEXT.md`
+- the separate data folders in `apps/desktop/src/app/DesktopStatePaths.ts` and `DesktopUserData.ts`
+- one line at the top of `AGENTS.md`
 
 ## Signing
 

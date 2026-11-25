@@ -197,7 +197,7 @@ jobs:
           gh release create "v${VERSION}" \
             --prerelease \
             --target "$MAIN_SHA" \
-            --title "Antimatter Nightly ${VERSION}" \
+            --title "mattr nightly ${VERSION}" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             release/*.zip release/*.dmg release/*.blockmap release/*-mac.yml
 

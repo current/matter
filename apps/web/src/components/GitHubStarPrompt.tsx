@@ -20,7 +20,8 @@ const IDLE_MS = 30_000;
 // User-driven actions (send, navigate, type, scroll) start with one of these; touch fires pointerdown.
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "focus"] as const;
 
-let shownThisSession = false;
+// mattr: the fork never asks its users to star upstream's repository; tests keep upstream's behavior.
+let shownThisSession = import.meta.env.MODE !== "test";
 
 function dismiss() {
   try {
