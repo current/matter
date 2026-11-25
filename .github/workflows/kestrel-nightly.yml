@@ -152,7 +152,11 @@ jobs:
           security unlock-keychain -p "$keychain_password" "$keychain"
           security import "$RUNNER_TEMP/kestrel.p12" -k "$keychain" -P "$KESTREL_SIGNING_P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          # codesign finds identities only in keychains on the user search list.
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm "$RUNNER_TEMP/kestrel.p12"
+          echo "::add-mask::$keychain_password"
+          echo "KESTREL_KEYCHAIN_PASSWORD=$keychain_password" >> "$GITHUB_ENV"
           identity=$(security find-identity -p codesigning "$keychain" | awk '/Kestrel/ {print $2; exit}')
           test -n "$identity"
           echo "KESTREL_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
@@ -172,7 +176,9 @@ jobs:
             --build-version "$VERSION" --verbose
 
       - name: Sign with the Kestrel certificate
-        run: node kestrel/sign-mac-release.mjs --release-dir release --identity "$KESTREL_IDENTITY" --keychain "$KESTREL_KEYCHAIN"
+        run: |
+          security unlock-keychain -p "$KESTREL_KEYCHAIN_PASSWORD" "$KESTREL_KEYCHAIN"
+          node kestrel/sign-mac-release.mjs --release-dir release --identity "$KESTREL_IDENTITY" --keychain "$KESTREL_KEYCHAIN"
 
       - name: Publish release
         env:
