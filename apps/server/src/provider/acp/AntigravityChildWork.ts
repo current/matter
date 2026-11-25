@@ -546,6 +546,40 @@ export const readAntigravityChildWork = Effect.fn("readAntigravityChildWork")(fu
   });
 });
 
+/** Size and mtime of each child's transcript: unchanged stamps mean no new steps to read. */
+export const statAntigravityChildTranscripts = Effect.fn("statAntigravityChildTranscripts")(
+  function* (input: {
+    readonly profileDirectory: string;
+    readonly conversationIds: ReadonlyArray<string>;
+  }) {
+    return yield* Effect.promise(async () => {
+      const profileRoot = await antigravityProfileRoot(input.profileDirectory);
+      if (profileRoot === undefined) return "";
+      const stamps = await Promise.all(
+        input.conversationIds.map(async (conversationId) => {
+          if (!NATIVE_ID.test(conversationId)) return `${conversationId}:-`;
+          const transcript = await antigravityManagedPath(
+            profileRoot,
+            [
+              "antigravity-acp",
+              "brain",
+              conversationId,
+              ".system_generated",
+              "logs",
+              "transcript.jsonl",
+            ],
+            "file",
+          ).catch(() => undefined);
+          return transcript === undefined
+            ? `${conversationId}:-`
+            : `${conversationId}:${transcript.info.size}:${transcript.info.mtimeMs}`;
+        }),
+      );
+      return stamps.join("|");
+    });
+  },
+);
+
 const decodeChildMessage = Schema.decodeUnknownOption(
   Schema.fromJsonString(
     Schema.Struct({

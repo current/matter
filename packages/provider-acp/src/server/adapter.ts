@@ -228,6 +228,7 @@ const ACP_TEXT_FLUSH_INTERVAL: Duration.Input = "50 millis";
 // Subagent messages are stored as finished, so they skip the server's paragraph
 // throttle and every snapshot is persisted. Match that throttle's 400 ms cadence.
 const ACP_SUBAGENT_TEXT_FLUSH_INTERVAL: Duration.Input = "400 millis";
+const ACP_NATIVE_SUBAGENT_POLL_INTERVAL: Duration.Input = "2 seconds";
 
 // Output of the running prompt. Session metadata and unknown updates do not reset its timeout.
 const ACP_PROMPT_ACTIVITY_UPDATES: ReadonlySet<string> = new Set([
@@ -663,6 +664,21 @@ export interface AcpAdapterV2Flavor {
   readonly extractSubagentUpdate?: (
     toolCall: AcpToolCallState,
   ) => AcpAdapterV2SubagentUpdate | undefined;
+  /**
+   * Subagents that report no child session: polls the provider's records of the child while it
+   * works, and streams what it did into the child thread and the subagent's progress.
+   */
+  readonly watchNativeSubagent?: (input: {
+    readonly sessionId: string;
+    readonly nativeTaskId: string;
+    readonly title: string | null;
+    readonly prompt: string;
+    readonly siblings: () => ReadonlyArray<{
+      readonly nativeTaskId: string;
+      readonly title: string | null;
+      readonly prompt: string;
+    }>;
+  }) => AcpNativeSubagentWatcher;
   readonly isProvisionalSubagentTool?: (toolCall: AcpToolCallState) => boolean;
   readonly normalizeToolCall?: (toolCall: AcpToolCallState) => AcpToolCallState;
   readonly isCancelledToolCall?: (payload: unknown) => boolean;
@@ -817,6 +833,25 @@ export type AcpSubagentSessionEvent =
       readonly delegationId: string;
       readonly prompt: string;
     };
+
+/** One step a native subagent took, read from the provider's own records of the child. */
+export type AcpNativeSubagentActivity =
+  | {
+      readonly kind: "tool";
+      /** Stable across reads, so re-reading never adds a row. */
+      readonly id: string;
+      readonly title: string;
+      readonly toolName: string;
+      readonly status: "inProgress" | "completed" | "failed";
+      readonly input: unknown;
+      readonly output: string | null;
+    }
+  | { readonly kind: "message"; readonly id: string; readonly text: string };
+
+export interface AcpNativeSubagentWatcher {
+  /** Everything the child did so far, or undefined when nothing changed since the last poll. */
+  readonly poll: Effect.Effect<ReadonlyArray<AcpNativeSubagentActivity> | undefined>;
+}
 
 export interface AcpAdapterV2SubagentUpdate {
   readonly nativeTaskId: string;
@@ -1989,6 +2024,8 @@ interface ActiveAcpSubagent {
   // ACP has no interrupted tool status; keep forced interruption across late updates.
   readonly interruptedToolIds: Set<string>;
   readonly toolSessionIds: Map<string, string>;
+  /** The parent row last emitted, so progress can refresh it between status updates. */
+  parentTurnItem?: Extract<OrchestrationV2TurnItem, { type: "subagent" }>;
 }
 
 interface AcpNativeChildSession {
@@ -4095,37 +4132,149 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             },
           });
           yield* emitProviderEvent({ type: "subagent.updated", driver, subagent: subagent.task });
+          subagent.parentTurnItem = {
+            id: turnItemId,
+            threadId: context.input.threadId,
+            runId: subagent.task.runId,
+            nodeId,
+            providerThreadId: context.input.providerThread.id,
+            providerTurnId: subagent.providerTurnId,
+            nativeItemRef,
+            parentItemId: null,
+            ordinal: turnItemOrdinal,
+            status: taskStatus,
+            title: subagent.task.title,
+            startedAt: subagent.task.startedAt,
+            completedAt: subagent.task.completedAt,
+            updatedAt: now,
+            type: "subagent",
+            subagentId: subagent.task.id,
+            origin: "provider_native",
+            driver,
+            providerInstanceId: context.input.modelSelection.instanceId,
+            childThreadId,
+            prompt: subagent.task.prompt,
+            ...(subagent.task.progress === undefined ? {} : { progress: subagent.task.progress }),
+            result,
+          };
           yield* emitProviderEvent({
             type: "turn_item.updated",
             driver,
-            turnItem: {
-              id: turnItemId,
-              threadId: context.input.threadId,
-              runId: subagent.task.runId,
-              nodeId,
-              providerThreadId: context.input.providerThread.id,
-              providerTurnId: subagent.providerTurnId,
-              nativeItemRef,
-              parentItemId: null,
-              ordinal: turnItemOrdinal,
-              status: taskStatus,
-              title: subagent.task.title,
-              startedAt: subagent.task.startedAt,
-              completedAt: subagent.task.completedAt,
-              updatedAt: now,
-              type: "subagent",
-              subagentId: subagent.task.id,
-              origin: "provider_native",
-              driver,
-              providerInstanceId: context.input.modelSelection.instanceId,
-              childThreadId,
-              prompt: subagent.task.prompt,
-              result,
-            },
+            turnItem: subagent.parentTurnItem,
           });
           if (acpSubagentStatusIsTerminal(taskStatus)) {
             subagent.terminalStatusProjected = true;
           }
+          if (existing === undefined && !acpSubagentStatusIsTerminal(taskStatus)) {
+            yield* watchNativeSubagentActivity(context, subagent);
+          }
+        });
+
+        const emitSubagentProgress = Effect.fnUntraced(function* (
+          subagent: ActiveAcpSubagent,
+          progress: string,
+        ) {
+          const parentTurnItem = subagent.parentTurnItem;
+          if (
+            parentTurnItem === undefined ||
+            subagent.task.progress === progress ||
+            acpSubagentStatusIsTerminal(subagent.task.status)
+          )
+            return;
+          const now = yield* DateTime.now;
+          subagent.task = { ...subagent.task, progress, updatedAt: now };
+          subagent.parentTurnItem = { ...parentTurnItem, progress, updatedAt: now };
+          yield* emitProviderEvent({ type: "subagent.updated", driver, subagent: subagent.task });
+          yield* emitProviderEvent({
+            type: "turn_item.updated",
+            driver,
+            turnItem: subagent.parentTurnItem,
+          });
+        });
+
+        /**
+         * Polls the provider's records of a subagent that reports no child session, until it ends
+         * or reports one, then reads once more so its last tool results and reply are kept.
+         */
+        const watchNativeSubagentActivity = Effect.fnUntraced(function* (
+          owner: ActiveAcpTurn,
+          subagent: ActiveAcpSubagent,
+        ) {
+          if (flavor.watchNativeSubagent === undefined || subagent.childSessionId !== null) return;
+          const sessionId = owner.nativeThreadId;
+          const nativeTaskId = subagent.task.nativeTaskRef?.nativeId ?? String(subagent.task.id);
+          const watcher = flavor.watchNativeSubagent({
+            sessionId,
+            nativeTaskId,
+            title: subagent.task.title,
+            prompt: subagent.task.prompt,
+            siblings: () =>
+              [...owner.subagents.values()].flatMap((other) => {
+                const id = other.task.nativeTaskRef?.nativeId;
+                return other === subagent || !id
+                  ? []
+                  : [{ nativeTaskId: id, title: other.task.title, prompt: other.task.prompt }];
+              }),
+          });
+          const emitted = new Map<string, string>();
+          let latest: ReadonlyArray<AcpNativeSubagentActivity> = [];
+          const project = Effect.fnUntraced(function* (final: boolean) {
+            const activity = yield* watcher.poll;
+            if (activity !== undefined) latest = activity;
+            else if (!final) return;
+            // Ended children leave no tool running; one cut off by Stop stays interrupted.
+            const endStatus =
+              subagent.task.status === "completed" || subagent.task.status === "idle"
+                ? ("completed" as const)
+                : ("failed" as const);
+            let running: string | undefined;
+            let last: string | undefined;
+            for (const item of latest) {
+              if (item.kind === "message") {
+                if (emitted.get(item.id) === item.text) continue;
+                emitted.set(item.id, item.text);
+                yield* emitSubagentAssistant(subagent, item.text, "replace", item.id);
+                continue;
+              }
+              const status = final && item.status === "inProgress" ? endStatus : item.status;
+              last = item.title;
+              if (status === "inProgress") running = item.title;
+              const signature = `${status}\0${item.output ?? ""}`;
+              if (emitted.get(item.id) === signature) continue;
+              emitted.set(item.id, signature);
+              yield* projectSubagentTool(
+                subagent,
+                sessionId,
+                {
+                  toolCallId: item.id,
+                  title: item.title,
+                  status,
+                  data: {
+                    rawInput: item.input,
+                    ...(item.output === null ? {} : { rawOutput: item.output }),
+                  },
+                },
+                final && item.status === "inProgress" && endStatus === "failed"
+                  ? "interrupted"
+                  : undefined,
+              );
+            }
+            const progress = running ?? last;
+            if (!final && progress !== undefined) yield* emitSubagentProgress(subagent, progress);
+          });
+          yield* Effect.gen(function* () {
+            while (
+              subagent.childSessionId === null &&
+              !acpSubagentStatusIsTerminal(subagent.task.status)
+            ) {
+              yield* Effect.sleep(ACP_NATIVE_SUBAGENT_POLL_INTERVAL);
+              yield* project(false);
+            }
+            if (subagent.childSessionId === null) {
+              yield* project(true);
+              yield* flushSubagentAssistant(subagent);
+            }
+          }).pipe(Effect.ignoreCause({ log: true }), Effect.forkIn(sessionScope));
         });
 
         const nativeChild = (sessionId: string) => {

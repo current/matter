@@ -3352,10 +3352,13 @@ export default function ChatView(props: ChatViewProps) {
     ]
       .filter((part) => part !== null)
       .join(" · ") || null;
+  // Servers that stream the child's work as turn items already show it in the timeline; only
+  // threads from older servers, which hold just the launch prompt, read the transcript here.
   const showNativeChildWorkInline =
     showProviderSubagentBar &&
     isServerThread &&
-    selectedProviderEntry?.driverKind === "antigravity";
+    selectedProviderEntry?.driverKind === "antigravity" &&
+    !(serverProjection?.turnItems ?? EMPTY_TURN_ITEMS).some((item) => item.type !== "user_message");
   const nativeChildWorkLive =
     isWorking ||
     (providerSubagentStatus !== null && isOrchestrationV2WorkActive(providerSubagentStatus.status));

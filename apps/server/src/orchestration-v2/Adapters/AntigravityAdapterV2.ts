@@ -36,6 +36,7 @@ import {
   readAntigravityChildrenAtWork,
   readAntigravityPendingReply,
 } from "../../provider/acp/AntigravityChildWork.ts";
+import { watchAntigravityChildActivity } from "../../provider/acp/AntigravityChildActivity.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
 import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTurnOutcome.ts";
 import {
@@ -110,8 +111,9 @@ export interface AntigravityAdapterV2Options {
 }
 
 /**
- * Native subagent tools report no child session ids, so children stay read-only.
- * Only permission prompts carry the launch; NativeChildWorkQuery matches their ids by this text.
+ * Native subagent tools report no child session ids, so children stay read-only and their work
+ * streams from the child transcripts (`watchNativeSubagent`). Only permission prompts carry the
+ * launch; NativeChildWorkQuery matches their ids by this text.
  */
 const extractAntigravitySubagentUpdate: NonNullable<AcpAdapterV2Flavor["extractSubagentUpdate"]> = (
   toolCall,
@@ -316,6 +318,15 @@ export function makeAntigravityAcpAdapterFlavor(
               profileDirectory,
               rootSessionId: sessionId,
               toolCallIds: nativeTaskIds,
+            }),
+          watchNativeSubagent: (input) =>
+            watchAntigravityChildActivity({
+              profileDirectory,
+              rootSessionId: input.sessionId,
+              nativeTaskId: input.nativeTaskId,
+              title: input.title,
+              prompt: input.prompt,
+              siblings: input.siblings,
             }),
           hasPendingReply: (sessionId: string) =>
             readAntigravityPendingReply({
