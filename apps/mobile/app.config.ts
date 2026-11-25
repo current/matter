@@ -2,6 +2,10 @@ import type { ExpoConfig } from "expo/config";
 
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
+import {
+  resolveMattrPersonalTeamBundleIdentifier,
+  withMattrMobileConfig,
+} from "../../antimatter/mobile-config.ts";
 
 type AppVariant = "development" | "preview" | "production";
 
@@ -16,7 +20,7 @@ const runtimeVersionPolicy =
   process.env.MOBILE_VERSION_POLICY ??
   (APP_VARIANT === "development" ? "appVersion" : "fingerprint");
 
-const personalTeamBundleIdentifier = repoEnv.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID?.trim();
+const personalTeamBundleIdentifier = resolveMattrPersonalTeamBundleIdentifier(repoEnv, APP_VARIANT);
 const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 
 // Compiled into the native project. Without a relay, Observe's native side could dispatch to
@@ -232,7 +236,7 @@ const sharingPlugin: NonNullable<ExpoConfig["plugins"]>[number] = [
 
 // Match iOS PostScript names on Android so RN and the native composer share fonts before runtime loading.
 
-const config: ExpoConfig = {
+const upstreamConfig: ExpoConfig = {
   name: variant.appName,
   slug: "t3-code",
   platforms: ["ios", "android"],
@@ -501,4 +505,8 @@ const config: ExpoConfig = {
   },
 };
 
-export default config;
+export default withMattrMobileConfig(upstreamConfig, {
+  env: repoEnv,
+  isIosPersonalTeamBuild,
+  iosBundleIdentifier,
+});
