@@ -36,7 +36,9 @@ export function buildIslandHtml(): string {
     --island-red: #ff453a;
     --island-btn-primary-bg: #ffffff;
     --island-btn-primary-fg: #000000;
-    --island-reveal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --island-emerald: #34d399;
+    --island-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --island-ease-in: cubic-bezier(0.4, 0, 1, 1);
   }
 
   * { box-sizing: border-box; }
@@ -52,15 +54,6 @@ export function buildIslandHtml(): string {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     user-select: none;
-  }
-
-  button,
-  .done-item {
-    transition: transform 90ms ease, background 130ms ease, color 130ms ease, border-color 130ms ease, opacity 130ms ease;
-  }
-  button:active:not(:disabled),
-  .done-item:active {
-    transform: scale(0.96);
   }
 
   #stage {
@@ -106,48 +99,94 @@ export function buildIslandHtml(): string {
     color: var(--island-fg);
   }
 
-  @keyframes island-body-enter {
-    from {
-      opacity: 0;
-      filter: blur(5px);
-      transform: translateY(-6px) scale(0.965);
-    }
-    to {
-      opacity: 1;
-      filter: blur(0px);
-      transform: translateY(0) scale(1);
-    }
+  /* Press feedback: snaps in fast, releases on a softer ease. */
+  button,
+  .done-item {
+    transition: transform 160ms var(--island-ease-out), background 130ms ease, color 130ms ease, border-color 130ms ease, opacity 130ms ease;
+  }
+  button:active:not(:disabled),
+  .done-item:active {
+    transform: scale(0.95);
+    transition-duration: 70ms;
   }
 
-  @keyframes island-wing-enter {
-    from {
-      opacity: 0;
-      filter: blur(3px);
-      transform: scale(0.96);
-    }
-    to {
-      opacity: 1;
-      filter: blur(0px);
-      transform: scale(1);
-    }
+  /* Blur-scale content morph, anchored to the notch edge (transform-origin 50% 0%). */
+  #island-content > *,
+  .morph-layer > * {
+    transform-origin: 50% 0%;
+  }
+  .morph-layer {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    pointer-events: none;
+    transform-origin: 50% 0%;
+  }
+  @keyframes island-morph-in {
+    from { opacity: 0; filter: blur(10px); transform: scale(0.94) translateY(-6px); }
+    to { opacity: 1; filter: blur(0px); transform: none; }
+  }
+  @keyframes island-morph-out {
+    from { opacity: 1; filter: blur(0px); transform: none; }
+    to { opacity: 0; filter: blur(8px); transform: scale(0.93) translateY(-4px); }
+  }
+  @keyframes island-slide-in-next {
+    from { opacity: 0; filter: blur(6px); transform: translateX(22px); }
+    to { opacity: 1; filter: blur(0px); transform: none; }
+  }
+  @keyframes island-slide-in-prev {
+    from { opacity: 0; filter: blur(6px); transform: translateX(-22px); }
+    to { opacity: 1; filter: blur(0px); transform: none; }
+  }
+  @keyframes island-slide-out-next {
+    from { opacity: 1; filter: blur(0px); transform: none; }
+    to { opacity: 0; filter: blur(6px); transform: translateX(-22px); }
+  }
+  @keyframes island-slide-out-prev {
+    from { opacity: 1; filter: blur(0px); transform: none; }
+    to { opacity: 0; filter: blur(6px); transform: translateX(22px); }
+  }
+  .morph-in { animation: island-morph-in 260ms var(--island-ease-out) both; }
+  .morph-out { animation: island-morph-out 110ms var(--island-ease-in) both; }
+  .slide-in-next { animation: island-slide-in-next 260ms var(--island-ease-out) both; }
+  .slide-in-prev { animation: island-slide-in-prev 260ms var(--island-ease-out) both; }
+  .slide-out-next { animation: island-slide-out-next 130ms var(--island-ease-in) both; }
+  .slide-out-prev { animation: island-slide-out-prev 130ms var(--island-ease-in) both; }
+
+  /* One-shot pings: tied to real activity changes, never looping. */
+  @keyframes island-ping {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.6); }
+    100% { transform: scale(1); }
+  }
+  @keyframes island-check-draw {
+    from { stroke-dashoffset: 14; }
+    to { stroke-dashoffset: 0; }
+  }
+  .provider-dot.ping,
+  .live-dot.ping {
+    animation: island-ping 620ms var(--island-ease-out) 1;
+  }
+  .plan-row.tick .plan-check path {
+    stroke-dasharray: 14;
+    animation: island-check-draw 420ms var(--island-ease-out) 1 both;
   }
 
-  .card-body.entering {
-    animation: island-body-enter 210ms var(--island-reveal-ease) both;
-  }
-
-  .pill-entering {
-    animation: island-wing-enter 180ms var(--island-reveal-ease) both;
+  #island-rim-path {
+    transition: stroke 260ms ease;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    @keyframes island-body-enter {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes island-wing-enter {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    @keyframes island-morph-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes island-morph-out { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes island-slide-in-next { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes island-slide-in-prev { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes island-slide-out-next { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes island-slide-out-prev { from { opacity: 1; } to { opacity: 0; } }
+    .provider-dot.ping,
+    .live-dot.ping,
+    .plan-row.tick .plan-check path {
+      animation: none;
     }
     button:active:not(:disabled),
     .done-item:active {
@@ -274,7 +313,7 @@ export function buildIslandHtml(): string {
     text-align: right;
   }
   .pill-capsule .pill-title {
-    text-align: left;
+    text-align: right;
   }
 
   .pill-btn {
@@ -430,8 +469,8 @@ export function buildIslandHtml(): string {
     flex: none;
   }
   .wing-header .icon-btn {
-    width: 22px;
-    height: 22px;
+    width: 21px;
+    height: 21px;
     font-size: 11.5px;
   }
   .icon-btn:hover {
@@ -476,6 +515,9 @@ export function buildIslandHtml(): string {
   .handsfree-chip:hover {
     color: var(--island-fg);
     background: var(--island-surface-hover);
+  }
+  .wing-header .handsfree-chip {
+    padding: 2.5px 6px;
   }
   .handsfree-chip.live {
     background: rgba(48, 209, 88, 0.16);
@@ -792,6 +834,7 @@ export function buildIslandHtml(): string {
 
   /* Question & Approval cards */
   .card-submeta {
+    min-height: 22px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -955,25 +998,263 @@ export function buildIslandHtml(): string {
     cursor: pointer;
   }
   .done-item:hover { background: var(--island-surface-hover); }
+
+  .card-heading {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .ghost-btn.compact {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+  .icon-btn.small {
+    width: 20px;
+    height: 20px;
+  }
+  .badge-chip.emerald { background: rgba(52, 211, 153, 0.15); color: #6ee7b7; }
+  .badge-chip.live { background: rgba(48, 209, 88, 0.14); color: #86efac; }
+  .badge-chip.red { background: rgba(255, 69, 58, 0.15); color: #fca5a5; }
+  .pill-btn.emerald { background: rgba(52, 211, 153, 0.2); color: #a7f3d0; }
+  .pill-btn.emerald:hover { background: rgba(52, 211, 153, 0.3); }
+  .pill-label.done-label { color: #a7f3d0; }
+
+  .done-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--island-emerald);
+    flex: none;
+  }
+
+  .provider-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    flex: none;
+    display: inline-block;
+  }
+  .provider-stack {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+  }
+  .provider-stack .provider-dot + .provider-dot {
+    margin-left: -2.5px;
+    box-shadow: 0 0 0 1.5px #000000;
+  }
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    flex: none;
+    background: var(--island-green);
+    box-shadow: 0 0 8px rgba(48, 209, 88, 0.6);
+  }
+
+  .elapsed,
+  .carousel-count,
+  .plan-count {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .pill-timer {
+    font-size: 12px;
+    font-weight: 560;
+    color: var(--island-fg-muted);
+    white-space: nowrap;
+  }
+
+  .carousel-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+    font-size: 11px;
+    font-weight: 560;
+    color: var(--island-fg-muted);
+  }
+  .carousel-count {
+    min-width: 34px;
+    text-align: center;
+  }
+
+  .agent-title {
+    display: block;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: var(--island-fg);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .agent-title:hover { color: #ffffff; }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    margin-top: -4px;
+  }
+  .meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 180px;
+    font-size: 11px;
+    font-weight: 540;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--island-surface);
+    color: var(--island-fg-muted);
+    white-space: nowrap;
+  }
+  .meta-chip.mono {
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+  }
+  .meta-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .activity-now {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    border-radius: 12px;
+    background: var(--island-surface);
+    font-size: 12.5px;
+    color: var(--island-fg);
+  }
+  .activity-now.muted { color: var(--island-fg-muted); }
+  .activity-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-icon {
+    flex: none;
+    color: var(--island-fg-muted);
+  }
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 11px;
+    margin-top: -3px;
+  }
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--island-fg-subtle);
+  }
+  .activity-row .activity-icon { color: var(--island-fg-subtle); }
+
+  .plan-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--island-fg-muted);
+  }
+  .plan-check {
+    display: inline-flex;
+    color: var(--island-emerald);
+    flex: none;
+  }
+  .plan-bar {
+    flex: 0 0 72px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+  .plan-bar-fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: var(--island-emerald);
+    transform-origin: left center;
+  }
+  .plan-step {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--island-fg-subtle);
+  }
+
+  .clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .agent-strip {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .agent-strip::-webkit-scrollbar { display: none; }
+  .agent-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 150px;
+    flex: none;
+    border: 1px solid transparent;
+    background: var(--island-surface);
+    color: var(--island-fg-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 540;
+    padding: 3px 9px 3px 7px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .agent-chip:hover { background: var(--island-surface-hover); color: var(--island-fg); }
+  .agent-chip.active {
+    background: var(--island-surface-active);
+    border-color: var(--island-border-strong);
+    color: var(--island-fg);
+  }
+  .agent-chip-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 </style>
 </head>
 <body>
 <div id="stage">
   <svg id="island-svg" width="560" height="600" viewBox="0 0 560 600" preserveAspectRatio="none" aria-hidden="true">
     <defs>
-      <linearGradient id="island-rim-grad" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0" />
-        <stop offset="35%" stop-color="#ffffff" stop-opacity="0" />
-        <stop offset="78%" stop-color="#ffffff" stop-opacity="0.065" />
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.135" />
-      </linearGradient>
       <clipPath id="notch-clip">
         <path id="island-clip-path" d="" />
       </clipPath>
     </defs>
     <g id="island-shape-group">
       <path id="island-shape-path" d="" fill="#000000" />
-      <path id="island-rim-path" d="" fill="none" stroke="url(#island-rim-grad)" stroke-width="1" stroke-opacity="0" />
+      <path id="island-rim-path" d="" fill="none" stroke-width="0.5" stroke-opacity="0" style="stroke: rgba(255, 255, 255, 0.08)" />
     </g>
   </svg>
   <div id="island-content-clip" class="is-inert">
@@ -1001,6 +1282,7 @@ export function buildIslandHtml(): string {
   const NOTCH_PILL_WIDTH = 456;
   const CAPSULE_PILL_WIDTH = 320;
   const CAPSULE_FLASH_WIDTH = 228;
+  const CAPSULE_RUNNING_WIDTH = 236;
   const CAPSULE_Y = 8;
   let lastStageW = 0;
   let lastStageH = 0;
@@ -1013,7 +1295,8 @@ export function buildIslandHtml(): string {
   };
 
   let snapshot = null;
-  let uiMode = "auto"; // "auto" | "voice" | "approval" | "question" | "done-list"
+  // "auto" | "voice" | "attention" | "agents" | "done-list"
+  let uiMode = "auto";
   let threadSwitcherOpen = false;
   let questionIndex = 0;
   let questionAnswers = {};
@@ -1022,30 +1305,107 @@ export function buildIslandHtml(): string {
   let flashMessage = null;
   let flashTimer = null;
 
+  // Attention carousel & multi-agent switcher
+  let attentionKey = null;
+  let attentionIndex = 0;
+  let attentionAutoOpened = false;
+  let autoCollapseTimer = null;
+  const answeredRequestIds = new Set();
+  const seenAttentionIds = new Set();
+  let agentKey = null;
+  let navDirection = "fade";
+
   // Hover & pointer state
   let isPointerInside = false;
+  let isHoverNudge = false;
   let isNotchPeeking = false;
   let peekEnterTimer = null;
   let peekLeaveTimer = null;
   let hoverExpandTimer = null;
   let lastPassthrough = true;
 
-  // Current geometric mode ("hidden" | "docked" | "peek" | "pill" | "card")
+  // Geometric mode: "hidden" | "docked" | "nudge" | "peek" | "pill" | "card"
   let geomState = "docked";
-  let lastViewKind = "hidden";
+  let lastGeomHover = 0;
   let lastRenderedSignature = "";
-  let targetContentWidth = 188;
+  let lastMorphKey = "";
+  let morphStartedAt = -Infinity;
+  let morphDirection = "fade";
+  let currentRimTone = "";
+  let elapsedTimer = null;
+  let lastPingSignature = "";
+  let lastPlanSignature = "";
 
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Coupled mass-spring-damper physics state
+  const PEEK_WING = 44;
+  const PILL_WING = { running: 112, done: 134, attention: 134, "voice-mode": 134 };
+  const GEOM_RANK = { hidden: 0, docked: 0, nudge: 1, peek: 2, pill: 3, card: 4 };
+  // WWDC23-style springs per animated value: [response (s), dampingRatio, start delay (ms)].
+  // Opening: width leads and height follows ~25ms later with a little jelly overshoot.
+  // Closing: height pulls in first and everything settles near-critically so it snaps home.
+  const MOTION = {
+    open: {
+      w: [0.34, 0.78, 0],
+      h: [0.4, 0.74, 25],
+      earR: [0.36, 0.8, 0],
+      botR: [0.38, 0.78, 12],
+      expand: [0.3, 0.9, 0],
+      presence: [0.32, 0.86, 0],
+    },
+    close: {
+      w: [0.28, 0.88, 18],
+      h: [0.28, 0.88, 0],
+      earR: [0.26, 0.9, 0],
+      botR: [0.28, 0.88, 0],
+      expand: [0.24, 0.95, 0],
+      presence: [0.26, 0.92, 0],
+    },
+    peek: {
+      w: [0.26, 0.76, 0],
+      h: [0.26, 0.76, 0],
+      earR: [0.26, 0.8, 0],
+      botR: [0.26, 0.8, 0],
+      expand: [0.22, 0.9, 0],
+      presence: [0.26, 0.86, 0],
+    },
+  };
+  const MORPH_ENTER_DELAY_MS = 65;
+  const SLIDE_ENTER_DELAY_MS = 30;
+  const MORPH_ENTER_DURATION_MS = 260;
+  const RIM_TONES = {
+    normal: { stroke: "rgba(255, 255, 255, 0.08)", glow: "" },
+    attention: {
+      stroke: "rgba(251, 146, 60, 0.42)",
+      glow: "drop-shadow(0 0 3px rgba(251, 146, 60, 0.35))",
+    },
+    done: {
+      stroke: "rgba(52, 211, 153, 0.34)",
+      glow: "drop-shadow(0 0 3px rgba(52, 211, 153, 0.28))",
+    },
+  };
+
+  function configureSpring(s, response, dampingRatio) {
+    const omega = (2 * Math.PI) / response;
+    s.k = omega * omega;
+    s.c = 2 * dampingRatio * omega;
+  }
+
+  function makeSpring(pos, eps) {
+    const s = { pos, vel: 0, target: pos, pending: null, releaseAt: 0, k: 0, c: 0, eps };
+    configureSpring(s, 0.28, 0.88);
+    return s;
+  }
+
+  // Independent velocity-preserving springs: retargeting keeps (pos, vel), so every state
+  // change (hover, click, new request, voice) interrupts mid-flight with zero jump.
   const springs = {
-    w: { pos: 188, vel: 0, target: 188, openK: 375, openD: 24.5, closeK: 440, closeD: 33, eps: 0.08 },
-    h: { pos: 37, vel: 0, target: 37, openK: 315, openD: 25.5, closeK: 440, closeD: 33, eps: 0.08 },
-    topR: { pos: 6, vel: 0, target: 6, openK: 340, openD: 27, closeK: 440, closeD: 33, eps: 0.08 },
-    botR: { pos: 11, vel: 0, target: 11, openK: 340, openD: 27, closeK: 440, closeD: 33, eps: 0.08 },
-    expand: { pos: 0, vel: 0, target: 0, openK: 340, openD: 28, closeK: 440, closeD: 33, eps: 0.002 },
-    presence: { pos: 1, vel: 0, target: 1, openK: 380, openD: 28, closeK: 440, closeD: 33, eps: 0.002 },
+    w: makeSpring(188, 0.05),
+    h: makeSpring(37, 0.05),
+    earR: makeSpring(6, 0.02),
+    botR: makeSpring(11, 0.02),
+    expand: makeSpring(0, 0.002),
+    presence: makeSpring(1, 0.002),
   };
   let springRaf = 0;
   let springLastTime = 0;
@@ -1093,10 +1453,13 @@ export function buildIslandHtml(): string {
     if (geomState === "docked" || geomState === "hidden") {
       notifiedIdleForRest = true;
       destroyWaveGl();
+      clearOutgoingLayers();
       if (lastRenderedSignature !== "hidden") {
         content.innerHTML = "";
         lastRenderedSignature = "hidden";
+        lastMorphKey = "";
       }
+      syncElapsedTicker();
       measureEl.style.width = (metrics.hasNotch ? metrics.notchWidth : 220) + "px";
       if (typeof bridge.notifyAnimationIdle === "function") {
         bridge.notifyAnimationIdle();
@@ -1104,28 +1467,37 @@ export function buildIslandHtml(): string {
     }
   }
 
-  // Exact boring.notch concave-ear SVG NotchShape path
-  function buildNotchShapePath(cx, w, h, topR, botR, inset) {
+  const KAPPA = 0.5523;
+
+  function fmt(n) {
+    return n.toFixed(2);
+  }
+
+  // Concave-ear NotchShape: circular (cubic, kappa) ears flare into y = 0 and the bottom
+  // corners are true quarter circles, so the silhouette reads as hardware, not a rounded rect.
+  function buildNotchShapePath(cx, w, h, earR, botR, inset) {
     const pad = inset || 0;
     const effW = Math.max(2, w - pad * 2);
     const effH = Math.max(2, h - pad);
-    const xL0 = cx - effW / 2 - topR;
     const xL = cx - effW / 2;
     const xR = cx + effW / 2;
-    const xR0 = cx + effW / 2 + topR;
     const rB = Math.max(0, Math.min(botR - pad * 0.5, effH / 2, effW / 2));
-    const rT = Math.max(0, Math.min(topR, Math.max(0, effH - rB)));
+    const rT = Math.max(0, Math.min(earR, Math.max(0, effH - rB)));
+    const xL0 = xL - rT;
+    const xR0 = xR + rT;
     const y0 = pad ? 0.5 : 0;
-    const yEnd = effH;
+    const yB = effH;
+    const kT = rT * KAPPA;
+    const kB = rB * KAPPA;
     const base =
-      \`M \${xL0.toFixed(2)},\${y0} \` +
-      \`Q \${xL.toFixed(2)},\${y0} \${xL.toFixed(2)},\${(y0 + rT).toFixed(2)} \` +
-      \`L \${xL.toFixed(2)},\${(yEnd - rB).toFixed(2)} \` +
-      \`Q \${xL.toFixed(2)},\${yEnd.toFixed(2)} \${(xL + rB).toFixed(2)},\${yEnd.toFixed(2)} \` +
-      \`L \${(xR - rB).toFixed(2)},\${yEnd.toFixed(2)} \` +
-      \`Q \${xR.toFixed(2)},\${yEnd.toFixed(2)} \${xR.toFixed(2)},\${(yEnd - rB).toFixed(2)} \` +
-      \`L \${xR.toFixed(2)},\${(y0 + rT).toFixed(2)} \` +
-      \`Q \${xR.toFixed(2)},\${y0} \${xR0.toFixed(2)},\${y0}\`;
+      "M " + fmt(xL0) + "," + fmt(y0) +
+      " C " + fmt(xL0 + kT) + "," + fmt(y0) + " " + fmt(xL) + "," + fmt(y0 + rT - kT) + " " + fmt(xL) + "," + fmt(y0 + rT) +
+      " L " + fmt(xL) + "," + fmt(yB - rB) +
+      " C " + fmt(xL) + "," + fmt(yB - rB + kB) + " " + fmt(xL + rB - kB) + "," + fmt(yB) + " " + fmt(xL + rB) + "," + fmt(yB) +
+      " L " + fmt(xR - rB) + "," + fmt(yB) +
+      " C " + fmt(xR - rB + kB) + "," + fmt(yB) + " " + fmt(xR) + "," + fmt(yB - rB + kB) + " " + fmt(xR) + "," + fmt(yB - rB) +
+      " L " + fmt(xR) + "," + fmt(y0 + rT) +
+      " C " + fmt(xR) + "," + fmt(y0 + rT - kT) + " " + fmt(xR0 - kT) + "," + fmt(y0) + " " + fmt(xR0) + "," + fmt(y0);
     return pad ? base : base + " Z";
   }
 
@@ -1134,18 +1506,22 @@ export function buildIslandHtml(): string {
     const effW = Math.max(2, w - pad * 2);
     const effH = Math.max(2, h - pad * 2);
     const x = cx - effW / 2;
-    const yTop = y + pad;
+    const xR = x + effW;
+    const yT = y + pad;
+    const yB = yT + effH;
     const cr = Math.max(0, Math.min(r - pad * 0.5, effW / 2, effH / 2));
+    const k = cr * KAPPA;
     return (
-      \`M \${(x + cr).toFixed(2)},\${yTop.toFixed(2)} \` +
-      \`L \${(x + effW - cr).toFixed(2)},\${yTop.toFixed(2)} \` +
-      \`Q \${(x + effW).toFixed(2)},\${yTop.toFixed(2)} \${(x + effW).toFixed(2)},\${(yTop + cr).toFixed(2)} \` +
-      \`L \${(x + effW).toFixed(2)},\${(yTop + effH - cr).toFixed(2)} \` +
-      \`Q \${(x + effW).toFixed(2)},\${(yTop + effH).toFixed(2)} \${(x + effW - cr).toFixed(2)},\${(yTop + effH).toFixed(2)} \` +
-      \`L \${(x + cr).toFixed(2)},\${(yTop + effH).toFixed(2)} \` +
-      \`Q \${x.toFixed(2)},\${(yTop + effH).toFixed(2)} \${x.toFixed(2)},\${(yTop + effH - cr).toFixed(2)} \` +
-      \`L \${x.toFixed(2)},\${(yTop + cr).toFixed(2)} \` +
-      \`Q \${x.toFixed(2)},\${yTop.toFixed(2)} \${(x + cr).toFixed(2)},\${yTop.toFixed(2)} Z\`
+      "M " + fmt(x + cr) + "," + fmt(yT) +
+      " L " + fmt(xR - cr) + "," + fmt(yT) +
+      " C " + fmt(xR - cr + k) + "," + fmt(yT) + " " + fmt(xR) + "," + fmt(yT + cr - k) + " " + fmt(xR) + "," + fmt(yT + cr) +
+      " L " + fmt(xR) + "," + fmt(yB - cr) +
+      " C " + fmt(xR) + "," + fmt(yB - cr + k) + " " + fmt(xR - cr + k) + "," + fmt(yB) + " " + fmt(xR - cr) + "," + fmt(yB) +
+      " L " + fmt(x + cr) + "," + fmt(yB) +
+      " C " + fmt(x + cr - k) + "," + fmt(yB) + " " + fmt(x) + "," + fmt(yB - cr + k) + " " + fmt(x) + "," + fmt(yB - cr) +
+      " L " + fmt(x) + "," + fmt(yT + cr) +
+      " C " + fmt(x) + "," + fmt(yT + cr - k) + " " + fmt(x + cr - k) + "," + fmt(yT) + " " + fmt(x + cr) + "," + fmt(yT) +
+      " Z"
     );
   }
 
@@ -1157,7 +1533,7 @@ export function buildIslandHtml(): string {
       lastStageH = h;
       svgEl.setAttribute("width", String(w));
       svgEl.setAttribute("height", String(h));
-      svgEl.setAttribute("viewBox", \`0 0 \${w} \${h}\`);
+      svgEl.setAttribute("viewBox", "0 0 " + w + " " + h);
       svgEl.style.width = w + "px";
       svgEl.style.height = h + "px";
     }
@@ -1175,112 +1551,94 @@ export function buildIslandHtml(): string {
     return Math.min(NOTCH_PILL_WIDTH, Math.max(metrics.notchWidth + 120, stageW - 28));
   }
 
+  function shadowFilter(amount, y1, b1, a1, y2, b2, a2) {
+    return (
+      "drop-shadow(0 " + (y1 * amount).toFixed(1) + "px " + (b1 * amount).toFixed(1) + "px rgba(0,0,0," + (a1 * amount).toFixed(3) + ")) " +
+      "drop-shadow(0 " + (y2 * amount).toFixed(1) + "px " + (b2 * amount).toFixed(1) + "px rgba(0,0,0," + (a2 * amount).toFixed(3) + "))"
+    );
+  }
+
   function applyGeometryFrame() {
     const { stageW } = syncStageSize();
     const cx = stageW / 2;
     const w = Math.max(24, springs.w.pos);
     const h = Math.max(24, springs.h.pos);
-    const topR = Math.max(0, springs.topR.pos);
+    const earR = Math.max(0, springs.earR.pos);
     const botR = Math.max(0, springs.botR.pos);
     const e = clamp(springs.expand.pos, 0, 1);
     const p = clamp(springs.presence.pos, 0, 1);
 
     if (metrics.hasNotch) {
-      const d = buildNotchShapePath(cx, w, h, topR, botR, 0);
-      const rimD = buildNotchShapePath(cx, w, h, topR, botR, 0.5);
+      const d = buildNotchShapePath(cx, w, h, earR, botR, 0);
       shapePathEl.setAttribute("d", d);
       clipPathEl.setAttribute("d", d);
-      rimPathEl.setAttribute("d", rimD);
-      rimPathEl.setAttribute("stroke", "url(#island-rim-grad)");
-      rimPathEl.setAttribute("stroke-opacity", e.toFixed(3));
+      rimPathEl.setAttribute("d", buildNotchShapePath(cx, w, h, earR, botR, 0.5));
+      rimPathEl.setAttribute("stroke-opacity", clamp(e / 0.3, 0, 1).toFixed(3));
 
-      // Invisible when fully docked inside the hardware notch so it never protrudes on any MacBook size
+      // Invisible while docked inside the hardware notch so it never protrudes on any MacBook.
       const silhouetteAlpha = geomState === "hidden" ? 0 : clamp(e / 0.06, 0, 1);
       svgEl.style.opacity = silhouetteAlpha.toFixed(3);
       svgEl.style.transform = "";
-
-      if (e > 0.01 && geomState !== "hidden") {
-        const s1y = (14 * e).toFixed(1);
-        const s1b = (32 * e).toFixed(1);
-        const s1a = (0.56 * e).toFixed(3);
-        const s2y = (3 * e).toFixed(1);
-        const s2b = (10 * e).toFixed(1);
-        const s2a = (0.34 * e).toFixed(3);
-        shapeGroupEl.style.filter = \`drop-shadow(0 \${s1y}px \${s1b}px rgba(0,0,0,\${s1a})) drop-shadow(0 \${s2y}px \${s2b}px rgba(0,0,0,\${s2a}))\`;
-      } else {
-        shapeGroupEl.style.filter = "none";
-      }
+      shapeGroupEl.style.filter =
+        e > 0.01 && geomState !== "hidden" ? shadowFilter(e, 14, 32, 0.56, 3, 10, 0.34) : "none";
 
       const rB = Math.max(0, Math.min(botR, h / 2, w / 2));
-      const xL = cx - w / 2;
-      contentClipEl.style.left = xL.toFixed(2) + "px";
+      contentClipEl.style.left = fmt(cx - w / 2) + "px";
       contentClipEl.style.top = "0px";
-      contentClipEl.style.width = w.toFixed(2) + "px";
-      contentClipEl.style.height = h.toFixed(2) + "px";
-      contentClipEl.style.borderRadius = \`0 0 \${rB.toFixed(2)}px \${rB.toFixed(2)}px\`;
+      contentClipEl.style.width = fmt(w) + "px";
+      contentClipEl.style.height = fmt(h) + "px";
+      contentClipEl.style.borderRadius = "0 0 " + fmt(rB) + "px " + fmt(rB) + "px";
       contentClipEl.style.transform = "";
       const contentAlpha =
         geomState === "hidden"
           ? 0
-          : geomState === "docked"
-            ? clamp((e - 0.1) / 0.4, 0, 1)
-            : geomState === "peek"
-              ? clamp(e / 0.2, 0, 1)
-              : clamp(e / 0.18, 0, 1);
+          : geomState === "docked" || geomState === "nudge"
+            ? clamp(e / 0.22, 0, 1)
+            : 1;
       contentClipEl.style.opacity = contentAlpha.toFixed(3);
-      contentClipEl.classList.toggle("is-inert", geomState === "docked" || geomState === "hidden");
+      contentClipEl.classList.toggle(
+        "is-inert",
+        geomState === "docked" || geomState === "hidden" || geomState === "nudge",
+      );
     } else {
       const yTop = -4 + (CAPSULE_Y + 4) * p;
       const scale = 0.92 + 0.08 * p;
       const d = buildCapsulePath(cx, yTop, w, h, botR, 0);
-      const rimD = buildCapsulePath(cx, yTop, w, h, botR, 0.5);
       shapePathEl.setAttribute("d", d);
       clipPathEl.setAttribute("d", d);
-      rimPathEl.setAttribute("d", rimD);
-      rimPathEl.setAttribute("stroke", "rgba(255, 255, 255, 0.12)");
+      rimPathEl.setAttribute("d", buildCapsulePath(cx, yTop, w, h, botR, 0.5));
       rimPathEl.setAttribute("stroke-opacity", p.toFixed(3));
 
       svgEl.style.opacity = p.toFixed(3);
-      svgEl.style.transform = p < 0.999 ? \`scale(\${scale.toFixed(4)})\` : "";
-
-      if (p > 0.02) {
-        const s1y = (12 * p).toFixed(1);
-        const s1b = (28 * p).toFixed(1);
-        const s1a = (0.52 * p).toFixed(3);
-        const s2y = (3 * p).toFixed(1);
-        const s2b = (9 * p).toFixed(1);
-        const s2a = (0.32 * p).toFixed(3);
-        shapeGroupEl.style.filter = \`drop-shadow(0 \${s1y}px \${s1b}px rgba(0,0,0,\${s1a})) drop-shadow(0 \${s2y}px \${s2b}px rgba(0,0,0,\${s2a}))\`;
-      } else {
-        shapeGroupEl.style.filter = "none";
-      }
+      svgEl.style.transform = p < 0.999 ? "scale(" + scale.toFixed(4) + ")" : "";
+      shapeGroupEl.style.filter = p > 0.02 ? shadowFilter(p, 12, 28, 0.52, 3, 9, 0.32) : "none";
 
       const rB = Math.max(0, Math.min(botR, h / 2, w / 2));
-      const xL = cx - w / 2;
-      contentClipEl.style.left = xL.toFixed(2) + "px";
-      contentClipEl.style.top = yTop.toFixed(2) + "px";
-      contentClipEl.style.width = w.toFixed(2) + "px";
-      contentClipEl.style.height = h.toFixed(2) + "px";
-      contentClipEl.style.borderRadius = \`\${rB.toFixed(2)}px\`;
-      contentClipEl.style.transform = p < 0.999 ? \`scale(\${scale.toFixed(4)})\` : "";
+      contentClipEl.style.left = fmt(cx - w / 2) + "px";
+      contentClipEl.style.top = fmt(yTop) + "px";
+      contentClipEl.style.width = fmt(w) + "px";
+      contentClipEl.style.height = fmt(h) + "px";
+      contentClipEl.style.borderRadius = fmt(rB) + "px";
+      contentClipEl.style.transform = p < 0.999 ? "scale(" + scale.toFixed(4) + ")" : "";
       contentClipEl.style.opacity = p.toFixed(3);
       contentClipEl.classList.toggle("is-inert", geomState === "hidden" || p < 0.05);
     }
   }
 
-  function stepSpring(s, dt) {
-    const opening = s.target >= s.pos;
-    const k = opening ? s.openK : s.closeK;
-    const d = opening ? s.openD : s.closeD;
-    const substeps = dt > 0.016 ? 2 : 1;
-    const step = dt / substeps;
-    for (let i = 0; i < substeps; i++) {
-      const disp = s.pos - s.target;
-      const acc = -k * disp - d * s.vel;
+  // Semi-implicit Euler at <= 1/240s substeps: stable for the stiffest (0.26s) spring.
+  function stepSpring(s, dt, now) {
+    if (s.pending !== null && now >= s.releaseAt) {
+      s.target = s.pending;
+      s.pending = null;
+    }
+    const steps = Math.max(1, Math.ceil(dt * 240));
+    const step = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      const acc = -s.k * (s.pos - s.target) - s.c * s.vel;
       s.vel += acc * step;
       s.pos += s.vel * step;
     }
-    if (Math.abs(s.pos - s.target) < s.eps && Math.abs(s.vel) < s.eps) {
+    if (s.pending === null && Math.abs(s.pos - s.target) < s.eps && Math.abs(s.vel) < s.eps * 10) {
       s.pos = s.target;
       s.vel = 0;
       return true;
@@ -1289,12 +1647,12 @@ export function buildIslandHtml(): string {
   }
 
   function tickSprings(now) {
-    const dt = springLastTime ? clamp((now - springLastTime) / 1000, 0.001, 0.032) : 1 / 60;
+    const dt = springLastTime ? clamp((now - springLastTime) / 1000, 0.001, 0.034) : 1 / 60;
     springLastTime = now;
 
     let allSettled = true;
     for (const key in springs) {
-      if (!stepSpring(springs[key], dt)) {
+      if (!stepSpring(springs[key], dt, now)) {
         allSettled = false;
       }
     }
@@ -1310,21 +1668,45 @@ export function buildIslandHtml(): string {
     }
   }
 
-  function setSpringTargets(targets, immediate) {
+  // profile: "open" | "close" | "peek" | "auto" (auto picks open/close per value by direction).
+  function setSpringTargets(targets, options) {
+    const immediate = Boolean(options && options.immediate) || prefersReducedMotion;
+    const profile = (options && options.profile) || "auto";
     notifiedIdleForRest = false;
+    const now = performance.now();
     let needsAnim = false;
     for (const key in targets) {
       const s = springs[key];
       if (!s) continue;
-      s.target = targets[key];
-      if (immediate || prefersReducedMotion) {
-        s.pos = s.target;
+      const value = targets[key];
+      if (immediate) {
+        s.pos = value;
         s.vel = 0;
-      } else if (Math.abs(s.pos - s.target) >= s.eps || Math.abs(s.vel) >= s.eps) {
-        needsAnim = true;
+        s.target = value;
+        s.pending = null;
+        continue;
       }
+      const current = s.pending !== null ? s.pending : s.target;
+      if (Math.abs(value - current) < 1e-6) {
+        if (s.pending !== null || Math.abs(s.pos - s.target) >= s.eps || Math.abs(s.vel) >= s.eps) {
+          needsAnim = true;
+        }
+        continue;
+      }
+      const resolved = profile === "auto" ? (value >= current ? "open" : "close") : profile;
+      const [response, dampingRatio, delayMs] = MOTION[resolved][key];
+      configureSpring(s, response, dampingRatio);
+      // Stagger only from rest; mid-flight retargets must respond on the very next frame.
+      if (delayMs > 0 && s.pending === null && Math.abs(s.vel) < 1) {
+        s.pending = value;
+        s.releaseAt = now + delayMs;
+      } else {
+        s.target = value;
+        s.pending = null;
+      }
+      needsAnim = true;
     }
-    if (immediate || prefersReducedMotion || !needsAnim) {
+    if (immediate || !needsAnim) {
       if (springRaf) {
         cancelAnimationFrame(springRaf);
         springRaf = 0;
@@ -1353,13 +1735,62 @@ export function buildIslandHtml(): string {
     }, 1150);
   }
 
+  function isActiveStatus(status) {
+    return status === "running" || status === "approval" || status === "input";
+  }
+
+  function activeAgents() {
+    return (snapshot?.recentThreads ?? []).filter((t) => isActiveStatus(t.status));
+  }
+
+  function agentList() {
+    const agents = activeAgents();
+    return agents.length > 0 ? agents : (snapshot?.recentThreads ?? []).slice(0, 1);
+  }
+
+  // Approvals first, then questions; answered ones vanish immediately, before the next snapshot.
+  function attentionItems() {
+    const items = [];
+    for (const approval of snapshot?.pendingApprovals ?? []) {
+      if (!answeredRequestIds.has(approval.requestId)) {
+        items.push({ kind: "approval", requestId: approval.requestId, item: approval });
+      }
+    }
+    for (const input of snapshot?.pendingUserInputs ?? []) {
+      if (!answeredRequestIds.has(input.requestId)) {
+        items.push({ kind: "question", requestId: input.requestId, item: input });
+      }
+    }
+    return items;
+  }
+
+  function currentAttention(items) {
+    if (items.length === 0) return null;
+    let index = items.findIndex((entry) => entry.requestId === attentionKey);
+    if (index < 0) index = clamp(attentionIndex, 0, items.length - 1);
+    attentionIndex = index;
+    attentionKey = items[index].requestId;
+    return { index, total: items.length, entry: items[index] };
+  }
+
+  function currentAttentionEntry() {
+    const cur = currentAttention(attentionItems());
+    return cur ? cur.entry : null;
+  }
+
+  function hoverView() {
+    if (metrics.hasNotch && isNotchPeeking) return { kind: "peek" };
+    if (metrics.hasNotch && isHoverNudge && isPointerInside) return { kind: "nudge" };
+    return { kind: "hidden" };
+  }
+
   function resolveEffectiveView() {
     if (flashMessage) return { kind: "flash" };
     if (!snapshot || !snapshot.settings.enabled) return { kind: "hidden" };
 
-    const approvals = snapshot.pendingApprovals || [];
-    const inputs = snapshot.pendingUserInputs || [];
+    const items = attentionItems();
     const done = snapshot.doneNotifications || [];
+    const agents = activeAgents();
     const voiceActive = snapshot.voice && snapshot.voice.phase !== "idle";
     const assistant = snapshot.assistant;
     const assistantActive =
@@ -1370,51 +1801,100 @@ export function buildIslandHtml(): string {
         assistant.phase === "acting" ||
         assistant.phase === "speaking");
 
-    if (uiMode === "voice" || voiceActive) {
-      return { kind: "voice" };
+    if (uiMode === "voice" || voiceActive) return { kind: "voice" };
+    if (uiMode === "attention" && items.length > 0) {
+      return { kind: "attention", ...currentAttention(items) };
     }
-    if (uiMode === "approval" && approvals.length > 0) {
-      return { kind: "approval", approval: approvals[0] };
-    }
-    if (uiMode === "question" && inputs.length > 0) {
-      return { kind: "question", input: inputs[0] };
-    }
-    if (uiMode === "done-list" && (done.length > 0 || approvals.length > 0 || inputs.length > 0)) {
-      return { kind: "done-list" };
-    }
+    if (uiMode === "agents" && agentList().length > 0) return { kind: "agents" };
+    if (uiMode === "done-list" && done.length > 0) return { kind: "done-list" };
 
     if (assistant?.handsFreeActive) {
       return { kind: "pill", pillKind: "voice-mode", assistant };
     }
 
-    // Auto mode: only show passive notch notifications when enabled and main window is unfocused
+    // Passive notch status only while mattr is in the background.
     if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) {
-      if (assistantActive) {
-        return { kind: "pill", pillKind: "voice-mode", assistant };
-      }
-      if (metrics.hasNotch && isNotchPeeking) {
-        return { kind: "peek" };
-      }
-      return { kind: "hidden" };
+      if (assistantActive) return { kind: "pill", pillKind: "voice-mode", assistant };
+      return hoverView();
     }
+    if (items.length > 0) return { kind: "pill", pillKind: "attention", items };
+    if (done.length > 0) return { kind: "pill", pillKind: "done", done };
+    if (agents.length > 0) return { kind: "pill", pillKind: "running", agents };
+    return hoverView();
+  }
 
-    const attentionCount = approvals.length + inputs.length;
-    if (attentionCount > 0) {
-      return {
-        kind: "pill",
-        pillKind: approvals.length > 0 ? "approval" : "input",
-        count: attentionCount,
-        approvals,
-        inputs,
-      };
+  const MODE_VIEW = { voice: "voice", attention: "attention", agents: "agents", "done-list": "done-list" };
+
+  // An explicit mode whose content went away (request answered elsewhere, agent finished)
+  // falls back to auto so a stale mode never resurrects a card later.
+  function normalizeUiMode(view) {
+    if (uiMode === "auto" || view.kind === "flash") return;
+    if (view.kind !== MODE_VIEW[uiMode]) {
+      uiMode = "auto";
+      attentionAutoOpened = false;
+      threadSwitcherOpen = false;
+      cancelAutoCollapse();
     }
-    if (done.length > 0) {
-      return { kind: "pill", pillKind: "done", count: done.length, done };
+  }
+
+  function rimToneFor(view) {
+    if (view.kind === "attention" || (view.kind === "pill" && view.pillKind === "attention")) {
+      return "attention";
     }
-    if (metrics.hasNotch && isNotchPeeking) {
-      return { kind: "peek" };
+    if (view.kind === "done-list" || (view.kind === "pill" && view.pillKind === "done")) {
+      return "done";
     }
-    return { kind: "hidden" };
+    return "normal";
+  }
+
+  function applyRimTone(tone) {
+    if (tone === currentRimTone) return;
+    currentRimTone = tone;
+    const next = RIM_TONES[tone] || RIM_TONES.normal;
+    rimPathEl.style.stroke = next.stroke;
+    rimPathEl.style.filter = next.glow;
+  }
+
+  function cancelAutoCollapse() {
+    if (autoCollapseTimer) {
+      clearTimeout(autoCollapseTimer);
+      autoCollapseTimer = null;
+    }
+  }
+
+  // Like iOS alerts on the Dynamic Island: a new request blooms open on its own, then folds
+  // back into the amber pill if the user never reaches for it.
+  function scheduleAutoCollapse() {
+    cancelAutoCollapse();
+    autoCollapseTimer = setTimeout(() => {
+      autoCollapseTimer = null;
+      if (!isPointerInside && uiMode === "attention" && attentionAutoOpened) {
+        uiMode = "auto";
+        attentionAutoOpened = false;
+        render();
+      }
+    }, 8000);
+  }
+
+  function trackAttention() {
+    const rawIds = new Set();
+    for (const a of snapshot?.pendingApprovals ?? []) rawIds.add(a.requestId);
+    for (const q of snapshot?.pendingUserInputs ?? []) rawIds.add(q.requestId);
+    for (const id of [...answeredRequestIds]) if (!rawIds.has(id)) answeredRequestIds.delete(id);
+    for (const id of [...seenAttentionIds]) if (!rawIds.has(id)) seenAttentionIds.delete(id);
+
+    const fresh = attentionItems().filter((entry) => !seenAttentionIds.has(entry.requestId));
+    for (const entry of fresh) seenAttentionIds.add(entry.requestId);
+    if (fresh.length === 0 || uiMode !== "auto" || flashMessage) return;
+    if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) return;
+    if ((snapshot.voice && snapshot.voice.phase !== "idle") || snapshot.assistant?.handsFreeActive) {
+      return;
+    }
+    uiMode = "attention";
+    attentionKey = fresh[0].requestId;
+    attentionAutoOpened = true;
+    navDirection = "fade";
+    scheduleAutoCollapse();
   }
 
   function stopWaveLoop() {
@@ -1610,26 +2090,163 @@ export function buildIslandHtml(): string {
     return list.find((t) => t.key === snapshot.selectedThreadKey) ?? list[0];
   }
 
+  const ICON_EXPAND =
+    '<svg width="11.5" height="11.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 2.5H13.5V6.5M13.5 2.5L9 7M6.5 13.5H2.5V9.5M2.5 13.5L7 9" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_OPEN_APP =
+    '<svg width="11.5" height="11.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5H12.5V10M12.5 3.5L4 12" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_CLOSE =
+    '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const ICON_CHEVRON_LEFT =
+    '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_CHEVRON_RIGHT =
+    '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_CHECK =
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_BRANCH =
+    '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.75" stroke="currentColor" stroke-width="1.5"/><circle cx="4.5" cy="12.5" r="1.75" stroke="currentColor" stroke-width="1.5"/><circle cx="11.5" cy="5.5" r="1.75" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.25V10.75M11.5 7.25C11.5 9.5 4.5 8.5 4.5 10.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  const ICON_MIC =
+    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.75" y="2" width="4.5" height="7.5" rx="2.25" stroke="currentColor" stroke-width="1.5" /><path d="M3.5 7.75a4.5 4.5 0 0 0 9 0M8 12.25V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>';
+  const ACTIVITY_ICON_PATHS = {
+    command: "M3 4.5L6.5 8L3 11.5M8.5 11.5H13",
+    edit: "M10.5 2.5L13.5 5.5L6 13H3V10Z",
+    read: "M4 2.5H9.5L12 5V13.5H4Z M6.5 8H9.5M6.5 10.5H9.5",
+    search: "M10 10L13.5 13.5 M11 7A4 4 0 1 1 3 7A4 4 0 1 1 11 7Z",
+    web: "M8 2.5A5.5 5.5 0 1 1 8 13.5A5.5 5.5 0 1 1 8 2.5Z M2.5 8H13.5 M8 2.5C10 4.5 10 11.5 8 13.5 M8 2.5C6 4.5 6 11.5 8 13.5",
+    tool: "M10.5 2.5A3 3 0 0 0 7.6 6.3L3 10.9L5.1 13L9.7 8.4A3 3 0 0 0 13.5 5.5L11.7 7.3L10 6.9L9.6 5.2Z",
+    agent: "M8 2.5L9.3 6.2L13 7.5L9.3 8.8L8 12.5L6.7 8.8L3 7.5L6.7 6.2Z",
+  };
+
+  function activityIcon(kind) {
+    const d = ACTIVITY_ICON_PATHS[kind] || ACTIVITY_ICON_PATHS.tool;
+    return (
+      '<svg class="activity-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="' +
+      d +
+      '" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    );
+  }
+
+  const PROVIDER_COLORS = [
+    ["claude", "#d97757"],
+    ["codex", "#10a37f"],
+    ["openai", "#10a37f"],
+    ["cursor", "#8b8bf5"],
+    ["antigravity", "#4f8df9"],
+    ["gemini", "#4f8df9"],
+    ["grok", "#c7c7cc"],
+    ["opencode", "#f5a524"],
+    ["kiro", "#a78bfa"],
+    ["replay", "#64d2ff"],
+  ];
+
+  function providerColor(id) {
+    const s = String(id || "").toLowerCase();
+    for (const [needle, color] of PROVIDER_COLORS) {
+      if (s.includes(needle)) return color;
+    }
+    return "#30d158";
+  }
+
+  function providerDot(thread, attrs) {
+    return (
+      '<span class="provider-dot" style="background:' +
+      providerColor(thread?.providerInstanceId) +
+      '" ' +
+      (attrs || "") +
+      "></span>"
+    );
+  }
+
+  // The lead dot pings once whenever the lead agent's live activity changes; never loops.
+  function providerStack(agents) {
+    const lead = agents[0];
+    const ping = lead
+      ? 'data-ping="' + escapeHtml(lead.key + "|" + (lead.currentActivity?.label ?? lead.status)) + '"'
+      : "";
+    return (
+      '<span class="provider-stack">' +
+      agents.slice(0, 3).map((t, i) => providerDot(t, i === 0 ? ping : "")).join("") +
+      "</span>"
+    );
+  }
+
+  function formatElapsed(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = String(total % 60).padStart(2, "0");
+    return hours > 0
+      ? hours + ":" + String(minutes).padStart(2, "0") + ":" + seconds
+      : minutes + ":" + seconds;
+  }
+
+  function durationText(startIso, endIso) {
+    const start = Date.parse(startIso || "");
+    const end = Date.parse(endIso || "");
+    return Number.isFinite(start) && Number.isFinite(end) && end >= start
+      ? formatElapsed(end - start)
+      : "";
+  }
+
+  function agoText(ms) {
+    const seconds = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if (seconds < 60) return "just now";
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return minutes + "m ago";
+    return Math.round(minutes / 60) + "h ago";
+  }
+
+  // Live timers render empty with data-since and are filled by a 1Hz text-only ticker, so the
+  // markup (and its render signature) never changes just because a second passed.
+  function elapsedSpan(thread, cls) {
+    if (!thread) return "";
+    const live = isActiveStatus(thread.status) && !thread.runCompletedAt;
+    if (!live) {
+      const text = durationText(thread.runStartedAt, thread.runCompletedAt);
+      return text ? '<span class="elapsed ' + (cls || "") + '">' + text + "</span>" : "";
+    }
+    const since = Date.parse(thread.runStartedAt || "");
+    return Number.isFinite(since)
+      ? '<span class="elapsed ' + (cls || "") + '" data-since="' + since + '"></span>'
+      : "";
+  }
+
+  function refreshElapsed() {
+    const nodes = content.querySelectorAll("[data-since]");
+    const now = Date.now();
+    for (const node of nodes) {
+      const text = formatElapsed(now - Number(node.dataset.since));
+      if (node.textContent !== text) node.textContent = text;
+    }
+  }
+
+  function syncElapsedTicker() {
+    const needsTicker = content.querySelector("[data-since]") !== null;
+    if (needsTicker && !elapsedTimer) {
+      elapsedTimer = setInterval(refreshElapsed, 1000);
+    } else if (!needsTicker && elapsedTimer) {
+      clearInterval(elapsedTimer);
+      elapsedTimer = null;
+    }
+  }
+
   function renderPeek() {
     const notchW = metrics.notchWidth;
     const h = metrics.notchHeight + 2;
-    const approvals = snapshot?.pendingApprovals?.length ?? 0;
-    const inputs = snapshot?.pendingUserInputs?.length ?? 0;
-    const hasRunning = (snapshot?.recentThreads ?? []).some((t) => t.status === "running" || t.isStreaming);
-    const dotClass = approvals > 0 ? "approval" : inputs > 0 ? "input" : hasRunning ? "done" : "idle";
+    const agents = activeAgents();
+    const pending = attentionItems().length;
+    const left =
+      pending > 0
+        ? '<span class="status-dot approval"></span>'
+        : agents.length > 0
+          ? providerStack(agents)
+          : '<span class="status-dot idle"></span>';
+    const leftAction = pending > 0 ? "expand-attention" : agents.length > 0 ? "expand-agents" : "expand-voice";
     return \`
-      <div class="peek-row pill-entering" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="expand-voice" title="Open mattr Island">
-        <div class="peek-wing">
-          <span class="status-dot \${dotClass}"></span>
-        </div>
+      <div class="peek-row" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="expand-voice" title="Open mattr Island">
+        <div class="peek-wing" data-action="\${leftAction}">\${left}</div>
         <div class="notch-cutout"></div>
-        <div class="peek-wing">
-          <span class="peek-mic" aria-hidden="true">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <rect x="5.75" y="2" width="4.5" height="7.5" rx="2.25" stroke="currentColor" stroke-width="1.5" />
-              <path d="M3.5 7.75a4.5 4.5 0 0 0 9 0M8 12.25V14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
-          </span>
+        <div class="peek-wing" data-action="expand-voice">
+          <span class="peek-mic">\${ICON_MIC}</span>
         </div>
       </div>
     \`;
@@ -1640,44 +2257,46 @@ export function buildIslandHtml(): string {
       const notchW = metrics.notchWidth;
       const h = metrics.notchHeight + 2;
       return \`
-        <div class="pill-notched pill-entering" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px">
+        <div class="pill-notched" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px">
           <div class="pill-wing left">
-            <span class="status-dot done"></span>
+            <span class="done-tick">\${ICON_CHECK}</span>
             <span class="pill-label flash-ok">\${escapeHtml(flashMessage)}</span>
           </div>
           <div class="notch-cutout"></div>
-          <div class="pill-wing right">
-            <span class="pill-title" style="color:var(--island-green)">✓</span>
-          </div>
+          <div class="pill-wing right"></div>
         </div>
       \`;
     }
     return \`
-      <div class="pill-capsule pill-entering" style="justify-content:center">
-        <span class="status-dot done"></span>
-        <span class="pill-label flash-ok">✓ \${escapeHtml(flashMessage)}</span>
+      <div class="pill-capsule" style="justify-content:center">
+        <span class="done-tick">\${ICON_CHECK}</span>
+        <span class="pill-label flash-ok">\${escapeHtml(flashMessage)}</span>
       </div>
     \`;
   }
 
+  function pillWidthFor(view) {
+    if (!metrics.hasNotch) {
+      if (view.kind === "flash") return CAPSULE_FLASH_WIDTH;
+      return view.pillKind === "running" ? CAPSULE_RUNNING_WIDTH : CAPSULE_PILL_WIDTH;
+    }
+    const wing = view.kind === "flash" ? 134 : (PILL_WING[view.pillKind] ?? 134);
+    return Math.min(getEffectiveNotchPillWidth(), metrics.notchWidth + wing * 2);
+  }
+
   function renderPill(view) {
-    let dotClass = "done";
-    let leftLabel = "mattr";
-    let rightTitle = "";
-    let ctaLabel = "";
-    let ctaAction = "";
-    let ctaExtraAttrs = "";
+    let leftHtml = "";
+    let rightHtml = "";
     let rowAction = "expand-voice";
-    let showEq = false;
-    let eqClass = "";
+    let rowAttrs = "";
 
     if (view.pillKind === "voice-mode") {
       const a = view.assistant || {};
       const speaking = Boolean(a.speaking || a.phase === "speaking");
       const thinking = a.phase === "thinking" || a.phase === "acting" || a.phase === "transcribing";
       const listening = a.phase === "listening" || snapshot?.voice?.phase === "recording";
-      dotClass = a.muted ? "approval" : thinking ? "input" : "done";
-      leftLabel = a.muted
+      const dotClass = a.muted ? "approval" : thinking ? "input" : "done";
+      const label = a.muted
         ? "Muted"
         : speaking
           ? a.activeBriefingLabel || "Speaking"
@@ -1686,96 +2305,62 @@ export function buildIslandHtml(): string {
             : listening
               ? "Listening"
               : "Voice Mode";
-      ctaLabel = a.handsFreeActive ? "Stop" : "Open";
-      ctaAction = a.handsFreeActive ? "assistant-toggle-hands-free" : "expand-voice";
-      rowAction = "expand-voice";
-      showEq = true;
-      eqClass = a.muted ? "muted" : thinking ? "thinking" : "";
+      const eqClass = a.muted ? "muted" : thinking ? "thinking" : "";
+      leftHtml = \`<span class="status-dot \${dotClass}"></span><span class="pill-label">\${escapeHtml(label)}</span>\`;
+      rightHtml =
+        \`<span id="pill-eq" class="eq-bars \${eqClass}" aria-hidden="true"><span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span></span>\` +
+        (a.handsFreeActive
+          ? \`<button class="pill-btn" data-action="assistant-toggle-hands-free">Stop</button>\`
+          : \`<button class="pill-btn" data-action="expand-voice">Open</button>\`);
+    } else if (view.pillKind === "running") {
+      const agents = view.agents;
+      const lead = agents[0];
+      rowAction = "expand-agents";
+      rowAttrs = \`data-key="\${escapeHtml(lead.key)}"\`;
+      leftHtml =
+        providerStack(agents) +
+        \`<span class="pill-label">\${agents.length === 1 ? "Running" : agents.length + " running"}</span>\`;
+      rightHtml = elapsedSpan(lead, "pill-timer");
     } else if (view.pillKind === "done") {
       const items = view.done;
-      dotClass = "done";
       rowAction = "expand-done";
+      leftHtml = \`<span class="done-tick">\${ICON_CHECK}</span><span class="pill-label done-label">Done</span>\`;
       if (items.length === 1) {
         const item = items[0];
-        leftLabel = "Done";
-        rightTitle = item.threadTitle;
-        ctaLabel = "Open";
-        ctaAction = "open-thread";
-        ctaExtraAttrs = \`data-env="\${escapeHtml(item.environmentId)}" data-thread="\${escapeHtml(item.threadId)}"\`;
+        rightHtml = \`<span class="pill-title">\${escapeHtml(item.threadTitle)}</span><button class="pill-btn emerald" data-action="open-thread" data-env="\${escapeHtml(item.environmentId)}" data-thread="\${escapeHtml(item.threadId)}">Review</button>\`;
       } else {
-        leftLabel = \`\${items.length} done\`;
-        ctaLabel = "View";
-        ctaAction = "expand-done";
+        rightHtml = \`<span class="pill-title">\${items.length} agents</span><button class="pill-btn emerald" data-action="expand-done">Review</button>\`;
       }
     } else {
-      const total = view.count;
-      if (total === 1 && view.approvals.length === 1) {
-        const item = view.approvals[0];
-        dotClass = "approval";
-        leftLabel = "Approve";
-        rightTitle = item.threadTitle;
-        ctaLabel = "Review";
-        ctaAction = "expand-approval";
-        rowAction = "expand-approval";
-      } else if (total === 1 && view.inputs.length === 1) {
-        const item = view.inputs[0];
-        dotClass = "input";
-        leftLabel = "Question";
-        rightTitle = item.threadTitle;
-        ctaLabel = "Answer";
-        ctaAction = "expand-question";
-        rowAction = "expand-question";
-      } else {
-        dotClass = view.approvals.length > 0 ? "approval" : "input";
-        leftLabel = \`\${total} pending\`;
-        ctaLabel = "Open";
-        ctaAction = "expand-attention";
-        rowAction = "expand-attention";
-      }
+      const items = view.items;
+      const first = items[0];
+      rowAction = "expand-attention";
+      const label =
+        items.length > 1 ? items.length + " pending" : first.kind === "approval" ? "Approve" : "Question";
+      leftHtml = \`<span class="status-dot \${first.kind === "approval" ? "approval" : "input"}"></span><span class="pill-label">\${escapeHtml(label)}</span>\`;
+      rightHtml = \`<span class="pill-title">\${escapeHtml(first.item.threadTitle)}</span><button class="pill-btn" data-action="expand-attention">Review</button>\`;
     }
-
-    const eqHtml = showEq
-      ? \`<span id="pill-eq" class="eq-bars \${eqClass}" aria-hidden="true"><span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span></span>\`
-      : "";
-    const ctaHtml = ctaLabel
-      ? \`<button class="pill-btn" data-action="\${ctaAction}" \${ctaExtraAttrs}>\${escapeHtml(ctaLabel)}</button>\`
-      : "";
 
     if (metrics.hasNotch) {
       const notchW = metrics.notchWidth;
       const h = metrics.notchHeight + 2;
       return \`
-        <div class="pill-notched pill-entering" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="\${rowAction}">
-          <div class="pill-wing left">
-            <span class="status-dot \${dotClass}"></span>
-            <span class="pill-label">\${escapeHtml(leftLabel)}</span>
-          </div>
+        <div class="pill-notched" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="\${rowAction}" \${rowAttrs}>
+          <div class="pill-wing left">\${leftHtml}</div>
           <div class="notch-cutout"></div>
-          <div class="pill-wing right">
-            \${showEq ? eqHtml : rightTitle ? \`<span class="pill-title">\${escapeHtml(rightTitle)}</span>\` : ""}
-            \${ctaHtml}
-          </div>
+          <div class="pill-wing right">\${rightHtml}</div>
         </div>
       \`;
     }
 
     return \`
-      <div class="pill-capsule pill-entering" data-action="\${rowAction}">
-        <span class="status-dot \${dotClass}"></span>
-        <span class="pill-label">\${escapeHtml(leftLabel)}</span>
-        \${rightTitle ? \`<span class="pill-title">\${escapeHtml(rightTitle)}</span>\` : \`<span style="flex:1"></span>\`}
-        \${eqHtml}
-        \${ctaHtml}
+      <div class="pill-capsule" data-action="\${rowAction}" \${rowAttrs}>
+        \${leftHtml}
+        <span style="flex:1"></span>
+        \${rightHtml}
       </div>
     \`;
   }
-
-  const ICON_EXPAND =
-    '<svg width="11.5" height="11.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.5 2.5H13.5V6.5M13.5 2.5L9 7M6.5 13.5H2.5V9.5M2.5 13.5L7 9" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const ICON_OPEN_APP =
-    '<svg width="11.5" height="11.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5H12.5V10M12.5 3.5L4 12" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const ICON_CLOSE =
-    '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 
   function renderCardHeader(leftHtml, rightHtml) {
     if (metrics.hasNotch) {
@@ -1797,54 +2382,59 @@ export function buildIslandHtml(): string {
     \`;
   }
 
-  function renderDoneList(entering) {
-    const approvals = snapshot?.pendingApprovals ?? [];
-    const inputs = snapshot?.pendingUserInputs ?? [];
+  function openInAppButton(environmentId, threadId) {
+    return \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(environmentId)}" data-thread="\${escapeHtml(threadId)}" title="Open in mattr">\${ICON_OPEN_APP}</button>\`;
+  }
+
+  const CLOSE_BUTTON = \`<button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`;
+
+  function carouselNav(index, total, scope) {
+    if (total <= 1) return "";
+    return \`
+      <span class="carousel-nav">
+        <button class="icon-btn small" data-action="\${scope}-prev" title="Previous (←)">\${ICON_CHEVRON_LEFT}</button>
+        <span class="carousel-count">\${index + 1} / \${total}</span>
+        <button class="icon-btn small" data-action="\${scope}-next" title="Next (→)">\${ICON_CHEVRON_RIGHT}</button>
+      </span>
+    \`;
+  }
+
+  function renderDoneCard() {
     const done = snapshot?.doneNotifications ?? [];
-    const rows = [];
-    for (const a of approvals) {
-      rows.push(\`
-        <div class="done-item" data-action="expand-approval">
-          <span class="status-dot approval"></span>
-          <span class="thread-list-title">\${escapeHtml(a.threadTitle)}</span>
-          <span class="badge-chip amber">Approve</span>
-        </div>
-      \`);
-    }
-    for (const q of inputs) {
-      rows.push(\`
-        <div class="done-item" data-action="expand-question">
-          <span class="status-dot input"></span>
-          <span class="thread-list-title">\${escapeHtml(q.threadTitle)}</span>
-          <span class="badge-chip blue">Question</span>
-        </div>
-      \`);
-    }
-    for (const d of done) {
-      rows.push(\`
+    const byKey = new Map((snapshot?.recentThreads ?? []).map((t) => [t.key, t]));
+    const rows = done.map((d) => {
+      const thread = byKey.get(d.key);
+      const meta = [thread ? durationText(thread.runStartedAt, thread.runCompletedAt) : "", agoText(d.completedAt)]
+        .filter(Boolean)
+        .join(" · ");
+      return \`
         <div class="done-item" data-action="open-thread" data-env="\${escapeHtml(d.environmentId)}" data-thread="\${escapeHtml(d.threadId)}">
-          <span class="status-dot done"></span>
+          \${thread ? providerDot(thread) : ""}
           <span class="thread-list-title">\${escapeHtml(d.threadTitle)}</span>
-          <span class="badge-chip green">Open</span>
+          <span class="thread-list-meta elapsed">\${escapeHtml(meta)}</span>
+          <span class="badge-chip emerald">Review</span>
+          <button class="icon-btn small" data-action="dismiss-done-item" data-key="\${escapeHtml(d.key)}" title="Dismiss">\${ICON_CLOSE}</button>
         </div>
-      \`);
-    }
+      \`;
+    });
     const headerHtml = renderCardHeader(
-      \`<span class="status-dot \${approvals.length > 0 ? "approval" : inputs.length > 0 ? "input" : "done"}"></span><span class="thread-title-text" style="font-size:13px;font-weight:600">Attention</span>\`,
-      \`<button class="ghost-btn" style="padding:3px 8px;font-size:11px" data-action="dismiss-done">Clear</button><button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`,
+      \`<span class="done-tick">\${ICON_CHECK}</span><span class="thread-title-text card-heading">Done · Review</span>\`,
+      \`<button class="ghost-btn compact" data-action="dismiss-done">Clear</button>\${CLOSE_BUTTON}\`,
     );
     return \`
       <div class="card-root">
         \${headerHtml}
-        <div class="card-body \${entering ? "entering" : ""}">
+        <div class="card-body">
           <div class="done-list">\${rows.join("")}</div>
         </div>
       </div>
     \`;
   }
 
-  function renderApproval(approval, entering) {
-    const opts = approval.options.map((opt, idx) => \`
+  function renderApproval(approval, navHtml) {
+    const opts = approval.options
+      .map(
+        (opt, idx) => \`
       <button class="option-card" data-action="pick-approval" data-decision="\${escapeHtml(opt.decision)}">
         <span class="option-num">\${idx + 1}</span>
         <span class="option-body">
@@ -1852,21 +2442,24 @@ export function buildIslandHtml(): string {
           \${opt.warning ? \`<span class="option-desc">\${escapeHtml(opt.warning)}</span>\` : ""}
         </span>
       </button>
-    \`).join("");
+    \`,
+      )
+      .join("");
 
     const headerHtml = renderCardHeader(
-      \`<span class="status-dot approval"></span><span class="thread-title-text" style="font-size:13px;font-weight:600">Approve</span>\`,
-      \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(approval.environmentId)}" data-thread="\${escapeHtml(approval.threadId)}" title="Open in mattr">\${ICON_OPEN_APP}</button><button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`,
+      \`<span class="status-dot approval"></span><span class="thread-title-text card-heading">Approve</span>\`,
+      openInAppButton(approval.environmentId, approval.threadId) + CLOSE_BUTTON,
     );
 
     return \`
       <div class="card-root">
         \${headerHtml}
-        <div class="card-body \${entering ? "entering" : ""}">
+        <div class="card-body">
           <div class="card-submeta">
-            <p class="prompt-heading">\${escapeHtml(approval.title)}</p>
             <span class="badge-chip">\${escapeHtml(approval.threadTitle)}</span>
+            \${navHtml}
           </div>
+          <p class="prompt-heading">\${escapeHtml(approval.title)}</p>
           \${approval.detail ? \`<div class="approval-detail">\${escapeHtml(approval.detail)}</div>\` : ""}
           \${approval.reason ? \`<div class="tool-meta">\${escapeHtml(approval.reason)}</div>\` : ""}
           <div class="option-list">\${opts}</div>
@@ -1875,7 +2468,7 @@ export function buildIslandHtml(): string {
     \`;
   }
 
-  function renderQuestion(input, entering) {
+  function renderQuestion(input, navHtml) {
     if (activeRequestId !== input.requestId) {
       activeRequestId = input.requestId;
       questionIndex = 0;
@@ -1889,9 +2482,10 @@ export function buildIslandHtml(): string {
       Array.isArray(currentAnswer) ? currentAnswer : currentAnswer ? [currentAnswer] : [],
     );
 
-    const opts = q.options.map((opt, idx) => {
-      const selected = !questionCustomText.trim() && selectedSet.has(opt.value);
-      return \`
+    const opts = q.options
+      .map((opt, idx) => {
+        const selected = !questionCustomText.trim() && selectedSet.has(opt.value);
+        return \`
         <button class="option-card \${selected ? "selected" : ""}" data-action="pick-question-option" data-qid="\${escapeHtml(q.id)}" data-value="\${escapeHtml(opt.value)}" data-multi="\${q.multiSelect ? "1" : "0"}">
           <span class="option-num">\${idx + 1}</span>
           <span class="option-body">
@@ -1900,29 +2494,33 @@ export function buildIslandHtml(): string {
           </span>
         </button>
       \`;
-    }).join("");
+      })
+      .join("");
 
     const canSend = Boolean(
       questionCustomText.trim().length > 0 ||
-      (Array.isArray(currentAnswer) ? currentAnswer.length > 0 : Boolean(currentAnswer)),
+        (Array.isArray(currentAnswer) ? currentAnswer.length > 0 : Boolean(currentAnswer)),
     );
     const isLast = questionIndex >= input.questions.length - 1;
 
     const headerHtml = renderCardHeader(
-      \`<span class="status-dot input"></span><span class="thread-title-text" style="font-size:13px;font-weight:600">Question</span>\${input.questions.length > 1 ? \`<span class="badge-chip blue">\${questionIndex + 1}/\${input.questions.length}</span>\` : ""}\`,
-      \`<button class="icon-btn" data-action="open-thread" data-env="\${escapeHtml(input.environmentId)}" data-thread="\${escapeHtml(input.threadId)}" title="Open in mattr">\${ICON_OPEN_APP}</button><button class="icon-btn" data-action="close-panel" title="Close (Esc)">\${ICON_CLOSE}</button>\`,
+      \`<span class="status-dot input"></span><span class="thread-title-text card-heading">Question</span>\${input.questions.length > 1 ? \`<span class="badge-chip blue">\${questionIndex + 1}/\${input.questions.length}</span>\` : ""}\`,
+      openInAppButton(input.environmentId, input.threadId) + CLOSE_BUTTON,
     );
 
     return \`
       <div class="card-root">
         \${headerHtml}
-        <div class="card-body \${entering ? "entering" : ""}">
+        <div class="card-body">
           <div class="card-submeta">
-            <p class="prompt-heading">\${escapeHtml(q.question || q.header)}</p>
             <span class="badge-chip">\${escapeHtml(input.threadTitle)}</span>
+            \${navHtml}
           </div>
+          <p class="prompt-heading">\${escapeHtml(q.question || q.header)}</p>
           <div class="option-list">\${opts}</div>
-          \${q.allowCustomAnswer !== false ? \`
+          \${
+            q.allowCustomAnswer !== false
+              ? \`
             <input
               id="question-custom-input"
               class="custom-answer-input"
@@ -1930,7 +2528,9 @@ export function buildIslandHtml(): string {
               placeholder="Something else…"
               value="\${escapeHtml(questionCustomText)}"
             />
-          \` : ""}
+          \`
+              : ""
+          }
           <div class="card-footer">
             \${input.dismissible ? \`<button class="ghost-btn" data-action="dismiss-question">Skip</button>\` : ""}
             <button class="primary-pill-btn" data-action="submit-question" \${canSend ? "" : "disabled"}>
@@ -1943,7 +2543,140 @@ export function buildIslandHtml(): string {
     \`;
   }
 
-  function renderVoicePanel(entering) {
+  function renderAttention(view) {
+    const nav = carouselNav(view.index, view.total, "attention");
+    return view.entry.kind === "approval"
+      ? renderApproval(view.entry.item, nav)
+      : renderQuestion(view.entry.item, nav);
+  }
+
+  const STATUS_CHIPS = {
+    running: ["live", "Running"],
+    approval: ["amber", "Needs approval"],
+    input: ["blue", "Question"],
+    done: ["emerald", "Done"],
+    failed: ["red", "Failed"],
+    limited: ["amber", "Usage limit"],
+    idle: ["", "Idle"],
+  };
+
+  function threadStatusChip(thread) {
+    const [tone, label] = STATUS_CHIPS[thread.status] || STATUS_CHIPS.idle;
+    return \`<span class="badge-chip \${tone}">\${label}</span>\`;
+  }
+
+  function renderPlan(thread) {
+    const plan = thread.plan;
+    if (!plan || plan.total <= 0) return "";
+    const fraction = clamp(plan.completed / plan.total, 0, 1);
+    return \`
+      <div class="plan-row" data-plan="\${escapeHtml(thread.key + ":" + plan.completed)}">
+        <span class="plan-check">\${ICON_CHECK}</span>
+        <span class="plan-count elapsed">\${plan.completed}/\${plan.total}</span>
+        <span class="plan-bar"><span class="plan-bar-fill" style="transform:scaleX(\${fraction.toFixed(3)})"></span></span>
+        \${plan.currentStep ? \`<span class="plan-step">\${escapeHtml(plan.currentStep)}</span>\` : ""}
+      </div>
+    \`;
+  }
+
+  function renderAgentsCard() {
+    const list = agentList();
+    if (list.length === 0) return "";
+    let index = list.findIndex((t) => t.key === agentKey);
+    if (index < 0) index = 0;
+    const t = list[index];
+    agentKey = t.key;
+
+    const headerHtml = renderCardHeader(
+      providerDot(t) +
+        \`<span class="thread-title-text card-heading">\${list.length > 1 ? list.length + " agents" : "Agent"}</span>\`,
+      openInAppButton(t.environmentId, t.threadId) + CLOSE_BUTTON,
+    );
+
+    const metaHtml = [
+      t.model
+        ? \`<span class="meta-chip">\${providerDot(t)}<span class="meta-text">\${escapeHtml(t.model)}</span></span>\`
+        : "",
+      t.branch
+        ? \`<span class="meta-chip mono">\${ICON_BRANCH}<span class="meta-text">\${escapeHtml(t.branch)}</span></span>\`
+        : "",
+      elapsedSpan(t, "meta-chip"),
+    ].join("");
+
+    const live = isActiveStatus(t.status);
+    const now =
+      t.currentActivity ||
+      (live && t.plan?.currentStep ? { kind: "tool", label: t.plan.currentStep, running: true } : null);
+    let activityHtml = "";
+    if (now) {
+      activityHtml = \`
+        <div class="activity-now">
+          \${activityIcon(now.kind)}
+          <span class="activity-label">\${escapeHtml(now.label)}</span>
+          \${now.running ? \`<span class="live-dot" data-ping="\${escapeHtml(t.key + "|" + now.label)}"></span>\` : ""}
+        </div>
+      \`;
+    } else if (t.status === "running") {
+      activityHtml = \`<div class="activity-now muted"><span class="activity-label">\${t.isStreaming ? "Writing a reply…" : "Working…"}</span></div>\`;
+    }
+
+    const recent = t.recentActivities ?? [];
+    const recentHtml =
+      recent.length > 0
+        ? \`<div class="activity-list">\${recent
+            .map(
+              (a) =>
+                \`<div class="activity-row">\${activityIcon(a.kind)}<span class="activity-label">\${escapeHtml(a.label)}</span></div>\`,
+            )
+            .join("")}</div>\`
+        : "";
+
+    const fallbackHtml =
+      !activityHtml && !recentHtml && t.latestAssistantMessage
+        ? \`<div class="assistant-text clamp-3">\${escapeHtml(t.latestAssistantMessage)}</div>\`
+        : "";
+
+    const stripHtml =
+      list.length > 1
+        ? \`<div class="agent-strip">\${list
+            .slice(0, 6)
+            .map(
+              (a) =>
+                \`<button class="agent-chip \${a.key === t.key ? "active" : ""}" data-action="select-agent" data-key="\${escapeHtml(a.key)}" title="\${escapeHtml(a.title)}">\${providerDot(a)}<span class="agent-chip-title">\${escapeHtml(a.title)}</span></button>\`,
+            )
+            .join("")}</div>\`
+        : "";
+
+    const reviewHtml =
+      t.status === "approval" || t.status === "input"
+        ? \`<button class="ghost-btn" data-action="expand-attention" data-thread="\${escapeHtml(t.threadId)}">\${t.status === "approval" ? "Review approval" : "Answer question"}</button>\`
+        : "";
+
+    return \`
+      <div class="card-root">
+        \${headerHtml}
+        <div class="card-body">
+          <div class="card-submeta">
+            \${threadStatusChip(t)}
+            \${carouselNav(index, list.length, "agents")}
+          </div>
+          <button class="agent-title" data-action="open-thread" data-env="\${escapeHtml(t.environmentId)}" data-thread="\${escapeHtml(t.threadId)}" title="Open in mattr">\${escapeHtml(t.title)}</button>
+          \${metaHtml ? \`<div class="meta-row">\${metaHtml}</div>\` : ""}
+          \${activityHtml}
+          \${recentHtml}
+          \${renderPlan(t)}
+          \${fallbackHtml}
+          \${stripHtml}
+          <div class="card-footer">
+            \${reviewHtml}
+            <button class="primary-pill-btn" data-action="open-thread" data-env="\${escapeHtml(t.environmentId)}" data-thread="\${escapeHtml(t.threadId)}">Open in mattr</button>
+          </div>
+        </div>
+      </div>
+    \`;
+  }
+
+  function renderVoicePanel() {
     const thread = selectedThread();
     const threads = snapshot?.recentThreads ?? [];
     const voice = snapshot?.voice ?? {
@@ -2101,9 +2834,9 @@ export function buildIslandHtml(): string {
 
     const attentionChipHtml =
       (snapshot?.pendingApprovals?.length ?? 0) > 0
-        ? \`<button class="badge-chip amber" style="border:none;cursor:pointer" data-action="expand-approval">Approve</button>\`
+        ? \`<button class="badge-chip amber" style="border:none;cursor:pointer" data-action="expand-attention">Approve</button>\`
         : (snapshot?.pendingUserInputs?.length ?? 0) > 0
-          ? \`<button class="badge-chip blue" style="border:none;cursor:pointer" data-action="expand-question">Question</button>\`
+          ? \`<button class="badge-chip blue" style="border:none;cursor:pointer" data-action="expand-attention">Question</button>\`
           : assistant.handsFreeActive
             ? \`<button class="badge-chip \${assistant.muted ? "amber" : "green"}" style="border:none;cursor:pointer" data-action="assistant-toggle-mute">\${assistant.muted ? "Unmute" : "Mute"}</button>\`
             : "";
@@ -2126,7 +2859,7 @@ export function buildIslandHtml(): string {
     return \`
       <div class="card-root">
         \${headerHtml}
-        <div class="card-body \${entering ? "entering" : ""}">
+        <div class="card-body">
           \${modeBarHtml}
           \${switcherHtml}
           \${messagesHtml}
@@ -2169,212 +2902,215 @@ export function buildIslandHtml(): string {
     \`;
   }
 
-  function syncCardHeightTarget() {
+  function syncCardHeightTarget(profile) {
     if (geomState !== "card") return;
     const { stageH } = syncStageSize();
     const cardW = getEffectiveCardWidth();
-    targetContentWidth = cardW;
     measureEl.style.width = cardW + "px";
     const rectH = Math.ceil(measureEl.getBoundingClientRect().height || 0);
     const scrollH = Math.ceil(measureEl.scrollHeight || 0);
-    const measured = Math.max(rectH, scrollH, 220) + 4;
+    const measured = Math.max(rectH, scrollH, 92) + 4;
     const maxH = Math.max(200, Math.min(540, stageH - 16));
-    const clampedH = clamp(measured, 160, maxH);
-    setSpringTargets({
-      w: cardW,
-      h: clampedH,
-      topR: metrics.hasNotch ? 16 : 0,
-      botR: 26,
-      expand: 1,
-      presence: 1,
-    });
+    setSpringTargets(
+      {
+        w: cardW,
+        h: clamp(measured, 96, maxH),
+        earR: metrics.hasNotch ? 16 : 0,
+        botR: 26,
+        expand: 1,
+        presence: 1,
+      },
+      { profile: profile || "auto" },
+    );
+  }
+
+  function contentWidthFor(view) {
+    if (view.kind === "peek") return metrics.notchWidth + PEEK_WING * 2;
+    if (view.kind === "pill" || view.kind === "flash") return pillWidthFor(view);
+    return getEffectiveCardWidth();
   }
 
   function syncGeometryForView(view) {
+    const prevState = geomState;
+    const prevRank = GEOM_RANK[prevState] ?? 0;
+    const nW = metrics.notchWidth;
+    const nH = metrics.notchHeight;
+    const hover = isHoverNudge && isPointerInside ? 1 : 0;
+    const hoverChanged = hover !== lastGeomHover;
+    lastGeomHover = hover;
+    let next;
+    let targets;
+
     if (view.kind === "hidden") {
       if (metrics.hasNotch && snapshot?.settings?.enabled !== false) {
-        geomState = "docked";
-        targetContentWidth = metrics.notchWidth;
-        setSpringTargets({
-          w: metrics.notchWidth,
-          h: metrics.notchHeight,
-          topR: 6,
-          botR: 11,
-          expand: 0,
-          presence: 1,
-        });
+        next = "docked";
+        targets = { w: nW, h: nH, earR: 6, botR: 11, expand: 0, presence: 1 };
       } else {
-        geomState = "hidden";
-        targetContentWidth = 220;
-        setSpringTargets({
-          w: 220,
-          h: 34,
-          topR: 0,
-          botR: 17,
-          expand: 0,
-          presence: 0,
-        });
+        next = "hidden";
+        targets = { w: 220, h: 34, earR: 0, botR: 17, expand: 0, presence: 0 };
       }
-      return;
-    }
-
-    if (view.kind === "peek") {
-      geomState = "peek";
-      const peekW = metrics.notchWidth + 68;
-      targetContentWidth = peekW;
-      measureEl.style.width = peekW + "px";
-      setSpringTargets({
-        w: peekW,
-        h: metrics.notchHeight + 2,
-        topR: 9,
-        botR: 15,
-        expand: 0.28,
+    } else if (view.kind === "nudge") {
+      // 0ms hover response: the silhouette stretches out of the hardware notch immediately.
+      next = "nudge";
+      targets = { w: nW + 10, h: nH + 5, earR: 7, botR: 13, expand: 0.16, presence: 1 };
+    } else if (view.kind === "peek") {
+      next = "peek";
+      targets = {
+        w: nW + PEEK_WING * 2 + hover * 10,
+        h: nH + 2 + hover * 5,
+        earR: 8,
+        botR: 14,
+        expand: 0.3,
         presence: 1,
-      });
+      };
+    } else if (view.kind === "pill" || view.kind === "flash") {
+      next = "pill";
+      const pillW = pillWidthFor(view);
+      targets = metrics.hasNotch
+        ? { w: pillW + hover * 10, h: nH + 2 + hover * 5, earR: 8, botR: 14, expand: 0.52, presence: 1 }
+        : { w: pillW + hover * 10, h: 38 + hover * 4, earR: 0, botR: 19 + hover * 2, expand: 0.52, presence: 1 };
+    } else {
+      geomState = "card";
+      syncCardHeightTarget(prevState === "card" ? "auto" : "open");
       return;
     }
 
-    if (view.kind === "pill" || view.kind === "flash") {
-      geomState = "pill";
-      const pillW = metrics.hasNotch
-        ? getEffectiveNotchPillWidth()
-        : view.kind === "flash"
-          ? CAPSULE_FLASH_WIDTH
-          : CAPSULE_PILL_WIDTH;
-      const pillH = metrics.hasNotch ? metrics.notchHeight + 2 : 38;
-      targetContentWidth = pillW;
-      measureEl.style.width = pillW + "px";
-      setSpringTargets({
-        w: pillW,
-        h: pillH,
-        topR: metrics.hasNotch ? 11 : 0,
-        botR: metrics.hasNotch ? 16 : 19,
-        expand: 0.52,
-        presence: 1,
-      });
-      return;
-    }
-
-    geomState = "card";
-    syncCardHeightTarget();
+    const nextRank = GEOM_RANK[next];
+    const hoverOnly = next === "nudge" || prevState === "nudge" || (nextRank === prevRank && hoverChanged);
+    const profile = hoverOnly
+      ? "peek"
+      : nextRank > prevRank
+        ? "open"
+        : nextRank < prevRank
+          ? "close"
+          : "auto";
+    geomState = next;
+    setSpringTargets(targets, { profile });
   }
 
-  function render() {
-    const view = resolveEffectiveView();
-    const enteringCard = view.kind !== lastViewKind && (
-      view.kind === "voice" ||
-      view.kind === "approval" ||
-      view.kind === "question" ||
-      view.kind === "done-list"
-    );
-    lastViewKind = view.kind;
+  function clearOutgoingLayers() {
+    for (const layer of contentClipEl.querySelectorAll(".morph-layer")) layer.remove();
+  }
 
-    if (view.kind === "hidden") {
-      stopWaveLoop();
-      syncGeometryForView(view);
-      if (!isPointerInside) {
-        setPassthrough(true);
-      }
-      return;
+  // Outgoing content dissolves (blur + scale toward the top edge) on its own layer while the
+  // incoming view resolves inside the reshaping blob.
+  function spawnOutgoing(direction) {
+    clearOutgoingLayers();
+    const old = content.firstElementChild;
+    if (!old || prefersReducedMotion) return;
+    const width = measureEl.offsetWidth;
+    const layer = document.createElement("div");
+    layer.className =
+      "morph-layer " +
+      (direction === "next" ? "slide-out-next" : direction === "prev" ? "slide-out-prev" : "morph-out");
+    layer.style.width = width + "px";
+    layer.style.marginLeft = -width / 2 + "px";
+    layer.setAttribute("aria-hidden", "true");
+    for (const node of old.querySelectorAll("[id]")) node.removeAttribute("id");
+    for (const node of old.querySelectorAll("[data-since]")) node.removeAttribute("data-since");
+    layer.appendChild(old);
+    contentClipEl.appendChild(layer);
+    const remove = () => layer.remove();
+    layer.addEventListener("animationend", (event) => {
+      if (event.target === layer) remove();
+    });
+    setTimeout(remove, 260);
+  }
+
+  function applyEnterAnimation() {
+    const el = content.firstElementChild;
+    if (!el) return;
+    const sliding = morphDirection === "next" || morphDirection === "prev";
+    const delay = sliding ? SLIDE_ENTER_DELAY_MS : MORPH_ENTER_DELAY_MS;
+    const elapsed = performance.now() - morphStartedAt;
+    if (elapsed >= delay + MORPH_ENTER_DURATION_MS) return;
+    const cls =
+      morphDirection === "next" ? "slide-in-next" : morphDirection === "prev" ? "slide-in-prev" : "morph-in";
+    el.classList.add(cls);
+    // A data re-render mid-transition resumes the same animation instead of restarting it.
+    el.style.animationDelay = Math.round(delay - elapsed) + "ms";
+    el.addEventListener("animationend", (event) => {
+      if (event.target !== el) return;
+      el.classList.remove(cls);
+      el.style.animationDelay = "";
+    });
+  }
+
+  function afterContentCommit() {
+    refreshElapsed();
+    syncElapsedTicker();
+    const pingEl = content.querySelector("[data-ping]");
+    if (pingEl) {
+      const sig = pingEl.dataset.ping;
+      if (lastPingSignature && sig !== lastPingSignature) pingEl.classList.add("ping");
+      lastPingSignature = sig;
     }
-
-    if (view.kind === "peek") {
-      destroyWaveGl();
-      const sig =
-        "peek:" +
-        metrics.notchWidth +
-        ":" +
-        metrics.notchHeight +
-        ":" +
-        (snapshot?.pendingApprovals?.length ?? 0) +
-        ":" +
-        (snapshot?.pendingUserInputs?.length ?? 0);
-      if (sig !== lastRenderedSignature) {
-        content.innerHTML = renderPeek();
-        lastRenderedSignature = sig;
+    const planEl = content.querySelector("[data-plan]");
+    if (planEl) {
+      const sig = planEl.dataset.plan;
+      const [key] = sig.split(":");
+      if (lastPlanSignature.startsWith(key + ":") && sig !== lastPlanSignature) {
+        planEl.classList.add("tick");
       }
-      syncGeometryForView(view);
-      return;
+      lastPlanSignature = sig;
     }
+  }
 
-    if (view.kind === "flash") {
-      destroyWaveGl();
-      const sig = "flash:" + metrics.hasNotch + ":" + flashMessage;
-      if (sig !== lastRenderedSignature) {
-        content.innerHTML = renderFlash();
-        lastRenderedSignature = sig;
+  function commitContent(view, signature, build, morphKey, direction) {
+    const keyChanged = morphKey !== lastMorphKey;
+    if (!keyChanged && signature === lastRenderedSignature) return;
+    const active = document.activeElement;
+    const focusId = active && content.contains(active) && active.id ? active.id : "";
+    let selStart = null;
+    let selEnd = null;
+    if (focusId) {
+      try {
+        selStart = active.selectionStart;
+        selEnd = active.selectionEnd;
+      } catch {}
+    }
+    if (keyChanged) {
+      if (lastMorphKey) spawnOutgoing(direction);
+      morphStartedAt = performance.now();
+      morphDirection = direction;
+    }
+    measureEl.style.width = contentWidthFor(view) + "px";
+    content.innerHTML = build();
+    lastRenderedSignature = signature;
+    lastMorphKey = morphKey;
+    if (focusId && !keyChanged) {
+      const nextFocus = document.getElementById(focusId);
+      if (nextFocus) {
+        nextFocus.focus();
+        if (selStart !== null && selEnd !== null) {
+          try {
+            nextFocus.setSelectionRange(selStart, selEnd);
+          } catch {}
+        }
       }
-      syncGeometryForView(view);
-      return;
     }
+    applyEnterAnimation();
+    afterContentCommit();
+  }
 
-    if (view.kind === "pill") {
-      destroyWaveGl();
-      const html = renderPill(view);
-      const sig = "pill:" + metrics.hasNotch + ":" + metrics.notchWidth + ":" + html;
-      if (sig !== lastRenderedSignature) {
-        content.innerHTML = html;
-        lastRenderedSignature = sig;
-      }
-      updatePillEqualizer();
-      syncGeometryForView(view);
-      return;
-    }
+  function dissolveContent() {
+    if (!lastMorphKey) return;
+    spawnOutgoing("fade");
+    content.innerHTML = "";
+    lastMorphKey = "";
+    lastRenderedSignature = "hidden";
+    syncElapsedTicker();
+  }
 
-    if (view.kind === "done-list") {
-      destroyWaveGl();
-      const html = renderDoneList(enteringCard);
-      const sig = "done-list:" + metrics.hasNotch + ":" + html;
-      if (sig !== lastRenderedSignature) {
-        content.innerHTML = html;
-        lastRenderedSignature = sig;
-      }
-      syncGeometryForView(view);
-      return;
-    }
-
-    if (view.kind === "approval") {
-      destroyWaveGl();
-      const html = renderApproval(view.approval, enteringCard);
-      const sig = "approval:" + metrics.hasNotch + ":" + html;
-      if (sig !== lastRenderedSignature) {
-        content.innerHTML = html;
-        lastRenderedSignature = sig;
-      }
-      syncGeometryForView(view);
-      return;
-    }
-
-    if (view.kind === "question") {
-      destroyWaveGl();
-      const html = renderQuestion(view.input, enteringCard);
-      const sig = "question:" + metrics.hasNotch + ":" + html;
-      if (sig !== lastRenderedSignature) {
-        const prevFocused = document.activeElement?.id === "question-custom-input";
-        content.innerHTML = html;
-        lastRenderedSignature = sig;
-        if (prevFocused) document.getElementById("question-custom-input")?.focus();
-      }
-      syncGeometryForView(view);
-      return;
-    }
-
-    // Voice panel: avoid clobbering the live WebGL canvas or typing cursor on audio-level ticks
-    const prevDraftInput = document.getElementById("island-draft-input");
-    const draftFocused = document.activeElement === prevDraftInput;
-    const selStart = prevDraftInput?.selectionStart ?? null;
-    const selEnd = prevDraftInput?.selectionEnd ?? null;
-
-    const structuralSnapshot = {
-      view: "voice",
+  function voiceSignature() {
+    return JSON.stringify({
       hasNotch: metrics.hasNotch,
       notchWidth: metrics.notchWidth,
       notchHeight: metrics.notchHeight,
       switcher: threadSwitcherOpen,
       thread: selectedThread(),
       threadsCount: snapshot?.recentThreads?.length ?? 0,
-      approvals: snapshot?.pendingApprovals?.length ?? 0,
-      inputs: snapshot?.pendingUserInputs?.length ?? 0,
+      attention: attentionItems().length,
       showMessages: snapshot?.settings?.showMessages,
       shortcut: snapshot?.settings?.shortcut,
       voicePhase: snapshot?.voice?.phase,
@@ -2391,27 +3127,119 @@ export function buildIslandHtml(): string {
       assistantStatus: snapshot?.assistant?.statusLabel,
       assistantTurns: snapshot?.assistant?.recentTurns?.slice(-3),
       assistantError: snapshot?.assistant?.error,
-    };
-    const sig = JSON.stringify(structuralSnapshot);
-    if (sig !== lastRenderedSignature) {
-      content.innerHTML = renderVoicePanel(enteringCard);
-      lastRenderedSignature = sig;
-      if (draftFocused) {
-        const nextInput = document.getElementById("island-draft-input");
-        if (nextInput) {
-          nextInput.focus();
-          if (selStart !== null && selEnd !== null) {
-            try { nextInput.setSelectionRange(selStart, selEnd); } catch {}
-          }
-        }
-      }
+    });
+  }
+
+  function render() {
+    const view = resolveEffectiveView();
+    normalizeUiMode(view);
+    applyRimTone(rimToneFor(view));
+
+    if (view.kind === "hidden" || view.kind === "nudge") {
+      stopWaveLoop();
+      dissolveContent();
+      syncGeometryForView(view);
+      if (!isPointerInside) setPassthrough(true);
+      return;
     }
-    ensureWaveMounted();
+
+    if (view.kind !== "voice") destroyWaveGl();
+    const direction = navDirection;
+    navDirection = "fade";
+
+    if (view.kind === "voice") {
+      commitContent(view, voiceSignature(), () => renderVoicePanel(), "voice", "fade");
+      ensureWaveMounted();
+      syncGeometryForView(view);
+      return;
+    }
+
+    let html = "";
+    let morphKey = view.kind;
+    let morphDir = "fade";
+    if (view.kind === "peek") {
+      html = renderPeek();
+    } else if (view.kind === "flash") {
+      html = renderFlash();
+    } else if (view.kind === "pill") {
+      html = renderPill(view);
+      morphKey = "pill:" + view.pillKind;
+    } else if (view.kind === "done-list") {
+      html = renderDoneCard();
+    } else if (view.kind === "attention") {
+      html = renderAttention(view);
+      morphKey = "attention:" + view.entry.requestId + ":" + questionIndex;
+      morphDir = direction;
+    } else if (view.kind === "agents") {
+      html = renderAgentsCard();
+      morphKey = "agents:" + agentKey;
+      morphDir = direction;
+    }
+    commitContent(view, html, () => html, morphKey, morphDir);
+    if (view.kind === "pill") updatePillEqualizer();
     syncGeometryForView(view);
   }
 
+  function decisionLabel(decision) {
+    return decision === "accept"
+      ? "Allowed once"
+      : decision === "acceptAlways"
+        ? "Always allowed"
+        : decision === "acceptForSession"
+          ? "Allowed for session"
+          : "Denied";
+  }
+
+  // After answering, slide to the next pending request; flash a confirmation only once the
+  // carousel is empty.
+  function finishAttentionItem(label) {
+    attentionKey = null;
+    if (uiMode === "attention" && attentionItems().length > 0) {
+      navDirection = "next";
+      render();
+      return;
+    }
+    uiMode = "auto";
+    attentionAutoOpened = false;
+    showFlash(label);
+  }
+
+  function respondApproval(approval, decision) {
+    if (!approval || !decision) return;
+    bridge.sendAction({
+      type: "respond-approval",
+      environmentId: approval.environmentId,
+      threadId: approval.threadId,
+      requestId: approval.requestId,
+      decision,
+    });
+    answeredRequestIds.add(approval.requestId);
+    finishAttentionItem(decisionLabel(decision));
+  }
+
+  function currentQuestionInput() {
+    const entry = currentAttentionEntry();
+    return entry && entry.kind === "question" ? entry.item : null;
+  }
+
+  function pickQuestionOption(q, value) {
+    questionCustomText = "";
+    if (q.multiSelect) {
+      const cur = Array.isArray(questionAnswers[q.id]) ? [...questionAnswers[q.id]] : [];
+      const i = cur.indexOf(value);
+      if (i >= 0) cur.splice(i, 1);
+      else cur.push(value);
+      questionAnswers[q.id] = cur;
+      render();
+      return;
+    }
+    questionAnswers[q.id] = value;
+    render();
+    setTimeout(() => submitCurrentQuestion(), 140);
+  }
+
   function submitCurrentQuestion() {
-    const input = snapshot?.pendingUserInputs?.[0];
+    const input = currentQuestionInput();
     if (!input) return;
     const q = input.questions[questionIndex] ?? input.questions[0];
     if (!q) return;
@@ -2424,6 +3252,7 @@ export function buildIslandHtml(): string {
     if (questionIndex < input.questions.length - 1) {
       questionIndex += 1;
       questionCustomText = "";
+      navDirection = "next";
       render();
       return;
     }
@@ -2434,12 +3263,12 @@ export function buildIslandHtml(): string {
       requestId: input.requestId,
       answers: questionAnswers,
     });
+    answeredRequestIds.add(input.requestId);
     questionIndex = 0;
     questionAnswers = {};
     questionCustomText = "";
     activeRequestId = null;
-    uiMode = "auto";
-    showFlash("Sent");
+    finishAttentionItem("Sent");
   }
 
   function submitVoiceReply() {
@@ -2472,10 +3301,53 @@ export function buildIslandHtml(): string {
   function closeIsland() {
     threadSwitcherOpen = false;
     isNotchPeeking = false;
+    isHoverNudge = false;
+    attentionAutoOpened = false;
+    cancelAutoCollapse();
     uiMode = "auto";
     bridge.sendAction({ type: "voice-cancel" });
     bridge.sendAction({ type: "close-panel" });
     render();
+  }
+
+  function openMode(mode) {
+    uiMode = mode;
+    isNotchPeeking = false;
+    attentionAutoOpened = false;
+    cancelAutoCollapse();
+    bridge.focusWindow();
+    lastPassthrough = false;
+    render();
+  }
+
+  function stepAttention(delta) {
+    const items = attentionItems();
+    const cur = currentAttention(items);
+    if (!cur || cur.total < 2) return;
+    const next = (cur.index + delta + cur.total) % cur.total;
+    attentionIndex = next;
+    attentionKey = items[next].requestId;
+    navDirection = delta > 0 ? "next" : "prev";
+    render();
+  }
+
+  function stepAgent(delta) {
+    const list = agentList();
+    if (list.length < 2) return;
+    const index = Math.max(0, list.findIndex((t) => t.key === agentKey));
+    const next = (index + delta + list.length) % list.length;
+    agentKey = list[next].key;
+    navDirection = delta > 0 ? "next" : "prev";
+    render();
+  }
+
+  function focusDraftSoon(delay) {
+    setTimeout(() => document.getElementById("island-draft-input")?.focus(), delay);
+  }
+
+  function openVoicePanel() {
+    openMode("voice");
+    focusDraftSoon(60);
   }
 
   // Click delegation on active Island content
@@ -2483,194 +3355,157 @@ export function buildIslandHtml(): string {
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
-    if (action === "open-thread") {
-      event.stopPropagation();
-      uiMode = "auto";
-      isNotchPeeking = false;
-      bridge.sendAction({
-        type: "open-thread",
-        environmentId: target.dataset.env,
-        threadId: target.dataset.thread,
-      });
-      render();
-      return;
-    }
-    if (action === "expand-done") {
-      uiMode = "done-list";
-      isNotchPeeking = false;
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
-      return;
-    }
-    if (action === "expand-approval") {
-      uiMode = "approval";
-      isNotchPeeking = false;
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
-      return;
-    }
-    if (action === "expand-question") {
-      uiMode = "question";
-      isNotchPeeking = false;
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
-      return;
-    }
-    if (action === "expand-attention") {
-      if ((snapshot?.pendingApprovals?.length ?? 0) > 0) uiMode = "approval";
-      else if ((snapshot?.pendingUserInputs?.length ?? 0) > 0) uiMode = "question";
-      else uiMode = "done-list";
-      isNotchPeeking = false;
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
-      return;
-    }
-    if (action === "dismiss-done") {
-      bridge.sendAction({ type: "dismiss-done" });
-      uiMode = "auto";
-      render();
-      return;
-    }
-    if (action === "close-panel") {
-      closeIsland();
-      return;
-    }
-    if (action === "toggle-thread-switcher") {
-      threadSwitcherOpen = !threadSwitcherOpen;
-      render();
-      return;
-    }
-    if (action === "select-thread") {
-      threadSwitcherOpen = false;
-      bridge.sendAction({ type: "select-thread", threadKey: target.dataset.key });
-      render();
-      return;
-    }
-    if (action === "voice-toggle") {
-      if (!snapshot?.voice?.available) {
-        bridge.sendAction({ type: "open-voice-settings" });
+    switch (action) {
+      case "open-thread": {
+        event.stopPropagation();
+        uiMode = "auto";
+        isNotchPeeking = false;
+        bridge.sendAction({
+          type: "open-thread",
+          environmentId: target.dataset.env,
+          threadId: target.dataset.thread,
+        });
+        render();
         return;
       }
-      bridge.sendAction({ type: "voice-toggle" });
-      return;
-    }
-    if (action === "expand-voice") {
-      uiMode = "voice";
-      isNotchPeeking = false;
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
-      setTimeout(() => document.getElementById("island-draft-input")?.focus(), 60);
-      return;
-    }
-    if (action === "assistant-set-mode") {
-      const mode = target.dataset.mode;
-      if (mode) {
-        bridge.sendAction({ type: "assistant-set-mode", mode });
+      case "expand-done":
+        openMode("done-list");
+        return;
+      case "expand-attention":
+      case "expand-approval":
+      case "expand-question": {
+        const threadId = target.dataset.thread;
+        if (threadId) {
+          const match = attentionItems().find((entry) => entry.item.threadId === threadId);
+          if (match) attentionKey = match.requestId;
+        }
+        navDirection = "fade";
+        openMode("attention");
+        return;
       }
-      return;
-    }
-    if (action === "assistant-toggle-hands-free") {
-      event.stopPropagation();
-      bridge.sendAction({ type: "assistant-toggle-hands-free" });
-      return;
-    }
-    if (action === "assistant-toggle-mute") {
-      event.stopPropagation();
-      bridge.sendAction({ type: "assistant-toggle-mute" });
-      return;
-    }
-    if (action === "assistant-barge-in") {
-      bridge.sendAction({ type: "assistant-barge-in" });
-      return;
-    }
-    if (action === "assistant-open-voice-mode-modal") {
-      uiMode = "auto";
-      isNotchPeeking = false;
-      bridge.sendAction({ type: "assistant-open-voice-mode-modal" });
-      render();
-      return;
-    }
-    if (action === "send-reply") {
-      submitVoiceReply();
-      return;
-    }
-    if (action === "pick-approval") {
-      const approval = snapshot?.pendingApprovals?.[0];
-      if (!approval) return;
-      const decision = target.dataset.decision;
-      bridge.sendAction({
-        type: "respond-approval",
-        environmentId: approval.environmentId,
-        threadId: approval.threadId,
-        requestId: approval.requestId,
-        decision,
-      });
-      uiMode = "auto";
-      const label =
-        decision === "accept"
-          ? "Allowed once"
-          : decision === "acceptAlways"
-            ? "Always allowed"
-            : decision === "acceptForSession"
-              ? "Allowed for session"
-              : "Denied";
-      showFlash(label);
-      return;
-    }
-    if (action === "pick-question-option") {
-      const qid = target.dataset.qid;
-      const value = target.dataset.value;
-      const multi = target.dataset.multi === "1";
-      questionCustomText = "";
-      if (multi) {
-        const cur = Array.isArray(questionAnswers[qid]) ? [...questionAnswers[qid]] : [];
-        const i = cur.indexOf(value);
-        if (i >= 0) cur.splice(i, 1);
-        else cur.push(value);
-        questionAnswers[qid] = cur;
+      case "expand-agents":
+        if (target.dataset.key) agentKey = target.dataset.key;
+        navDirection = "fade";
+        openMode("agents");
+        return;
+      case "attention-prev":
+        stepAttention(-1);
+        return;
+      case "attention-next":
+        stepAttention(1);
+        return;
+      case "agents-prev":
+        stepAgent(-1);
+        return;
+      case "agents-next":
+        stepAgent(1);
+        return;
+      case "select-agent": {
+        const list = agentList();
+        const from = list.findIndex((t) => t.key === agentKey);
+        const to = list.findIndex((t) => t.key === target.dataset.key);
+        if (to < 0 || to === from) return;
+        agentKey = target.dataset.key;
+        navDirection = to > from ? "next" : "prev";
         render();
-      } else {
-        questionAnswers[qid] = value;
-        render();
-        setTimeout(() => submitCurrentQuestion(), 140);
+        return;
       }
-      return;
-    }
-    if (action === "dismiss-question") {
-      const input = snapshot?.pendingUserInputs?.[0];
-      if (!input) return;
-      bridge.sendAction({
-        type: "dismiss-user-input",
-        environmentId: input.environmentId,
-        threadId: input.threadId,
-        requestId: input.requestId,
-      });
-      uiMode = "auto";
-      render();
-      return;
-    }
-    if (action === "submit-question") {
-      submitCurrentQuestion();
-      return;
+      case "dismiss-done":
+        bridge.sendAction({ type: "dismiss-done" });
+        uiMode = "auto";
+        render();
+        return;
+      case "dismiss-done-item":
+        event.stopPropagation();
+        bridge.sendAction({ type: "dismiss-done", key: target.dataset.key });
+        return;
+      case "close-panel":
+        closeIsland();
+        return;
+      case "toggle-thread-switcher":
+        threadSwitcherOpen = !threadSwitcherOpen;
+        render();
+        return;
+      case "select-thread":
+        threadSwitcherOpen = false;
+        bridge.sendAction({ type: "select-thread", threadKey: target.dataset.key });
+        render();
+        return;
+      case "voice-toggle":
+        if (!snapshot?.voice?.available) {
+          bridge.sendAction({ type: "open-voice-settings" });
+          return;
+        }
+        bridge.sendAction({ type: "voice-toggle" });
+        return;
+      case "expand-voice":
+        openVoicePanel();
+        return;
+      case "assistant-set-mode":
+        if (target.dataset.mode) {
+          bridge.sendAction({ type: "assistant-set-mode", mode: target.dataset.mode });
+        }
+        return;
+      case "assistant-toggle-hands-free":
+        event.stopPropagation();
+        bridge.sendAction({ type: "assistant-toggle-hands-free" });
+        return;
+      case "assistant-toggle-mute":
+        event.stopPropagation();
+        bridge.sendAction({ type: "assistant-toggle-mute" });
+        return;
+      case "assistant-barge-in":
+        bridge.sendAction({ type: "assistant-barge-in" });
+        return;
+      case "assistant-open-voice-mode-modal":
+        uiMode = "auto";
+        isNotchPeeking = false;
+        bridge.sendAction({ type: "assistant-open-voice-mode-modal" });
+        render();
+        return;
+      case "send-reply":
+        submitVoiceReply();
+        return;
+      case "pick-approval": {
+        const entry = currentAttentionEntry();
+        if (entry && entry.kind === "approval") respondApproval(entry.item, target.dataset.decision);
+        return;
+      }
+      case "pick-question-option": {
+        const input = currentQuestionInput();
+        const q = input?.questions.find((item) => item.id === target.dataset.qid);
+        if (q) pickQuestionOption(q, target.dataset.value);
+        return;
+      }
+      case "dismiss-question": {
+        const input = currentQuestionInput();
+        if (!input) return;
+        bridge.sendAction({
+          type: "dismiss-user-input",
+          environmentId: input.environmentId,
+          threadId: input.threadId,
+          requestId: input.requestId,
+        });
+        answeredRequestIds.add(input.requestId);
+        finishAttentionItem("Skipped");
+        return;
+      }
+      case "submit-question":
+        submitCurrentQuestion();
+        return;
     }
   });
 
   // Clicking transparent margin outside an expanded card dismisses it;
-  // clicking directly inside the docked notch immediately opens Voice Assistant
+  // clicking directly inside the (hover-stretched) notch immediately opens Voice Assistant
   stage.addEventListener("click", (event) => {
     if (event.target !== stage) return;
-    if (geomState === "docked" && metrics.hasNotch && isPointInsideIsland(event.clientX, event.clientY)) {
-      isNotchPeeking = false;
-      uiMode = "voice";
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
-      setTimeout(() => document.getElementById("island-draft-input")?.focus(), 60);
+    if (
+      (geomState === "docked" || geomState === "nudge") &&
+      metrics.hasNotch &&
+      isPointInsideIsland(event.clientX, event.clientY)
+    ) {
+      openVoicePanel();
       return;
     }
     if (geomState === "card") {
@@ -2695,7 +3530,7 @@ export function buildIslandHtml(): string {
     }
   });
 
-  // Keyboard shortcuts (Escape, Enter, 1-9 for options, Cmd+Enter for Open in app)
+  // Keyboard: Escape, Enter, 1-9 for options, ←/→ for carousels, Cmd+Enter to open in mattr
   window.addEventListener("keydown", (event) => {
     const view = resolveEffectiveView();
     if (event.key === "Escape") {
@@ -2703,6 +3538,7 @@ export function buildIslandHtml(): string {
       closeIsland();
       return;
     }
+    const typing = document.activeElement?.tagName === "INPUT";
     if (event.key === "Enter" && event.metaKey && view.kind === "pill" && view.pillKind === "done" && view.done[0]) {
       event.preventDefault();
       bridge.sendAction({
@@ -2718,63 +3554,48 @@ export function buildIslandHtml(): string {
         submitVoiceReply();
         return;
       }
-      if (view.kind === "question") {
+      if (view.kind === "attention" && view.entry.kind === "question") {
         event.preventDefault();
         submitCurrentQuestion();
         return;
       }
-    }
-    if (
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey &&
-      document.activeElement?.tagName !== "INPUT"
-    ) {
-      const digit = Number.parseInt(event.key, 10);
-      if (digit >= 1 && digit <= 9) {
-        if (view.kind === "approval") {
-          const opt = view.approval.options[digit - 1];
-          if (opt) {
-            event.preventDefault();
-            bridge.sendAction({
-              type: "respond-approval",
-              environmentId: view.approval.environmentId,
-              threadId: view.approval.threadId,
-              requestId: view.approval.requestId,
-              decision: opt.decision,
-            });
-            uiMode = "auto";
-            showFlash(
-              opt.decision === "accept"
-                ? "Allowed once"
-                : opt.decision === "acceptAlways"
-                  ? "Always allowed"
-                  : opt.decision === "acceptForSession"
-                    ? "Allowed for session"
-                    : "Denied",
-            );
-          }
-        } else if (view.kind === "question") {
-          const q = view.input.questions[questionIndex] ?? view.input.questions[0];
-          const opt = q?.options[digit - 1];
-          if (q && opt) {
-            event.preventDefault();
-            questionCustomText = "";
-            if (q.multiSelect) {
-              const cur = Array.isArray(questionAnswers[q.id]) ? [...questionAnswers[q.id]] : [];
-              const i = cur.indexOf(opt.value);
-              if (i >= 0) cur.splice(i, 1);
-              else cur.push(opt.value);
-              questionAnswers[q.id] = cur;
-              render();
-            } else {
-              questionAnswers[q.id] = opt.value;
-              render();
-              setTimeout(() => submitCurrentQuestion(), 140);
-            }
-          }
+      if (view.kind === "agents" && !typing) {
+        const t = agentList().find((item) => item.key === agentKey);
+        if (t) {
+          event.preventDefault();
+          bridge.sendAction({ type: "open-thread", environmentId: t.environmentId, threadId: t.threadId });
         }
+        return;
       }
+    }
+    if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const delta = event.key === "ArrowRight" ? 1 : -1;
+      if (view.kind === "attention") {
+        event.preventDefault();
+        stepAttention(delta);
+      } else if (view.kind === "agents") {
+        event.preventDefault();
+        stepAgent(delta);
+      }
+      return;
+    }
+    const digit = Number.parseInt(event.key, 10);
+    if (!(digit >= 1 && digit <= 9) || view.kind !== "attention") return;
+    if (view.entry.kind === "approval") {
+      const opt = view.entry.item.options[digit - 1];
+      if (opt) {
+        event.preventDefault();
+        respondApproval(view.entry.item, opt.decision);
+      }
+      return;
+    }
+    const input = view.entry.item;
+    const q = input.questions[questionIndex] ?? input.questions[0];
+    const opt = q?.options[digit - 1];
+    if (q && opt) {
+      event.preventDefault();
+      pickQuestionOption(q, opt.value);
     }
   });
 
@@ -2794,14 +3615,14 @@ export function buildIslandHtml(): string {
 
     if (geomState === "docked") {
       if (!metrics.hasNotch) return false;
-      // Strictly confined to the 184 x notchHeight physical camera cutout
+      // Strictly confined to the physical camera cutout
       const halfHitW = Math.min(92, metrics.notchWidth / 2);
       return x >= cx - halfHitW && x <= cx + halfHitW && y >= 0 && y <= metrics.notchHeight;
     }
 
     const liveW = Math.max(springs.w.pos, springs.w.target * 0.85);
     const liveH = Math.max(springs.h.pos, springs.h.target * 0.85);
-    const earPad = metrics.hasNotch ? springs.topR.pos * 0.45 : 0;
+    const earPad = metrics.hasNotch ? springs.earR.pos * 0.45 : 0;
     const yTop = metrics.hasNotch ? 0 : CAPSULE_Y;
     return (
       x >= cx - liveW / 2 - earPad &&
@@ -2826,6 +3647,43 @@ export function buildIslandHtml(): string {
     }
   }
 
+  function onPointerEnterIsland() {
+    cancelAutoCollapse();
+    if (attentionAutoOpened) {
+      // The user reached for an auto-opened request: take focus so keys and clicks land.
+      attentionAutoOpened = false;
+      bridge.focusWindow();
+      lastPassthrough = false;
+    }
+    if (geomState === "card") return;
+    const wasDocked = geomState === "docked";
+    isHoverNudge = true;
+    render();
+    if (wasDocked && metrics.hasNotch && !isNotchPeeking && !peekEnterTimer) {
+      peekEnterTimer = setTimeout(() => {
+        peekEnterTimer = null;
+        if (isPointerInside && !isNotchPeeking && geomState === "nudge") {
+          isNotchPeeking = true;
+          render();
+        }
+      }, 140);
+      return;
+    }
+    const view = resolveEffectiveView();
+    if (view.kind === "pill" && view.pillKind === "attention") {
+      if (hoverExpandTimer) clearTimeout(hoverExpandTimer);
+      hoverExpandTimer = setTimeout(() => {
+        hoverExpandTimer = null;
+        if (!isPointerInside) return;
+        const cur = resolveEffectiveView();
+        if (cur.kind === "pill" && cur.pillKind === "attention") {
+          navDirection = "fade";
+          openMode("attention");
+        }
+      }, 220);
+    }
+  }
+
   function handlePointerOutside() {
     isPointerInside = false;
     if (peekEnterTimer) {
@@ -2836,14 +3694,21 @@ export function buildIslandHtml(): string {
       clearTimeout(hoverExpandTimer);
       hoverExpandTimer = null;
     }
-    if (isNotchPeeking && !peekLeaveTimer) {
-      peekLeaveTimer = setTimeout(() => {
-        peekLeaveTimer = null;
-        if (!isPointerInside && isNotchPeeking) {
-          isNotchPeeking = false;
-          render();
-        }
-      }, 110);
+    const hadNudge = isHoverNudge;
+    isHoverNudge = false;
+    if (isNotchPeeking) {
+      if (!peekLeaveTimer) {
+        peekLeaveTimer = setTimeout(() => {
+          peekLeaveTimer = null;
+          if (!isPointerInside && isNotchPeeking) {
+            isNotchPeeking = false;
+            render();
+          }
+        }, 110);
+      }
+      if (hadNudge) render();
+    } else if (hadNudge) {
+      render();
     }
     setPassthrough(true);
   }
@@ -2858,32 +3723,7 @@ export function buildIslandHtml(): string {
         peekLeaveTimer = null;
       }
       setPassthrough(false);
-
-      if (geomState === "docked" && metrics.hasNotch && !isNotchPeeking && !peekEnterTimer) {
-        peekEnterTimer = setTimeout(() => {
-          peekEnterTimer = null;
-          if (isPointerInside && geomState === "docked" && !isNotchPeeking) {
-            isNotchPeeking = true;
-            render();
-          }
-        }, 55);
-      } else if (!wasInside) {
-        const view = resolveEffectiveView();
-        if (view.kind === "pill" && (view.pillKind === "approval" || view.pillKind === "input")) {
-          if (hoverExpandTimer) clearTimeout(hoverExpandTimer);
-          hoverExpandTimer = setTimeout(() => {
-            hoverExpandTimer = null;
-            if (!isPointerInside) return;
-            const cur = resolveEffectiveView();
-            if (cur.kind === "pill") {
-              uiMode = cur.pillKind === "approval" ? "approval" : "question";
-              bridge.focusWindow();
-              lastPassthrough = false;
-              render();
-            }
-          }, 220);
-        }
-      }
+      if (!wasInside) onPointerEnterIsland();
     } else if (isPointerInside || !lastPassthrough) {
       handlePointerOutside();
     }
@@ -2897,12 +3737,14 @@ export function buildIslandHtml(): string {
   window.addEventListener("blur", () => {
     clearHoverTimers();
     isNotchPeeking = false;
+    isHoverNudge = false;
     const voiceActive = snapshot?.voice && snapshot.voice.phase !== "idle";
     if (!voiceActive && uiMode !== "auto") {
       uiMode = "auto";
+      attentionAutoOpened = false;
       threadSwitcherOpen = false;
-      render();
     }
+    render();
   });
 
   // Display metrics from DesktopIsland (notched vs external monitor)
@@ -2918,15 +3760,17 @@ export function buildIslandHtml(): string {
     syncStageSize();
     if (!metrics.hasNotch) {
       isNotchPeeking = false;
+      isHoverNudge = false;
     }
     if (changedNotch && geomState !== "card") {
       setSpringTargets(
         metrics.hasNotch
-          ? { w: metrics.notchWidth, h: metrics.notchHeight, topR: 6, botR: 11, expand: 0, presence: 1 }
-          : { w: 220, h: 34, topR: 0, botR: 17, expand: 0, presence: 0 },
-        true,
+          ? { w: metrics.notchWidth, h: metrics.notchHeight, earR: 6, botR: 11, expand: 0, presence: 1 }
+          : { w: 220, h: 34, earR: 0, botR: 17, expand: 0, presence: 0 },
+        { immediate: true },
       );
     }
+    lastRenderedSignature = "";
     render();
   }
 
@@ -2934,7 +3778,7 @@ export function buildIslandHtml(): string {
   if (typeof ResizeObserver === "function") {
     const ro = new ResizeObserver(() => {
       if (geomState === "card") {
-        syncCardHeightTarget();
+        syncCardHeightTarget("auto");
       }
     });
     ro.observe(measureEl);
@@ -2942,14 +3786,8 @@ export function buildIslandHtml(): string {
 
   window.addEventListener("resize", () => {
     syncStageSize();
-    if (geomState === "card") {
-      syncCardHeightTarget();
-    } else if (geomState === "pill" && metrics.hasNotch) {
-      const pillW = getEffectiveNotchPillWidth();
-      targetContentWidth = pillW;
-      measureEl.style.width = pillW + "px";
-      setSpringTargets({ w: pillW }, true);
-    }
+    lastRenderedSignature = "";
+    render();
     applyGeometryFrame();
   });
 
@@ -2959,6 +3797,12 @@ export function buildIslandHtml(): string {
 
   bridge.onSnapshot((next) => {
     snapshot = next;
+    trackAttention();
+    if (snapshot.mainWindowFocused && attentionAutoOpened && uiMode === "attention") {
+      uiMode = "auto";
+      attentionAutoOpened = false;
+      cancelAutoCollapse();
+    }
     updateWaveVisuals();
     render();
   });
@@ -2970,14 +3814,11 @@ export function buildIslandHtml(): string {
     }
     if (command.type === "open-voice-panel") {
       isNotchPeeking = false;
-      uiMode = "voice";
-      bridge.focusWindow();
-      lastPassthrough = false;
-      render();
+      openMode("voice");
       if (command.startVoice && snapshot?.voice?.available && snapshot?.voice?.phase === "idle") {
         bridge.sendAction({ type: "voice-start" });
       } else {
-        setTimeout(() => document.getElementById("island-draft-input")?.focus(), 50);
+        focusDraftSoon(50);
       }
       return;
     }
@@ -2989,17 +3830,13 @@ export function buildIslandHtml(): string {
         } else {
           closeIsland();
         }
+        return;
+      }
+      openMode("voice");
+      if (command.startVoice && snapshot?.voice?.available) {
+        bridge.sendAction({ type: "voice-start" });
       } else {
-        isNotchPeeking = false;
-        uiMode = "voice";
-        bridge.focusWindow();
-        lastPassthrough = false;
-        render();
-        if (command.startVoice && snapshot?.voice?.available) {
-          bridge.sendAction({ type: "voice-start" });
-        } else {
-          setTimeout(() => document.getElementById("island-draft-input")?.focus(), 50);
-        }
+        focusDraftSoon(50);
       }
     }
   });

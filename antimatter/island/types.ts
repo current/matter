@@ -97,6 +97,20 @@ export interface IslandDoneNotification {
   readonly completedAt: number;
 }
 
+export type IslandActivityKind = "command" | "edit" | "read" | "search" | "web" | "tool" | "agent";
+
+export interface IslandActivity {
+  readonly kind: IslandActivityKind;
+  readonly label: string;
+  readonly running: boolean;
+}
+
+export interface IslandPlanProgress {
+  readonly completed: number;
+  readonly total: number;
+  readonly currentStep: string | null;
+}
+
 export interface IslandThreadSummary {
   readonly key: string;
   readonly environmentId: string;
@@ -109,6 +123,16 @@ export interface IslandThreadSummary {
   readonly latestAssistantMessage: string | null;
   readonly toolCallCount: number;
   readonly isStreaming: boolean;
+  readonly providerInstanceId: string;
+  readonly model: string | null;
+  readonly branch: string | null;
+  /** ISO start of the active run, or of the latest run once it has finished. */
+  readonly runStartedAt: string | null;
+  readonly runCompletedAt: string | null;
+  readonly currentActivity: IslandActivity | null;
+  /** Newest first, excluding `currentActivity`. */
+  readonly recentActivities: ReadonlyArray<IslandActivity>;
+  readonly plan: IslandPlanProgress | null;
 }
 
 export interface IslandVoiceState {

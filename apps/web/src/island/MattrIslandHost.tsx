@@ -8,7 +8,6 @@ import {
   EnvironmentId,
   RuntimeRequestId,
   ThreadId,
-  type OrchestrationV2ThreadProjection,
   type OrchestrationV2ThreadShell,
   type ProviderApprovalDecision,
   type ScopedThreadRef,
@@ -47,6 +46,7 @@ import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { MattrVoiceModeModal } from "./MattrVoiceModeModal";
 import { VoiceBriefingCoordinator } from "./VoiceBriefingCoordinator";
+import { EMPTY_ISLAND_THREAD_PREVIEW, summarizeThreadProjection } from "./islandThreadActivity";
 import { useIslandSettings } from "./islandSettingsStore";
 import {
   bargeInVoiceAssistant,
@@ -79,6 +79,8 @@ import type {
 
 const MAX_RECENT_THREADS = 12;
 const MAX_DONE_NOTIFICATIONS = 8;
+const MAX_WATCHED_RUNNING_THREADS = 6;
+const SNAPSHOT_SYNC_INTERVAL_MS = 32;
 
 function defaultApprovalOptions(): ReadonlyArray<IslandApprovalOption> {
   return [
@@ -88,23 +90,8 @@ function defaultApprovalOptions(): ReadonlyArray<IslandApprovalOption> {
   ];
 }
 
-const TOOL_ITEM_TYPES = new Set([
-  "command_execution",
-  "file_change",
-  "dynamic_tool",
-  "mcp_tool_call",
-  "web_search",
-  "subagent",
-]);
-
 function currentTimestampIso(): string {
   return new Date().toISOString();
-}
-
-function truncateText(text: string, maxLength: number): string {
-  const cleaned = text.trim();
-  if (cleaned.length <= maxLength) return cleaned;
-  return `${cleaned.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
 function approvalKindTitle(kind: string, appName?: string): string {
@@ -121,52 +108,6 @@ function approvalKindTitle(kind: string, appName?: string): string {
     default:
       return m(msg("Tool approval"));
   }
-}
-
-function extractThreadConversationPreview(projection: OrchestrationV2ThreadProjection | null): {
-  readonly latestUserMessage: string | null;
-  readonly latestAssistantMessage: string | null;
-  readonly toolCallCount: number;
-  readonly isStreaming: boolean;
-} {
-  if (!projection) {
-    return {
-      latestUserMessage: null,
-      latestAssistantMessage: null,
-      toolCallCount: 0,
-      isStreaming: false,
-    };
-  }
-
-  let latestUserMessage: string | null = null;
-  let latestAssistantMessage: string | null = null;
-  let isStreaming = false;
-  let latestRunId: string | null = null;
-
-  for (let i = projection.messages.length - 1; i >= 0; i -= 1) {
-    const message = projection.messages[i];
-    if (!message) continue;
-    if (latestAssistantMessage === null && message.role === "assistant" && message.text.trim()) {
-      latestAssistantMessage = truncateText(message.text, 520);
-      isStreaming = message.streaming;
-      if (latestRunId === null && message.runId) latestRunId = message.runId;
-    }
-    if (latestUserMessage === null && message.role === "user" && message.text.trim()) {
-      latestUserMessage = truncateText(message.text, 240);
-      if (latestRunId === null && message.runId) latestRunId = message.runId;
-    }
-    if (latestUserMessage !== null && latestAssistantMessage !== null) break;
-  }
-
-  const targetRunId = latestRunId ?? projection.runs.at(-1)?.id ?? null;
-  let toolCallCount = 0;
-  for (const visible of projection.visibleTurnItems) {
-    if (!TOOL_ITEM_TYPES.has(visible.item.type)) continue;
-    if (targetRunId && visible.item.runId && visible.item.runId !== targetRunId) continue;
-    toolCallCount += 1;
-  }
-
-  return { latestUserMessage, latestAssistantMessage, toolCallCount, isStreaming };
 }
 
 function mapThreadStatus(
@@ -264,14 +205,32 @@ export function MattrIslandHost() {
   const primaryPrepared = Option.getOrNull(usePreparedConnection(activeHostEnvironmentId));
   const speechDestination = useVoiceTranscriptionDestination();
 
-  // Track main window focus/blur and clear done notifications when user returns to mattr
+  const routeThreadKeyRef = useRef(routeThreadKey);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- exposes the routed thread to focus listeners
+  useEffect(() => {
+    routeThreadKeyRef.current = routeThreadKey;
+  }, [routeThreadKey]);
+
+  // Done pins stay until opened or dismissed; the thread on screen counts as reviewed.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window focus/blur for notch visibility
   useEffect(() => {
+    const clearRoutedDone = () => {
+      const routed = routeThreadKeyRef.current;
+      if (!routed) return;
+      setDoneNotifications((existing) =>
+        existing.some((entry) => entry.key === routed)
+          ? existing.filter((entry) => entry.key !== routed)
+          : existing,
+      );
+    };
     const onFocus = () => {
       setMainWindowFocused(true);
-      setDoneNotifications([]);
+      clearRoutedDone();
     };
-    const onBlur = () => setMainWindowFocused(false);
+    const onBlur = () => {
+      setMainWindowFocused(false);
+      clearRoutedDone();
+    };
     window.addEventListener("focus", onFocus);
     window.addEventListener("blur", onBlur);
     return () => {
@@ -365,6 +324,8 @@ export function MattrIslandHost() {
       readonly raw: OrchestrationV2ThreadShell;
       readonly title: string;
       readonly status: IslandThreadSummary["status"];
+      readonly runStartedAt: string | null;
+      readonly runCompletedAt: string | null;
     }
   >();
 
@@ -392,11 +353,15 @@ export function MattrIslandHost() {
           subagentRequests.get(raw.id) ?? null,
         );
         const sidebarStatus = resolveSidebarThreadStatus(presented);
+        const runStartedAt = raw.activityRunStartedAt ?? raw.latestRunStartedAt ?? null;
+        const runCompletedAt = raw.activeRunId ? null : (raw.latestRunCompletedAt ?? null);
         shellsByKey.set(key, {
           environmentId,
           raw,
           title: presented.title || m(msg("Untitled thread")),
           status: mapThreadStatus(sidebarStatus, presented.latestRun?.status),
+          runStartedAt: runStartedAt ? DateTime.formatIso(runStartedAt) : null,
+          runCompletedAt: runCompletedAt ? DateTime.formatIso(runCompletedAt) : null,
         });
       }
     }
@@ -418,9 +383,18 @@ export function MattrIslandHost() {
   // Mount detail streams for the selected thread + any thread awaiting approval or user input
   const watchedDetailKeys = new Set<string>();
   if (effectiveSelectedKey) watchedDetailKeys.add(effectiveSelectedKey);
+  let watchedRunning = 0;
   for (const [key, entry] of shellsByKey) {
     if (entry.status === "approval" || entry.status === "input") {
       watchedDetailKeys.add(key);
+    } else if (
+      entry.status === "running" &&
+      !mainWindowFocused &&
+      watchedRunning < MAX_WATCHED_RUNNING_THREADS
+    ) {
+      // Live activity only shows in the notch while mattr is in the background.
+      watchedDetailKeys.add(key);
+      watchedRunning += 1;
     }
   }
   const watchedDetailKeySignature = [...watchedDetailKeys].toSorted().join("\u0001");
@@ -551,11 +525,11 @@ export function MattrIslandHost() {
 
     for (const [key, entry] of sortedShells) {
       const ref = parseThreadKey(key);
-      const detail =
-        key === effectiveSelectedKey
-          ? Option.getOrNull(appAtomRegistry.get(environmentThreadDetails.stateAtom(ref)).data)
-          : null;
-      const preview = extractThreadConversationPreview(detail);
+      const preview = watchedDetailKeys.has(key)
+        ? summarizeThreadProjection(
+            Option.getOrNull(appAtomRegistry.get(environmentThreadDetails.stateAtom(ref)).data),
+          )
+        : EMPTY_ISLAND_THREAD_PREVIEW;
       threads.push({
         key,
         environmentId: entry.environmentId,
@@ -568,6 +542,14 @@ export function MattrIslandHost() {
         latestAssistantMessage: preview.latestAssistantMessage,
         toolCallCount: preview.toolCallCount,
         isStreaming: preview.isStreaming,
+        providerInstanceId: entry.raw.providerInstanceId,
+        model: entry.raw.modelSelection.model,
+        branch: entry.raw.branch,
+        runStartedAt: entry.runStartedAt,
+        runCompletedAt: entry.runCompletedAt,
+        currentActivity: preview.currentActivity,
+        recentActivities: preview.recentActivities,
+        plan: preview.plan,
       });
     }
 
@@ -1063,19 +1045,38 @@ export function MattrIslandHost() {
       }
     : null;
 
-  const lastLevelSyncRef = useRef(0);
+  const lastSnapshotSyncRef = useRef(0);
+  const pendingSnapshotRef = useRef<IslandSnapshot | null>(null);
+  const trailingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Streaming tokens and audio levels re-render this host many times a second; the trailing
+  // flush keeps IPC at ~30Hz without ever dropping the final state.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes Island state snapshots to the floating Electron panel
   useEffect(() => {
     if (!islandBridge || !snapshot) return;
-    const now = Date.now();
-    const highFreq =
-      snapshot.voice.phase === "recording" ||
-      snapshot.assistant.phase === "listening" ||
-      snapshot.assistant.phase === "speaking";
-    if (highFreq && now - lastLevelSyncRef.current < 32) return;
-    lastLevelSyncRef.current = now;
-    void islandBridge.syncSnapshot(snapshot).catch(() => undefined);
+    pendingSnapshotRef.current = snapshot;
+    const flush = () => {
+      trailingSyncTimerRef.current = null;
+      const next = pendingSnapshotRef.current;
+      if (!next) return;
+      pendingSnapshotRef.current = null;
+      lastSnapshotSyncRef.current = Date.now();
+      void islandBridge.syncSnapshot(next).catch(() => undefined);
+    };
+    const wait = SNAPSHOT_SYNC_INTERVAL_MS - (Date.now() - lastSnapshotSyncRef.current);
+    if (wait <= 0) {
+      flush();
+    } else if (trailingSyncTimerRef.current === null) {
+      trailingSyncTimerRef.current = setTimeout(flush, wait);
+    }
   }, [islandBridge, snapshot]);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the trailing IPC flush timer on unmount
+  useEffect(
+    () => () => {
+      if (trailingSyncTimerRef.current !== null) clearTimeout(trailingSyncTimerRef.current);
+    },
+    [],
+  );
 
   return (
     <>

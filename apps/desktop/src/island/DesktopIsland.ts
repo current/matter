@@ -7,6 +7,7 @@ import * as Electron from "electron";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { startMacSingleTapModifierMonitor } from "../../../../antimatter/island/MacControlTapMonitor.ts";
 import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
+import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
   ISLAND_ACTION_CHANNEL,
@@ -71,36 +72,6 @@ function computeNotchPlacement(isMac: boolean): ComputedNotchPlacement {
       windowWidth: ISLAND_WINDOW_WIDTH,
     },
   };
-}
-
-function shouldKeepWindowAlive(
-  snapshot: IslandSnapshot | null,
-  forcedOpen: boolean,
-  hasNotch: boolean,
-): boolean {
-  if (!snapshot || !snapshot.settings.enabled) return false;
-  // On notched MacBooks, keep the transparent overlay docked invisibly inside the physical camera
-  // cutout so hover-to-peek and spring open/close transitions run on frame 1 with zero flash.
-  if (hasNotch) return true;
-  if (forcedOpen) return true;
-  if (snapshot.voice.phase !== "idle") return true;
-  if (snapshot.assistant?.handsFreeActive) return true;
-  if (
-    snapshot.assistant &&
-    (snapshot.assistant.phase === "listening" ||
-      snapshot.assistant.phase === "transcribing" ||
-      snapshot.assistant.phase === "thinking" ||
-      snapshot.assistant.phase === "acting" ||
-      snapshot.assistant.phase === "speaking")
-  ) {
-    return true;
-  }
-  if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) return false;
-  return (
-    snapshot.pendingApprovals.length > 0 ||
-    snapshot.pendingUserInputs.length > 0 ||
-    snapshot.doneNotifications.length > 0
-  );
 }
 
 export const layer = Layer.effect(
@@ -289,7 +260,7 @@ export const layer = Layer.effect(
       }
       const placement = computeNotchPlacement(isMac);
       latestMetrics = placement.metrics;
-      const keepAlive = shouldKeepWindowAlive(
+      const keepAlive = shouldKeepIslandWindowAlive(
         latestSnapshot,
         forcedOpen,
         placement.metrics.hasNotch,
