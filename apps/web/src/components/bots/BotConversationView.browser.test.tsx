@@ -98,16 +98,36 @@ const realFetch = globalThis.fetch;
 function useBotConversationServer(options: {
   readonly botOverride?: BotIdentity;
   readonly initialMessages?: ReadonlyArray<BotMessage>;
+  readonly conversations?: ReadonlyArray<{ conversationId: string; title: string | null }>;
 }) {
   resetBotsStoreForTests();
   const activeBot = options.botOverride ?? bot;
+  const activeProvider: BotProviderDescriptor = options.conversations
+    ? { ...provider, capabilities: { ...provider.capabilities, conversationDiscovery: true } }
+    : provider;
   const activeMessages = options.initialMessages ?? messages;
   const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
     const url = new URL(String(input));
     if (!url.pathname.startsWith("/api/mattr/")) return realFetch(input, init);
     switch (url.pathname) {
       case "/api/mattr/bots/providers":
-        return json({ providers: [provider] });
+        return json({ providers: [activeProvider] });
+      case "/api/mattr/bots/conversations":
+        return json({
+          conversations: (options.conversations ?? []).map((conversation) => ({
+            ...conversation,
+            providerId: "grok-bot",
+            accountScopeId: "local",
+            botId: activeBot.remoteBotId,
+            participantBotIds: [],
+            kind: "direct",
+            parentConversationId: null,
+            unreadCount: 0,
+            lastActivityAt: null,
+            activityState: "idle",
+            officialAppUrl: null,
+          })),
+        });
       case "/api/mattr/bots/bots":
         return json({ bots: [activeBot] });
       case "/api/mattr/bots/pending":
@@ -208,5 +228,76 @@ describe("BotConversationView", () => {
     await expect.element(page.getByRole("button", { name: "Stop generation" })).toBeVisible();
     expect(screen.container.querySelector("[data-bot-working-indicator]")).not.toBeNull();
     expect(screen.container.querySelector('[data-bot-header-status="working"]')).not.toBeNull();
+  });
+
+  it("renders a single breadcrumb when the Bot shares its provider's name", async () => {
+    using _server = useBotConversationServer({ botOverride: { ...bot, name: "Grok Bot" } });
+    await using screen = await render(
+      <SidebarProvider>
+        <BotConversationView providerId="grok-bot" botId="bot-black" />
+      </SidebarProvider>,
+    );
+
+    await expect.element(page.getByText("All pipelines are green.")).toBeVisible();
+    const crumbs = screen.container.querySelector('nav[aria-label="Bot breadcrumb"]');
+    expect(crumbs?.textContent?.match(/Grok Bot/g)?.length).toBe(1);
+  });
+
+  it("puts the transcript and composer in the same column width", async () => {
+    using _server = useBotConversationServer({});
+    await using screen = await render(
+      <SidebarProvider>
+        <BotConversationView providerId="grok-bot" botId="bot-black" />
+      </SidebarProvider>,
+    );
+
+    await expect.element(page.getByText("All pipelines are green.")).toBeVisible();
+    const column = screen.container.querySelector<HTMLElement>("[data-bot-transcript-column]");
+    const composer = screen.container.querySelector<HTMLElement>("[data-bot-composer-form]");
+    const columnBox = column!.getBoundingClientRect();
+    const composerBox = composer!.getBoundingClientRect();
+    expect(Math.abs(columnBox.left - composerBox.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(columnBox.width - composerBox.width)).toBeLessThanOrEqual(1);
+  });
+
+  it("folds scheduled trigger prompts into an expandable event row", async () => {
+    const trigger: BotMessage = {
+      ...messages[0]!,
+      remoteId: "m-trigger",
+      markdown: "Promise check: TASK-1 — promise is past its deadline and still open.",
+      parts: [],
+      seq: 3,
+    };
+    using _server = useBotConversationServer({ initialMessages: [...messages, trigger] });
+    await using screen = await render(
+      <SidebarProvider>
+        <BotConversationView providerId="grok-bot" botId="bot-black" />
+      </SidebarProvider>,
+    );
+
+    const row = page.getByRole("button", { name: "Scheduled check · TASK-1" });
+    await expect.element(row).toBeVisible();
+    expect(screen.container.querySelectorAll("[data-user-message-bubble]")).toHaveLength(1);
+    await row.click();
+    await expect.element(page.getByText(/past its deadline and still open/)).toBeVisible();
+  });
+
+  it("labels untitled conversation tabs on an opaque strip", async () => {
+    using _server = useBotConversationServer({
+      conversations: [
+        { conversationId: "bot-black", title: null },
+        { conversationId: "c-2", title: "Build Notion team hub" },
+      ],
+    });
+    await using screen = await render(
+      <SidebarProvider>
+        <BotConversationView providerId="grok-bot" botId="bot-black" />
+      </SidebarProvider>,
+    );
+
+    await expect.element(page.getByRole("tab", { name: "Main chat" })).toBeVisible();
+    await expect.element(page.getByRole("tab", { name: "Build Notion team hub" })).toBeVisible();
+    const strip = screen.container.querySelector<HTMLElement>("[data-bot-conversation-tabs]");
+    expect(getComputedStyle(strip!).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
   });
 });

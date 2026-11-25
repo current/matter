@@ -16,9 +16,10 @@ import { setVoiceAssistantModalOpen } from "../../../island/voiceAssistantStore"
 import { cn } from "../../../lib/utils";
 import { formatRelativeTime } from "../../../timestampFormat";
 import { BotAvatar } from "../../bots/BotAvatarRenderer";
-import { BOT_ACTIVITY_DOT, BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
+import { BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
 import { retainBotsSync, useBotsState } from "../../bots/botsStore";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../../ui/tooltip";
+import { botPreviewText } from "./mattrBots.logic";
 import type { MattrThreadItem } from "./mattrSidebar.logic";
 import type { MattrSidebarActions } from "./useMattrSidebarModel";
 
@@ -212,14 +213,6 @@ export function MattrSectionHeader({
   );
 }
 
-export function botNeedsAttention(bot: BotIdentity): boolean {
-  return (
-    bot.status === "waiting_for_user" ||
-    bot.status === "waiting_for_approval" ||
-    bot.unreadCount > 0
-  );
-}
-
 /**
  * Renders its children with the connected Bots, but only while an add-on that provides Bots is
  * enabled. Disabled, it renders nothing and opens no event stream.
@@ -254,22 +247,23 @@ function MattrBotsSlotContent({
 }
 
 function MattrBotBadge({ bot }: { bot: BotIdentity }) {
-  const hasUnread = bot.unreadCount > 0;
   const needsUser = bot.status === "waiting_for_user" || bot.status === "waiting_for_approval";
-  // Grok Bot renders its own bottom-right activity badge; surface unread/waiting cleanly at top-right.
-  const dot = hasUnread
-    ? "bg-info"
-    : needsUser
-      ? "bg-warning"
-      : bot.providerId === "grok-bot"
-        ? null
-        : BOT_ACTIVITY_DOT[bot.status];
+  // One calm signal: unread wins, then a block on the user, then a failure. Working shows in text.
+  const dot =
+    bot.unreadCount > 0
+      ? "bg-info"
+      : needsUser
+        ? "bg-warning"
+        : bot.status === "error"
+          ? "bg-destructive"
+          : null;
   if (!dot) return null;
   return (
     <span
       aria-hidden
+      data-mattr-bot-dot
       className={cn(
-        "pointer-events-none absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-sidebar",
+        "pointer-events-none absolute -top-1 -right-1 size-2 rounded-full ring-2 ring-sidebar",
         dot,
       )}
     />
@@ -339,9 +333,14 @@ export function MattrBotLink({
   );
 }
 
-/** Full-row Needs You entry for a Bot that has unread briefings or is waiting for approval. */
-export function MattrBotAttentionRow({ bot }: { bot: BotIdentity }) {
-  const gt = useGT();
+/** Full-row Needs You entry for a Bot that is blocked on the user. */
+export function MattrBotAttentionRow({
+  bot,
+  requestTitle,
+}: {
+  bot: BotIdentity;
+  requestTitle?: string | undefined;
+}) {
   const m = useMessages();
   const pathname = useLocation({ select: (location) => location.pathname });
   const href = `/bots/${encodeURIComponent(bot.providerId)}/${encodeURIComponent(bot.remoteBotId)}`;
@@ -368,39 +367,35 @@ export function MattrBotAttentionRow({ bot }: { bot: BotIdentity }) {
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-medium text-sidebar-foreground">{bot.name}</span>
-          <span className="mt-0.5 truncate text-2xs leading-tight text-sidebar-muted-foreground">
-            {statusLabel}
+          <span className="mt-0.5 truncate text-2xs leading-tight text-warning-foreground">
+            {requestTitle ?? statusLabel}
           </span>
         </span>
-        {bot.unreadCount > 0 ? (
-          <span className="shrink-0 rounded-full bg-sidebar-row-active px-1.5 py-0.5 text-2xs font-medium tabular-nums text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65">
-            {gt("{count, plural, one {# unread} other {# unread}}", {
-              count: bot.unreadCount,
-            })}
-          </span>
-        ) : null}
       </Link>
     </li>
   );
 }
 
-/** A Crew row: the Bot as a standing teammate, with its live state as the subtitle. */
+/** A Crew row: the Bot as a standing teammate, with its live state or latest line beside it. */
 export function MattrBotCrewRow({ bot }: { bot: BotIdentity }) {
   const gt = useGT();
   const m = useMessages();
   const pathname = useLocation({ select: (location) => location.pathname });
   const href = `/bots/${encodeURIComponent(bot.providerId)}/${encodeURIComponent(bot.remoteBotId)}`;
   const active = pathname === href;
-  const statusLabel =
-    bot.unreadCount > 0
-      ? gt("{count, plural, one {# unread} other {# unread}}", { count: bot.unreadCount })
-      : m(BOT_ACTIVITY_LABELS[bot.status]);
+  const unread = bot.unreadCount > 0;
+  const liveStatus = bot.status === "working" || bot.status === "error" || bot.status === "offline";
+  const preview = botPreviewText(bot);
+  const subtitle = liveStatus ? m(BOT_ACTIVITY_LABELS[bot.status]) : preview;
   const tone =
-    bot.status === "waiting_for_user" || bot.status === "waiting_for_approval"
-      ? "text-warning-foreground"
+    bot.status === "working"
+      ? "text-success-foreground"
       : bot.status === "error"
         ? "text-destructive-foreground"
         : "text-sidebar-muted-foreground";
+  const accessibleStatus = unread
+    ? gt("{count, plural, one {# unread} other {# unread}}", { count: bot.unreadCount })
+    : m(BOT_ACTIVITY_LABELS[bot.status]);
 
   return (
     <li>
@@ -408,20 +403,27 @@ export function MattrBotCrewRow({ bot }: { bot: BotIdentity }) {
         to="/bots/$providerId/$botId"
         params={{ providerId: bot.providerId, botId: bot.remoteBotId }}
         aria-current={active ? "page" : undefined}
-        aria-label={`${bot.name}, ${statusLabel}`}
+        aria-label={`${bot.name}, ${accessibleStatus}`}
+        data-unread={unread ? "" : undefined}
         className={cn(
           "flex h-7.5 items-center gap-2 rounded-md px-2 text-sm outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
           active
             ? "bg-sidebar-row-active text-sidebar-foreground"
-            : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover",
+            : unread
+              ? "text-sidebar-foreground hover:bg-sidebar-row-hover"
+              : "text-sidebar-foreground/85 hover:bg-sidebar-row-hover",
         )}
       >
         <span className="relative inline-flex shrink-0 items-center justify-center">
           <BotAvatar bot={bot} size={18} activity={bot.status} />
           <MattrBotBadge bot={bot} />
         </span>
-        <span className="shrink-0 truncate font-medium">{bot.name}</span>
-        <span className={cn("min-w-0 flex-1 truncate text-2xs", tone)}>{statusLabel}</span>
+        <span className={cn("max-w-[60%] shrink-0 truncate", unread && "font-semibold")}>
+          {bot.name}
+        </span>
+        {subtitle ? (
+          <span className={cn("min-w-0 flex-1 truncate text-2xs", tone)}>{subtitle}</span>
+        ) : null}
       </Link>
     </li>
   );

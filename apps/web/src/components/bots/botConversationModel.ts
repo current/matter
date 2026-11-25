@@ -63,3 +63,19 @@ export function applyBotConversationEvent(
   }
   return messages;
 }
+
+/**
+ * Automated prompts (a scheduled trigger or a promise check) arrive as user messages. Returns the
+ * detail to show beside "Scheduled check" so the transcript can fold them into a quiet event row,
+ * or null for an ordinary message.
+ */
+export function scheduledTriggerDetail(markdown: string): { readonly detail: string } | null {
+  const text = markdown.trim();
+  const promiseCheck = /^Promise check:\s*([^\s—–]+)/i.exec(text);
+  if (promiseCheck?.[1]) return { detail: promiseCheck[1] };
+  if (!/Triggering Event/i.test(text) || !/Source\W*schedule\b/i.test(text)) return null;
+  const firstLine = (text.split("\n").find((line) => line.trim().length > 0) ?? "")
+    .replace(/[#*_`>]/g, "")
+    .trim();
+  return { detail: firstLine.length > 80 ? `${firstLine.slice(0, 79)}…` : firstLine };
+}

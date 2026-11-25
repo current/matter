@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   applyBotConversationEvent,
   prependBotMessages,
+  scheduledTriggerDetail,
   upsertBotMessage,
 } from "./botConversationModel";
 
@@ -70,5 +71,23 @@ describe("botConversationModel", () => {
       message: message({ remoteId: "r2", conversationId: "c2" }),
     });
     expect(elsewhere).toBe(messages);
+  });
+});
+
+describe("scheduledTriggerDetail", () => {
+  it("folds a promise check into its ticket id", () => {
+    expect(
+      scheduledTriggerDetail("Promise check: TASK-1 — promise promise-7930 is past its deadline."),
+    ).toEqual({ detail: "TASK-1" });
+  });
+
+  it("folds a scheduled triggering event into its first line", () => {
+    const text = "Run the nightly digest.\n\n---\n\n## Triggering Event\n**Source:** schedule";
+    expect(scheduledTriggerDetail(text)).toEqual({ detail: "Run the nightly digest." });
+  });
+
+  it("leaves ordinary messages alone", () => {
+    expect(scheduledTriggerDetail("Can you check the schedule for tomorrow?")).toBeNull();
+    expect(scheduledTriggerDetail("## Triggering Event\n**Source:** webhook")).toBeNull();
   });
 });

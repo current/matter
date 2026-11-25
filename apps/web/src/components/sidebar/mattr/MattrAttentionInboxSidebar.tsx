@@ -1,3 +1,4 @@
+import type { BotIdentity } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 import {
   ActivityIcon,
@@ -22,8 +23,8 @@ import {
   filterThreadsByQuery,
   type MattrThreadItem,
 } from "./mattrSidebar.logic";
+import { botKey, CREW_COLLAPSED_LIMIT, rankCrew, splitBotsByAttention } from "./mattrBots.logic";
 import {
-  botNeedsAttention,
   compactAge,
   MattrBotAttentionRow,
   MattrBotCrewRow,
@@ -36,11 +37,24 @@ import { MattrScopeLine } from "./MattrScopeLine";
 import { useMattrInboxProjectFilter, useMattrQuietExpanded } from "./mattrSidebarStore";
 import type { MattrSidebarModel } from "./useMattrSidebarModel";
 
-function useBotAttentionCount(): number {
+/** Connected Bots split so each one appears once: blocked on the user, or in the Crew. */
+function useBotSections() {
   const providers = useEnabledBotProviderAddons();
   const state = useBotsState();
-  if (providers.length === 0) return 0;
-  return Object.values(state.botsByProvider).flat().filter(botNeedsAttention).length;
+  const bots =
+    providers.length === 0
+      ? []
+      : state.providers.flatMap((provider) =>
+          provider.status.kind === "connected"
+            ? (state.botsByProvider[provider.providerId] ?? [])
+            : [],
+        );
+  const { needsYou, crew } = splitBotsByAttention(bots, state.pending);
+  const requestTitleFor = (bot: BotIdentity) =>
+    state.pending.find(
+      (request) => request.providerId === bot.providerId && request.botId === bot.remoteBotId,
+    )?.title;
+  return { needsYou, crew: rankCrew(crew), requestTitleFor };
 }
 
 export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel }) {
@@ -49,7 +63,13 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
   const [storedFilter, setProjectFilter] = useMattrInboxProjectFilter();
   const [quietExpanded, setQuietExpanded] = useMattrQuietExpanded();
   const [query, setQuery] = useState("");
-  const botAttentionCount = useBotAttentionCount();
+  const botSections = useBotSections();
+  const botAttentionCount = botSections.needsYou.length;
+  const [crewExpanded, setCrewExpanded] = useState(false);
+  const visibleCrew = crewExpanded
+    ? botSections.crew
+    : botSections.crew.slice(0, CREW_COLLAPSED_LIMIT);
+  const hiddenCrewCount = botSections.crew.length - CREW_COLLAPSED_LIMIT;
 
   const projectFilter =
     storedFilter !== null && projects.some((project) => project.key === storedFilter)
@@ -199,18 +219,13 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
                       }
                     />
                   ))}
-                  <MattrBotsSlot>
-                    {(bots) =>
-                      bots
-                        .filter(botNeedsAttention)
-                        .map((bot) => (
-                          <MattrBotAttentionRow
-                            key={`${bot.providerId}:${bot.remoteBotId}`}
-                            bot={bot}
-                          />
-                        ))
-                    }
-                  </MattrBotsSlot>
+                  {botSections.needsYou.map((bot) => (
+                    <MattrBotAttentionRow
+                      key={botKey(bot)}
+                      bot={bot}
+                      requestTitle={botSections.requestTitleFor(bot)}
+                    />
+                  ))}
                 </ul>
               </section>
             ) : null}
@@ -266,16 +281,30 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
             ) : null}
 
             <MattrBotsSlot>
-              {(bots) => (
-                <section aria-label={gt("Crew")}>
-                  <MattrSectionHeader icon={<UsersIcon aria-hidden />} label={gt("Crew")} />
-                  <ul className="flex flex-col gap-0.5">
-                    {bots.map((bot) => (
-                      <MattrBotCrewRow key={`${bot.providerId}:${bot.remoteBotId}`} bot={bot} />
-                    ))}
-                  </ul>
-                </section>
-              )}
+              {() =>
+                visibleCrew.length > 0 ? (
+                  <section aria-label={gt("Crew")}>
+                    <MattrSectionHeader icon={<UsersIcon aria-hidden />} label={gt("Crew")} />
+                    <ul className="flex flex-col gap-0.5">
+                      {visibleCrew.map((bot) => (
+                        <MattrBotCrewRow key={botKey(bot)} bot={bot} />
+                      ))}
+                    </ul>
+                    {hiddenCrewCount > 0 ? (
+                      <button
+                        type="button"
+                        aria-expanded={crewExpanded}
+                        onClick={() => setCrewExpanded((value) => !value)}
+                        className="mt-0.5 flex h-6 w-full cursor-pointer items-center rounded-md px-2 text-2xs text-sidebar-muted-foreground outline-hidden ring-ring transition-colors hover:bg-sidebar-row-hover/70 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset"
+                      >
+                        {crewExpanded
+                          ? gt("Show less")
+                          : gt("Show all ({count})", { count: botSections.crew.length })}
+                      </button>
+                    ) : null}
+                  </section>
+                ) : null
+              }
             </MattrBotsSlot>
 
             {nothingLive && botAttentionCount === 0 ? (

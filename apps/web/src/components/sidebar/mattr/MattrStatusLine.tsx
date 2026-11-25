@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useIsAddonEnabled } from "../../../addons/useAddonRegistry";
+import { useDesktopUpdateState } from "../../../state/desktopUpdate";
 import { setVoiceAssistantModalOpen } from "../../../island/voiceAssistantStore";
 import { cn } from "../../../lib/utils";
 import {
@@ -26,6 +27,7 @@ import { isSidebarUtilityPage, useNavigateToMainApp } from "../mainAppLocation";
 import { SidebarProviderUpdatePill } from "../SidebarProviderUpdatePill";
 import { SidebarThreadUndoNotice } from "../SidebarThreadUndoNotice";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "../SidebarUpdatePill";
+import { hostDotTone, shortHostLabel } from "./mattrBots.logic";
 import { MattrTip } from "./MattrSidebarParts";
 
 const quietButton =
@@ -61,14 +63,18 @@ export function MattrStatusLine() {
   const openIssues = () =>
     go(() => void navigate({ to: "/issues", search: readIssueListPreferences() }));
 
-  const hostLabel = environment?.serverConfig?.environment.label ?? gt("This Mac");
-  const phase = environment?.connection.phase;
-  const connectionDot =
-    phase === undefined || phase === "available"
-      ? "bg-success"
-      : phase === "connecting"
-        ? "bg-warning"
-        : "bg-destructive";
+  const updateStatus = useDesktopUpdateState()?.status;
+  const fullHostLabel = environment?.serverConfig?.environment.label ?? gt("This Mac");
+  const hostLabel = shortHostLabel(fullHostLabel);
+  const dotTone = hostDotTone(environment?.connection.phase, updateStatus);
+  const dot =
+    dotTone === "error"
+      ? { className: "bg-destructive", label: gt("Disconnected") }
+      : dotTone === "connecting"
+        ? { className: "bg-warning", label: gt("Connecting") }
+        : dotTone === "update"
+          ? { className: "bg-info", label: gt("Update available") }
+          : null;
 
   return (
     <div className="flex shrink-0 flex-col gap-1 px-2 pb-1.5" data-mattr-status-line>
@@ -93,20 +99,24 @@ export function MattrStatusLine() {
               render={
                 <button
                   type="button"
-                  aria-label={gt("{host} menu", { host: hostLabel })}
+                  aria-label={gt("{host} menu", { host: fullHostLabel })}
                   className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md pr-1.5 pl-1 text-left outline-hidden ring-ring transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset data-popup-open:bg-sidebar-row-active"
                 />
               }
             >
               <span className="relative grid size-5 shrink-0 place-items-center rounded-md bg-sidebar-row-active text-3xs font-semibold text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60">
                 {hostLabel.slice(0, 1).toUpperCase()}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute -right-0.5 -bottom-0.5 size-[7px] rounded-full ring-2 ring-sidebar",
-                    connectionDot,
-                  )}
-                />
+                {dot ? (
+                  <span
+                    role="img"
+                    aria-label={dot.label}
+                    data-mattr-host-dot={dotTone}
+                    className={cn(
+                      "absolute -right-0.5 -bottom-0.5 size-[7px] rounded-full ring-2 ring-sidebar",
+                      dot.className,
+                    )}
+                  />
+                ) : null}
               </span>
               <span className="min-w-0 truncate text-xs font-medium text-sidebar-foreground">
                 {hostLabel}

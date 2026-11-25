@@ -156,7 +156,10 @@ const bot: BotIdentity = {
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
 
-function useServer(grokEnabled: boolean) {
+function useServer(
+  grokEnabled: boolean,
+  options: { bots?: ReadonlyArray<BotIdentity>; pending?: ReadonlyArray<unknown> } = {},
+) {
   const realFetch = globalThis.fetch;
   window.localStorage.clear();
   resetAddonStoreForTests();
@@ -170,9 +173,9 @@ function useServer(grokEnabled: boolean) {
       case "/api/mattr/bots/providers":
         return json({ providers: [provider] });
       case "/api/mattr/bots/bots":
-        return json({ bots: [bot] });
+        return json({ bots: options.bots ?? [bot] });
       case "/api/mattr/bots/pending":
-        return json({ requests: [] });
+        return json({ requests: options.pending ?? [] });
       case "/api/mattr/bots/events":
         return new Response(new ReadableStream(), {
           headers: { "content-type": "text/event-stream" },
@@ -260,10 +263,73 @@ describe("MattrAttentionInboxSidebar", () => {
     await expect
       .element(crew.getByRole("link", { name: /Scout/ }))
       .toHaveAttribute("href", "/bots/grok-bot/scout");
-    await expect.element(crew.getByText("3 unread")).toBeVisible();
+    await expect
+      .element(crew.getByRole("link", { name: /Scout/ }))
+      .toHaveAttribute("data-unread", "");
+    expect(crew.getByText("3 unread").elements()).toHaveLength(0);
+    // Unread alone is not a blocker: Scout stays in Crew and out of Needs you.
     await expect
       .element(page.getByRole("heading", { name: /Needs you/ }))
-      .toHaveTextContent("Needs you2");
+      .toHaveTextContent("Needs you1");
+    expect(page.getByRole("link", { name: /Scout/ }).elements()).toHaveLength(1);
+  });
+
+  it("moves a Bot blocked on the user to Needs you and out of Crew", async () => {
+    const waiting = { ...bot, remoteBotId: "ward", name: "Ward", status: "idle" as const };
+    using _server = useServer(true, {
+      bots: [bot, waiting],
+      pending: [
+        {
+          requestId: "r1",
+          providerId: "grok-bot",
+          accountScopeId: "acct",
+          botId: "ward",
+          conversationId: null,
+          kind: "approval",
+          title: "Deploy to production?",
+          detail: null,
+          options: [],
+          allowFreeText: false,
+          createdAt: "2026-11-25T12:00:00.000Z",
+          expiresAt: null,
+        },
+      ],
+    });
+    await using _screen = await render(
+      <SidebarProvider>
+        <MattrAttentionInboxSidebar model={model()} />
+      </SidebarProvider>,
+    );
+    const needsYou = page.getByRole("region", { name: "Needs you" });
+    await expect.element(needsYou.getByRole("link", { name: /Ward/ })).toBeVisible();
+    await expect.element(needsYou.getByText("Deploy to production?")).toBeVisible();
+    await expect
+      .element(page.getByRole("region", { name: "Crew" }).getByRole("link", { name: /Scout/ }))
+      .toBeVisible();
+    expect(page.getByRole("link", { name: /Ward/ }).elements()).toHaveLength(1);
+  });
+
+  it("caps Crew at five Bots behind a Show all toggle, previews first", async () => {
+    const crewBots = Array.from({ length: 7 }, (_, index) => ({
+      ...bot,
+      remoteBotId: `crew-${index}`,
+      name: `Crew ${index}`,
+      status: "idle" as const,
+      unreadCount: 0,
+      metadata: { lastMessagePreview: `**Report** ${index}\nready` },
+    }));
+    using _server = useServer(true, { bots: crewBots });
+    await using _screen = await render(
+      <SidebarProvider>
+        <MattrAttentionInboxSidebar model={model()} />
+      </SidebarProvider>,
+    );
+    const crew = page.getByRole("region", { name: "Crew" });
+    await expect.element(crew.getByText("Report 0 ready")).toBeVisible();
+    expect(crew.getByRole("link").elements()).toHaveLength(5);
+    expect(crew.getByText("Idle").elements()).toHaveLength(0);
+    await crew.getByRole("button", { name: "Show all (7)" }).click();
+    expect(crew.getByRole("link").elements()).toHaveLength(7);
   });
 });
 
