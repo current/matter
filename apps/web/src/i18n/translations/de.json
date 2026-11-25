@@ -3124,7 +3124,6 @@
   "3bd23d5083b5d405": "{count, plural, one {{formatted} Zelle} other {{formatted} Zellen}}",
   "3bd42b40bd62ca11": "Versionskontrollanbieter",
   "3bd4b97ed3dae2a5": "Dieses Open-VSX-Erweiterungspaket konnte nicht geöffnet werden.",
-  "3bd78e8fcb75cb71": "Verwendet {model}",
   "3bdf1e9299d35b97": "Aus",
   "3bf40445a706e4c9": "Alles",
   "3bf42e08dad6483f": [
@@ -13270,5 +13269,11 @@
   "fffd51054a4240ab": "{status, select, inProgress {Review-Leitfaden wird gelesen} completed {Review-Leitfaden gelesen} failed {Review-Leitfaden konnte nicht gelesen werden} declined {Lesen eines Review-Leitfadens abgelehnt} stopped {Lesen eines Review-Leitfadens abgebrochen} other {Review-Leitfaden wird gelesen}}",
   "eb2e464bbdf1a809": "Agents sehen Nutzungslimits",
   "a02932c0ecd7e30e": "Agents können die verbleibende Nutzung lesen und werden gewarnt, wenn sie an ein aufgebrauchtes Konto delegieren.",
-  "a65bbcd6001ffbf5": "nutzung kontingent rate limit verbleibend delegieren subagent mcp"
+  "a65bbcd6001ffbf5": "nutzung kontingent rate limit verbleibend delegieren subagent mcp",
+  "ee6e4c4557dd5dcc": "{model} auf {provider} wird verwendet",
+  "d5445c75826bc7c6": "Wenn das Kontingent aufgebraucht ist, mit demselben Modell auf einem anderen Konto fortfahren, dann mit einem anderen Anbieter. Neue Threads versuchen zuerst das Ersatzmodell.",
+  "ca8fddd33a9c8336": "Wechsel zu verfügbaren Konten zurücksetzen",
+  "579c4931f3e68d7d": "Zu einem Konto mit verbleibendem Kontingent wechseln",
+  "059d9edd7ab4879b": "Wechsel erlaubt zu",
+  "f1c790c336d8fa09": "automatisch Konto Anbieter Kontingent Limit neue Threads"
 }

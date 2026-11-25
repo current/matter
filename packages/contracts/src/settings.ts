@@ -1499,6 +1499,13 @@ export const ServerSettings = Schema.Struct({
   fallbackModelSelection: Schema.NullOr(ModelSelection).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  fallbackToAvailableAccounts: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(false)),
+  ),
+  /** mattr: instances automatic account switching never moves work onto. */
+  fallbackExcludedInstanceIds: Schema.Array(ProviderInstanceId).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
   defaultRuntimeMode: RuntimeMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE)),
   ),
@@ -1962,6 +1969,8 @@ export const ServerSettingsPatch = Schema.Struct({
   defaultModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   defaultRuntimeMode: Schema.optionalKey(RuntimeMode),
   fallbackModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  fallbackToAvailableAccounts: Schema.optionalKey(Schema.Boolean),
+  fallbackExcludedInstanceIds: Schema.optionalKey(Schema.Array(ProviderInstanceId)),
   /** Replaces each project's override set; null removes it. Omitted providerInstances retains its stored value. */
   projectSettingsOverrides: Schema.optionalKey(
     Schema.Record(

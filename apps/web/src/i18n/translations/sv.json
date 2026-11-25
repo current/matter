@@ -3128,7 +3128,6 @@
   "3bd23d5083b5d405": "{count, plural, one {{formatted} cell} other {{formatted} celler}}",
   "3bd42b40bd62ca11": "Leverantörer av versionshantering",
   "3bd4b97ed3dae2a5": "Open VSX-tilläggspaketet kunde inte öppnas.",
-  "3bd78e8fcb75cb71": "Använder {model}",
   "3bdf1e9299d35b97": "Av",
   "3bf40445a706e4c9": "Allt",
   "3bf42e08dad6483f": [
@@ -13277,5 +13276,11 @@
   "fffd51054a4240ab": "{status, select, inProgress {Läser en granskningsguide} completed {Läste en granskningsguide} failed {Kunde inte läsa en granskningsguide} declined {Avböjde att läsa en granskningsguide} stopped {Slutade läsa en granskningsguide} other {Läser en granskningsguide}}",
   "eb2e464bbdf1a809": "Agenter ser användningsgränser",
   "a02932c0ecd7e30e": "Agenter kan läsa kvarvarande användning och varnas när de delegerar till ett konto som har nått sin gräns.",
-  "a65bbcd6001ffbf5": "användning kvot hastighetsbegränsning kvar delegera subagent mcp"
+  "a65bbcd6001ffbf5": "användning kvot hastighetsbegränsning kvar delegera subagent mcp",
+  "ee6e4c4557dd5dcc": "Använder {model} på {provider}",
+  "d5445c75826bc7c6": "När användningen tar slut, fortsätt med samma modell på ett annat konto och sedan hos en annan leverantör. Nya trådar provar reservmodellen först.",
+  "ca8fddd33a9c8336": "Återställ byte till tillgängliga konton",
+  "579c4931f3e68d7d": "Byt till ett konto med användning kvar",
+  "059d9edd7ab4879b": "Kan bytas till",
+  "f1c790c336d8fa09": "automatiskt konto leverantör användning gräns nya trådar"
 }

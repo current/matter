@@ -3126,7 +3126,6 @@
   "3bd23d5083b5d405": "{count, plural, one {{formatted} célula} other {{formatted} células}}",
   "3bd42b40bd62ca11": "Provedores de controle de versão",
   "3bd4b97ed3dae2a5": "Não foi possível abrir esse pacote de extensão do Open VSX.",
-  "3bd78e8fcb75cb71": "Usando {model}",
   "3bdf1e9299d35b97": "Desativado",
   "3bf40445a706e4c9": "Tudo",
   "3bf42e08dad6483f": [
@@ -13270,5 +13269,11 @@
   "fffd51054a4240ab": "{status, select, inProgress {Lendo um guia de revisão} completed {Leu um guia de revisão} failed {Falha ao ler um guia de revisão} declined {Recusou-se a ler um guia de revisão} stopped {Parou de ler um guia de revisão} other {Lendo um guia de revisão}}",
   "eb2e464bbdf1a809": "Agentes veem os limites de uso",
   "a02932c0ecd7e30e": "Os agentes podem ler o uso restante e são avisados ao delegar para uma conta esgotada.",
-  "a65bbcd6001ffbf5": "uso cota limite de taxa restante delegar subagente mcp"
+  "a65bbcd6001ffbf5": "uso cota limite de taxa restante delegar subagente mcp",
+  "ee6e4c4557dd5dcc": "Usando {model} em {provider}",
+  "d5445c75826bc7c6": "Quando o uso acabar, continuar com o mesmo modelo em outra conta e depois com outro provedor. Novas conversas tentam primeiro o modelo alternativo.",
+  "ca8fddd33a9c8336": "Redefinir a mudança para contas disponíveis",
+  "579c4931f3e68d7d": "Mudar para uma conta com uso disponível",
+  "059d9edd7ab4879b": "Pode ser usada na troca",
+  "f1c790c336d8fa09": "automático conta provedor uso limite novas conversas"
 }
