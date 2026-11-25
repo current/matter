@@ -65,7 +65,7 @@ function harness(
       return { result, finish: entry.finish, cancel: entry.cancel } satisfies ActiveListening;
     }),
     watchForBargeIn: vi.fn(async () => async () => {}),
-    play: vi.fn(() => {
+    play: vi.fn(async () => {
       let finish!: () => void;
       let stopNow!: () => void;
       const done = new Promise<"finished" | "stopped">((resolve) => {
@@ -77,6 +77,7 @@ function harness(
       return { done, stop: entry.stop } satisfies ActivePlayback;
     }),
     transcribe: vi.fn(async () => transcripts.shift() ?? ""),
+    discardRecording: vi.fn(),
   };
   const api = {
     turn: vi.fn(async (request: VoiceAssistantTurnRequest) => {
@@ -106,7 +107,7 @@ const speech: ListenResult = { kind: "utterance", uri: "file:///a.m4a", heardSpe
 describe("VoiceModeSession", () => {
   it("runs listen → transcribe → turn → speak and listens again", async () => {
     const { session, listens, playbacks, turns } = harness();
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     expect(session.getSnapshot().phase).toBe("listening");
 
@@ -149,7 +150,7 @@ describe("VoiceModeSession", () => {
           clientActions: [action],
         }),
     });
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     listens[0]!.resolve(speech);
 
@@ -164,7 +165,7 @@ describe("VoiceModeSession", () => {
 
   it("tapping the orb while speaking stops playback and listens", async () => {
     const { session, listens, playbacks } = harness();
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     listens[0]!.resolve(speech);
     await vi.waitFor(() => expect(playbacks).toHaveLength(1));
@@ -177,7 +178,7 @@ describe("VoiceModeSession", () => {
 
   it("tapping the orb while hearing sends the recording now", async () => {
     const { session, listens } = harness();
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     session.tapOrb();
     expect(listens[0]!.finish).toHaveBeenCalled();
@@ -185,8 +186,8 @@ describe("VoiceModeSession", () => {
   });
 
   it("pauses when the orb is tapped before anyone spoke", async () => {
-    const { session, listens, turns } = harness();
-    await session.start();
+    const { session, audio, listens, turns } = harness();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     listens[0]!.finish.mockImplementation(() =>
       listens[0]!.resolve({ kind: "utterance", uri: "file:///a.m4a", heardSpeech: false }),
@@ -194,6 +195,7 @@ describe("VoiceModeSession", () => {
     session.tapOrb();
     await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("paused"));
     expect(turns).toHaveLength(0);
+    expect(audio.discardRecording).toHaveBeenCalledWith("file:///a.m4a");
 
     session.tapOrb();
     await vi.waitFor(() => expect(listens).toHaveLength(2));
@@ -202,7 +204,7 @@ describe("VoiceModeSession", () => {
 
   it("keeps the reply on screen when the server has no speech provider", async () => {
     const { session, listens, playbacks } = harness({ noTts: true });
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     listens[0]!.resolve(speech);
     await vi.waitFor(() => expect(listens).toHaveLength(2));
@@ -213,7 +215,7 @@ describe("VoiceModeSession", () => {
 
   it("muting stops the microphone and unmuting resumes it", async () => {
     const { session, listens } = harness();
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
 
     session.setMuted(true);
@@ -228,7 +230,7 @@ describe("VoiceModeSession", () => {
 
   it("sends typed text as a turn", async () => {
     const { session, listens, turns } = harness();
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
 
     session.sendText("  list my threads ");
@@ -240,7 +242,7 @@ describe("VoiceModeSession", () => {
 
   it("stays on one turn when hands-free is off", async () => {
     const { session, listens, playbacks } = harness();
-    await session.start();
+    session.start();
     session.setHandsFree(false);
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     listens[0]!.resolve(speech);
@@ -252,19 +254,92 @@ describe("VoiceModeSession", () => {
     await session.stop();
   });
 
-  it("reports a microphone failure", async () => {
-    const { session, audio } = harness();
+  it("reports a microphone failure and retries it on a tap", async () => {
+    const { session, audio, listens } = harness();
+    session.setHandsFree(false);
     vi.mocked(audio.open).mockRejectedValueOnce(new Error("Microphone access is turned off."));
-    await session.start();
-    expect(session.getSnapshot()).toMatchObject({
-      phase: "error",
-      error: "Microphone access is turned off.",
-    });
+    session.start();
+    await vi.waitFor(() =>
+      expect(session.getSnapshot()).toMatchObject({
+        phase: "error",
+        error: "Microphone access is turned off.",
+      }),
+    );
+    expect(listens).toHaveLength(0);
+
+    session.tapOrb();
+    await vi.waitFor(() => expect(listens).toHaveLength(1));
+    expect(audio.open).toHaveBeenCalledTimes(2);
+    await session.stop();
+  });
+
+  it("does not listen when the screen closes while the microphone is opening", async () => {
+    const { session, audio, listens } = harness();
+    let grant!: () => void;
+    vi.mocked(audio.open).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          grant = resolve;
+        }),
+    );
+    session.start();
+    await vi.waitFor(() => expect(audio.open).toHaveBeenCalled());
+    const stopped = session.stop();
+    grant();
+    await stopped;
+    await Promise.resolve();
+    expect(audio.close).toHaveBeenCalled();
+    expect(audio.listen).not.toHaveBeenCalled();
+    expect(listens).toHaveLength(0);
+  });
+
+  it("does not start a reply that arrives after the turn was cancelled", async () => {
+    const { session, audio, listens, playbacks } = harness();
+    session.start();
+    await vi.waitFor(() => expect(listens).toHaveLength(1));
+    let ready!: () => void;
+    vi.mocked(audio.play).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          const playback = { done: Promise.resolve("stopped" as const), stop: vi.fn() };
+          playbacks.push({ finish: () => {}, stop: playback.stop });
+          ready = () => resolve(playback);
+        }),
+    );
+    listens[0]!.resolve(speech);
+    await vi.waitFor(() => expect(audio.play).toHaveBeenCalled());
+    const stopped = session.stop();
+    ready();
+    await stopped;
+    await vi.waitFor(() => expect(playbacks[0]!.stop).toHaveBeenCalled());
+  });
+
+  it("shows a failed approval answer instead of rejecting", async () => {
+    const { session, executeAction } = harness();
+    session.start();
+    executeAction.mockRejectedValueOnce(new Error("The action didn't go through."));
+    await expect(
+      session.respondToApproval(
+        {
+          environmentId: "env-1",
+          threadId: "t1",
+          threadTitle: "Fix the build",
+          requestId: "r1",
+          requestKind: "command",
+          title: "Run tests",
+          detail: null,
+          reason: null,
+        },
+        "accept",
+      ),
+    ).resolves.toBeUndefined();
+    expect(session.getSnapshot().error).toBe("The action didn't go through.");
+    await session.stop();
   });
 
   it("releases the audio session on stop", async () => {
     const { session, audio, listens } = harness();
-    await session.start();
+    session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     await session.stop();
     expect(audio.close).toHaveBeenCalled();

@@ -5714,6 +5714,8 @@
   "7c9d104d5fc75704": "Silenciar",
   "bb26ea55815a1d7f": "La acción no se completó.",
   "10301a03d2d6d149": "El acceso al micrófono está desactivado para mattr.",
+  "d752933d7fe43e41": "El modo de voz no está escuchando ahora.",
+  "522b0c5b5dbfe247": "Se interrumpió el micrófono. El modo de voz volverá a escuchar.",
   "dcab63582336c608": "Otra sesión de audio está usando el micrófono.",
   "6bcb8ff45f598ecc": "Esta compilación no puede leer el audio del micrófono.",
   "7b2a187aeab1eba2": "El reconocimiento de voz no está configurado en este servidor. Añade una clave de Deepgram.",

@@ -5720,6 +5720,8 @@
   "7c9d104d5fc75704": "Stäng av mikrofonen",
   "bb26ea55815a1d7f": "Åtgärden gick inte igenom.",
   "10301a03d2d6d149": "Mikrofonåtkomsten är avstängd för mattr.",
+  "d752933d7fe43e41": "Röstläget lyssnar inte just nu.",
+  "522b0c5b5dbfe247": "Mikrofonen avbröts. Röstläget börjar lyssna igen.",
   "dcab63582336c608": "En annan ljudsession använder mikrofonen.",
   "6bcb8ff45f598ecc": "Den här versionen kan inte läsa mikrofonljud.",
   "7b2a187aeab1eba2": "Taligenkänning är inte konfigurerad på den här servern. Lägg till en Deepgram-nyckel.",

@@ -21,6 +21,10 @@ const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
 const MATTR_APP_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng);
 const MATTR_IOS_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIconComposerProject);
 
+// Chris's free Apple ID team; `T3CODE_IOS_APPLE_TEAM_ID` signs with another one.
+const MATTR_PERSONAL_TEAM_ID = "RMAD3349Z8";
+const PERSONAL_TEAM_CAPABILITIES_PLUGIN = "./plugins/withoutIosPersonalTeamCapabilities.cjs";
+
 const PERSONAL_TEAM_BUNDLE_IDENTIFIERS: Record<AppVariant, string> = {
   development: "com.current.antimatter.mobile.dev",
   preview: "com.current.antimatter.mobile.preview",
@@ -61,11 +65,25 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
   const { extra, ...rest } = config;
   const branded = { ...rebrandDeep(rest), extra };
 
-  const plugins = branded.plugins?.map((plugin) =>
+  // Voice Mode keeps listening and speaking with the screen locked.
+  const audioPlugins = branded.plugins?.map((plugin) =>
     Array.isArray(plugin) && plugin[0] === "expo-audio"
-      ? [plugin[0], { ...plugin[1], enableBackgroundPlayback: true }]
+      ? [
+          plugin[0],
+          { ...plugin[1], enableBackgroundPlayback: true, enableBackgroundRecording: true },
+        ]
       : plugin,
   );
+  // Mods run in reverse plugin order. Upstream lists the capability stripper last, so it runs
+  // before expo-notifications adds `aps-environment` and Personal Team signing fails; first in
+  // the list it runs after every other entitlements mod.
+  const plugins =
+    options.isIosPersonalTeamBuild && audioPlugins?.includes(PERSONAL_TEAM_CAPABILITIES_PLUGIN)
+      ? [
+          PERSONAL_TEAM_CAPABILITIES_PLUGIN,
+          ...audioPlugins.filter((plugin) => plugin !== PERSONAL_TEAM_CAPABILITIES_PLUGIN),
+        ]
+      : audioPlugins;
 
   const { appleTeamId, associatedDomains, ...ios } = (branded.ios ?? {}) as Record<
     string,
@@ -73,7 +91,8 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
   > & {
     entitlements?: object;
   };
-  const appleTeamIdOverride = options.env.T3CODE_IOS_APPLE_TEAM_ID?.trim();
+  const personalTeamId = options.env.T3CODE_IOS_APPLE_TEAM_ID?.trim() || MATTR_PERSONAL_TEAM_ID;
+  const infoPlist = (ios.infoPlist ?? {}) as Record<string, unknown>;
 
   return {
     ...branded,
@@ -82,14 +101,18 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
     ios: {
       ...ios,
       icon: MATTR_IOS_ICON,
+      infoPlist: {
+        ...infoPlist,
+        // On-device Apple Speech is Voice Mode's fallback when the server has no Deepgram key.
+        NSSpeechRecognitionUsageDescription:
+          "Allow mattr to transcribe your voice on this device when your server can't.",
+      },
       entitlements: {
         ...ios.entitlements,
         "keychain-access-groups": [`$(AppIdentifierPrefix)${options.iosBundleIdentifier}`],
       },
       ...(options.isIosPersonalTeamBuild
-        ? appleTeamIdOverride
-          ? { appleTeamId: appleTeamIdOverride }
-          : {}
+        ? { appleTeamId: personalTeamId }
         : { appleTeamId, associatedDomains }),
     },
     android: { ...branded.android, icon: MATTR_APP_ICON },

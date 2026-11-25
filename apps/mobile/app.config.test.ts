@@ -73,15 +73,17 @@ it.each([
   expect(config.ios?.icon).toContain("assets/nightly/app-icon.icon");
 });
 
-it("keeps locked-screen audio playback enabled for Voice Mode", async () => {
+it("keeps Voice Mode listening and speaking with the screen locked", async () => {
   const config = await loadConfig(undefined);
   const audio = config.plugins?.find(
     (plugin) => Array.isArray(plugin) && plugin[0] === "expo-audio",
   );
   expect(audio).toEqual([
     "expo-audio",
-    expect.objectContaining({ enableBackgroundPlayback: true }),
+    expect.objectContaining({ enableBackgroundPlayback: true, enableBackgroundRecording: true }),
   ]);
+  expect(config.ios?.infoPlist?.UIBackgroundModes).toContain("audio");
+  expect(config.ios?.infoPlist?.NSSpeechRecognitionUsageDescription).toContain("mattr");
 });
 
 it.each([
@@ -90,13 +92,26 @@ it.each([
 ])("signs Personal Team builds for APP_VARIANT=%j without paid capabilities", async (value, id) => {
   const config = await loadConfig(value, { T3CODE_IOS_PERSONAL_TEAM: "1" });
   expect(config.ios?.bundleIdentifier).toBe(id);
-  expect(config.ios).not.toHaveProperty("appleTeamId");
+  expect(config.ios?.appleTeamId).toBe("RMAD3349Z8");
   expect(config.ios).not.toHaveProperty("associatedDomains");
   expect(config.ios?.entitlements?.["keychain-access-groups"]).toEqual([
     `$(AppIdentifierPrefix)${id}`,
   ]);
   expect(config.updates?.enabled).toBe(false);
-  expect(config.plugins).toContain("./plugins/withoutIosPersonalTeamCapabilities.cjs");
+  // First in the list, so its mod runs after expo-notifications adds aps-environment.
+  expect(config.plugins?.[0]).toBe("./plugins/withoutIosPersonalTeamCapabilities.cjs");
+  expect(
+    config.plugins?.filter(
+      (plugin) => plugin === "./plugins/withoutIosPersonalTeamCapabilities.cjs",
+    ),
+  ).toHaveLength(1);
+});
+
+it("leaves paid builds' plugin order and team alone", async () => {
+  const config = await loadConfig(undefined);
+  expect(config.ios?.appleTeamId).toBe("ARK85ZXQ4Z");
+  expect(config.plugins).not.toContain("./plugins/withoutIosPersonalTeamCapabilities.cjs");
+  expect(config.plugins?.[0]).toBe("expo-asset");
 });
 
 it("honors Personal Team bundle id and team id overrides", async () => {

@@ -31,14 +31,16 @@ describe("activateAudioSession", () => {
   it("keeps a hands-free session alive in the background and on the speaker", async () => {
     const token = acquireAudioSession("recording");
     await activateAudioSession(token, {
-      shouldPlayInBackground: true,
+      keepAliveInBackground: true,
       shouldRouteThroughEarpiece: false,
     });
+    // Without background recording Expo pauses the recorder as soon as the screen locks.
     expect(audio.setMode).toHaveBeenCalledWith({
       allowsRecording: true,
       interruptionMode: "doNotMix",
       playsInSilentMode: true,
       shouldPlayInBackground: true,
+      allowsBackgroundRecording: true,
       shouldRouteThroughEarpiece: false,
     });
     expect(audio.setActive).toHaveBeenLastCalledWith(true);
@@ -47,11 +49,12 @@ describe("activateAudioSession", () => {
 
   it("returns to foreground-only audio when a recording session is released", async () => {
     const token = acquireAudioSession("recording");
-    await activateAudioSession(token, { shouldPlayInBackground: true });
+    await activateAudioSession(token, { keepAliveInBackground: true });
     await releaseAudioSession(token);
     expect(audio.setMode).toHaveBeenLastCalledWith({
       allowsRecording: false,
       shouldPlayInBackground: false,
+      allowsBackgroundRecording: false,
     });
     expect(audio.setActive).toHaveBeenLastCalledWith(false);
   });
@@ -59,7 +62,7 @@ describe("activateAudioSession", () => {
   it("does not configure a session another owner has taken", async () => {
     const first = acquireAudioSession("recording");
     const second = acquireAudioSession("recording");
-    expect(await activateAudioSession(first, { shouldPlayInBackground: true })).toBe(false);
+    expect(await activateAudioSession(first, { keepAliveInBackground: true })).toBe(false);
     expect(audio.setMode).not.toHaveBeenCalled();
     await releaseAudioSession(second);
   });

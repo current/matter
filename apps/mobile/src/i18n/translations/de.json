@@ -5720,6 +5720,8 @@
   "7c9d104d5fc75704": "Stummschalten",
   "bb26ea55815a1d7f": "Die Aktion wurde nicht ausgeführt.",
   "10301a03d2d6d149": "Der Mikrofonzugriff für mattr ist ausgeschaltet.",
+  "d752933d7fe43e41": "Der Sprachmodus hört gerade nicht zu.",
+  "522b0c5b5dbfe247": "Das Mikrofon wurde unterbrochen. Der Sprachmodus hört gleich wieder zu.",
   "dcab63582336c608": "Eine andere Audiositzung verwendet das Mikrofon.",
   "6bcb8ff45f598ecc": "Dieser Build kann kein Mikrofon-Audio lesen.",
   "7b2a187aeab1eba2": "Spracherkennung ist auf diesem Server nicht eingerichtet. Füge einen Deepgram-Schlüssel hinzu.",

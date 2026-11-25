@@ -144,16 +144,38 @@ describe("createVoiceActivityDetector", () => {
     const quiet = drive(BARGE_IN_VAD, [[-30, 40]]);
     expect(quiet.events).toEqual([]);
     const brief = drive(BARGE_IN_VAD, [
-      [-55, 5],
+      [-55, 12],
       [-12, 3],
       [-55, 10],
     ]);
     expect(brief.events).toEqual([]);
     const spoken = drive(BARGE_IN_VAD, [
-      [-55, 5],
+      [-55, 12],
       [-12, 8],
     ]);
     expect(spoken.events.map((entry) => entry.event)).toEqual(["speech-start"]);
+  });
+
+  it("ignores everything during the barge-in warmup", () => {
+    expect(drive(BARGE_IN_VAD, [[-3, 11]]).events).toEqual([]);
+  });
+
+  it("does not mistake the reply leaking from the speaker for the user", () => {
+    // Loud sentences with short pauses between them, as a spoken reply sounds at the mic.
+    const sentence: ReadonlyArray<readonly [number, number]> = [
+      [-15, 25],
+      [-50, 7],
+    ];
+    const { events } = drive(BARGE_IN_VAD, Array.from({ length: 6 }, () => sentence).flat());
+    expect(events).toEqual([]);
+  });
+
+  it("still hears the user over a loud reply", () => {
+    const { events } = drive(BARGE_IN_VAD, [
+      [-15, 30],
+      [-3, 6],
+    ]);
+    expect(events.map((entry) => entry.event)).toEqual(["speech-start"]);
   });
 });
 

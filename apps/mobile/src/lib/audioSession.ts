@@ -65,8 +65,11 @@ export function activateAudioSession(
   options: {
     readonly nativePlayback?: boolean;
     readonly allowBluetoothRecording?: boolean;
-    /** Keeps audio running with the screen locked or the app backgrounded (hands-free voice). */
-    readonly shouldPlayInBackground?: boolean;
+    /**
+     * Keeps playback and recording running with the screen locked or the app backgrounded
+     * (hands-free voice). Expo otherwise pauses both when the app leaves the foreground.
+     */
+    readonly keepAliveInBackground?: boolean;
     readonly shouldRouteThroughEarpiece?: boolean;
   } = {},
 ): Promise<boolean> {
@@ -84,7 +87,10 @@ export function activateAudioSession(
         : { shouldRouteThroughEarpiece: options.shouldRouteThroughEarpiece }),
       interruptionMode: "doNotMix",
       playsInSilentMode: true,
-      shouldPlayInBackground: options.shouldPlayInBackground ?? false,
+      shouldPlayInBackground: options.keepAliveInBackground ?? false,
+      ...(token.kind === "recording" && options.keepAliveInBackground
+        ? { allowsBackgroundRecording: true }
+        : {}),
     });
     if (!isAudioSessionOwner(token)) return false;
     await setIsAudioActiveAsync(true);
@@ -98,7 +104,11 @@ export function releaseAudioSession(token: AudioSessionToken): Promise<void> {
     if (owner !== token) return;
     try {
       if (token.kind === "recording") {
-        await setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false });
+        await setAudioModeAsync({
+          allowsRecording: false,
+          shouldPlayInBackground: false,
+          allowsBackgroundRecording: false,
+        });
       }
     } finally {
       if (owner === token) {

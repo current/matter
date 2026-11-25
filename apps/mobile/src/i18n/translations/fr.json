@@ -5714,6 +5714,8 @@
   "7c9d104d5fc75704": "Couper le micro",
   "bb26ea55815a1d7f": "L'action n'a pas abouti.",
   "10301a03d2d6d149": "L'accès au micro est désactivé pour mattr.",
+  "d752933d7fe43e41": "Le mode vocal n'écoute pas pour le moment.",
+  "522b0c5b5dbfe247": "Le micro a été interrompu. Le mode vocal va se remettre à écouter.",
   "dcab63582336c608": "Une autre session audio utilise le micro.",
   "6bcb8ff45f598ecc": "Cette version ne peut pas lire l'audio du micro.",
   "7b2a187aeab1eba2": "La reconnaissance vocale n'est pas configurée sur ce serveur. Ajoutez une clé Deepgram.",

@@ -5722,6 +5722,8 @@
   "7c9d104d5fc75704": "Mute",
   "bb26ea55815a1d7f": "The action didn't go through.",
   "10301a03d2d6d149": "Microphone access is turned off for mattr.",
+  "d752933d7fe43e41": "Voice mode isn't listening right now.",
+  "522b0c5b5dbfe247": "The microphone was interrupted. Voice mode will listen again.",
   "dcab63582336c608": "Another audio session is using the microphone.",
   "6bcb8ff45f598ecc": "This build cannot read microphone audio.",
   "7b2a187aeab1eba2": "Speech recognition isn't set up on this server. Add a Deepgram key.",

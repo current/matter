@@ -42,8 +42,9 @@ export interface VoiceModeAudio {
   close(): Promise<void>;
   listen(options: ListenOptions): Promise<ActiveListening>;
   watchForBargeIn(config: VoiceActivityConfig, onBargeIn: () => void): Promise<() => Promise<void>>;
-  play(audio: SpokenAudio): ActivePlayback;
+  play(audio: SpokenAudio): Promise<ActivePlayback>;
   transcribe(uri: string, api: VoiceAssistantApi, signal?: AbortSignal): Promise<string>;
+  discardRecording(uri: string): void;
 }
 
 export interface VoiceModeDeps {
@@ -132,21 +133,11 @@ export class VoiceModeSession {
     return generation === this.generation && this.started;
   }
 
-  async start(): Promise<void> {
+  start() {
     if (this.started) return;
     this.started = true;
-    const generation = ++this.generation;
+    this.generation += 1;
     this.setPhase("starting");
-    try {
-      await this.deps.audio.open();
-    } catch (error) {
-      if (this.current(generation)) this.setPhase("error", messageOf(error));
-      return;
-    }
-    if (!this.current(generation)) {
-      await this.deps.audio.close();
-      return;
-    }
     this.stopWorkspaceWatch = this.deps.watchWorkspace(() => this.refreshPending());
     this.refreshPending();
     this.armed = true;
@@ -229,6 +220,10 @@ export class VoiceModeSession {
   }
 
   private async cycle(generation: number): Promise<CycleOutcome> {
+    // Every cycle reopens, so a tap after a refused permission or lost session retries it.
+    // The audio serializes open and close, so a stop() during this await still wins.
+    await this.deps.audio.open();
+    if (!this.current(generation)) throw new VoiceCancelled();
     const api = this.deps.getApi();
     if (!api) throw new Error(m(msg("Connect to an environment to use voice mode.")));
 
@@ -285,7 +280,10 @@ export class VoiceModeSession {
       throw new VoiceCancelled();
     }
     if (result.kind === "no-speech") return null;
-    if (!result.heardSpeech && this.manualFinish) return "pause";
+    if (!result.heardSpeech && this.manualFinish) {
+      this.deps.audio.discardRecording(result.uri);
+      return "pause";
+    }
     this.setPhase("transcribing");
     const abort = new AbortController();
     this.turnAbort = abort;
@@ -369,7 +367,11 @@ export class VoiceModeSession {
     }
     if (!this.current(generation) || signal.aborted) throw new VoiceCancelled();
 
-    const playback = this.deps.audio.play(audio);
+    const playback = await this.deps.audio.play(audio);
+    if (!this.current(generation) || signal.aborted) {
+      playback.stop();
+      throw new VoiceCancelled();
+    }
     this.playback = playback;
     let stopWatching: (() => Promise<void>) | null = null;
     if (this.settings.bargeInEnabled) {
@@ -460,17 +462,22 @@ export class VoiceModeSession {
     this.requestLoop();
   }
 
+  /** Never rejects: a failed answer shows as the session error and the card stays up. */
   async respondToApproval(
     approval: VoiceWorkspaceApprovalSummary,
     decision: "accept" | "decline",
   ): Promise<void> {
-    await this.deps.executeAction({
-      type: "respond-approval",
-      environmentId: approval.environmentId,
-      threadId: approval.threadId,
-      requestId: approval.requestId,
-      decision,
-    });
-    this.refreshPending();
+    try {
+      await this.deps.executeAction({
+        type: "respond-approval",
+        environmentId: approval.environmentId,
+        threadId: approval.threadId,
+        requestId: approval.requestId,
+        decision,
+      });
+    } catch (error) {
+      if (this.started) this.update({ error: messageOf(error) });
+    }
+    if (this.started) this.refreshPending();
   }
 }

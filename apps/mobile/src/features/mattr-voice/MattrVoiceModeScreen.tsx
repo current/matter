@@ -1,7 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import { useGT } from "gt-react-native";
 import * as Haptics from "expo-haptics";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   TextInput,
   View,
+  type ScrollViewInstance,
 } from "react-native";
 import Animated, {
   Easing,
@@ -194,10 +195,7 @@ export function MattrVoiceModeScreen() {
           executeVoiceClientAction(action, {
             openThread: (target) => {
               navigation.goBack();
-              openWorkspaceDetail({
-                name: "Thread",
-                params: target as never,
-              });
+              openWorkspaceDetail({ name: "Thread", params: target });
             },
           }),
         setLevel: (value) => level.set(value),
@@ -209,9 +207,10 @@ export function MattrVoiceModeScreen() {
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- opens the microphone and audio session with the screen and releases them when it closes
   useEffect(() => {
-    void session.start();
+    session.start();
     return () => void session.stop();
   }, [session]);
+  const transcript = useRef<ScrollViewInstance>(null);
 
   const labels: Record<VoicePhase, string> = {
     starting: gt("Starting…"),
@@ -345,8 +344,10 @@ export function MattrVoiceModeScreen() {
 
       {snapshot.turns.length > 0 ? (
         <ScrollView
+          ref={transcript}
           className="mb-2 max-h-[34%] px-4"
           contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+          onContentSizeChange={() => transcript.current?.scrollToEnd({ animated: true })}
         >
           {snapshot.turns.map((turn) => (
             <TurnRow key={turn.id} turn={turn} />

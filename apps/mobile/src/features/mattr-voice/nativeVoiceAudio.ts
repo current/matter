@@ -3,7 +3,7 @@ import {
   createAudioPlayer,
   RecordingPresets,
   requestRecordingPermissionsAsync,
-  type AudioPlayer,
+  type AudioStatus,
 } from "expo-audio";
 import { File, Paths } from "expo-file-system";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
@@ -34,20 +34,29 @@ import {
 
 const KEEP_AWAKE_TAG = "mattr-voice-mode";
 const METERING_INTERVAL_MS = 60;
+// A recorder that is still not running this long after record() was stopped by the system
+// (a phone call, Siri, another app taking the microphone).
+const RECORDING_START_GRACE_MS = 600;
+// A reply whose file has not loaded by then is not going to play.
+const PLAYBACK_LOAD_TIMEOUT_MS = 15_000;
+const PLAYBACK_END_SLACK_MS = 5_000;
 // A reply longer than this is a stuck player, not speech.
 const MAX_PLAYBACK_MS = 6 * 60_000;
 
 // The native constructor expects platform-flattened options, as built by useAudioRecorder.
+// Speech is decoded to 16 kHz mono before upload, so a second channel only costs disk and CPU.
 const { ios: IOS_RECORDING_OPTIONS, android: ANDROID_RECORDING_OPTIONS } =
   RecordingPresets.HIGH_QUALITY;
 const VOICE_RECORDING_OPTIONS = {
   extension: RecordingPresets.HIGH_QUALITY.extension,
   sampleRate: RecordingPresets.HIGH_QUALITY.sampleRate,
-  numberOfChannels: RecordingPresets.HIGH_QUALITY.numberOfChannels,
-  bitRate: RecordingPresets.HIGH_QUALITY.bitRate,
+  numberOfChannels: 1,
+  bitRate: 64_000,
   isMeteringEnabled: true,
   ...(Platform.OS === "ios" ? IOS_RECORDING_OPTIONS : ANDROID_RECORDING_OPTIONS),
 };
+
+type Recorder = InstanceType<typeof AudioModule.AudioRecorder>;
 
 interface VoiceTranscriptionNative {
   decodeRecording?: (uri: string) => Promise<Uint8Array>;
@@ -58,13 +67,17 @@ interface VoiceTranscriptionNative {
 
 const native = requireOptionalNativeModule<VoiceTranscriptionNative>("T3VoiceTranscription");
 
-export const hasNativeVoiceCapture = typeof native?.decodeRecording === "function";
-
 function deleteQuietly(uri: string | null) {
   if (!uri) return;
   try {
     new File(uri).delete();
   } catch {}
+}
+
+/** Expo reports a failed load as an `error` key that its status type does not declare. */
+function playbackError(status: AudioStatus): boolean {
+  const { error } = status as AudioStatus & { readonly error?: unknown };
+  return typeof error === "string" && error.length > 0;
 }
 
 export type ListenResult =
@@ -80,6 +93,7 @@ export interface ListenOptions {
 }
 
 export interface ActiveListening {
+  /** Rejects when the system takes the microphone away mid-recording. */
   readonly result: Promise<ListenResult>;
   /** Ends the recording now and keeps it (tap to send). */
   finish(): void;
@@ -101,103 +115,131 @@ export interface ActivePlayback {
  */
 export class NativeVoiceAudio {
   private token: ReturnType<typeof acquireAudioSession> | null = null;
-  private recorder: InstanceType<typeof AudioModule.AudioRecorder> | null = null;
+  private recorder: Recorder | null = null;
   private opened = false;
   private fileSequence = 0;
+  // open() and close() run one at a time, so a screen that closes while the permission
+  // prompt is up cannot leave the session, or the screen, awake.
+  private lifecycle: Promise<void> = Promise.resolve();
 
-  private opening: Promise<void> | null = null;
+  private serialize(operation: () => Promise<void>): Promise<void> {
+    const next = this.lifecycle.then(operation);
+    this.lifecycle = next.catch(() => {});
+    return next;
+  }
 
   /** Asks for the microphone, takes the shared audio session and keeps the screen awake. */
   open(): Promise<void> {
-    if (this.opened) return Promise.resolve();
-    this.opening ??= this.openOnce().finally(() => {
-      this.opening = null;
-    });
-    return this.opening;
-  }
-
-  private async openOnce(): Promise<void> {
-    const permission = await requestRecordingPermissionsAsync();
-    if (!permission.granted) throw new Error(m(msg("Microphone access is turned off for mattr.")));
-    const token = acquireAudioSession("recording");
-    this.token = token;
-    try {
-      const active = await activateAudioSession(token, {
-        shouldPlayInBackground: true,
-        shouldRouteThroughEarpiece: false,
-      });
-      if (!active) throw new Error(m(msg("Another audio session is using the microphone.")));
-    } catch (error) {
-      this.token = null;
-      await releaseAudioSession(token).catch(() => {});
-      throw error;
-    }
-    this.opened = true;
-    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => {});
-  }
-
-  async close(): Promise<void> {
-    if (!this.opened && !this.token) return;
-    this.opened = false;
-    const recorder = this.recorder;
-    this.recorder = null;
-    if (recorder) {
+    return this.serialize(async () => {
+      if (this.opened) return;
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error(m(msg("Microphone access is turned off for mattr.")));
+      }
+      const token = acquireAudioSession("recording");
+      this.token = token;
       try {
-        await recorder.stop();
-      } catch {}
-      deleteQuietly(recorder.uri);
+        const active = await activateAudioSession(token, {
+          keepAliveInBackground: true,
+          shouldRouteThroughEarpiece: false,
+        });
+        if (!active) throw new Error(m(msg("Another audio session is using the microphone.")));
+      } catch (error) {
+        this.token = null;
+        await releaseAudioSession(token).catch(() => {});
+        throw error;
+      }
+      this.opened = true;
+      void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => {});
+    });
+  }
+
+  close(): Promise<void> {
+    return this.serialize(async () => {
+      if (!this.opened && !this.token) return;
+      this.opened = false;
+      const recorder = this.recorder;
+      this.recorder = null;
+      if (recorder) {
+        try {
+          await recorder.stop();
+        } catch {}
+        deleteQuietly(recorder.uri);
+        recorder.release();
+      }
+      void Promise.resolve(deactivateKeepAwake(KEEP_AWAKE_TAG)).catch(() => {});
+      const token = this.token;
+      this.token = null;
+      if (token) await releaseAudioSession(token).catch(() => {});
+    });
+  }
+
+  private async startRecorder(): Promise<Recorder> {
+    if (!this.opened) throw new Error(m(msg("Voice mode isn't listening right now.")));
+    const recorder = (this.recorder ??= new AudioModule.AudioRecorder(VOICE_RECORDING_OPTIONS));
+    await recorder.prepareToRecordAsync();
+    recorder.record();
+    return recorder;
+  }
+
+  /** A reset media server invalidates every recorder; the next recording builds a new one. */
+  private dropRecorder(recorder: Recorder) {
+    if (this.recorder !== recorder) return;
+    this.recorder = null;
+    try {
       recorder.release();
-    }
-    void Promise.resolve(deactivateKeepAwake(KEEP_AWAKE_TAG)).catch(() => {});
-    const token = this.token;
-    this.token = null;
-    if (token) await releaseAudioSession(token).catch(() => {});
+    } catch {}
   }
 
   /** Records one utterance, ending on silence, `finish()` or `cancel()`. */
   async listen(options: ListenOptions): Promise<ActiveListening> {
-    const recorder = (this.recorder ??= new AudioModule.AudioRecorder(VOICE_RECORDING_OPTIONS));
-    await recorder.prepareToRecordAsync();
-    recorder.record();
-
+    const recorder = await this.startRecorder();
+    const startedAt = Date.now();
     const detector = createVoiceActivityDetector(options.vad);
     let heardSpeech = false;
     let settled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    let resolveResult: (result: ListenResult) => void = () => {};
-    const result = new Promise<ListenResult>((resolve) => {
-      resolveResult = resolve;
+    let settle: (outcome: ListenResult | Error) => void = () => {};
+    const result = new Promise<ListenResult>((resolve, reject) => {
+      settle = (outcome) => (outcome instanceof Error ? reject(outcome) : resolve(outcome));
     });
 
-    const end = async (reason: "keep" | "discard" | "no-speech") => {
+    const end = async (reason: "keep" | "discard" | "no-speech" | Error) => {
       if (settled) return;
       settled = true;
-      if (timer !== null) clearInterval(timer);
+      clearInterval(timer);
       options.onLevel(0);
       try {
         await recorder.stop();
       } catch {}
       const uri = recorder.uri;
       if (reason === "keep" && uri) {
-        resolveResult({ kind: "utterance", uri, heardSpeech });
+        settle({ kind: "utterance", uri, heardSpeech });
         return;
       }
       deleteQuietly(uri);
-      resolveResult(reason === "no-speech" ? { kind: "no-speech" } : { kind: "cancelled" });
+      if (reason instanceof Error) settle(reason);
+      else settle(reason === "no-speech" ? { kind: "no-speech" } : { kind: "cancelled" });
     };
+    const interrupted = () =>
+      new Error(m(msg("The microphone was interrupted. Voice mode will listen again.")));
 
-    timer = setInterval(() => {
+    const timer = setInterval(() => {
       if (settled) return;
       let metering: number | undefined;
       try {
         const status = recorder.getStatus();
         if (status.mediaServicesDidReset) {
-          void end("discard");
+          this.dropRecorder(recorder);
+          void end(interrupted());
+          return;
+        }
+        if (!status.isRecording && Date.now() - startedAt > RECORDING_START_GRACE_MS) {
+          void end(interrupted());
           return;
         }
         metering = status.metering;
       } catch {
-        void end("discard");
+        void end(interrupted());
         return;
       }
       options.onLevel(normalizeVoiceInputDecibels(metering));
@@ -219,14 +261,17 @@ export class NativeVoiceAudio {
     };
   }
 
+  /** Deletes a recording the caller decided not to transcribe. */
+  discardRecording(uri: string) {
+    deleteQuietly(uri);
+  }
+
   /**
    * Watches the microphone while the assistant talks and reports the moment the user speaks over
    * it. It records nothing the caller keeps: a barge-in starts a fresh `listen()`.
    */
   async watchForBargeIn(config: VoiceActivityConfig, onBargeIn: () => void) {
-    const recorder = (this.recorder ??= new AudioModule.AudioRecorder(VOICE_RECORDING_OPTIONS));
-    await recorder.prepareToRecordAsync();
-    recorder.record();
+    const recorder = await this.startRecorder();
     const detector = createVoiceActivityDetector(config);
     let stopped = false;
     const timer = setInterval(() => {
@@ -248,36 +293,55 @@ export class NativeVoiceAudio {
   }
 
   /** Plays reply audio from the server; `stop()` interrupts it immediately. */
-  play(audio: SpokenAudio): ActivePlayback {
+  async play(audio: SpokenAudio): Promise<ActivePlayback> {
     const file = new File(
       Paths.cache,
       `mattr-voice-${Date.now()}-${++this.fileSequence}.${audioExtensionForContentType(audio.contentType)}`,
     );
-    file.create({ overwrite: true });
-    file.write(audio.bytes);
+    try {
+      file.create({ overwrite: true });
+      // Async since Expo SDK 58: the player must not open a half-written file.
+      await file.write(audio.bytes);
+    } catch (error) {
+      deleteQuietly(file.uri);
+      throw error;
+    }
 
-    let player: AudioPlayer | null = createAudioPlayer({ uri: file.uri }, { updateInterval: 100 });
+    // The voice session owns the audio session; the player must never deactivate it.
+    const player = createAudioPlayer(
+      { uri: file.uri },
+      { updateInterval: 100, keepAudioSessionActive: true },
+    );
     let ended = false;
     let finishWith: (outcome: "finished" | "stopped") => void = () => {};
     const done = new Promise<"finished" | "stopped">((resolve) => {
       finishWith = resolve;
     });
+    let failsafe = setTimeout(() => end("stopped"), PLAYBACK_LOAD_TIMEOUT_MS);
+    let durationKnown = false;
     const subscription = player.addListener("playbackStatusUpdate", (status) => {
-      if (status.didJustFinish) end("finished");
+      if (status.didJustFinish) {
+        end("finished");
+      } else if (playbackError(status)) {
+        end("stopped");
+      } else if (!durationKnown && status.isLoaded) {
+        durationKnown = true;
+        clearTimeout(failsafe);
+        const expectedMs =
+          Number.isFinite(status.duration) && status.duration > 0
+            ? status.duration * 1000 + PLAYBACK_END_SLACK_MS
+            : MAX_PLAYBACK_MS;
+        failsafe = setTimeout(() => end("stopped"), Math.min(expectedMs, MAX_PLAYBACK_MS));
+      }
     });
-    const failsafe = setTimeout(() => end("stopped"), MAX_PLAYBACK_MS);
 
     function end(outcome: "finished" | "stopped") {
       if (ended) return;
       ended = true;
       clearTimeout(failsafe);
       subscription.remove();
-      const current = player;
-      player = null;
-      if (current) disposeAudioPlayer(current);
-      try {
-        file.delete();
-      } catch {}
+      disposeAudioPlayer(player);
+      deleteQuietly(file.uri);
       finishWith(outcome);
     }
 
@@ -291,8 +355,7 @@ export class NativeVoiceAudio {
       done,
       stop: () => {
         if (ended) return;
-        const current = player;
-        if (current) pauseAudioPlayer(current);
+        pauseAudioPlayer(player);
         end("stopped");
       },
     };
@@ -313,7 +376,7 @@ export class NativeVoiceAudio {
       } catch (error) {
         const unavailable =
           isVoiceAssistantApiError(error) && (error.unavailable || error.status === 502);
-        if (!unavailable) throw error;
+        if (!unavailable || signal?.aborted) throw error;
         return await this.transcribeOnDevice(uri);
       }
     } finally {
