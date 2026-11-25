@@ -10,8 +10,8 @@
 }
 
 @media (min-width: 768px) {
-  /* The frame sits a step darker than the card. Light themes already have a darker sidebar;
-     dark ones darken the frame and lift the card toward the card tone. */
+  /* The frame sits apart from the card. Light themes already have a darker sidebar; dark ones
+     use a fixed toolbar gray and lift the card toward the card tone. */
   [data-slot="sidebar-wrapper"] {
     --mattr-shell-gap: 8px;
     --mattr-shell-radius: 10px;
@@ -24,7 +24,7 @@
   }
 
   .dark [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(in srgb, var(--background) 60%, black);
+    --mattr-frame: #111313;
     --mattr-canvas: color-mix(in srgb, var(--card) 60%, var(--background));
   }
 
