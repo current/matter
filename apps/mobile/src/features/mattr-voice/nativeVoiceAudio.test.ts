@@ -98,9 +98,13 @@ function installPcmTap(voiceProcessing = true) {
   let listener: ((event: { data: string; level: number }) => void) | null = null;
   const stop = vi.fn(async () => {});
   Object.assign(native.transcription, {
-    startPcmStream: vi.fn(async () => ({ voiceProcessing })),
+    startPcmStream: vi.fn(async function (this: unknown) {
+      expect(this).toBe(native.transcription);
+      return { voiceProcessing };
+    }),
     stopPcmStream: stop,
-    addListener: (_event: string, next: typeof listener) => {
+    addListener(this: unknown, _event: string, next: typeof listener) {
+      expect(this).toBe(native.transcription);
       listener = next;
       return { remove: () => (listener = null) };
     },

@@ -118,16 +118,16 @@ class NativePcmFeed implements PcmFeed {
 
   start(): Promise<{ readonly voiceProcessing: boolean }> {
     if (this.starting) return this.starting;
-    const { startPcmStream, addListener } = native ?? {};
-    if (!startPcmStream || !addListener) {
+    if (!native?.startPcmStream || !native.addListener) {
       return Promise.reject(new Error("Live microphone streaming is not available."));
     }
-    this.subscription = addListener("onPcmChunk", (event) => {
+    // Keep `this` bound to the JSI NativeModule; detaching Expo EventEmitter.addListener SIGBUSes Hermes.
+    this.subscription = native.addListener("onPcmChunk", (event) => {
       if (this.subscribers.size === 0) return;
       const chunk = { bytes: decodeBase64(event.data), level: event.level };
       for (const subscriber of this.subscribers) subscriber(chunk);
     });
-    const starting = startPcmStream();
+    const starting = native.startPcmStream();
     this.starting = starting;
     starting.catch(() => {
       if (this.starting === starting) void this.stop();
