@@ -34,7 +34,7 @@ vi.mock(import("../../../addons/mattrApi"), async (original) => ({
 
 import { MattrAttentionInboxSidebar } from "./MattrAttentionInboxSidebar";
 import { toMattrThreadItem } from "./mattrSidebar.logic";
-import { MattrLayoutSwitcher } from "./MattrSidebarParts";
+import { MattrScopeLine } from "./MattrScopeLine";
 import { MATTR_SIDEBAR_LAYOUT_STORAGE_KEY } from "./mattrSidebarStore";
 import { MattrSpacesSidebar } from "./MattrSpacesSidebar";
 import type { MattrSidebarModel, MattrSidebarProject } from "./useMattrSidebarModel";
@@ -233,32 +233,34 @@ describe("MattrAttentionInboxSidebar", () => {
         <MattrAttentionInboxSidebar model={current} />
       </SidebarProvider>,
     );
-    await page.getByRole("button", { name: /Lilt/ }).click();
+    await page.getByRole("button", { name: /Sidebar view: Inbox, All projects/ }).click();
+    await page.getByRole("menuitemradio", { name: /Lilt/ }).click();
     await expect.element(page.getByRole("region", { name: "Running" })).not.toBeInTheDocument();
     await page.getByRole("button", { name: /Quiet/ }).click();
     await expect.element(page.getByText("Onboarding copy pass")).toBeVisible();
     await expect.element(page.getByText("Muse provider matrix")).not.toBeInTheDocument();
 
-    await page.getByRole("button", { name: /^All/ }).click();
+    await page.getByRole("button", { name: /Sidebar view: Inbox, Lilt/ }).click();
+    await page.getByRole("menuitemradio", { name: "All projects" }).click();
     await page.getByRole("searchbox", { name: "Search threads" }).fill("spring");
     await expect.element(page.getByRole("region", { name: "Search results" })).toBeVisible();
     await userEvent.keyboard("{Enter}");
     expect(current.actions.openThread).toHaveBeenCalledWith(items[1]);
   });
 
-  it("shows the crew row and bot attention once the Grok Bot add-on is on", async () => {
+  it("shows the Crew section and bot attention once the Grok Bot add-on is on", async () => {
     using _server = useServer(true);
     await using _screen = await render(
       <SidebarProvider>
         <MattrAttentionInboxSidebar model={model()} />
       </SidebarProvider>,
     );
-    const crew = page.getByRole("group", { name: "Bots" });
+    const crew = page.getByRole("region", { name: "Crew" });
     await expect.element(crew).toBeVisible();
     await expect
       .element(crew.getByRole("link", { name: /Scout/ }))
       .toHaveAttribute("href", "/bots/grok-bot/scout");
-    await expect.element(page.getByText("3 unread")).toBeVisible();
+    await expect.element(crew.getByText("3 unread")).toBeVisible();
     await expect
       .element(page.getByRole("heading", { name: /Needs you/ }))
       .toHaveTextContent("Needs you2");
@@ -323,11 +325,12 @@ describe("MattrSpacesSidebar", () => {
   });
 });
 
-describe("MattrLayoutSwitcher", () => {
-  it("persists the chosen layout", async () => {
+describe("MattrScopeLine", () => {
+  it("persists the layout chosen from its menu", async () => {
     using _server = useServer(false);
-    await using _screen = await render(<MattrLayoutSwitcher />);
-    await page.getByRole("button", { name: "Spaces" }).click();
+    await using _screen = await render(<MattrScopeLine />);
+    await page.getByRole("button", { name: /Sidebar view/ }).click();
+    await page.getByRole("menuitemradio", { name: "Spaces" }).click();
     expect(window.localStorage.getItem(MATTR_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"spaces"');
   });
 });

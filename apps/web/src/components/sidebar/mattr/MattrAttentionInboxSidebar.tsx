@@ -6,12 +6,13 @@ import {
   MoonIcon,
   PlusIcon,
   SearchIcon,
+  UsersIcon,
   XIcon,
 } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 
 import { useEnabledBotProviderAddons } from "../../../addons/useAddonRegistry";
-import { cn, isMacPlatform } from "../../../lib/utils";
+import { isMacPlatform } from "../../../lib/utils";
 import { useBotsState } from "../../bots/botsStore";
 import { Button } from "../../ui/button";
 import { SidebarInput } from "../../ui/sidebar";
@@ -25,16 +26,15 @@ import {
   botNeedsAttention,
   compactAge,
   MattrBotAttentionRow,
-  MattrBotLink,
+  MattrBotCrewRow,
   MattrBotsSlot,
   MattrSectionHeader,
   MattrThreadRow,
   MattrVoiceTrigger,
 } from "./MattrSidebarParts";
+import { MattrScopeLine } from "./MattrScopeLine";
 import { useMattrInboxProjectFilter, useMattrQuietExpanded } from "./mattrSidebarStore";
 import type { MattrSidebarModel } from "./useMattrSidebarModel";
-
-const ALL_PROJECTS = "__all__";
 
 function useBotAttentionCount(): number {
   const providers = useEnabledBotProviderAddons();
@@ -127,6 +127,7 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
             </kbd>
           )}
         </div>
+        <MattrVoiceTrigger variant="icon" />
         <Button
           size="icon-sm"
           variant="ghost"
@@ -136,6 +137,15 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
           <PlusIcon />
         </Button>
       </div>
+      <MattrScopeLine
+        projects={projects.map((project) => ({
+          key: project.key,
+          name: project.name,
+          liveCount: counts.get(project.key),
+        }))}
+        projectFilter={projectFilter}
+        onProjectFilterChange={setProjectFilter}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 [scrollbar-width:none]">
         {searching ? (
@@ -255,6 +265,19 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
               </section>
             ) : null}
 
+            <MattrBotsSlot>
+              {(bots) => (
+                <section aria-label={gt("Crew")}>
+                  <MattrSectionHeader icon={<UsersIcon aria-hidden />} label={gt("Crew")} />
+                  <ul className="flex flex-col gap-0.5">
+                    {bots.map((bot) => (
+                      <MattrBotCrewRow key={`${bot.providerId}:${bot.remoteBotId}`} bot={bot} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </MattrBotsSlot>
+
             {nothingLive && botAttentionCount === 0 ? (
               <p className="px-2 py-3 text-xs text-sidebar-muted-foreground">
                 {gt("Nothing needs you right now.")}
@@ -262,73 +285,6 @@ export function MattrAttentionInboxSidebar({ model }: { model: MattrSidebarModel
             ) : null}
           </>
         )}
-      </div>
-
-      <div className="flex shrink-0 flex-col gap-1.5 px-2 pt-1 pb-1.5 empty:hidden">
-        <div className="flex items-center gap-1.5 empty:hidden">
-          <MattrBotsSlot>
-            {(bots) => (
-              <div
-                role="group"
-                aria-label={gt("Bots")}
-                className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]"
-              >
-                {bots.slice(0, 6).map((bot) => (
-                  <MattrBotLink
-                    key={`${bot.providerId}:${bot.remoteBotId}`}
-                    bot={bot}
-                    variant="crew"
-                  />
-                ))}
-              </div>
-            )}
-          </MattrBotsSlot>
-          <MattrVoiceTrigger variant="pill" />
-        </div>
-        {projects.length > 1 ? (
-          <div
-            role="group"
-            aria-label={gt("Filter by project")}
-            className="-mx-2 flex items-center gap-1 overflow-x-auto px-2 [scrollbar-width:none]"
-          >
-            <button
-              type="button"
-              aria-pressed={projectFilter === null}
-              onClick={() => setProjectFilter(null)}
-              className={cn(
-                "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-2xs whitespace-nowrap outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
-                projectFilter === null
-                  ? "bg-sidebar-row-active font-medium text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65"
-                  : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover/75 hover:text-sidebar-foreground",
-              )}
-            >
-              {gt("All")}
-            </button>
-            {projects.map((project) => {
-              const selected = (projectFilter ?? ALL_PROJECTS) === project.key;
-              const liveCount = counts.get(project.key);
-              return (
-                <button
-                  key={project.key}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setProjectFilter(project.key)}
-                  className={cn(
-                    "inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-2xs whitespace-nowrap outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
-                    selected
-                      ? "bg-sidebar-row-active font-medium text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65"
-                      : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover/75 hover:text-sidebar-foreground",
-                  )}
-                >
-                  <span>{project.name}</span>
-                  {liveCount ? (
-                    <span className="text-3xs tabular-nums opacity-65">{liveCount}</span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
       </div>
     </div>
   );

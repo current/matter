@@ -26,6 +26,7 @@ import {
   MattrTip,
   MattrVoiceTrigger,
 } from "./MattrSidebarParts";
+import { MattrScopeLine } from "./MattrScopeLine";
 import { useMattrActiveSpace, useMattrEarlierExpanded } from "./mattrSidebarStore";
 import type { MattrSidebarModel } from "./useMattrSidebarModel";
 
@@ -102,6 +103,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-mattr-sidebar="spaces">
+      <MattrScopeLine />
       <div className="flex shrink-0 flex-col gap-1.5 px-2 pt-1">
         <div role="group" aria-label={gt("Spaces")} className="grid grid-cols-4 gap-1.5">
           {favorites.map((project, index) => {

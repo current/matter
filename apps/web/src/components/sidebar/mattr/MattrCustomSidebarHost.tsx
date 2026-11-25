@@ -1,12 +1,12 @@
 import { isElectron } from "../../../env";
-import { SidebarChromeFooter, SidebarChromeHeader } from "../SidebarChrome";
+import { SidebarChromeHeader } from "../SidebarChrome";
 import { MattrAttentionInboxSidebar } from "./MattrAttentionInboxSidebar";
-import { MattrLayoutSwitcher } from "./MattrSidebarParts";
 import { MattrSpacesSidebar } from "./MattrSpacesSidebar";
+import { MattrStatusLine } from "./MattrStatusLine";
 import type { MattrSidebarLayout } from "./mattrSidebarStore";
 import { useMattrSidebarModel } from "./useMattrSidebarModel";
 
-/** The fork's custom sidebar bodies, framed by the same chrome header and footer as Classic. */
+/** The fork's custom sidebar bodies, under Classic's chrome header and above one status line. */
 export function MattrCustomSidebarHost({
   layout,
 }: {
@@ -21,12 +21,7 @@ export function MattrCustomSidebarHost({
       ) : (
         <MattrAttentionInboxSidebar model={model} />
       )}
-      <div className="shrink-0 border-t border-sidebar-border/60 pt-1.5">
-        <div className="px-2 pb-0.5">
-          <MattrLayoutSwitcher />
-        </div>
-        <SidebarChromeFooter hideVoice />
-      </div>
+      <MattrStatusLine />
     </div>
   );
 }
