@@ -29,7 +29,12 @@ Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 
 ## Releases
 
-Push to `main` → `.github/workflows/antimatter-nightly.yml` merges upstream, builds macOS arm64, re-signs with the fork's certificate and publishes a prerelease → Chris clicks Update in the app. Updating or quitting the live app interrupts any running chat (history is kept), so Chris updates when idle. Never restart or replace the live app yourself.
+Two paths, same result:
+
+- **Local (fast, the default when Chris wants the change now):** commit to `main`, then `node antimatter/ship-local.mjs --install`. It merges the newest upstream nightly into `main` in the reusable build checkout `../mattr-ship` (never in your checkout), builds, signs with `~/.antimatter-signing`, then quits mattr, moves the old app to the Trash, installs `/Applications/mattr.app` and reopens it. Without `--install` it only builds. It reuses the newest published version number, so the next CI release still shows up as an update.
+- **CI (for the update button):** push to `main` → `.github/workflows/antimatter-nightly.yml` merges upstream, builds, signs and publishes a prerelease → Chris clicks Update. Pushes that change only Markdown don't build.
+
+Installing or quitting the live app interrupts every running chat (history is kept). Run `--install` only when Chris asks for it, after checking no other thread is running, and send your final reply before the quit delay ends.
 
 ## Testing UI changes
 
@@ -37,7 +42,7 @@ Test in the separate **mattr (Dev)** desktop window, not the browser or the in-a
 
 - Start it from your own shell in the checkout you changed: `vp run dev:desktop` (if `vp` is not on PATH: `mise exec node@26.13.1 -- node_modules/.bin/vp run dev:desktop`). It runs beside the live app with its own data (`~/.antimatter/dev` in the main checkout, `<worktree>/.t3/userdata` in a linked worktree) and hot-reloads web changes.
 - Tell Chris it is open and what to look at. Stop it (your harness's stop, never `pkill`) before handing back, unless Chris asks to keep it running; then give the port, PID and stop command.
-- Once Chris approves, commit and push; the release replaces the live app on his next update.
+- Once Chris approves, commit and push, then install it with the local path under Releases if he wants it now.
 
 ## Proposing UI options
 
