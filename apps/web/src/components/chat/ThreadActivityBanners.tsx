@@ -20,6 +20,7 @@ import {
   CircleDashedIcon,
   CircleStopIcon,
   GitBranchIcon,
+  HourglassIcon,
   MessageCircleIcon,
   ShieldQuestionIcon,
   TargetIcon,
@@ -186,6 +187,51 @@ export function runStopNowItem(input: {
         />
         {unresponsive && input.canForceStop ? (
           <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
+            {input.forceStopping ? <T>Force stopping...</T> : <T>Force stop</T>}
+          </InlineButton>
+        ) : null}
+      </>
+    ),
+  };
+}
+
+/** A running turn the provider has been silent on; tools can legitimately run this long. */
+export function quietRunNowItem(input: {
+  readonly threadId: ThreadId;
+  readonly quietSince: string;
+  readonly stopDisabled: boolean;
+  readonly stopping: boolean;
+  readonly onStop: () => void;
+  readonly canForceStop: boolean;
+  readonly forceStopping: boolean;
+  readonly onForceStop: () => void;
+}): ThreadNowItem {
+  const quietSinceMs = Date.parse(input.quietSince);
+  return {
+    id: `quiet-run:${input.threadId}`,
+    icon: <HourglassIcon className="text-warning-foreground" />,
+    title: (
+      <T>
+        No activity for{" "}
+        <Var>
+          <span
+            ref={tickTextContent(
+              (nowMs) => formatDuration(Math.max(1_000, nowMs - quietSinceMs), m),
+              true,
+            )}
+            className="tabular-nums"
+          />
+        </Var>
+      </T>
+    ),
+    description: <T>A long tool may still be running, or the agent may be stuck.</T>,
+    actions: (
+      <>
+        <InlineButton disabled={input.stopDisabled} onClick={input.onStop}>
+          {input.stopping ? <T>Stopping...</T> : <T context="verb, stops the running turn">Stop</T>}
+        </InlineButton>
+        {input.canForceStop ? (
+          <InlineButton tone="muted" disabled={input.forceStopping} onClick={input.onForceStop}>
             {input.forceStopping ? <T>Force stopping...</T> : <T>Force stop</T>}
           </InlineButton>
         ) : null}

@@ -17,10 +17,19 @@ export interface ServerConfigProjection {
  * cache could restore a set the machine no longer reports.
  */
 export function withoutEnvironmentThemes(config: ServerConfig): ServerConfig {
-  if (config.environmentThemes === undefined && config.usageLimitSources === undefined) {
+  if (
+    config.environmentThemes === undefined &&
+    config.usageLimitSources === undefined &&
+    config.quietRuns === undefined
+  ) {
     return config;
   }
-  const { environmentThemes: _themes, usageLimitSources: _sources, ...rest } = config;
+  const {
+    environmentThemes: _themes,
+    usageLimitSources: _sources,
+    quietRuns: _quietRuns,
+    ...rest
+  } = config;
   return rest;
 }
 
@@ -107,8 +116,15 @@ export function applyServerConfigProjection(
       const carriedSources = Option.isSome(current)
         ? current.value.config.usageLimitSources
         : undefined;
+      // A server without the event would never clear carried quiet runs.
+      const heldQuietRuns = Option.getOrUndefined(current)?.config.quietRuns;
+      const carriedQuietRuns =
+        heldQuietRuns !== undefined && event.config.environment.capabilities.quietRuns === true
+          ? heldQuietRuns
+          : undefined;
       const config: ServerConfig = {
         ...event.config,
+        ...(carriedQuietRuns === undefined ? {} : { quietRuns: carriedQuietRuns }),
         providers: withHeldProviderCatalogs(
           Option.getOrUndefined(current)?.config.providers,
           event.config.providers,
@@ -181,5 +197,15 @@ export function applyServerConfigProjection(
         latestEvent: event,
         source: "live",
       }));
+    case "quietRunsUpdated":
+      return Option.map(current, (projection) => {
+        const { quietRuns: _previous, ...config } = projection.config;
+        return {
+          config:
+            event.payload.runs.length === 0 ? config : { ...config, quietRuns: event.payload.runs },
+          latestEvent: event,
+          source: "live",
+        };
+      });
   }
 }

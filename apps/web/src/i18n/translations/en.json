@@ -3200,6 +3200,15 @@
   "3d084099adaeed61": "Authenticated",
   "3d117a49eb32d0cb": "Collapse diff",
   "3d11a160a55b2fa9": "searching",
+  "3d1432f6b1e8415c": [
+    "No activity for",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "3d1e8943c6f1623f": "Cause",
   "3d2036743bbda4c9": "Unable to drag file",
   "3d23609d27f213d7": "Custom Claude home and config directory. Keeps .claude.json and .claude separate.",
@@ -6945,6 +6954,7 @@
   "8639d5532561f87f": "Close",
   "86479042bae0e2db": "Mobile app",
   "86522c53dd8e09d1": "Working…",
+  "86542e0b1553fda6": "Failed to stop.",
   "865f034346b82f47": "Cancel {title}? Its agents stop and the run cannot be resumed.",
   "866b2e7be2433828": "Default",
   "8676efb0616ff22f": "Checked linked issues",
@@ -7654,6 +7664,7 @@
   "94168222df47e6a3": "Install the GitHub command-line tool ({cli}) via {url} or your package manager (for example {command}).",
   "941d08db15f62d17": "Archived",
   "94215375ea2558b8": "Running",
+  "942556fe0dd9861b": "A long tool may still be running, or the agent may be stuck.",
   "94289a28173e294d": "Disable",
   "942a831ce4a4171e": "That Antigravity model is no longer available. Choose another model.",
   "942bd0edd477156d": "Open Settings -> Source control & issues to configure this provider.",
@@ -9740,6 +9751,7 @@
   "bbcd3776bcd3e2c5": "Downloaded {fileName}",
   "bbce9df5e435f900": "Could not change when the model unloads",
   "bbd8a0d1d08fe382": "Recursive",
+  "bbda43718a49df92": "No activity",
   "bbde430e56272901": "Drag to resize sidebar",
   "bbdf85f06b8cc315": "The owner sees your name and approves each message before the agent gets it.",
   "bbe7fd0f95de9593": "Your ticks could not be read",
@@ -11637,6 +11649,7 @@
   "e05d1bee2862c2be": "Tool call failed",
   "e05df18a60c4310e": "Shared policy",
   "e0616a924f8405cb": "Enable extension",
+  "e067efa06cc44adf": "Stop",
   "e075244ca816ebf6": "Save action",
   "e0799fd6703244c6": "Completed",
   "e07aeb67f54ee2c4": "Could not load relay DPoP proof key.",

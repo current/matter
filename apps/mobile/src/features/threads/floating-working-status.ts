@@ -1,4 +1,5 @@
 import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { msg } from "gt-react-native";
 
 import { m, type MessageResolver } from "../../i18n/messages";
@@ -16,6 +17,13 @@ export type FloatingWorkingStatus =
       readonly label: string;
       readonly accessibilityLabel: string;
       readonly onPress: () => void;
+    }
+  | {
+      readonly kind: "quiet";
+      readonly environmentId: EnvironmentId;
+      /** When the provider last sent anything for the running turn, on the server's clock. */
+      readonly quietSince: string;
+      readonly action: FloatingStatusAction;
     }
   | {
       readonly kind: "stop";

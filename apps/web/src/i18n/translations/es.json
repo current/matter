@@ -3197,6 +3197,15 @@
   "3d084099adaeed61": "Autenticado",
   "3d117a49eb32d0cb": "Contraer diff",
   "3d11a160a55b2fa9": "searching",
+  "3d1432f6b1e8415c": [
+    "No activity for",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "3d1e8943c6f1623f": "Causa",
   "3d2036743bbda4c9": "No se puede arrastrar el archivo",
   "3d23609d27f213d7": "Directorio personalizado de inicio y configuración de Claude. Mantiene .claude.json y .claude separados.",
@@ -6933,6 +6942,7 @@
   "8639d5532561f87f": "Cerrar",
   "86479042bae0e2db": "App móvil",
   "86522c53dd8e09d1": "Trabajando…",
+  "86542e0b1553fda6": "Failed to stop.",
   "865f034346b82f47": "¿Cancelar {title}? Sus agentes se detienen y la ejecución no se podrá reanudar.",
   "866b2e7be2433828": "Predeterminado",
   "8676efb0616ff22f": "Comprobó las issues vinculadas",
@@ -7642,6 +7652,7 @@
   "94168222df47e6a3": "Instala la herramienta de línea de comandos de GitHub ({cli}) desde {url} o con tu gestor de paquetes (por ejemplo, {command}).",
   "941d08db15f62d17": "Archivado",
   "94215375ea2558b8": "En ejecución",
+  "942556fe0dd9861b": "A long tool may still be running, or the agent may be stuck.",
   "94289a28173e294d": "Desactivar",
   "942a831ce4a4171e": "Ese modelo de Antigravity ya no está disponible. Elige otro modelo.",
   "942bd0edd477156d": "Abre Ajustes -> Control de versiones e issues para configurar este proveedor.",
@@ -9726,6 +9737,7 @@
   "bbcd3776bcd3e2c5": "Se descargó {fileName}",
   "bbce9df5e435f900": "No se pudo cambiar cuándo se descarga el modelo",
   "bbd8a0d1d08fe382": "Recursivo",
+  "bbda43718a49df92": "No activity",
   "bbde430e56272901": "Arrastra para cambiar el tamaño de la barra lateral",
   "bbdf85f06b8cc315": "El propietario ve tu nombre y aprueba cada mensaje antes de que le llegue al agente.",
   "bbe7fd0f95de9593": "No se pudieron leer tus marcas",
@@ -11622,6 +11634,7 @@
   "e05d1bee2862c2be": "Falló la llamada a herramienta",
   "e05df18a60c4310e": "Política compartida",
   "e0616a924f8405cb": "Activar extensión",
+  "e067efa06cc44adf": "Stop",
   "e075244ca816ebf6": "Guardar acción",
   "e0799fd6703244c6": "Completado",
   "e07aeb67f54ee2c4": "No se pudo cargar la clave de prueba DPoP del relay.",

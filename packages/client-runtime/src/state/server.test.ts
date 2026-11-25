@@ -5,7 +5,9 @@ import {
   ProviderInstanceId,
   type ProviderInstallState,
   type ProviderSetupInput,
+  RunId,
   ServerObservability,
+  ThreadId,
   EnvironmentThemeId,
   UsageLimitSourceId,
   type ServerConfig,
@@ -19,6 +21,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { vi } from "vite-plus/test";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -1477,7 +1480,17 @@ describe("server state projection", () => {
           yield* Queue.offer(events, {
             version: 1,
             type: "snapshot",
-            config: { ...CONFIG, lastEventLoopStall },
+            config: {
+              ...CONFIG,
+              lastEventLoopStall,
+              quietRuns: [
+                {
+                  threadId: ThreadId.make("thread-quiet"),
+                  runId: RunId.make("run-quiet"),
+                  quietSince: DateTime.makeUnsafe(0),
+                },
+              ],
+            },
           });
           const projected = yield* SubscriptionRef.changes(state).pipe(
             Stream.filter((value) =>
@@ -1495,7 +1508,10 @@ describe("server state projection", () => {
       );
 
       // Cached, it would read as a fresh freeze on the next launch.
-      expect(yield* Queue.take(savedConfigs)).not.toHaveProperty("lastEventLoopStall");
+      const saved = yield* Queue.take(savedConfigs);
+      expect(saved).not.toHaveProperty("lastEventLoopStall");
+      // Live-only: a cached set would flag runs long finished.
+      expect(saved).not.toHaveProperty("quietRuns");
     }),
   );
 });

@@ -37,6 +37,9 @@ import {
   presentPendingBackgroundWork,
   presentProviderGoal,
   presentRunStop,
+  quietRunId,
+  quietRunSince,
+  type QuietRunThread,
   readSelectedEffortValue,
   threadRuntimeHasInterruptibleRun,
 } from "./threadExecution.ts";
@@ -959,5 +962,39 @@ describe("presentPendingBackgroundWork", () => {
       },
     ]);
     expect(presentation?.items[0]?.label).toBe("mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF");
+  });
+});
+
+describe("quiet run selectors", () => {
+  const threadId = ThreadId.make("thread-quiet");
+  const quietRun = RunId.make("run-quiet");
+  const config = {
+    quietRuns: [{ threadId, runId: quietRun, quietSince: DateTime.makeUnsafe(0) }],
+  };
+
+  it("flag the quiet run only while it is still the active run and not waiting", () => {
+    const thread = (activeRunId: RunId | null, waiting: Partial<QuietRunThread> = {}) => ({
+      id: threadId,
+      runtime: { activeRunId },
+      hasPendingApprovals: false,
+      hasPendingUserInput: false,
+      ...waiting,
+    });
+    expect(quietRunId(config, thread(quietRun))).toBe(quietRun);
+    expect(quietRunSince(config, thread(quietRun))).toBe("1970-01-01T00:00:00.000Z");
+    // A follow-up started before the next quiet-runs update.
+    const followUp = RunId.make("run-follow-up");
+    expect(quietRunId(config, thread(followUp))).toBeNull();
+    expect(quietRunSince(config, thread(followUp))).toBeNull();
+    expect(quietRunSince(config, thread(null))).toBeNull();
+    for (const waiting of [
+      { hasPendingApprovals: true },
+      { hasPendingUserInput: true },
+      { pendingSubagentRequest: "approval" },
+      { blockedOnThreadWait: true },
+    ]) {
+      expect(quietRunId(config, thread(quietRun, waiting))).toBeNull();
+      expect(quietRunSince(config, thread(quietRun, waiting))).toBeNull();
+    }
   });
 });

@@ -13,6 +13,7 @@ import {
   NonNegativeInt,
   PositiveInt,
   ProjectId,
+  RunId,
   ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
@@ -702,6 +703,15 @@ export const ServerEventLoopStall = Schema.Struct({
 });
 export type ServerEventLoopStall = typeof ServerEventLoopStall.Type;
 
+/** A running turn whose provider has sent nothing since `quietSince`. */
+export const ServerQuietRun = Schema.Struct({
+  threadId: ThreadId,
+  /** The quiet run itself, so Stop and Force stop cannot reach a newer one. */
+  runId: RunId,
+  quietSince: Schema.DateTimeUtc,
+});
+export type ServerQuietRun = typeof ServerQuietRun.Type;
+
 /** The boolean `T3CODE_FEATURE_FLAGS` a server started with. Unset flags are off. */
 export const ServerFeatureFlags = Schema.Struct({
   secretProviders: Schema.optionalKey(Schema.Boolean),
@@ -775,6 +785,8 @@ export const ServerConfig = Schema.Struct({
   environmentThemes: Schema.optional(Schema.Array(EnvironmentTheme)),
   /** Stream-only and opt-in; the source stream emits the current set on subscribe. */
   usageLimitSources: Schema.optional(UsageLimitSourceSnapshots),
+  /** Stream-only and opt-in; turns quiet for ten minutes or more. */
+  quietRuns: Schema.optional(Schema.Array(ServerQuietRun)),
 });
 export type ServerConfig = typeof ServerConfig.Type;
 
@@ -911,6 +923,14 @@ export const ServerConfigStreamUsageLimitSourcesUpdatedEvent = Schema.Struct({
 export type ServerConfigStreamUsageLimitSourcesUpdatedEvent =
   typeof ServerConfigStreamUsageLimitSourcesUpdatedEvent.Type;
 
+export const ServerConfigStreamQuietRunsUpdatedEvent = Schema.Struct({
+  version: Schema.Literal(1),
+  type: Schema.Literal("quietRunsUpdated"),
+  payload: Schema.Struct({ runs: Schema.Array(ServerQuietRun) }),
+});
+export type ServerConfigStreamQuietRunsUpdatedEvent =
+  typeof ServerConfigStreamQuietRunsUpdatedEvent.Type;
+
 export const ServerConfigStreamEvent = Schema.Union([
   ServerConfigStreamSnapshotEvent,
   ServerConfigStreamKeybindingsUpdatedEvent,
@@ -919,6 +939,7 @@ export const ServerConfigStreamEvent = Schema.Union([
   ServerConfigStreamSettingsUpdatedEvent,
   ServerConfigStreamEnvironmentThemesUpdatedEvent,
   ServerConfigStreamUsageLimitSourcesUpdatedEvent,
+  ServerConfigStreamQuietRunsUpdatedEvent,
 ]);
 export type ServerConfigStreamEvent = typeof ServerConfigStreamEvent.Type;
 

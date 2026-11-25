@@ -1,6 +1,9 @@
+import { toServerClock } from "@t3tools/client-runtime/clock";
+import { formatWorkingDurationLabel } from "@t3tools/client-runtime/state/models";
 import type { SubagentPillSegment } from "@t3tools/client-runtime/state/thread-subagents";
+import type { EnvironmentId } from "@t3tools/contracts";
 import { GlassContainer, GlassView } from "expo-glass-effect";
-import { useGT } from "gt-react-native";
+import { useGT, useMessages } from "gt-react-native";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { type LayoutChangeEvent, Pressable, useWindowDimensions, View } from "react-native";
 import Animated, {
@@ -25,6 +28,7 @@ import { BrowserPreviewButton } from "../browser/browser-preview-button";
 import { DevicePreviewButton } from "../devices/device-preview-button";
 import type { FloatingStatusAction, FloatingWorkingStatus } from "./floating-working-status";
 import { ShimmeringWorkContent } from "./thread-work-log";
+import { useVisibleSecondClock } from "./use-visible-second-clock";
 
 const CONTROL_HEIGHT = 38.5;
 const CONTROL_GAP = 8;
@@ -88,7 +92,9 @@ export function FloatingWorkingControl(props: {
       ? props.status.actions
       : props.status?.kind === "stop" && props.status.action !== null
         ? [props.status.action]
-        : [];
+        : props.status?.kind === "quiet"
+          ? [props.status.action]
+          : [];
   const [agentsWidth, setAgentsWidth] = useState(0);
   const hasQueue = props.queuedCount > 0;
   const hasPreview = props.devicePreview !== null || props.browserPreview !== null;
@@ -190,7 +196,7 @@ export function FloatingWorkingControl(props: {
         >
           <FloatingStatusLabel
             key={
-              props.status.kind === "extension"
+              props.status.kind === "extension" || props.status.kind === "quiet"
                 ? props.status.kind
                 : `${props.status.kind}:${props.status.label}`
             }
@@ -391,6 +397,7 @@ function FloatingStatusLabel(props: {
   readonly status: FloatingWorkingStatus;
   readonly onLayout: (event: LayoutChangeEvent) => void;
 }) {
+  const gt = useGT();
   if (props.status.kind === "extension") {
     return (
       <StatusLabelRow
@@ -442,6 +449,24 @@ function FloatingStatusLabel(props: {
         >
           {props.status.label}
         </Text>
+      </StatusLabelRow>
+    );
+  }
+  if (props.status.kind === "quiet") {
+    return (
+      <StatusLabelRow
+        key="quiet"
+        accessibilityLabel={gt("No activity from the agent")}
+        className="gap-2"
+        onLayout={props.onLayout}
+      >
+        <SymbolView
+          name="timer"
+          size={13}
+          tintColorClassName="accent-warning-foreground"
+          type="monochrome"
+        />
+        <QuietRunLabel environmentId={props.status.environmentId} since={props.status.quietSince} />
       </StatusLabelRow>
     );
   }
@@ -512,6 +537,28 @@ function FloatingStatusLabel(props: {
         showIcon={false}
       />
     </StatusLabelRow>
+  );
+}
+
+// Ticks on its own so the rest of the control does not re-render every second.
+function QuietRunLabel(props: { readonly environmentId: EnvironmentId; readonly since: string }) {
+  const gt = useGT();
+  const messages = useMessages();
+  const sinceMs = Date.parse(props.since);
+  const nowMs = useVisibleSecondClock(true);
+  return (
+    <Text
+      className="shrink font-t3-medium text-xs text-foreground"
+      numberOfLines={1}
+      style={{ fontVariant: ["tabular-nums"] }}
+    >
+      {gt("No activity for {duration}", {
+        duration: formatWorkingDurationLabel(
+          toServerClock(props.environmentId, nowMs) - sinceMs,
+          messages,
+        ),
+      })}
+    </Text>
   );
 }
 

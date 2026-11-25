@@ -136,3 +136,31 @@ describe("applyServerConfigProjection provider catalogs", () => {
     expect(legacy.loadedCatalogDigest).toBeUndefined();
   });
 });
+
+describe("applyServerConfigProjection quietRunsUpdated", () => {
+  it("keeps quiet runs across a reconnect snapshot from a server that sends them, and drops them once they end", () => {
+    const snapshotFrom = (quietRuns: boolean) =>
+      ({
+        type: "snapshot",
+        version: 1,
+        config: { environment: { capabilities: { quietRuns } }, providers: [] },
+      }) as unknown as ServerConfigStreamEvent;
+    const quietRunsUpdated = (threadIds: ReadonlyArray<string>) =>
+      ({
+        type: "quietRunsUpdated",
+        version: 1,
+        payload: { runs: threadIds.map((threadId) => ({ threadId, quietSince: 0 })) },
+      }) as unknown as ServerConfigStreamEvent;
+    const snapshot = snapshotFrom(true);
+    const quiet = applyServerConfigProjection(
+      applyServerConfigProjection(Option.none(), snapshot),
+      quietRunsUpdated(["thread-a"]),
+    );
+    const reconnected = Option.getOrThrow(applyServerConfigProjection(quiet, snapshot));
+    expect(reconnected.config.quietRuns?.map((run) => run.threadId)).toEqual(["thread-a"]);
+    const olderServer = Option.getOrThrow(applyServerConfigProjection(quiet, snapshotFrom(false)));
+    expect(olderServer.config.quietRuns).toBeUndefined();
+    const ended = applyServerConfigProjection(Option.some(reconnected), quietRunsUpdated([]));
+    expect(Option.getOrThrow(ended).config.quietRuns).toBeUndefined();
+  });
+});

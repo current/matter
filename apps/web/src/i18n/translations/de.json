@@ -3194,6 +3194,15 @@
   "3d084099adaeed61": "Authentifiziert",
   "3d117a49eb32d0cb": "Diff einklappen",
   "3d11a160a55b2fa9": "searching",
+  "3d1432f6b1e8415c": [
+    "No activity for",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "3d1e8943c6f1623f": "Ursache",
   "3d2036743bbda4c9": "Datei kann nicht gezogen werden",
   "3d23609d27f213d7": "Eigenes Claude-Home- und Konfigurationsverzeichnis. Hält .claude.json und .claude getrennt.",
@@ -6940,6 +6949,7 @@
   "8639d5532561f87f": "Schließen",
   "86479042bae0e2db": "Mobile App",
   "86522c53dd8e09d1": "Wird ausgeführt…",
+  "86542e0b1553fda6": "Failed to stop.",
   "865f034346b82f47": "{title} abbrechen? Die Agenten stoppen und die Ausführung kann nicht fortgesetzt werden.",
   "866b2e7be2433828": "Standard",
   "8676efb0616ff22f": "Verknüpfte Issues geprüft",
@@ -7648,6 +7658,7 @@
   "94168222df47e6a3": "Installiere das GitHub-Kommandozeilentool ({cli}) über {url} oder deinen Paketmanager (zum Beispiel {command}).",
   "941d08db15f62d17": "Archiviert",
   "94215375ea2558b8": "Läuft",
+  "942556fe0dd9861b": "A long tool may still be running, or the agent may be stuck.",
   "94289a28173e294d": "Deaktivieren",
   "942a831ce4a4171e": "Dieses Antigravity-Modell ist nicht mehr verfügbar. Wähle ein anderes Modell.",
   "942bd0edd477156d": "Öffne Einstellungen -> Versionskontrolle & Issues, um diesen Anbieter zu konfigurieren.",
@@ -9732,6 +9743,7 @@
   "bbcd3776bcd3e2c5": "{fileName} heruntergeladen",
   "bbce9df5e435f900": "Zeitpunkt zum Entladen des Modells konnte nicht geändert werden",
   "bbd8a0d1d08fe382": "Rekursiv",
+  "bbda43718a49df92": "No activity",
   "bbde430e56272901": "Ziehen, um die Seitenleiste zu skalieren",
   "bbdf85f06b8cc315": "Der Besitzer sieht deinen Namen und genehmigt jede Nachricht, bevor der Agent sie erhält.",
   "bbe7fd0f95de9593": "Deine Häkchen konnten nicht gelesen werden",
@@ -11627,6 +11639,7 @@
   "e05d1bee2862c2be": "Tool-Aufruf fehlgeschlagen",
   "e05df18a60c4310e": "Gemeinsame Richtlinie",
   "e0616a924f8405cb": "Erweiterung aktivieren",
+  "e067efa06cc44adf": "Stop",
   "e075244ca816ebf6": "Aktion speichern",
   "e0799fd6703244c6": "Abgeschlossen",
   "e07aeb67f54ee2c4": "Der DPoP-Nachweisschlüssel des Relays konnte nicht geladen werden.",

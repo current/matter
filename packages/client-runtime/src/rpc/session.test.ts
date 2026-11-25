@@ -629,7 +629,7 @@ describe("RpcSessionFactory", () => {
     }),
   );
 
-  it.effect("replays theme updates and deletion as authoritative events", () =>
+  it.effect("replays theme updates, deletion and quiet runs as authoritative events", () =>
     Effect.gen(function* () {
       const { factory, sockets } = yield* makeFactory({ environmentThemes: true });
       const session = yield* factory.connect(PREPARED);
@@ -664,12 +664,13 @@ describe("RpcSessionFactory", () => {
         Stream.mapEffect((event) =>
           Deferred.succeed(subscriberStarted, undefined).pipe(Effect.as(event)),
         ),
-        Stream.take(4),
+        Stream.take(5),
         Stream.runCollect,
         Effect.forkChild,
       );
       yield* Deferred.await(subscriberStarted);
       yield* publishConfigEvents(socket, [
+        { version: 1, type: "quietRunsUpdated", payload: { runs: [] } },
         {
           version: 1,
           type: "environmentThemesUpdated",
@@ -690,18 +691,24 @@ describe("RpcSessionFactory", () => {
       const liveEvents = Array.from(yield* Fiber.join(subscriber));
       expect(liveEvents.map((event) => event.type)).toEqual([
         "snapshot",
+        "quietRunsUpdated",
         "environmentThemesUpdated",
         "environmentThemesUpdated",
         "environmentThemesUpdated",
       ]);
-      expect(liveEvents[2]).toMatchObject({ payload: { themes: replacementThemes } });
+      expect(liveEvents[3]).toMatchObject({ payload: { themes: replacementThemes } });
 
+      // A late subscriber also needs live quiet runs, which snapshots never carry.
       const replay = Array.from(
         yield* session
           .subscribeServerConfig({ environmentThemes: true })
-          .pipe(Stream.take(2), Stream.runCollect),
+          .pipe(Stream.take(3), Stream.runCollect),
       );
-      expect(replay.map((event) => event.type)).toEqual(["snapshot", "environmentThemesUpdated"]);
+      expect(replay.map((event) => event.type)).toEqual([
+        "snapshot",
+        "environmentThemesUpdated",
+        "quietRunsUpdated",
+      ]);
       expect(replay[1]).toMatchObject({ payload: { themes: [] } });
 
       let projection = applyServerConfigProjection(Option.none(), {

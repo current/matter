@@ -5729,5 +5729,13 @@
   "fffd51054a4240ab": "{status, select, inProgress {Lendo um guia de revisão} completed {Leu um guia de revisão} failed {Falha ao ler um guia de revisão} declined {Recusou-se a ler um guia de revisão} stopped {Parou de ler um guia de revisão} other {Lendo um guia de revisão}}",
   "fffe4b4a5ee40c3a": "Todos os estados",
   "eb2e464bbdf1a809": "Agentes veem os limites de uso",
-  "a02932c0ecd7e30e": "Os agentes podem ler o uso restante e são avisados ao delegar para uma conta esgotada."
+  "a02932c0ecd7e30e": "Os agentes podem ler o uso restante e são avisados ao delegar para uma conta esgotada.",
+  "1f039917ecdf3def": "Could not stop the turn",
+  "6a05e86e0915951c": "Stop the quiet turn",
+  "67e059a0873b919c": "Stop this turn?",
+  "f8eacf1fa6119b9a": "The agent has sent nothing for a while. A long tool may still be running. Force stop ends the turn and kills the agent's processes, unless other working threads share them.",
+  "20875c06df175510": "The agent has sent nothing for a while. A long tool may still be running.",
+  "1ce5cadc73bad038": "No activity from the agent",
+  "c20dbf51869d9075": "No activity for {duration}",
+  "18fe9add1f27ac23": "No activity"
 }

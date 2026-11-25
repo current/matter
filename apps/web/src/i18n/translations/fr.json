@@ -3198,6 +3198,15 @@
   "3d084099adaeed61": "Authentifié",
   "3d117a49eb32d0cb": "Réduire le diff",
   "3d11a160a55b2fa9": "searching",
+  "3d1432f6b1e8415c": [
+    "No activity for",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "3d1e8943c6f1623f": "Cause",
   "3d2036743bbda4c9": "Impossible de faire glisser le fichier",
   "3d23609d27f213d7": "Répertoire personnalisé de home et de configuration Claude. Garde .claude.json et .claude séparés.",
@@ -6936,6 +6945,7 @@
   "8639d5532561f87f": "Fermer",
   "86479042bae0e2db": "App mobile",
   "86522c53dd8e09d1": "En cours…",
+  "86542e0b1553fda6": "Failed to stop.",
   "865f034346b82f47": "Annuler {title} ? Ses agents s’arrêtent et l’exécution ne pourra pas être reprise.",
   "866b2e7be2433828": "Par défaut",
   "8676efb0616ff22f": "Tickets associés vérifiés",
@@ -7645,6 +7655,7 @@
   "94168222df47e6a3": "Installez l’outil en ligne de commande GitHub ({cli}) via {url} ou votre gestionnaire de paquets (par exemple {command}).",
   "941d08db15f62d17": "Archivé",
   "94215375ea2558b8": "En cours",
+  "942556fe0dd9861b": "A long tool may still be running, or the agent may be stuck.",
   "94289a28173e294d": "Désactiver",
   "942a831ce4a4171e": "Ce modèle Antigravity n’est plus disponible. Choisissez-en un autre.",
   "942bd0edd477156d": "Ouvrez Paramètres -> Gestion de versions et tickets pour configurer ce fournisseur.",
@@ -9729,6 +9740,7 @@
   "bbcd3776bcd3e2c5": "{fileName} téléchargé",
   "bbce9df5e435f900": "Impossible de changer le moment où le modèle est déchargé",
   "bbd8a0d1d08fe382": "Récursif",
+  "bbda43718a49df92": "No activity",
   "bbde430e56272901": "Faites glisser pour redimensionner la barre latérale",
   "bbdf85f06b8cc315": "Le propriétaire voit votre nom et approuve chaque message avant qu’il parvienne à l’agent.",
   "bbe7fd0f95de9593": "Impossible de lire vos coches",
@@ -11627,6 +11639,7 @@
   "e05d1bee2862c2be": "Échec de l’appel d’outil",
   "e05df18a60c4310e": "Politique partagée",
   "e0616a924f8405cb": "Activer l’extension",
+  "e067efa06cc44adf": "Stop",
   "e075244ca816ebf6": "Enregistrer l’action",
   "e0799fd6703244c6": "Terminé",
   "e07aeb67f54ee2c4": "Impossible de charger la clé de preuve DPoP du relais.",

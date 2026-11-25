@@ -174,7 +174,11 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useEnvironmentScopeDenied } from "../../state/session";
 import type { PendingUserInputDraftAnswer } from "@t3tools/client-runtime/state/pending-user-input";
-import type { RunStopPresentation } from "@t3tools/client-runtime/state/thread-execution";
+import {
+  quietRunId,
+  quietRunSince,
+  type RunStopPresentation,
+} from "@t3tools/client-runtime/state/thread-execution";
 import type {
   PendingApproval,
   PendingUserInput,
@@ -584,6 +588,33 @@ function ThreadDetailBody(
   const canForceStop =
     useAtomValue(orchestrationEnvironment.forceStopThread.permissionAtom(props.environmentId)) &&
     props.serverConfig?.environment.capabilities.threadForceStop === true;
+  // The run the server saw go quiet, not the latest one: a queued follow-up can be newer.
+  const quietRunTarget = quietRunId(props.serverConfig, props.selectedThread) ?? undefined;
+  const quietSince =
+    props.activeWorkStartedAt === null
+      ? null
+      : quietRunSince(props.serverConfig, props.selectedThread);
+  const [stoppingQuietRunKey, setStoppingQuietRunKey] = useState<string | null>(null);
+  const stopQuietRun = async () => {
+    if (stoppingQuietRunKey === selectedThreadKey || !props.canOperateThread) return;
+    const threadKey = selectedThreadKey;
+    setStoppingQuietRunKey(threadKey);
+    const result = await interruptThreadTurn({
+      environmentId: props.environmentId,
+      input:
+        quietRunTarget === undefined
+          ? { threadId: props.selectedThread.id }
+          : { threadId: props.selectedThread.id, runId: quietRunTarget },
+    });
+    setStoppingQuietRunKey((current) => (current === threadKey ? null : current));
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      const error = squashAtomCommandFailure(result);
+      Dialog.alert(
+        gt("Could not stop the turn"),
+        errorDisplayMessage(error, m) ?? gt("Try again."),
+      );
+    }
+  };
   const [forceStoppingKey, setForceStoppingKey] = useState<string | null>(null);
   // The run that ignored Stop, so a confirmation left open cannot hit a newer run.
   const forceStop = async (runId: RunId | undefined) => {
@@ -885,6 +916,51 @@ function ThreadDetailBody(
         onPress: () => {
           Keyboard.dismiss();
           openLinkedThread({ environmentId: childInput.environmentId, threadId: childInput.id });
+        },
+      };
+    }
+    if (quietSince !== null && contentPresentationKind === "ready") {
+      return {
+        kind: "quiet",
+        environmentId: props.environmentId,
+        quietSince,
+        action: {
+          label:
+            forceStoppingKey === selectedThreadKey
+              ? gt("Force stopping...")
+              : stoppingQuietRunKey === selectedThreadKey
+                ? gt("Stopping...")
+                : gt("Stop", { $context: "verb, button" }),
+          accessibilityLabel: gt("Stop the quiet turn"),
+          disabled:
+            !props.canOperateThread ||
+            stoppingQuietRunKey === selectedThreadKey ||
+            forceStoppingKey === selectedThreadKey,
+          onPress: () =>
+            Dialog.alert(
+              gt("Stop this turn?"),
+              canForceStop
+                ? gt(
+                    "The agent has sent nothing for a while. A long tool may still be running. Force stop ends the turn and kills the agent's processes, unless other working threads share them.",
+                  )
+                : gt("The agent has sent nothing for a while. A long tool may still be running."),
+              [
+                { text: gt("Cancel"), style: "cancel" },
+                {
+                  text: gt("Stop", { $context: "verb, button" }),
+                  onPress: () => void stopQuietRun(),
+                },
+                ...(canForceStop
+                  ? [
+                      {
+                        text: gt("Force stop"),
+                        style: "destructive" as const,
+                        onPress: () => void forceStop(quietRunTarget),
+                      },
+                    ]
+                  : []),
+              ],
+            ),
         },
       };
     }

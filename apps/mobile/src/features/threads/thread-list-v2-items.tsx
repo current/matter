@@ -14,6 +14,8 @@ import { CustomSnoozeSheet } from "./CustomSnoozeSheet";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { threadArrangementOpenAtom } from "../../state/thread-order";
 import { threadEnvironment } from "../../state/threads";
+import { serverEnvironment } from "../../state/server";
+import { quietRunSince } from "@t3tools/client-runtime/state/thread-execution";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useVisibleSecondClock } from "./use-visible-second-clock";
 import type { ThreadMoveDestination } from "./threadOrder";
@@ -148,6 +150,12 @@ const STATUS_LABEL_BY_STATUS: Partial<Record<ThreadListV2Status, StatusLabel>> =
     className: "text-warning-foreground",
     iconTintClassName: "accent-warning-foreground",
   },
+};
+const QUIET_STATUS_LABEL: StatusLabel = {
+  label: msg("No activity", { $context: "thread status, the agent has sent nothing" }),
+  icon: "timer",
+  className: "text-warning-foreground",
+  iconTintClassName: "accent-warning-foreground",
 };
 const DONE_STATUS_LABEL: StatusLabel = {
   label: msg("Done", { $context: "thread status, turn finished" }),
@@ -873,10 +881,17 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const rawStatus = resolveThreadListV2Status(thread);
   const status = resolveThreadListV2RowStatus(thread);
   const isUnread = status === "ready" && threadHasUnseenCompletion(thread);
-  const workingLabel = STATUS_LABEL_BY_STATUS[status];
+  const quietSince = useAtomValue(
+    serverEnvironment.configValueAtom(thread.environmentId),
+    (config) => (status === "working" ? quietRunSince(config, thread) : null),
+  );
+  const workingLabel = quietSince !== null ? QUIET_STATUS_LABEL : STATUS_LABEL_BY_STATUS[status];
   const showsWoke = status === "ready" && props.wokeAt !== null;
   const statusEntry =
-    (status === "working" && workingLabel !== undefined && thread.goal?.status === "active"
+    (status === "working" &&
+    quietSince === null &&
+    workingLabel !== undefined &&
+    thread.goal?.status === "active"
       ? {
           ...workingLabel,
           label: msg("Goal", { $context: "thread status, working toward a goal" }),
@@ -1480,7 +1495,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
                 {status === "working" ? (
                   <ThreadListV2Duration
                     environmentId={thread.environmentId}
-                    startedAt={resolveThreadWorkingStartedAt(thread)}
+                    startedAt={quietSince ?? resolveThreadWorkingStartedAt(thread)}
                     leadingSpace={statusLabel.label !== null}
                   />
                 ) : status === "waiting" ? (

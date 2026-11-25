@@ -3198,6 +3198,15 @@
   "3d084099adaeed61": "Autenticado",
   "3d117a49eb32d0cb": "Recolher diff",
   "3d11a160a55b2fa9": "searching",
+  "3d1432f6b1e8415c": [
+    "No activity for",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "3d1e8943c6f1623f": "Causa",
   "3d2036743bbda4c9": "Não foi possível arrastar o arquivo",
   "3d23609d27f213d7": "Diretório home e de configuração personalizado do Claude. Mantém .claude.json e .claude separados.",
@@ -6936,6 +6945,7 @@
   "8639d5532561f87f": "Fechar",
   "86479042bae0e2db": "App móvel",
   "86522c53dd8e09d1": "Trabalhando…",
+  "86542e0b1553fda6": "Failed to stop.",
   "865f034346b82f47": "Cancelar {title}? Os agentes param e a execução não pode ser retomada.",
   "866b2e7be2433828": "Padrão",
   "8676efb0616ff22f": "Verificou as issues vinculadas",
@@ -7645,6 +7655,7 @@
   "94168222df47e6a3": "Instale a ferramenta de linha de comando do GitHub ({cli}) em {url} ou pelo seu gerenciador de pacotes (por exemplo, {command}).",
   "941d08db15f62d17": "Arquivado",
   "94215375ea2558b8": "Em execução",
+  "942556fe0dd9861b": "A long tool may still be running, or the agent may be stuck.",
   "94289a28173e294d": "Desativar",
   "942a831ce4a4171e": "Esse modelo do Antigravity não está mais disponível. Escolha outro modelo.",
   "942bd0edd477156d": "Abra Configurações -> Controle de versão e issues para configurar este provedor.",
@@ -9729,6 +9740,7 @@
   "bbcd3776bcd3e2c5": "{fileName} baixado",
   "bbce9df5e435f900": "Não foi possível alterar quando o modelo é descarregado",
   "bbd8a0d1d08fe382": "Recursivo",
+  "bbda43718a49df92": "No activity",
   "bbde430e56272901": "Arraste para redimensionar a barra lateral",
   "bbdf85f06b8cc315": "O proprietário vê seu nome e aprova cada mensagem antes que o agente a receba.",
   "bbe7fd0f95de9593": "Não foi possível ler suas marcações",
@@ -11626,6 +11638,7 @@
   "e05d1bee2862c2be": "Falha na chamada de ferramenta",
   "e05df18a60c4310e": "Política compartilhada",
   "e0616a924f8405cb": "Ativar extensão",
+  "e067efa06cc44adf": "Stop",
   "e075244ca816ebf6": "Salvar ação",
   "e0799fd6703244c6": "Concluído",
   "e07aeb67f54ee2c4": "Não foi possível carregar a chave de prova DPoP do relay.",

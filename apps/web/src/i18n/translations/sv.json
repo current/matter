@@ -3200,6 +3200,15 @@
   "3d084099adaeed61": "Autentiserad",
   "3d117a49eb32d0cb": "Fäll ihop diff",
   "3d11a160a55b2fa9": "searching",
+  "3d1432f6b1e8415c": [
+    "No activity for",
+    " ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "3d1e8943c6f1623f": "Orsak",
   "3d2036743bbda4c9": "Det gick inte att dra filen",
   "3d23609d27f213d7": "Anpassad hem- och konfigurationskatalog för Claude. Håller .claude.json och .claude separata.",
@@ -6941,6 +6950,7 @@
   "8639d5532561f87f": "Stäng",
   "86479042bae0e2db": "Mobilapp",
   "86522c53dd8e09d1": "Arbetar…",
+  "86542e0b1553fda6": "Failed to stop.",
   "865f034346b82f47": "Avbryta {title}? Dess agenter stoppas och körningen kan inte återupptas.",
   "866b2e7be2433828": "Standard",
   "8676efb0616ff22f": "Kontrollerade länkade ärenden",
@@ -7650,6 +7660,7 @@
   "94168222df47e6a3": "Installera GitHubs kommandoradsverktyg ({cli}) via {url} eller din pakethanterare (till exempel {command}).",
   "941d08db15f62d17": "Arkiverat",
   "94215375ea2558b8": "Körs",
+  "942556fe0dd9861b": "A long tool may still be running, or the agent may be stuck.",
   "94289a28173e294d": "Inaktivera",
   "942a831ce4a4171e": "Den Antigravity-modellen är inte längre tillgänglig. Välj en annan modell.",
   "942bd0edd477156d": "Öppna Inställningar -> Versionshantering och ärenden för att konfigurera den här leverantören.",
@@ -9738,6 +9749,7 @@
   "bbcd3776bcd3e2c5": "Laddade ned {fileName}",
   "bbce9df5e435f900": "Kunde inte ändra när modellen laddas ur",
   "bbd8a0d1d08fe382": "Rekursivt",
+  "bbda43718a49df92": "No activity",
   "bbde430e56272901": "Dra för att ändra storlek på sidofältet",
   "bbdf85f06b8cc315": "Ägaren ser ditt namn och godkänner varje meddelande innan agenten får det.",
   "bbe7fd0f95de9593": "Dina bockar kunde inte läsas",
@@ -11635,6 +11647,7 @@
   "e05d1bee2862c2be": "Verktygsanropet misslyckades",
   "e05df18a60c4310e": "Delad policy",
   "e0616a924f8405cb": "Aktivera tillägget",
+  "e067efa06cc44adf": "Stop",
   "e075244ca816ebf6": "Spara åtgärd",
   "e0799fd6703244c6": "Slutförd",
   "e07aeb67f54ee2c4": "Kunde inte läsa in reläets DPoP-bevisnyckel.",
