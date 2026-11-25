@@ -14,6 +14,7 @@
     "../../antimatter/island/types.ts",
     "../../antimatter/island/siriWaveShaders.ts",
     "../../antimatter/island/MacControlTapMonitor.ts",
-    "../../antimatter/island/islandHtml.ts"
+    "../../antimatter/island/islandHtml.ts",
+    "../../antimatter/voice-assistant/types.ts"
   ]
 }

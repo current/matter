@@ -494,6 +494,78 @@ describe("DesktopServerExposure", () => {
     },
   );
 
+  it.effect(
+    "detects Tailscale MagicDNS in local-only mode when a Tailscale interface is active",
+    () => {
+      let statusReads = 0;
+      return withHarness(
+        { ...lanNetworkInterfaces, ...tailnetNetworkInterfaces },
+        Effect.gen(function* () {
+          const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
+          yield* serverExposure.configureFromSettings({ port: 4173 });
+
+          const endpoints = yield* serverExposure.getAdvertisedEndpoints;
+          assert.deepEqual(
+            endpoints.map((endpoint) => [endpoint.id, endpoint.httpBaseUrl, endpoint.status]),
+            [
+              ["desktop-loopback:4173", "http://127.0.0.1:4173/", "available"],
+              [
+                "tailscale-magicdns:https://desktop.tail.ts.net/",
+                "https://desktop.tail.ts.net/",
+                "unavailable",
+              ],
+            ],
+          );
+          assert.equal(statusReads, 1);
+
+          const enabled = yield* serverExposure.setTailscaleServeEnabled({
+            enabled: true,
+            port: 443,
+          });
+          assert.equal(enabled.requiresRelaunch, true);
+          assert.equal(enabled.state.mode, "local-only");
+          assert.equal(enabled.state.tailscaleServeEnabled, true);
+          assert.equal((yield* serverExposure.backendConfig).bindHost, "127.0.0.1");
+          assert.equal((yield* serverExposure.backendConfig).tailscaleServeEnabled, true);
+        }),
+        {},
+        layerMockSpawner(
+          JSON.stringify({
+            Self: { DNSName: "desktop.tail.ts.net.", TailscaleIPs: ["100.90.1.2"] },
+          }),
+          () => {
+            statusReads += 1;
+          },
+        ),
+      );
+    },
+  );
+
+  it.effect(
+    "skips spawning Tailscale in local-only mode when no Tailscale interface is active",
+    () => {
+      let statusReads = 0;
+      return withHarness(
+        lanNetworkInterfaces,
+        Effect.gen(function* () {
+          const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
+          yield* serverExposure.configureFromSettings({ port: 4173 });
+
+          const endpoints = yield* serverExposure.getAdvertisedEndpoints;
+          assert.deepEqual(
+            endpoints.map((endpoint) => endpoint.httpBaseUrl),
+            ["http://127.0.0.1:4173/"],
+          );
+          assert.equal(statusReads, 0);
+        }),
+        {},
+        layerMockSpawner(`{"Self":{"DNSName":"desktop.tail.ts.net."}}`, () => {
+          statusReads += 1;
+        }),
+      );
+    },
+  );
+
   it.effect("preserves explicit Tailscale exposure overrides", () =>
     withHarness(
       lanNetworkInterfaces,

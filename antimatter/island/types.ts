@@ -1,3 +1,9 @@
+import {
+  DEFAULT_VOICE_ASSISTANT_SETTINGS,
+  type VoiceAssistantSettings,
+  type VoiceAssistantToolResult,
+} from "../voice-assistant/types.ts";
+
 export const ISLAND_SNAPSHOT_CHANNEL = "desktop:island-snapshot";
 export const ISLAND_ACTION_CHANNEL = "desktop:island-action";
 export const ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL = "desktop:island-set-mouse-passthrough";
@@ -12,11 +18,14 @@ export interface IslandWindowCommand {
 
 export type IslandShortcutMode = "control" | "option" | "command-shift-space" | "off";
 
+export type IslandVoicePanelMode = "smart" | "assistant" | "dictation" | "voice-mode";
+
 export interface IslandSettings {
   readonly enabled: boolean;
   readonly shortcut: IslandShortcutMode;
   readonly showNotifications: boolean;
   readonly showMessages: boolean;
+  readonly voiceAssistant: VoiceAssistantSettings;
 }
 
 export const DEFAULT_ISLAND_SETTINGS: IslandSettings = {
@@ -24,6 +33,7 @@ export const DEFAULT_ISLAND_SETTINGS: IslandSettings = {
   shortcut: "control",
   showNotifications: true,
   showMessages: true,
+  voiceAssistant: DEFAULT_VOICE_ASSISTANT_SETTINGS,
 };
 
 export interface IslandApprovalOption {
@@ -102,6 +112,38 @@ export interface IslandVoiceState {
   readonly available: boolean;
 }
 
+export interface IslandVoiceAssistantTurn {
+  readonly id: string;
+  readonly role: "user" | "assistant" | "briefing";
+  readonly text: string;
+  readonly toolResults?: ReadonlyArray<VoiceAssistantToolResult> | undefined;
+  readonly timestamp: number;
+}
+
+export interface IslandVoiceAssistantState {
+  readonly mode: IslandVoicePanelMode;
+  readonly phase:
+    | "idle"
+    | "listening"
+    | "transcribing"
+    | "thinking"
+    | "acting"
+    | "speaking"
+    | "error";
+  readonly handsFreeActive: boolean;
+  readonly muted: boolean;
+  readonly speaking: boolean;
+  readonly outputLevel: number;
+  readonly liveTranscript: string;
+  readonly statusLabel: string | null;
+  readonly lastReply: string | null;
+  readonly lastToolResults: ReadonlyArray<VoiceAssistantToolResult>;
+  readonly recentTurns: ReadonlyArray<IslandVoiceAssistantTurn>;
+  readonly activeBriefingLabel: string | null;
+  readonly pendingBriefingCount: number;
+  readonly error: string | null;
+}
+
 export interface IslandSnapshot {
   readonly theme: "dark" | "light";
   readonly mainWindowFocused: boolean;
@@ -112,6 +154,7 @@ export interface IslandSnapshot {
   readonly recentThreads: ReadonlyArray<IslandThreadSummary>;
   readonly selectedThreadKey: string | null;
   readonly voice: IslandVoiceState;
+  readonly assistant: IslandVoiceAssistantState;
 }
 
 export type IslandAction =
@@ -149,6 +192,13 @@ export type IslandAction =
   | { readonly type: "voice-stop" }
   | { readonly type: "voice-cancel" }
   | { readonly type: "update-draft"; readonly text: string }
+  | { readonly type: "assistant-set-mode"; readonly mode: IslandVoicePanelMode }
+  | { readonly type: "assistant-submit-text"; readonly text: string }
+  | { readonly type: "assistant-toggle-hands-free" }
+  | { readonly type: "assistant-toggle-mute" }
+  | { readonly type: "assistant-barge-in" }
+  | { readonly type: "assistant-open-voice-mode-modal" }
+  | { readonly type: "assistant-clear-history" }
   | { readonly type: "open-voice-settings" }
   | { readonly type: "open-island-settings" }
   | { readonly type: "close-panel" };

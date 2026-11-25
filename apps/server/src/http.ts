@@ -857,3 +857,5 @@ export const layerStaticAndDevRoute = Layer.unwrap(
     Effect.map((assets) => HttpRouter.add("GET", "*", handleStaticAndDevRequest(assets))),
   ),
 );
+
+export { layerVoiceAssistantRoutes } from "./voiceAssistant/voiceAssistantHttp.ts";

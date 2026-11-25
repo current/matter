@@ -65,15 +65,13 @@ export function isQrShareableEndpoint(endpoint: AdvertisedEndpoint): boolean {
   return endpoint.status !== "unavailable" && endpoint.reachability !== "loopback";
 }
 
-/** Desktop skips Tailscale probing until network/Serve is enabled to avoid macOS prompts; absence then
- * means unchecked. */
+/** Tailscale probing runs in local-only mode whenever a Tailscale interface is active; absence
+ * means Tailscale is not running or has no MagicDNS hostname yet. */
 export function missingTailscaleEndpointDescription(
-  state: Pick<DesktopServerExposureState, "mode" | "tailscaleServeEnabled"> | null,
+  _state: Pick<DesktopServerExposureState, "mode" | "tailscaleServeEnabled"> | null,
   resolve: MessageResolver = m,
 ): string {
-  return state && state.mode !== "network-accessible" && !state.tailscaleServeEnabled
-    ? resolve(msg("Turn on Network access to detect Tailscale."))
-    : resolve(msg("Start Tailscale to set up HTTPS access through MagicDNS."));
+  return resolve(msg("Start Tailscale to set up HTTPS access through MagicDNS."));
 }
 
 export function resolveTailscaleServeBaseUrl(
@@ -436,11 +434,22 @@ export function endpointDefaultPreferenceKey(endpoint: AdvertisedEndpoint): stri
   return `${endpoint.provider.id}:${endpoint.reachability}:${scheme}:${endpoint.label}`;
 }
 
+function hasExplicitHostedAppUrl(): boolean {
+  const configured = import.meta.env.VITE_HOSTED_APP_URL?.trim();
+  if (!configured) return false;
+  try {
+    const url = new URL(configured);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function resolveAdvertisedEndpointPairingUrl(
   endpoint: AdvertisedEndpoint,
   credential: string,
 ): string {
-  if (endpoint.compatibility.hostedHttpsApp === "compatible") {
+  if (endpoint.compatibility.hostedHttpsApp === "compatible" && hasExplicitHostedAppUrl()) {
     return (
       resolveHostedPairingUrl(endpoint.httpBaseUrl, credential) ??
       resolveDesktopPairingUrl(endpoint.httpBaseUrl, credential)
@@ -477,6 +486,9 @@ export function endpointShareHint(
 ): string {
   if (isHostedAppPairingUrl(url)) {
     return resolve(msg("Opens the hosted app, no install needed"));
+  }
+  if (isTailscaleHttpsEndpoint(endpoint)) {
+    return resolve(msg("Opens mattr directly · Add to Home Screen on phone"));
   }
   switch (endpoint.reachability) {
     case "lan":

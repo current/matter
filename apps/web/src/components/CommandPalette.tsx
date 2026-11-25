@@ -80,11 +80,16 @@ import {
   PinIcon,
   PinOffIcon,
   PlugIcon,
+  RadioIcon,
   SquarePenIcon,
   TextSearchIcon,
   UserPlusIcon,
   WorkflowIcon,
 } from "lucide-react";
+import {
+  setVoiceAssistantModalOpen,
+  toggleVoiceAssistantHandsFree,
+} from "../island/voiceAssistantStore";
 import { openThreadFind } from "./chat/threadFindStore";
 import { dispatchPreviewAction } from "./preview/previewActionBus";
 import { previewBridge } from "./preview/previewBridge";
@@ -1803,6 +1808,28 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:voice-mode-open",
+    searchTerms: ["voice", "assistant", "road trip", "hands free", "driving", "siri", "speak"],
+    title: gt("Open Voice Mode"),
+    icon: <RadioIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      setVoiceAssistantModalOpen(true);
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:voice-mode-toggle",
+    searchTerms: ["voice", "hands free", "toggle", "assistant", "road trip", "listen"],
+    title: gt("Toggle Hands-Free Voice Mode"),
+    icon: <RadioIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      toggleVoiceAssistantHandsFree();
+    },
+  });
 
   actionItems.push({
     kind: "action",

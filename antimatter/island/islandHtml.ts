@@ -646,6 +646,107 @@ export function buildIslandHtml(): string {
     font-weight: 540;
     color: var(--island-green);
   }
+
+  .mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .mode-pills {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--island-surface);
+    border: 1px solid var(--island-border);
+  }
+  .mode-pill-btn {
+    border: none;
+    background: transparent;
+    color: var(--island-fg-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 540;
+    padding: 3.5px 9px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .mode-pill-btn:hover {
+    color: var(--island-fg);
+  }
+  .mode-pill-btn.active {
+    background: var(--island-btn-primary-bg);
+    color: var(--island-btn-primary-fg);
+  }
+  .handsfree-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--island-border);
+    background: var(--island-surface);
+    color: var(--island-fg-muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 560;
+    padding: 4px 9px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+  .handsfree-chip:hover {
+    color: var(--island-fg);
+    background: var(--island-surface-hover);
+  }
+  .handsfree-chip.live {
+    background: rgba(52, 211, 153, 0.14);
+    border-color: rgba(52, 211, 153, 0.42);
+    color: var(--island-green);
+  }
+  .assistant-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    max-height: 156px;
+    overflow-y: auto;
+    padding: 2px 0;
+  }
+  .assistant-reply {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--island-fg);
+    background: var(--island-surface);
+    border: 1px solid var(--island-border);
+    border-radius: 12px;
+    padding: 8px 10px;
+  }
+  .assistant-reply.briefing {
+    border-color: rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.08);
+  }
+  .tool-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .tool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-weight: 540;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(52, 211, 153, 0.14);
+    color: var(--island-green);
+  }
+  .tool-chip.fail {
+    background: rgba(248, 113, 113, 0.14);
+    color: var(--island-red);
+  }
 </style>
 </head>
 <body>
@@ -722,6 +823,14 @@ export function buildIslandHtml(): string {
     const inputs = snapshot.pendingUserInputs || [];
     const done = snapshot.doneNotifications || [];
     const voiceActive = snapshot.voice && snapshot.voice.phase !== "idle";
+    const assistant = snapshot.assistant;
+    const assistantActive =
+      assistant &&
+      (assistant.phase === "listening" ||
+        assistant.phase === "transcribing" ||
+        assistant.phase === "thinking" ||
+        assistant.phase === "acting" ||
+        assistant.phase === "speaking");
 
     if (uiMode === "voice" || voiceActive) {
       return { kind: "voice" };
@@ -736,8 +845,15 @@ export function buildIslandHtml(): string {
       return { kind: "done-list" };
     }
 
+    if (assistant?.handsFreeActive) {
+      return { kind: "pill", pillKind: "voice-mode", assistant };
+    }
+
     // Auto mode: only show passive notch notifications when enabled and main window is unfocused
     if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) {
+      if (assistantActive) {
+        return { kind: "pill", pillKind: "voice-mode", assistant };
+      }
       return { kind: "hidden" };
     }
 
@@ -858,26 +974,47 @@ export function buildIslandHtml(): string {
 
   function updateWaveVisuals() {
     const phase = snapshot?.voice?.phase ?? "idle";
-    waveLevel = snapshot?.voice?.level ?? 0;
-    if (phase === "recording") {
+    const assistant = snapshot?.assistant;
+    const assistantPhase = assistant?.phase ?? "idle";
+    const inputLevel = snapshot?.voice?.level ?? 0;
+    const outputLevel = assistant?.outputLevel ?? 0;
+
+    if (assistantPhase === "speaking" || assistant?.speaking) {
+      waveState = "speaking";
+      waveVariant = "wave";
+      waveLevel = Math.max(0.18, outputLevel);
+    } else if (assistantPhase === "thinking" || assistantPhase === "acting") {
+      waveState = "thinking";
+      waveVariant = "fluid-dots";
+      waveLevel = 0.4;
+    } else if (phase === "recording" || assistantPhase === "listening") {
       waveState = "listening";
       waveVariant = "wave";
+      waveLevel = inputLevel;
     } else if (phase === "preparing") {
       waveState = "connecting";
       waveVariant = "fluid-dots";
-    } else if (phase === "transcribing" || phase === "post-processing") {
+      waveLevel = 0;
+    } else if (
+      phase === "transcribing" ||
+      phase === "post-processing" ||
+      assistantPhase === "transcribing"
+    ) {
       waveState = "thinking";
       waveVariant = "fluid-dots";
-    } else if (phase === "error") {
+      waveLevel = 0;
+    } else if (phase === "error" || assistantPhase === "error") {
       waveState = "error";
       waveVariant = "wave";
+      waveLevel = 0;
     } else {
       waveState = "idle";
       waveVariant = "wave";
+      waveLevel = 0;
     }
     if (waveCanvasEl) {
       const stretch =
-        waveState === "listening"
+        waveState === "listening" || waveState === "speaking"
           ? 0.55 + 0.9 * Math.min(1, Math.max(0, waveLevel))
           : waveState === "idle" || waveState === "error"
             ? 0.45
@@ -897,6 +1034,26 @@ export function buildIslandHtml(): string {
   }
 
   function renderPill(view) {
+    if (view.pillKind === "voice-mode") {
+      const a = view.assistant || {};
+      const statusText = a.muted
+        ? "Voice Mode · Muted"
+        : a.speaking || a.phase === "speaking"
+          ? a.activeBriefingLabel || "Speaking…"
+          : a.phase === "thinking" || a.phase === "acting"
+            ? a.statusLabel || "Working…"
+            : a.phase === "listening"
+              ? "Listening…"
+              : "Voice Mode";
+      return \`
+        <div class="pill-row" data-action="expand-voice">
+          <span class="status-dot \${a.muted ? "approval" : "done"}"></span>
+          <span class="pill-label">mattr</span>
+          <span class="pill-title">\${escapeHtml(statusText)}</span>
+          <button class="pill-btn" data-action="assistant-toggle-hands-free">\${a.handsFreeActive ? "Stop" : "Open"}</button>
+        </div>
+      \`;
+    }
     if (view.pillKind === "done") {
       const items = view.done;
       if (items.length === 1) {
@@ -1108,14 +1265,42 @@ export function buildIslandHtml(): string {
       error: null,
       available: false,
     };
+    const assistant = snapshot?.assistant ?? {
+      mode: "smart",
+      phase: "idle",
+      handsFreeActive: false,
+      muted: false,
+      speaking: false,
+      outputLevel: 0,
+      liveTranscript: "",
+      statusLabel: null,
+      lastReply: null,
+      lastToolResults: [],
+      recentTurns: [],
+      activeBriefingLabel: null,
+      pendingBriefingCount: 0,
+      error: null,
+    };
+    const activeMode = assistant.mode || "smart";
+    const isDictationOnly = activeMode === "dictation";
     const showMessages = snapshot?.settings?.showMessages !== false;
-    const isRecording = voice.phase === "recording";
+    const isRecording = voice.phase === "recording" || assistant.phase === "listening";
+    const isSpeaking = assistant.speaking || assistant.phase === "speaking";
     const isBusy =
       voice.phase === "preparing" ||
       voice.phase === "transcribing" ||
-      voice.phase === "post-processing";
-    const livePreview = (voice.previewCommitted + voice.previewTentative).trim();
-    const draftReady = (voice.draftText || "").trim().length > 0 || isRecording;
+      voice.phase === "post-processing" ||
+      assistant.phase === "transcribing" ||
+      assistant.phase === "thinking" ||
+      assistant.phase === "acting";
+    const livePreview = (
+      assistant.liveTranscript ||
+      voice.previewCommitted + voice.previewTentative
+    ).trim();
+    const draftText = (voice.draftText || "").trim();
+    const canSend = isDictationOnly
+      ? (draftText.length > 0 || isRecording) && Boolean(thread)
+      : draftText.length > 0 || isRecording;
 
     const statusDotClass =
       thread?.status === "approval"
@@ -1141,7 +1326,25 @@ export function buildIslandHtml(): string {
       : "";
 
     let messagesHtml = "";
-    if (showMessages && thread) {
+    if (!isDictationOnly && (assistant.recentTurns.length > 0 || assistant.lastReply)) {
+      const turns = assistant.recentTurns.slice(-3);
+      const blocks = turns.map((turn) => {
+        if (turn.role === "user") {
+          return \`<div class="user-bubble">\${escapeHtml(turn.text)}</div>\`;
+        }
+        const toolsHtml =
+          turn.toolResults && turn.toolResults.length > 0
+            ? \`<div class="tool-chip-row">\${turn.toolResults
+                .map(
+                  (tr) =>
+                    \`<span class="tool-chip \${tr.ok ? "" : "fail"}">\${tr.ok ? "✓" : "!"} \${escapeHtml(tr.summary)}</span>\`,
+                )
+                .join("")}</div>\`
+            : "";
+        return \`<div class="assistant-reply \${turn.role === "briefing" ? "briefing" : ""}">\${escapeHtml(turn.text)}\${toolsHtml}</div>\`;
+      });
+      messagesHtml = \`<div class="assistant-feed">\${blocks.join("")}</div>\`;
+    } else if (showMessages && thread) {
       const parts = [];
       if (thread.latestUserMessage) {
         parts.push(\`<div class="user-bubble">\${escapeHtml(thread.latestUserMessage)}</div>\`);
@@ -1160,17 +1363,46 @@ export function buildIslandHtml(): string {
       if (parts.length > 0) {
         messagesHtml = \`<div class="messages-box">\${parts.join("")}</div>\`;
       }
+    } else if (!isDictationOnly) {
+      messagesHtml = \`<div class="empty-hint">Ask mattr to check threads, create projects, launch audits, or reply to a chat.</div>\`;
     } else if (!thread) {
-      messagesHtml = \`<div class="empty-hint">Open a thread in mattr to reply from here.</div>\`;
+      messagesHtml = \`<div class="empty-hint">Open a thread in mattr to dictate directly into it.</div>\`;
     }
 
-    const hintText = isRecording
-      ? "Listening… tap again to stop"
-      : voice.phase === "preparing"
-        ? "Starting mic…"
-        : voice.phase === "transcribing" || voice.phase === "post-processing"
-          ? "Transcribing…"
-          : shortcutLabel();
+    const hintText = isSpeaking
+      ? "Speaking… tap to interrupt"
+      : assistant.phase === "thinking" || assistant.phase === "acting"
+        ? assistant.statusLabel || "Working…"
+        : isRecording
+          ? assistant.handsFreeActive
+            ? "Hands-free listening…"
+            : "Listening… tap again to send"
+          : voice.phase === "preparing"
+            ? "Starting mic…"
+            : voice.phase === "transcribing" ||
+                voice.phase === "post-processing" ||
+                assistant.phase === "transcribing"
+              ? "Transcribing…"
+              : shortcutLabel();
+
+    const modeBarHtml = \`
+      <div class="mode-bar">
+        <div class="mode-pills">
+          <button class="mode-pill-btn \${activeMode === "smart" ? "active" : ""}" data-action="assistant-set-mode" data-mode="smart">Smart</button>
+          <button class="mode-pill-btn \${activeMode === "assistant" ? "active" : ""}" data-action="assistant-set-mode" data-mode="assistant">Assistant</button>
+          <button class="mode-pill-btn \${activeMode === "dictation" ? "active" : ""}" data-action="assistant-set-mode" data-mode="dictation">Dictate</button>
+        </div>
+        <div class="header-actions">
+          <button class="handsfree-chip \${assistant.handsFreeActive ? "live" : ""}" data-action="assistant-toggle-hands-free" title="Hands-free conversational Voice Mode">
+            <span class="status-dot \${assistant.handsFreeActive ? "done" : "running"}" style="width:6px;height:6px"></span>
+            <span>\${assistant.handsFreeActive ? "Live" : "Voice Mode"}</span>
+          </button>
+          <button class="icon-btn" data-action="assistant-open-voice-mode-modal" title="Open full Voice Mode">⤢</button>
+        </div>
+      </div>
+    \`;
+
+    const combinedError = assistant.error || voice.error;
 
     return \`
       <div class="card-inner">
@@ -1178,7 +1410,7 @@ export function buildIslandHtml(): string {
           <div class="thread-picker-wrap">
             <span class="status-dot \${statusDotClass}"></span>
             <button class="thread-title-btn" data-action="toggle-thread-switcher">
-              <span class="thread-title-text">\${escapeHtml(thread?.title ?? "mattr")}</span>
+              <span class="thread-title-text">\${escapeHtml(isDictationOnly ? (thread?.title ?? "mattr") : "mattr Assistant")}</span>
               \${threads.length > 1 ? \`<span class="thread-chevron">▾</span>\` : ""}
             </button>
           </div>
@@ -1192,36 +1424,37 @@ export function buildIslandHtml(): string {
             <button class="icon-btn" data-action="close-panel" title="Close (Esc)">✕</button>
           </div>
         </div>
+        \${modeBarHtml}
         \${switcherHtml}
         \${messagesHtml}
         <div class="voice-stage">
           \${livePreview ? \`
             <div class="transcript-pill">
-              <span>\${escapeHtml(voice.previewCommitted)}<span class="tentative">\${escapeHtml(voice.previewTentative)}</span></span>
+              <span>\${escapeHtml(assistant.liveTranscript || voice.previewCommitted)}<span class="tentative">\${escapeHtml(assistant.liveTranscript ? "" : voice.previewTentative)}</span></span>
             </div>
           \` : ""}
-          <button class="wave-trigger" data-action="voice-toggle" title="\${escapeHtml(hintText)}">
-            <canvas id="siri-wave-canvas" style="width:140px;height:140px"></canvas>
+          <button class="wave-trigger" data-action="\${isSpeaking ? "assistant-barge-in" : "voice-toggle"}" title="\${escapeHtml(hintText)}">
+            <canvas id="siri-wave-canvas" style="width:132px;height:132px"></canvas>
           </button>
-          \${voice.error ? \`<div class="voice-error">\${escapeHtml(voice.error)}</div>\` : ""}
+          \${combinedError ? \`<div class="voice-error">\${escapeHtml(combinedError)}</div>\` : ""}
         </div>
         <div class="composer-row">
-          <button class="shortcut-hint \${isRecording || isBusy ? "active" : ""}" data-action="voice-toggle">
+          <button class="shortcut-hint \${isRecording || isBusy || isSpeaking ? "active" : ""}" data-action="\${isSpeaking ? "assistant-barge-in" : "voice-toggle"}">
             \${escapeHtml(hintText)}
           </button>
           <input
             id="island-draft-input"
             class="draft-input"
             type="text"
-            placeholder="\${thread ? "Reply…" : ""}"
+            placeholder="\${isDictationOnly ? (thread ? "Reply…" : "") : "Ask mattr anything…"}"
             value="\${escapeHtml(voice.draftText || "")}"
-            \${thread ? "" : "disabled"}
+            \${isDictationOnly && !thread ? "disabled" : ""}
           />
           <button
-            class="send-circle-btn \${draftReady && thread ? "ready" : ""}"
+            class="send-circle-btn \${canSend ? "ready" : ""}"
             data-action="send-reply"
-            \${draftReady && thread ? "" : "disabled"}
-            title="Send reply (↵)"
+            \${canSend ? "" : "disabled"}
+            title="\${isDictationOnly ? "Send reply (↵)" : "Ask mattr (↵)"}"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M8 12.5V3.5M8 3.5L4 7.5M8 3.5L12 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1321,6 +1554,15 @@ export function buildIslandHtml(): string {
       previewTentative: snapshot?.voice?.previewTentative,
       draftText: snapshot?.voice?.draftText,
       voiceError: snapshot?.voice?.error,
+      assistantMode: snapshot?.assistant?.mode,
+      assistantPhase: snapshot?.assistant?.phase,
+      assistantHandsFree: snapshot?.assistant?.handsFreeActive,
+      assistantMuted: snapshot?.assistant?.muted,
+      assistantSpeaking: snapshot?.assistant?.speaking,
+      assistantTranscript: snapshot?.assistant?.liveTranscript,
+      assistantStatus: snapshot?.assistant?.statusLabel,
+      assistantTurns: snapshot?.assistant?.recentTurns?.slice(-3),
+      assistantError: snapshot?.assistant?.error,
     };
     const sig = JSON.stringify(structuralSnapshot);
     if (sig !== lastRenderedSignature) {
@@ -1372,8 +1614,7 @@ export function buildIslandHtml(): string {
   }
 
   function submitVoiceReply() {
-    const thread = selectedThread();
-    if (!thread) return;
+    const mode = snapshot?.assistant?.mode || "smart";
     const inputEl = document.getElementById("island-draft-input");
     const text = (inputEl?.value ?? snapshot?.voice?.draftText ?? "").trim();
     if (snapshot?.voice?.phase === "recording") {
@@ -1381,6 +1622,14 @@ export function buildIslandHtml(): string {
       return;
     }
     if (!text) return;
+    if (mode !== "dictation") {
+      bridge.sendAction({ type: "assistant-submit-text", text });
+      bridge.sendAction({ type: "update-draft", text: "" });
+      threadSwitcherOpen = false;
+      return;
+    }
+    const thread = selectedThread();
+    if (!thread) return;
     bridge.sendAction({
       type: "send-reply",
       environmentId: thread.environmentId,
@@ -1468,6 +1717,34 @@ export function buildIslandHtml(): string {
         return;
       }
       bridge.sendAction({ type: "voice-toggle" });
+      return;
+    }
+    if (action === "expand-voice") {
+      uiMode = "voice";
+      bridge.focusWindow();
+      render();
+      return;
+    }
+    if (action === "assistant-set-mode") {
+      const mode = target.dataset.mode;
+      if (mode) {
+        bridge.sendAction({ type: "assistant-set-mode", mode });
+      }
+      return;
+    }
+    if (action === "assistant-toggle-hands-free") {
+      event.stopPropagation();
+      bridge.sendAction({ type: "assistant-toggle-hands-free" });
+      return;
+    }
+    if (action === "assistant-barge-in") {
+      bridge.sendAction({ type: "assistant-barge-in" });
+      return;
+    }
+    if (action === "assistant-open-voice-mode-modal") {
+      uiMode = "auto";
+      bridge.sendAction({ type: "assistant-open-voice-mode-modal" });
+      render();
       return;
     }
     if (action === "send-reply") {

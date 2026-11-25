@@ -1141,35 +1141,42 @@ function ConnectionsSettingsContent({
     );
   };
 
-  const renderTailscaleRow = () => (
-    <SettingsRow
-      title={searchableSetting("tailscale-https").title}
-      description={
-        tailscaleHttpsEndpoint
-          ? tailscaleHttpsEndpoint.status === "available"
-            ? tailscaleHttpsEndpoint.httpBaseUrl
-            : gt("Use Tailscale Serve to expose this backend through a MagicDNS HTTPS URL.")
-          : missingTailscaleEndpointDescription(desktopServerExposureState, m)
-      }
-      control={
-        tailscaleHttpsEndpoint ? (
-          <Switch
-            checked={tailscaleHttpsEndpoint.status === "available"}
-            disabled={isUpdatingTailscaleServe}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                handleStartTailscaleServeSetup(tailscaleHttpsEndpoint);
-                return;
-              }
-              handleStartTailscaleServeDisable(tailscaleHttpsEndpoint);
-            }}
-            aria-label={gt("Enable Tailscale HTTPS")}
-          />
-        ) : null
-      }
-      managed={tailscaleHttpsEndpoint?.status === "available" ? undefined : remoteClientsDenial}
-    />
-  );
+  const renderTailscaleRow = () => {
+    const isTailscaleServeEnabled =
+      tailscaleHttpsEndpoint?.status === "available" ||
+      desktopServerExposureState?.tailscaleServeEnabled === true;
+    const canToggleTailscaleServe =
+      tailscaleHttpsEndpoint !== null || desktopServerExposureState?.tailscaleServeEnabled === true;
+    return (
+      <SettingsRow
+        title={searchableSetting("tailscale-https").title}
+        description={
+          tailscaleHttpsEndpoint
+            ? tailscaleHttpsEndpoint.status === "available"
+              ? tailscaleHttpsEndpoint.httpBaseUrl
+              : gt("Use Tailscale Serve to expose this backend through a MagicDNS HTTPS URL.")
+            : missingTailscaleEndpointDescription(desktopServerExposureState, m)
+        }
+        control={
+          canToggleTailscaleServe ? (
+            <Switch
+              checked={isTailscaleServeEnabled}
+              disabled={isUpdatingTailscaleServe}
+              onCheckedChange={(checked) => {
+                if (checked && tailscaleHttpsEndpoint) {
+                  handleStartTailscaleServeSetup(tailscaleHttpsEndpoint);
+                  return;
+                }
+                setDisableTailscaleServeDialogOpen(true);
+              }}
+              aria-label={gt("Enable Tailscale HTTPS")}
+            />
+          ) : null
+        }
+        managed={isTailscaleServeEnabled ? undefined : remoteClientsDenial}
+      />
+    );
+  };
   const newestPairingLink = visibleDesktopPairingLinks.find(
     (pairingLink) => pairingLink.id === newestPairingLinkId,
   );

@@ -434,6 +434,20 @@ const withCurrentAdvertisedHost = (
   };
 };
 
+const hasTailscaleNetworkInterface = (
+  networkInterfaces: DesktopNetworkInterfaces.NetworkInterfaces,
+): boolean =>
+  Object.entries(networkInterfaces).some(
+    ([interfaceName, addresses]) =>
+      /^tailscale(?:\d+|ipv[46])?$/iu.test(interfaceName) ||
+      (addresses ?? []).some(
+        (address) =>
+          !address.internal &&
+          ((address.family === "IPv4" && isTailscaleIpv4Address(address.address)) ||
+            (address.family === "IPv6" && /^fd7a:115c:a1e0:/iu.test(address.address))),
+      ),
+  );
+
 const tailscaleIpv4AddressKey = (
   networkInterfaces: DesktopNetworkInterfaces.NetworkInterfaces,
 ): string =>
@@ -610,8 +624,12 @@ export const make = Effect.gen(function* () {
       customHttpsEndpointUrls: config.desktopHttpsEndpointUrls,
     });
 
-    // Spawning Mac App Store Tailscale can prompt for TCC access even when exposure is disabled.
-    if (state.mode !== "network-accessible" && !state.tailscaleServeEnabled) {
+    // Spawning Mac App Store Tailscale can prompt for TCC access when Tailscale is not active.
+    if (
+      state.mode !== "network-accessible" &&
+      !state.tailscaleServeEnabled &&
+      !hasTailscaleNetworkInterface(currentNetworkInterfaces)
+    ) {
       return coreEndpoints;
     }
 
@@ -628,7 +646,12 @@ export const make = Effect.gen(function* () {
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, childProcessSpawner),
       Effect.provideService(HttpClient.HttpClient, httpClient),
     );
-    return [...coreEndpoints, ...tailscaleEndpoints];
+    // Only MagicDNS Serve works over loopback; raw Tailscale IP needs a non-loopback bind.
+    const visibleTailscaleEndpoints =
+      state.mode === "network-accessible"
+        ? tailscaleEndpoints
+        : tailscaleEndpoints.filter((endpoint) => endpoint.id.startsWith("tailscale-magicdns:"));
+    return [...coreEndpoints, ...visibleTailscaleEndpoints];
   }).pipe(Effect.withSpan("desktop.serverExposure.getAdvertisedEndpoints"));
 
   return DesktopServerExposure.of({

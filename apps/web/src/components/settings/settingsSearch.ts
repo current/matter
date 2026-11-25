@@ -349,6 +349,17 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "mattr-voice-assistant",
+    title: msg("Voice Assistant & Voice Mode"),
+    to: "/settings/general",
+    targetId: "mattr-voice-assistant",
+    searchTerms: [
+      msg(
+        "voice mode hands free road trip driving assistant tts speech spoken briefings barge in smart routing",
+      ),
+    ],
+  },
+  {
     id: "color-scheme",
     title: msg("Color scheme"),
     to: "/settings/appearance",

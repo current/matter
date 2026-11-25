@@ -62,33 +62,37 @@
   /* Translucent, frosted blur, and Liquid Glass window materials let the native desktop backdrop
      show through the outer frame and sidebar while the inset page card stays solid and crisp. */
   html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]),
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) body {
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) body,
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) #root,
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) [data-slot="sidebar"],
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-slot="sidebar-container"] {
     background-color: transparent !important;
     background-image: none !important;
   }
 
   html[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(in srgb, var(--sidebar) 70%, transparent);
-  }
-
-  html.dark[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: rgb(17 19 19 / 68%);
-  }
-
-  html[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
     --mattr-frame: color-mix(in srgb, var(--sidebar) 46%, transparent);
   }
 
-  html.dark[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
+  html.dark[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
     --mattr-frame: rgb(17 19 19 / 46%);
   }
 
+  html[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: color-mix(in srgb, var(--sidebar) 30%, transparent);
+  }
+
+  html.dark[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: rgb(17 19 19 / 28%);
+  }
+
   html[data-mattr-shell-material="liquid-glass"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(in srgb, var(--sidebar) 20%, transparent);
+    --mattr-frame: color-mix(in srgb, var(--sidebar) 14%, transparent);
   }
 
   html.dark[data-mattr-shell-material="liquid-glass"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: rgb(17 19 19 / 24%);
+    --mattr-frame: rgb(17 19 19 / 16%);
   }
 
   html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])

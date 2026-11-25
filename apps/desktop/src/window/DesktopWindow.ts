@@ -518,11 +518,20 @@ export const make = Effect.gen(function* () {
       minHeight: DesktopAppSettings.MIN_MAIN_WINDOW_SIZE.height,
       show: false,
       autoHideMenuBar: true,
-      ...(environment.platform === "darwin" ? { disableAutoHideCursor: true } : {}),
+      ...(environment.platform === "darwin"
+        ? {
+            disableAutoHideCursor: true,
+            transparent: true,
+            hasShadow: true,
+            visualEffectState: "active" as const,
+          }
+        : {}),
       backgroundColor:
-        currentShellMaterial === "solid"
-          ? getInitialWindowBackgroundColor(shouldUseDarkColors)
-          : "#00000000",
+        environment.platform === "darwin"
+          ? "#00000000"
+          : currentShellMaterial === "solid"
+            ? getInitialWindowBackgroundColor(shouldUseDarkColors)
+            : "#00000000",
       ...iconOption,
       title: environment.displayName,
       ...getWindowTitleBarOptions(shouldUseDarkColors, environment.platform),

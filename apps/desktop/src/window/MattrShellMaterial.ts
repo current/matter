@@ -262,7 +262,9 @@ export function applyWindowShellMaterial(
           !existingState.hasWindowsMaterial &&
           !existingState.nonOpaque))
     ) {
-      window.setBackgroundColor(options.solidBackgroundColor);
+      window.setBackgroundColor(
+        options.platform === "darwin" ? "#00000000" : options.solidBackgroundColor,
+      );
       return;
     }
 
@@ -270,14 +272,10 @@ export function applyWindowShellMaterial(
 
     if (options.platform === "darwin") {
       if (options.material === "solid") {
-        if (state.glassView !== null || state.nonOpaque) {
+        if (state.glassView !== null) {
           const bridge = await loadMacObjcBridge();
           if (bridge && !window.isDestroyed()) {
             detachMacGlassView(bridge, state);
-            if (state.nonOpaque) {
-              setMacWindowOpaque(bridge, window, true);
-              state.nonOpaque = false;
-            }
           }
         }
         if (state.hasVibrancy && !window.isDestroyed()) {
@@ -285,26 +283,25 @@ export function applyWindowShellMaterial(
           state.hasVibrancy = false;
         }
         if (!window.isDestroyed()) {
-          window.setBackgroundColor(options.solidBackgroundColor);
+          // Keep the transparent macOS BrowserWindow's backing clear; CSS fills the solid frame.
+          window.setBackgroundColor("#00000000");
         }
         return;
       }
 
       if (options.material === "transparent") {
-        const bridge = await loadMacObjcBridge();
-        if (window.isDestroyed()) return;
-        if (bridge) {
-          detachMacGlassView(bridge, state);
+        if (state.glassView !== null) {
+          const bridge = await loadMacObjcBridge();
+          if (bridge && !window.isDestroyed()) {
+            detachMacGlassView(bridge, state);
+          }
         }
+        if (window.isDestroyed()) return;
         if (state.hasVibrancy) {
           setVibrancySafe(window, null);
           state.hasVibrancy = false;
         }
         window.setBackgroundColor("#00000000");
-        if (bridge) {
-          setMacWindowOpaque(bridge, window, false);
-          state.nonOpaque = true;
-        }
         return;
       }
 

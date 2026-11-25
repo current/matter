@@ -23,7 +23,7 @@ describe("MattrShellMaterial", () => {
         solidBackgroundColor: "#000000",
         platform: "darwin",
       });
-      assert.deepEqual(vi.mocked(window.setBackgroundColor).mock.calls, [["#000000"]]);
+      assert.deepEqual(vi.mocked(window.setBackgroundColor).mock.calls, [["#00000000"]]);
       assert.lengthOf(vi.mocked(window.setVibrancy).mock.calls, 0);
       cleanupWindowShellMaterial(window);
     }),
@@ -48,7 +48,7 @@ describe("MattrShellMaterial", () => {
       assert.deepEqual(vi.mocked(window.setVibrancy).mock.calls, [["under-window"], [null]]);
       assert.deepEqual(vi.mocked(window.setBackgroundColor).mock.calls, [
         ["#00000000"],
-        ["#ffffff"],
+        ["#00000000"],
       ]);
       cleanupWindowShellMaterial(window);
     }),

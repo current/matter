@@ -1,10 +1,13 @@
-import { type DesktopWslState, EnvironmentId } from "@t3tools/contracts";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { type AdvertisedEndpoint, type DesktopWslState, EnvironmentId } from "@t3tools/contracts";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   applyWslEnableSelection,
+  endpointShareHint,
   isServerNetworkAccessible,
+  missingTailscaleEndpointDescription,
   parseManualDesktopSshTarget,
   resolveAccessEnvironmentId,
+  resolveAdvertisedEndpointPairingUrl,
   resolveCurrentOriginPairingUrl,
   resolveTailscaleServeBaseUrl,
   selectQrEndpointOption,
@@ -235,5 +238,102 @@ describe("isServerNetworkAccessible", () => {
     { authPolicy: null, directEndpoints: served, expected: false },
   ] as const)("$authPolicy with $directEndpoints.length endpoints", (row) => {
     expect(isServerNetworkAccessible(row)).toBe(row.expected);
+  });
+});
+
+describe("resolveAdvertisedEndpointPairingUrl", () => {
+  const tailscaleHttpsEndpoint: AdvertisedEndpoint = {
+    id: "tailscale-magicdns:https://mac.tailnet.ts.net/",
+    label: "Tailscale HTTPS",
+    httpBaseUrl: "https://mac.tailnet.ts.net/",
+    wsBaseUrl: "wss://mac.tailnet.ts.net/",
+    reachability: "private-network",
+    status: "available",
+    source: "desktop-addon",
+    isDefault: false,
+    provider: {
+      id: "tailscale",
+      label: "Tailscale",
+      kind: "private-network",
+      isAddon: true,
+    },
+    compatibility: {
+      hostedHttpsApp: "compatible",
+      desktopApp: "compatible",
+    },
+  };
+
+  const lanEndpoint: AdvertisedEndpoint = {
+    ...tailscaleHttpsEndpoint,
+    id: "desktop-lan:http://192.168.1.20:3773",
+    label: "Local network",
+    httpBaseUrl: "http://192.168.1.20:3773/",
+    wsBaseUrl: "ws://192.168.1.20:3773/",
+    reachability: "lan",
+    source: "desktop-core",
+    compatibility: {
+      hostedHttpsApp: "mixed-content-blocked",
+      desktopApp: "compatible",
+    },
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("uses the direct Tailscale HTTPS pairing URL when VITE_HOSTED_APP_URL is unset or blank", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "");
+    expect(resolveAdvertisedEndpointPairingUrl(tailscaleHttpsEndpoint, "PAIRCODE")).toBe(
+      "https://mac.tailnet.ts.net/pair#token=PAIRCODE",
+    );
+
+    vi.stubEnv("VITE_HOSTED_APP_URL", "   ");
+    expect(resolveAdvertisedEndpointPairingUrl(tailscaleHttpsEndpoint, "PAIRCODE")).toBe(
+      "https://mac.tailnet.ts.net/pair#token=PAIRCODE",
+    );
+  });
+
+  it("wraps into a hosted pairing URL only when VITE_HOSTED_APP_URL is explicitly configured", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "https://mattr.example.com");
+    expect(resolveAdvertisedEndpointPairingUrl(tailscaleHttpsEndpoint, "PAIRCODE")).toBe(
+      "https://mattr.example.com/pair?host=https%3A%2F%2Fmac.tailnet.ts.net%2F#token=PAIRCODE",
+    );
+  });
+
+  it("falls back to the direct URL when VITE_HOSTED_APP_URL is invalid", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "not-a-valid-url");
+    expect(resolveAdvertisedEndpointPairingUrl(tailscaleHttpsEndpoint, "PAIRCODE")).toBe(
+      "https://mac.tailnet.ts.net/pair#token=PAIRCODE",
+    );
+  });
+
+  it("keeps direct pairing URLs for HTTP LAN endpoints even when VITE_HOSTED_APP_URL is set", () => {
+    vi.stubEnv("VITE_HOSTED_APP_URL", "https://mattr.example.com");
+    expect(resolveAdvertisedEndpointPairingUrl(lanEndpoint, "PAIRCODE")).toBe(
+      "http://192.168.1.20:3773/pair#token=PAIRCODE",
+    );
+  });
+
+  it("describes direct Tailscale HTTPS links for mattr and Add to Home Screen", () => {
+    expect(
+      endpointShareHint(tailscaleHttpsEndpoint, "https://mac.tailnet.ts.net/pair#token=PAIRCODE"),
+    ).toBe("Opens mattr directly · Add to Home Screen on phone");
+    expect(
+      endpointShareHint(
+        tailscaleHttpsEndpoint,
+        "https://mattr.example.com/pair?host=https%3A%2F%2Fmac.tailnet.ts.net%2F#token=PAIRCODE",
+      ),
+    ).toBe("Opens the hosted app, no install needed");
+  });
+});
+
+describe("missingTailscaleEndpointDescription", () => {
+  it("asks to start Tailscale rather than enabling Network access in local-only mode", () => {
+    expect(
+      missingTailscaleEndpointDescription({ mode: "local-only", tailscaleServeEnabled: false }),
+    ).toBe("Start Tailscale to set up HTTPS access through MagicDNS.");
+    expect(missingTailscaleEndpointDescription(null)).toBe(
+      "Start Tailscale to set up HTTPS access through MagicDNS.",
+    );
   });
 });

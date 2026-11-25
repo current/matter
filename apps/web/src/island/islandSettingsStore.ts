@@ -4,6 +4,11 @@ import {
   type IslandSettings,
   type IslandShortcutMode,
 } from "../../../../antimatter/island/types";
+import {
+  DEFAULT_VOICE_ASSISTANT_SETTINGS,
+  type VoiceAssistantSettings,
+  type VoiceTtsProvider,
+} from "../../../../antimatter/voice-assistant/types";
 
 const STORAGE_KEY = "mattr:island:settings:v1";
 
@@ -14,29 +19,106 @@ const VALID_SHORTCUTS = new Set<IslandShortcutMode>([
   "off",
 ]);
 
+const VALID_VOICE_DEFAULT_MODES = new Set<VoiceAssistantSettings["defaultMode"]>([
+  "smart",
+  "assistant",
+  "dictation",
+]);
+
+const VALID_TTS_PROVIDERS = new Set<VoiceTtsProvider>([
+  "auto",
+  "openai",
+  "macos",
+  "browser",
+  "off",
+]);
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function normalizeVoiceAssistantSettings(
+  raw: unknown,
+  base: VoiceAssistantSettings = DEFAULT_VOICE_ASSISTANT_SETTINGS,
+): VoiceAssistantSettings {
+  const parsed =
+    typeof raw === "object" && raw !== null ? (raw as Partial<VoiceAssistantSettings>) : {};
+  return {
+    defaultMode:
+      typeof parsed.defaultMode === "string" &&
+      VALID_VOICE_DEFAULT_MODES.has(parsed.defaultMode as VoiceAssistantSettings["defaultMode"])
+        ? (parsed.defaultMode as VoiceAssistantSettings["defaultMode"])
+        : base.defaultMode,
+    speakReplies:
+      typeof parsed.speakReplies === "boolean" ? parsed.speakReplies : base.speakReplies,
+    ttsProvider:
+      typeof parsed.ttsProvider === "string" &&
+      VALID_TTS_PROVIDERS.has(parsed.ttsProvider as VoiceTtsProvider)
+        ? (parsed.ttsProvider as VoiceTtsProvider)
+        : base.ttsProvider,
+    ttsVoice: typeof parsed.ttsVoice === "string" ? parsed.ttsVoice : base.ttsVoice,
+    ttsSpeed: clampNumber(parsed.ttsSpeed, 0.8, 1.5, base.ttsSpeed),
+    handsFreeAutoListen:
+      typeof parsed.handsFreeAutoListen === "boolean"
+        ? parsed.handsFreeAutoListen
+        : base.handsFreeAutoListen,
+    bargeInEnabled:
+      typeof parsed.bargeInEnabled === "boolean" ? parsed.bargeInEnabled : base.bargeInEnabled,
+    silenceTimeoutMs: Math.round(
+      clampNumber(parsed.silenceTimeoutMs, 400, 5000, base.silenceTimeoutMs),
+    ),
+    proactiveBriefings:
+      typeof parsed.proactiveBriefings === "boolean"
+        ? parsed.proactiveBriefings
+        : base.proactiveBriefings,
+    announceApprovals:
+      typeof parsed.announceApprovals === "boolean"
+        ? parsed.announceApprovals
+        : base.announceApprovals,
+    announceQuestions:
+      typeof parsed.announceQuestions === "boolean"
+        ? parsed.announceQuestions
+        : base.announceQuestions,
+    announceCompletions:
+      typeof parsed.announceCompletions === "boolean"
+        ? parsed.announceCompletions
+        : base.announceCompletions,
+    announceFailures:
+      typeof parsed.announceFailures === "boolean"
+        ? parsed.announceFailures
+        : base.announceFailures,
+  };
+}
+
+export function normalizeIslandSettings(
+  raw: unknown,
+  base: IslandSettings = DEFAULT_ISLAND_SETTINGS,
+): IslandSettings {
+  const parsed = typeof raw === "object" && raw !== null ? (raw as Partial<IslandSettings>) : {};
+  return {
+    enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : base.enabled,
+    shortcut:
+      typeof parsed.shortcut === "string" &&
+      VALID_SHORTCUTS.has(parsed.shortcut as IslandShortcutMode)
+        ? (parsed.shortcut as IslandShortcutMode)
+        : base.shortcut,
+    showNotifications:
+      typeof parsed.showNotifications === "boolean"
+        ? parsed.showNotifications
+        : base.showNotifications,
+    showMessages:
+      typeof parsed.showMessages === "boolean" ? parsed.showMessages : base.showMessages,
+    voiceAssistant: normalizeVoiceAssistantSettings(parsed.voiceAssistant, base.voiceAssistant),
+  };
+}
+
 function readStoredSettings(): IslandSettings {
   if (typeof window === "undefined") return DEFAULT_ISLAND_SETTINGS;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_ISLAND_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<IslandSettings>;
-    return {
-      enabled:
-        typeof parsed.enabled === "boolean" ? parsed.enabled : DEFAULT_ISLAND_SETTINGS.enabled,
-      shortcut:
-        typeof parsed.shortcut === "string" &&
-        VALID_SHORTCUTS.has(parsed.shortcut as IslandShortcutMode)
-          ? (parsed.shortcut as IslandShortcutMode)
-          : DEFAULT_ISLAND_SETTINGS.shortcut,
-      showNotifications:
-        typeof parsed.showNotifications === "boolean"
-          ? parsed.showNotifications
-          : DEFAULT_ISLAND_SETTINGS.showNotifications,
-      showMessages:
-        typeof parsed.showMessages === "boolean"
-          ? parsed.showMessages
-          : DEFAULT_ISLAND_SETTINGS.showMessages,
-    };
+    return normalizeIslandSettings(JSON.parse(raw), DEFAULT_ISLAND_SETTINGS);
   } catch {
     return DEFAULT_ISLAND_SETTINGS;
   }
@@ -55,7 +137,7 @@ function subscribeIslandSettings(listener: () => void): () => void {
 }
 
 export function updateIslandSettings(patch: Partial<IslandSettings>): IslandSettings {
-  const next: IslandSettings = { ...currentSettings, ...patch };
+  const next = normalizeIslandSettings(patch, currentSettings);
   currentSettings = next;
   if (typeof window !== "undefined") {
     try {
@@ -65,6 +147,14 @@ export function updateIslandSettings(patch: Partial<IslandSettings>): IslandSett
   }
   for (const listener of listeners) listener();
   return next;
+}
+
+export function updateVoiceAssistantSettings(
+  patch: Partial<VoiceAssistantSettings>,
+): IslandSettings {
+  return updateIslandSettings({
+    voiceAssistant: normalizeVoiceAssistantSettings(patch, currentSettings.voiceAssistant),
+  });
 }
 
 export function useIslandSettings(): IslandSettings {

@@ -1,4 +1,11 @@
-import { ArrowLeftIcon, ArrowRightIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  ChartNoAxesColumnIcon,
+  RadioIcon,
+  SettingsIcon,
+} from "lucide-react";
+import { setVoiceAssistantModalOpen } from "../../island/voiceAssistantStore";
 import type { ReactNode } from "react";
 import { T, useGT } from "gt-react";
 import { memo } from "react";
@@ -296,6 +303,14 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             icon={<ChartNoAxesColumnIcon />}
             label={gt("Usage")}
             onClick={handleUsageClick}
+          />
+          <SidebarUtilityItem
+            icon={<RadioIcon />}
+            label={gt("Voice Mode")}
+            onClick={() => {
+              closeMobileSidebar();
+              setVoiceAssistantModalOpen(true);
+            }}
           />
         </>
       )}
