@@ -8,19 +8,11 @@ import {
   Pressable,
   ScrollView,
   TextInput,
+  useWindowDimensions,
   View,
   type ScrollViewInstance,
 } from "react-native";
-import Animated, {
-  Easing,
-  makeMutable,
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-  type SharedValue,
-} from "react-native-reanimated";
+import { makeMutable, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/ui/AppText";
@@ -33,74 +25,51 @@ import {
   readVoiceWorkspaceContext,
   watchVoiceWorkspace,
 } from "./mobileVoiceContext";
+import { SiriWaveMobile, type SiriWaveMobileMode } from "./SiriWaveMobile";
 import { createVoiceAssistantApi } from "./voiceAssistantApi";
 import type { VoiceTurnEntry } from "./voiceContextLogic";
 import { VoiceModeSession, type VoicePhase } from "./voiceModeSession";
 
 const BACKGROUND = "#05060A";
-const ORB_SIZE = 168;
 
-const PHASE_COLOR: Record<VoicePhase, string> = {
-  starting: "#6B7280",
-  listening: "#5EA2FF",
-  hearing: "#4DE3B5",
-  transcribing: "#B58CFF",
-  thinking: "#B58CFF",
-  speaking: "#FFB86B",
-  muted: "#6B7280",
-  paused: "#8AA4C8",
-  error: "#FF6B6B",
+const WAVE_HEIGHT = 220;
+
+const WAVE_MODE: Record<VoicePhase, SiriWaveMobileMode> = {
+  starting: "thinking",
+  listening: "listening",
+  hearing: "hearing",
+  transcribing: "thinking",
+  thinking: "thinking",
+  speaking: "speaking",
+  muted: "muted",
+  paused: "idle",
+  error: "error",
 };
 
-function VoiceOrb(props: {
+/** The wave is the whole tap target, so it is easy to hit without looking (in the car). */
+function VoiceWave(props: {
   readonly level: SharedValue<number>;
   readonly phase: VoicePhase;
   readonly label: string;
   readonly onPress: () => void;
 }) {
-  const pulse = useSharedValue(0);
-  const smoothed = useDerivedValue(() => withTiming(props.level.value, { duration: 90 }));
-  const animates = props.phase === "speaking" || props.phase === "thinking";
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- drives the UI-thread pulse that stands in for output level while the assistant speaks or thinks
-  useEffect(() => {
-    pulse.set(
-      animates
-        ? withRepeat(withTiming(1, { duration: 850, easing: Easing.inOut(Easing.quad) }), -1, true)
-        : withTiming(0, { duration: 200 }),
-    );
-  }, [animates, pulse]);
-
-  const outer = useAnimatedStyle(() => ({
-    transform: [{ scale: 1.05 + smoothed.value * 0.75 + pulse.value * 0.22 }],
-    opacity: 0.16 + smoothed.value * 0.2,
-  }));
-  const middle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + smoothed.value * 0.42 + pulse.value * 0.12 }],
-    opacity: 0.3 + smoothed.value * 0.25,
-  }));
-  const core = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.86 + smoothed.value * 0.18 + pulse.value * 0.05 }],
-  }));
-  const color = PHASE_COLOR[props.phase];
-  const disc = {
-    position: "absolute",
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    borderRadius: ORB_SIZE / 2,
-    backgroundColor: color,
-  } as const;
-
+  const { width } = useWindowDimensions();
+  const waveWidth = Math.min(width, 520);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={props.label}
       onPress={props.onPress}
       className="items-center justify-center"
-      style={{ width: ORB_SIZE * 2, height: ORB_SIZE * 2 }}
+      style={{ width: waveWidth, height: WAVE_HEIGHT + 40 }}
     >
-      <Animated.View style={[disc, outer]} />
-      <Animated.View style={[disc, middle]} />
-      <Animated.View style={[disc, core]} />
+      <SiriWaveMobile
+        level={props.level}
+        active={props.phase !== "paused" && props.phase !== "muted"}
+        mode={WAVE_MODE[props.phase]}
+        width={waveWidth}
+        height={WAVE_HEIGHT}
+      />
     </Pressable>
   );
 }
@@ -276,7 +245,7 @@ export function MattrVoiceModeScreen() {
       </View>
 
       <View className="flex-1 items-center justify-center">
-        <VoiceOrb
+        <VoiceWave
           level={level}
           phase={snapshot.phase}
           label={orbHint}
@@ -292,6 +261,15 @@ export function MattrVoiceModeScreen() {
         >
           {labels[snapshot.phase]}
         </Text>
+        {snapshot.liveTranscript !== null ? (
+          <Text
+            numberOfLines={3}
+            className="mt-2 px-8 text-center text-base leading-snug"
+            style={{ color: "rgba(255,255,255,0.7)" }}
+          >
+            {snapshot.liveTranscript}
+          </Text>
+        ) : null}
         {snapshot.error !== null ? (
           <Text
             accessibilityRole="alert"

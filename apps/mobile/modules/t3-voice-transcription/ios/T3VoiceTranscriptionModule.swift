@@ -3,8 +3,33 @@ import ExpoModulesCore
 import Foundation
 
 public class T3VoiceTranscriptionModule: Module {
+  private var pcmStreamer: PcmStreamer?
+
   public func definition() -> ModuleDefinition {
     Name("T3VoiceTranscription")
+
+    Events("onPcmChunk")
+
+    // Streams the microphone for voice mode; the JS side owns the shared audio session.
+    AsyncFunction("startPcmStream") { [weak self] () throws -> [String: Any] in
+      guard let self else { throw CocoaError(.featureUnsupported) }
+      let streamer =
+        self.pcmStreamer
+        ?? PcmStreamer { [weak self] chunk, level in
+          self?.sendEvent("onPcmChunk", ["data": chunk.base64EncodedString(), "level": level])
+        }
+      self.pcmStreamer = streamer
+      let started = try streamer.start()
+      return ["voiceProcessing": started.voiceProcessing, "sampleRate": 16_000]
+    }.runOnQueue(.main)
+
+    AsyncFunction("stopPcmStream") { [weak self] in
+      self?.pcmStreamer?.stop()
+    }.runOnQueue(.main)
+
+    OnDestroy { [weak self] in
+      self?.pcmStreamer?.stop()
+    }
 
     Function("isAppleSpeechAvailable") {
       if #available(iOS 26, *) { return AppleSpeechEngine.isAvailable }

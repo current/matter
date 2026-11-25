@@ -14,6 +14,8 @@ import type {
 import { runSpeech } from "../voice-input/voiceDestination";
 
 const BASE_PATH = "/api/mattr/voice-assistant";
+const FLUX_WS_PATH = `${BASE_PATH}/flux`;
+const MEDIA_TICKET_PATH = "/api/auth/websocket-ticket/media";
 
 const TURN_TIMEOUT_MS = 120_000;
 const TRANSCRIBE_TIMEOUT_MS = 60_000;
@@ -73,10 +75,11 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
     readonly signal?: AbortSignal | undefined;
     readonly contentType?: string;
     readonly body?: BodyInit | undefined;
-    readonly read: (response: Response) => Promise<T>;
-  }): Promise<T> =>
+    readonly read: (response: Response, url: string) => Promise<T>;
+  }): Promise<T> => {
+    let requestUrl = "";
     // Typed HTTP failures travel as values so callers see the original error, not a fiber wrapper.
-    runSpeech(
+    return runSpeech(
       executeMattrEnvironmentRequest<Response, VoiceRequestFailure>({
         prepared,
         method: input.method,
@@ -85,8 +88,9 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
         isUnauthorizedResponse: (response: Response) => response.status === 401,
         send: ({ url, headers }) =>
           Effect.tryPromise({
-            try: (abort) =>
-              expoFetch(url, {
+            try: (abort) => {
+              requestUrl = url;
+              return expoFetch(url, {
                 method: input.method,
                 redirect: "error",
                 // Cookie-authenticated environments carry their session in the cookie jar.
@@ -99,7 +103,8 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
                 },
                 signal: abort,
                 ...(input.body === undefined ? {} : { body: input.body }),
-              }) as unknown as Promise<Response>,
+              }) as unknown as Promise<Response>;
+            },
             catch: (cause) => new VoiceRequestFailure({ cause }),
           }),
       }).pipe(
@@ -107,7 +112,7 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
           Effect.tryPromise({
             try: async () =>
               response.ok
-                ? { value: await input.read(response) }
+                ? { value: await input.read(response, requestUrl) }
                 : { failure: await failureOf(response) },
             catch: (cause) => new VoiceRequestFailure({ cause }),
           }),
@@ -118,10 +123,36 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
       if ("failure" in result) throw result.failure;
       return result.value;
     });
+  };
 
   const json = <T>(response: Response) => response.json() as Promise<T>;
 
   return {
+    /**
+     * The Deepgram Flux streaming socket, authorized by a one-use media ticket because a
+     * WebSocket cannot carry the environment's request headers.
+     */
+    fluxSocketUrl: (signal?: AbortSignal) =>
+      send<string>({
+        method: "POST",
+        path: MEDIA_TICKET_PATH,
+        timeoutMs: INFO_TIMEOUT_MS,
+        signal,
+        read: async (response, url) => {
+          const body: unknown = await response.json();
+          const ticket =
+            typeof body === "object" && body !== null && "ticket" in body
+              ? (body as { readonly ticket: unknown }).ticket
+              : null;
+          if (typeof ticket !== "string" || ticket.trim().length === 0) {
+            throw new Error("The server did not issue a voice streaming ticket.");
+          }
+          const socketUrl = new URL(FLUX_WS_PATH, url);
+          socketUrl.protocol = socketUrl.protocol === "https:" ? "wss:" : "ws:";
+          socketUrl.searchParams.set("wsTicket", ticket.trim());
+          return socketUrl.toString();
+        },
+      }),
     ttsInfo: (signal?: AbortSignal) =>
       send<VoiceAvailableTtsInfo>({
         method: "GET",

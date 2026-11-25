@@ -5,6 +5,11 @@ import type {
   VoiceAssistantTurnResponse,
   VoiceWorkspaceContext,
 } from "../../../../../antimatter/voice-assistant/types";
+import type {
+  ActiveStreamingListening,
+  StreamingListenOptions,
+  StreamingListenResult,
+} from "./fluxListening";
 import type { ActiveListening, ActivePlayback, ListenResult } from "./nativeVoiceAudio";
 import type { VoiceAssistantApi } from "./voiceAssistantApi";
 import { VoiceModeSession, type VoiceModeAudio, type VoicePhase } from "./voiceModeSession";
@@ -57,7 +62,7 @@ function harness(
       const entry = {
         resolve,
         finish: vi.fn(() =>
-          resolve({ kind: "utterance", uri: "file:///a.m4a", heardSpeech: true }),
+          resolve({ kind: "utterance", recording: { uri: "file:///a.m4a" }, heardSpeech: true }),
         ),
         cancel: vi.fn(() => resolve({ kind: "cancelled" })),
       };
@@ -102,7 +107,11 @@ function harness(
   return { session, audio, api, listens, playbacks, turns, phases, executeAction };
 }
 
-const speech: ListenResult = { kind: "utterance", uri: "file:///a.m4a", heardSpeech: true };
+const speech: ListenResult = {
+  kind: "utterance",
+  recording: { uri: "file:///a.m4a" },
+  heardSpeech: true,
+};
 
 describe("VoiceModeSession", () => {
   it("runs listen → transcribe → turn → speak and listens again", async () => {
@@ -190,12 +199,16 @@ describe("VoiceModeSession", () => {
     session.start();
     await vi.waitFor(() => expect(listens).toHaveLength(1));
     listens[0]!.finish.mockImplementation(() =>
-      listens[0]!.resolve({ kind: "utterance", uri: "file:///a.m4a", heardSpeech: false }),
+      listens[0]!.resolve({
+        kind: "utterance",
+        recording: { uri: "file:///a.m4a" },
+        heardSpeech: false,
+      }),
     );
     session.tapOrb();
     await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("paused"));
     expect(turns).toHaveLength(0);
-    expect(audio.discardRecording).toHaveBeenCalledWith("file:///a.m4a");
+    expect(audio.discardRecording).toHaveBeenCalledWith({ uri: "file:///a.m4a" });
 
     session.tapOrb();
     await vi.waitFor(() => expect(listens).toHaveLength(2));
@@ -344,5 +357,79 @@ describe("VoiceModeSession", () => {
     await session.stop();
     expect(audio.close).toHaveBeenCalled();
     expect(listens[0]!.cancel).toHaveBeenCalled();
+  });
+
+  describe("with streaming recognition", () => {
+    function streamingHarness() {
+      const base = harness();
+      const streams: Array<{
+        options: StreamingListenOptions;
+        resolve: (result: StreamingListenResult) => void;
+        finish: ReturnType<typeof vi.fn>;
+      }> = [];
+      base.audio.listenStreaming = vi.fn(async (_api, options: StreamingListenOptions) => {
+        let resolve!: (result: StreamingListenResult) => void;
+        const result = new Promise<StreamingListenResult>((r) => {
+          resolve = r;
+        });
+        const entry = {
+          options,
+          resolve,
+          finish: vi.fn(() => resolve({ kind: "utterance", text: "", heardSpeech: false })),
+        };
+        streams.push(entry);
+        return {
+          result,
+          finish: entry.finish,
+          cancel: () => resolve({ kind: "cancelled" }),
+        } satisfies ActiveStreamingListening;
+      });
+      return { ...base, streams };
+    }
+
+    it("answers the moment Flux ends the turn, showing the words as they arrive", async () => {
+      const { session, audio, streams, turns, playbacks } = streamingHarness();
+      session.start();
+      await vi.waitFor(() => expect(streams).toHaveLength(1));
+      expect(session.getSnapshot().phase).toBe("listening");
+
+      streams[0]!.options.onTranscript("show me");
+      expect(session.getSnapshot()).toMatchObject({ phase: "hearing", liveTranscript: "show me" });
+      streams[0]!.resolve({ kind: "utterance", text: "show me the build", heardSpeech: true });
+
+      await vi.waitFor(() => expect(playbacks).toHaveLength(1));
+      expect(turns[0]!.utterance).toBe("show me the build");
+      expect(session.getSnapshot().liveTranscript).toBeNull();
+      expect(audio.listen).not.toHaveBeenCalled();
+      expect(audio.transcribe).not.toHaveBeenCalled();
+      await session.stop();
+    });
+
+    it("falls back to local listening for good when the server has no Deepgram", async () => {
+      const { session, audio, streams, listens, playbacks } = streamingHarness();
+      session.start();
+      await vi.waitFor(() => expect(streams).toHaveLength(1));
+      streams[0]!.resolve({ kind: "unavailable", permanent: true });
+
+      // The same cycle records locally instead.
+      await vi.waitFor(() => expect(listens).toHaveLength(1));
+      listens[0]!.resolve(speech);
+      await vi.waitFor(() => expect(playbacks).toHaveLength(1));
+      playbacks[0]!.finish();
+      await vi.waitFor(() => expect(listens).toHaveLength(2));
+      expect(audio.listenStreaming).toHaveBeenCalledTimes(1);
+      await session.stop();
+    });
+
+    it("pauses when the wave is tapped before anyone spoke", async () => {
+      const { session, streams, turns } = streamingHarness();
+      session.start();
+      await vi.waitFor(() => expect(streams).toHaveLength(1));
+      session.tapOrb();
+      expect(streams[0]!.finish).toHaveBeenCalled();
+      await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("paused"));
+      expect(turns).toHaveLength(0);
+      await session.stop();
+    });
   });
 });

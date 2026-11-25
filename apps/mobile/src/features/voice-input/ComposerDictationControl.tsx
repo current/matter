@@ -18,6 +18,7 @@ import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView, type AppSymbolName } from "../../components/ui/AppSymbol";
 import { useAndroidControlSizing } from "../../components/ui/useAndroidControlSizing";
 import { cn } from "../../lib/cn";
+import { SiriWaveMobile } from "../mattr-voice/SiriWaveMobile";
 import type { VoiceComposerPresentation } from "./voiceInputPresentation";
 import { VOICE_WAVEFORM_SAMPLE_COUNT } from "./voiceInputMetering";
 
@@ -75,14 +76,9 @@ const DRAFT_TOOLBAR_ENTERING = toolbarFlip(90, 0);
 const DRAFT_TOOLBAR_EXITING = toolbarFlip(0, 90);
 const DICTATION_TOOLBAR_ENTERING = toolbarFlip(-90, 0);
 const DICTATION_TOOLBAR_EXITING = toolbarFlip(0, -90);
-const WAVEFORM_BAR_HEIGHT = 32;
-const WAVEFORM_MIN_BAR_HEIGHT = 2;
-const WAVEFORM_BAR_SPACING = 5;
-const WAVEFORM_TIMING = {
-  duration: 100,
-  easing: Easing.out(Easing.quad),
-  reduceMotion: ReduceMotion.System,
-} as const;
+const WAVEFORM_HEIGHT = 32;
+const COMPACT_WAVEFORM_WIDTH = 44;
+const COMPACT_WAVEFORM_HEIGHT = 18;
 
 export function ComposerDictationDraftContent(props: {
   readonly children: ReactNode;
@@ -145,92 +141,53 @@ export function ComposerDictationToolbar(props: {
   );
 }
 
-const WaveformBar = memo(function WaveformBar(props: {
-  readonly audioLevels: SharedValue<ReadonlyArray<number>>;
-  readonly sampleIndex: number;
-  readonly height?: number;
-}) {
-  const { audioLevels, sampleIndex } = props;
-  const height = props.height ?? WAVEFORM_BAR_HEIGHT;
-  const animatedStyle = useAnimatedStyle(() => {
-    const level = audioLevels.value[sampleIndex] ?? 0;
-    return {
-      opacity: withTiming(0.22 + level * 0.78, WAVEFORM_TIMING),
-      transform: [
-        {
-          scaleY: withTiming(
-            (WAVEFORM_MIN_BAR_HEIGHT + level * (height - WAVEFORM_MIN_BAR_HEIGHT)) / height,
-            WAVEFORM_TIMING,
-          ),
-        },
-      ],
-    };
-  });
-
-  return (
-    <Animated.View
-      className="w-0.5 rounded-full bg-foreground"
-      style={[{ height }, animatedStyle]}
-    />
-  );
-});
-
-const COMPACT_WAVEFORM_BAR_COUNT = 8;
-const COMPACT_WAVEFORM_BAR_HEIGHT = 14;
+/** The newest metering sample drives the wave's stretch. */
+function useLatestLevel(audioLevels: SharedValue<ReadonlyArray<number>>) {
+  return useDerivedValue(() => audioLevels.value[VOICE_WAVEFORM_SAMPLE_COUNT - 1] ?? 0);
+}
 
 export const CompactVoiceWaveform = memo(function CompactVoiceWaveform(props: {
   readonly audioLevels: SharedValue<ReadonlyArray<number>>;
 }) {
+  const level = useLatestLevel(props.audioLevels);
   return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      className="flex-row items-center gap-0.5"
-      style={{ height: COMPACT_WAVEFORM_BAR_HEIGHT }}
-    >
-      {Array.from({ length: COMPACT_WAVEFORM_BAR_COUNT }, (_, index) => (
-        <WaveformBar
-          key={index}
-          audioLevels={props.audioLevels}
-          height={COMPACT_WAVEFORM_BAR_HEIGHT}
-          sampleIndex={VOICE_WAVEFORM_SAMPLE_COUNT - COMPACT_WAVEFORM_BAR_COUNT + index}
-        />
-      ))}
-    </View>
+    <SiriWaveMobile
+      compact
+      active
+      level={level}
+      mode="listening"
+      width={COMPACT_WAVEFORM_WIDTH}
+      height={COMPACT_WAVEFORM_HEIGHT}
+    />
   );
 });
 
 const VoiceWaveform = memo(function VoiceWaveform(props: {
   readonly audioLevels: SharedValue<ReadonlyArray<number>>;
+  readonly active: boolean;
 }) {
-  const [barCount, setBarCount] = useState(0);
+  const level = useLatestLevel(props.audioLevels);
+  const [width, setWidth] = useState(0);
   const handleLayout = (event: LayoutChangeEvent) => {
-    setBarCount(
-      Math.max(
-        1,
-        Math.min(
-          VOICE_WAVEFORM_SAMPLE_COUNT,
-          Math.floor(event.nativeEvent.layout.width / WAVEFORM_BAR_SPACING),
-        ),
-      ),
-    );
+    setWidth(Math.round(event.nativeEvent.layout.width));
   };
 
   return (
     <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      className="min-w-0 flex-1 flex-row items-center justify-between overflow-hidden"
-      style={{ height: WAVEFORM_BAR_HEIGHT }}
+      className="min-w-0 flex-1 items-center justify-center overflow-hidden"
+      style={{ height: WAVEFORM_HEIGHT }}
       onLayout={handleLayout}
     >
-      {Array.from({ length: barCount }, (_, index) => (
-        <WaveformBar
-          key={index}
-          audioLevels={props.audioLevels}
-          sampleIndex={VOICE_WAVEFORM_SAMPLE_COUNT - barCount + index}
+      {width > 0 ? (
+        <SiriWaveMobile
+          compact
+          active={props.active}
+          level={level}
+          mode="listening"
+          width={width}
+          height={WAVEFORM_HEIGHT}
         />
-      ))}
+      ) : null}
     </View>
   );
 });
@@ -376,7 +333,7 @@ export function ComposerDictationStatus(props: {
           className="absolute inset-0 min-w-0 flex-row items-center gap-2 px-1"
           style={waveformStyle}
         >
-          <VoiceWaveform audioLevels={props.audioLevels} />
+          <VoiceWaveform audioLevels={props.audioLevels} active={recording} />
           <DictationElapsedTime className="text-foreground-muted" seconds={props.elapsedSeconds} />
         </Animated.View>
         <Animated.View className="absolute inset-0 justify-center px-2" style={labelStyle}>

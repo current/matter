@@ -10,7 +10,13 @@ import {
   type VoiceWorkspaceApprovalSummary,
   type VoiceWorkspaceContext,
 } from "../../../../../antimatter/voice-assistant/types";
-import type { ActiveListening, ActivePlayback, ListenOptions } from "./nativeVoiceAudio";
+import type { ActiveStreamingListening, StreamingListenOptions } from "./fluxListening";
+import type {
+  ActiveListening,
+  ActivePlayback,
+  ListenOptions,
+  VoiceRecording,
+} from "./nativeVoiceAudio";
 import type { SpokenAudio, VoiceAssistantApi } from "./voiceAssistantApi";
 import { BARGE_IN_VAD, LISTENING_VAD, type VoiceActivityConfig } from "./voiceAudioLogic";
 import { historyFromTurns, type VoiceTurnEntry } from "./voiceContextLogic";
@@ -34,6 +40,8 @@ export interface VoiceModeSnapshot {
   readonly turns: ReadonlyArray<VoiceTurnEntry>;
   readonly error: string | null;
   readonly pendingApprovals: ReadonlyArray<VoiceWorkspaceApprovalSummary>;
+  /** Words heard so far in the current turn while streaming recognition runs. */
+  readonly liveTranscript: string | null;
 }
 
 /** What the session needs from the microphone and speaker; faked in tests. */
@@ -41,10 +49,19 @@ export interface VoiceModeAudio {
   open(): Promise<void>;
   close(): Promise<void>;
   listen(options: ListenOptions): Promise<ActiveListening>;
+  /** Streaming recognition for one turn; null (or absent) where it is not supported. */
+  listenStreaming?(
+    api: VoiceAssistantApi,
+    options: StreamingListenOptions,
+  ): Promise<ActiveStreamingListening | null>;
   watchForBargeIn(config: VoiceActivityConfig, onBargeIn: () => void): Promise<() => Promise<void>>;
   play(audio: SpokenAudio): Promise<ActivePlayback>;
-  transcribe(uri: string, api: VoiceAssistantApi, signal?: AbortSignal): Promise<string>;
-  discardRecording(uri: string): void;
+  transcribe(
+    recording: VoiceRecording,
+    api: VoiceAssistantApi,
+    signal?: AbortSignal,
+  ): Promise<string>;
+  discardRecording(recording: VoiceRecording): void;
 }
 
 export interface VoiceModeDeps {
@@ -62,6 +79,8 @@ export interface VoiceModeDeps {
 
 const MAX_CONSECUTIVE_ERRORS = 3;
 const ERROR_RETRY_DELAY_MS = 2_000;
+// Streaming that keeps failing (no ticket, relay without proof, upstream down) stops being tried.
+const MAX_STREAMING_FAILURES = 2;
 
 type CycleOutcome = "continue" | "pause";
 
@@ -89,6 +108,7 @@ export class VoiceModeSession {
     turns: [],
     error: null,
     pendingApprovals: [],
+    liveTranscript: null,
   };
   private readonly listeners = new Set<() => void>();
   private readonly settings: VoiceAssistantSettings;
@@ -98,7 +118,9 @@ export class VoiceModeSession {
   /** Whether the loop may begin another listening cycle. */
   private armed = false;
   private pendingText: string | null = null;
-  private listening: ActiveListening | null = null;
+  private listening: { finish(): void; cancel(): void } | null = null;
+  private streamingFailures = 0;
+  private streamingDisabled = false;
   private manualFinish = false;
   private playback: ActivePlayback | null = null;
   private turnAbort: AbortController | null = null;
@@ -248,21 +270,102 @@ export class VoiceModeSession {
     return "continue";
   }
 
+  /** The words heard so far, or what a typed message or tap turned the cancellation into. */
+  private cancelledListening(): string {
+    const typed = this.pendingText;
+    this.pendingText = null;
+    if (typed !== null) return typed;
+    throw new VoiceCancelled();
+  }
+
+  private onSpeechStart(generation: number) {
+    if (this.current(generation) && this.snapshot.phase === "listening") {
+      this.setPhase("hearing");
+    }
+  }
+
+  /**
+   * Deepgram Flux streaming: the turn ends on meaning rather than a fixed silence and the words
+   * show while the user talks. Undefined hands the cycle to local endpointing.
+   */
+  private async listenStreamed(
+    generation: number,
+    api: VoiceAssistantApi,
+  ): Promise<string | "pause" | null | undefined> {
+    if (!this.deps.audio.listenStreaming) return undefined;
+    this.setPhase("listening");
+    this.manualFinish = false;
+    let listening: ActiveStreamingListening | null;
+    try {
+      listening = await this.deps.audio.listenStreaming(api, {
+        onLevel: (level) => this.deps.setLevel(level),
+        onSpeechStart: () => this.onSpeechStart(generation),
+        onTranscript: (text) => {
+          if (!this.current(generation)) return;
+          this.onSpeechStart(generation);
+          this.update({ liveTranscript: text });
+        },
+      });
+    } catch {
+      if (!this.current(generation)) throw new VoiceCancelled();
+      this.noteStreamingFailure(false);
+      return undefined;
+    }
+    if (listening === null) {
+      this.streamingDisabled = true;
+      return undefined;
+    }
+    if (!this.current(generation)) {
+      listening.cancel();
+      throw new VoiceCancelled();
+    }
+    this.listening = listening;
+    const result = await listening.result;
+    if (this.listening === listening) this.listening = null;
+    if (this.snapshot.liveTranscript !== null) this.update({ liveTranscript: null });
+    if (!this.current(generation)) throw new VoiceCancelled();
+    switch (result.kind) {
+      case "cancelled":
+        return this.cancelledListening();
+      case "unavailable":
+        this.noteStreamingFailure(result.permanent);
+        return undefined;
+      case "no-speech":
+        this.streamingFailures = 0;
+        return null;
+      case "utterance":
+        this.streamingFailures = 0;
+        if (result.text.length > 0) return result.text;
+        return this.manualFinish && !result.heardSpeech ? "pause" : null;
+    }
+  }
+
+  private noteStreamingFailure(permanent: boolean) {
+    this.streamingFailures += 1;
+    if (permanent || this.streamingFailures >= MAX_STREAMING_FAILURES) {
+      this.streamingDisabled = true;
+    }
+  }
+
   /** The user's words, null to listen again, or "pause" when they tapped to stop. */
   private async listenForUtterance(
     generation: number,
     api: VoiceAssistantApi,
   ): Promise<string | "pause" | null> {
+    if (!this.streamingDisabled && this.deps.audio.listenStreaming) {
+      const streamed = await this.listenStreamed(generation, api);
+      if (streamed !== undefined) return streamed;
+    }
     this.setPhase("listening");
     this.manualFinish = false;
     const listening = await this.deps.audio.listen({
-      vad: { ...LISTENING_VAD, silenceMs: this.settings.silenceTimeoutMs },
+      // Mobile tunes its own end-of-speech wait unless the caller passed settings.
+      vad:
+        this.deps.settings === undefined
+          ? LISTENING_VAD
+          : { ...LISTENING_VAD, silenceMs: this.settings.silenceTimeoutMs },
       onLevel: (level) => this.deps.setLevel(level),
-      onSpeechStart: () => {
-        if (this.current(generation) && this.snapshot.phase === "listening") {
-          this.setPhase("hearing");
-        }
-      },
+      onSpeechStart: () => this.onSpeechStart(generation),
     });
     if (!this.current(generation)) {
       listening.cancel();
@@ -272,23 +375,18 @@ export class VoiceModeSession {
     const result = await listening.result;
     if (this.listening === listening) this.listening = null;
     if (!this.current(generation)) throw new VoiceCancelled();
-    if (result.kind === "cancelled") {
-      // Muting, a typed message or a tap on "thinking" cancelled the recording.
-      const typed = this.pendingText;
-      this.pendingText = null;
-      if (typed !== null) return typed;
-      throw new VoiceCancelled();
-    }
+    // Muting, a typed message or a tap on "thinking" cancelled the recording.
+    if (result.kind === "cancelled") return this.cancelledListening();
     if (result.kind === "no-speech") return null;
     if (!result.heardSpeech && this.manualFinish) {
-      this.deps.audio.discardRecording(result.uri);
+      this.deps.audio.discardRecording(result.recording);
       return "pause";
     }
     this.setPhase("transcribing");
     const abort = new AbortController();
     this.turnAbort = abort;
     try {
-      const text = await this.deps.audio.transcribe(result.uri, api, abort.signal);
+      const text = await this.deps.audio.transcribe(result.recording, api, abort.signal);
       if (!this.current(generation) || abort.signal.aborted) throw new VoiceCancelled();
       return text.length === 0 ? null : text;
     } catch (error) {

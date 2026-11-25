@@ -93,9 +93,9 @@ describe("createVoiceActivityDetector", () => {
     ]);
     expect(events.map((entry) => entry.event)).toEqual(["speech-start", "end-of-speech"]);
     const [start, end] = events;
-    // Speech runs through the poll at 1800 ms; the first poll 1150 ms later ends it.
+    // Speech runs through the poll at 1800 ms; the first poll 750 ms later ends it.
     expect(start!.at).toBe(780);
-    expect(end!.at).toBe(3000);
+    expect(end!.at).toBe(2580);
     expect(detector.speaking).toBe(true);
   });
 
@@ -111,8 +111,8 @@ describe("createVoiceActivityDetector", () => {
   });
 
   it("raises its threshold above steady engine noise", () => {
-    // -30 dB hum is louder than the fixed -34 dB onset but never speech on its own.
-    const { events } = drive(LISTENING_VAD, [[-30, 100]]);
+    // -40 dB hum is louder than the fixed -44 dB onset but never speech on its own.
+    const { events } = drive(LISTENING_VAD, [[-40, 100]]);
     expect(events).toEqual([]);
   });
 

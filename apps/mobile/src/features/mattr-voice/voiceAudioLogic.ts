@@ -60,15 +60,17 @@ export interface VoiceActivityConfig {
   readonly floorFall: number;
 }
 
+// Tuned on iPhone and AirPods microphones: normal speech at arm's length meters around -40 dBFS,
+// so a -34 dB onset (or 10 dB over a -42 dB room) never heard it.
 export const LISTENING_VAD: VoiceActivityConfig = {
-  onsetDb: -34,
-  offsetDb: -42,
-  maxNoiseFloorDb: -38,
-  onsetMarginDb: 10,
-  offsetMarginDb: 6,
-  onsetMs: 120,
-  silenceMs: 1150,
-  minSpeechMs: 300,
+  onsetDb: -44,
+  offsetDb: -50,
+  maxNoiseFloorDb: -42,
+  onsetMarginDb: 6,
+  offsetMarginDb: 3.5,
+  onsetMs: 80,
+  silenceMs: 750,
+  minSpeechMs: 220,
   maxUtteranceMs: 90_000,
   noSpeechTimeoutMs: null,
   warmupMs: 0,
@@ -92,6 +94,27 @@ export const BARGE_IN_VAD: VoiceActivityConfig = {
   // Pauses between sentences must not drop the floor, or the next sentence reads as speech.
   floorFall: 0.02,
 };
+
+/**
+ * With Apple's voice processing on, the reply is cancelled from the microphone signal, so the
+ * user can interrupt at close to normal speaking level.
+ */
+export const BARGE_IN_ECHO_CANCELLED_VAD: VoiceActivityConfig = {
+  ...LISTENING_VAD,
+  onsetDb: -36,
+  maxNoiseFloorDb: -30,
+  onsetMarginDb: 8,
+  onsetMs: 160,
+  warmupMs: 300,
+  maxOnsetDb: -14,
+  floorFall: 0.05,
+};
+
+/** dBFS of a 0..1 RMS amplitude, as the recorder's metering reports it. */
+export function rmsToDecibels(rms: number): number {
+  if (!Number.isFinite(rms) || rms <= 0) return -160;
+  return Math.max(-160, 20 * Math.log10(Math.min(1, rms)));
+}
 
 export type VoiceActivityEvent =
   | "none"
