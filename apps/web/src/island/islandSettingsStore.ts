@@ -6,6 +6,7 @@ import {
 } from "../../../../antimatter/island/types";
 import {
   DEFAULT_VOICE_ASSISTANT_SETTINGS,
+  ELEVENLABS_TTS_MODELS,
   type VoiceAssistantSettings,
   type VoiceTtsProvider,
 } from "../../../../antimatter/voice-assistant/types";
@@ -27,12 +28,15 @@ const VALID_VOICE_DEFAULT_MODES = new Set<VoiceAssistantSettings["defaultMode"]>
 
 const VALID_TTS_PROVIDERS = new Set<VoiceTtsProvider>([
   "auto",
+  "elevenlabs",
   "deepgram",
   "openai",
   "macos",
   "browser",
   "off",
 ]);
+
+export const ELEVENLABS_VOICE_ID_PATTERN = /^[A-Za-z0-9]{16,40}$/;
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
@@ -59,6 +63,14 @@ function normalizeVoiceAssistantSettings(
         ? (parsed.ttsProvider as VoiceTtsProvider)
         : base.ttsProvider,
     ttsVoice: typeof parsed.ttsVoice === "string" ? parsed.ttsVoice : base.ttsVoice,
+    elevenlabsModel:
+      ELEVENLABS_TTS_MODELS.find((model) => model === parsed.elevenlabsModel) ??
+      base.elevenlabsModel,
+    elevenlabsVoice:
+      typeof parsed.elevenlabsVoice === "string" &&
+      ELEVENLABS_VOICE_ID_PATTERN.test(parsed.elevenlabsVoice.trim())
+        ? parsed.elevenlabsVoice.trim()
+        : base.elevenlabsVoice,
     ttsSpeed: clampNumber(parsed.ttsSpeed, 0.8, 1.5, base.ttsSpeed),
     handsFreeAutoListen:
       typeof parsed.handsFreeAutoListen === "boolean"

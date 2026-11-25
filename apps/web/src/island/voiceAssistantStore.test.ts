@@ -10,9 +10,12 @@ import type {
   VoiceWorkspaceApprovalSummary,
   VoiceWorkspaceContext,
 } from "../../../../antimatter/voice-assistant/types";
-import { updateIslandSettings } from "./islandSettingsStore";
+import { DEFAULT_VOICE_ASSISTANT_SETTINGS } from "../../../../antimatter/voice-assistant/types";
+import { updateIslandSettings, updateVoiceAssistantSettings } from "./islandSettingsStore";
 import {
   bargeInVoiceAssistant as bargeIn,
+  buildServerTtsPreferences,
+  buildVoiceSpeakOptions,
   clearVoiceAssistantHistory as clearHistory,
   getVoiceAssistantState,
   registerHostBridge,
@@ -21,6 +24,7 @@ import {
   setVoiceAssistantMode as setMode,
   submitQuickBriefing,
   submitVoiceAssistantUtterance as submitUtterance,
+  syncVoiceTtsPreferencesToServer,
   toggleVoiceAssistantHandsFree,
   tryFastPathIntent,
 } from "./voiceAssistantStore";
@@ -434,6 +438,156 @@ describe("voiceAssistantStore", () => {
     bargeIn();
     expect(getVoiceAssistantState().speaking).toBe(false);
     expect(getVoiceAssistantState().phase).toBe("idle");
+  });
+});
+
+describe("ElevenLabs TTS preferences", () => {
+  beforeEach(() => {
+    updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
+    resetVoiceAssistantStoreForTests();
+  });
+
+  afterEach(() => {
+    resetVoiceAssistantStoreForTests();
+  });
+
+  it("builds provider-specific speak options for ElevenLabs, auto, and Deepgram", () => {
+    expect(
+      buildVoiceSpeakOptions({
+        ...DEFAULT_VOICE_ASSISTANT_SETTINGS,
+        ttsProvider: "elevenlabs",
+        ttsVoice: "aura-2-luna-en",
+        elevenlabsVoice: "EXAVITQu4vr4xnSDxMaL",
+        elevenlabsModel: "eleven_flash_v2_5",
+      }),
+    ).toEqual({
+      provider: "elevenlabs",
+      voice: "EXAVITQu4vr4xnSDxMaL",
+      model: "eleven_flash_v2_5",
+      speed: 1.08,
+    });
+    expect(buildVoiceSpeakOptions(DEFAULT_VOICE_ASSISTANT_SETTINGS)).toEqual({
+      provider: "auto",
+      model: "eleven_v4_turbo",
+      speed: 1.08,
+    });
+    expect(
+      buildVoiceSpeakOptions({
+        ...DEFAULT_VOICE_ASSISTANT_SETTINGS,
+        ttsProvider: "deepgram",
+        ttsVoice: "aura-2-luna-en",
+      }),
+    ).toEqual({ provider: "deepgram", voice: "aura-2-luna-en", speed: 1.08 });
+  });
+
+  it("builds server preferences without clobbering the Deepgram voice for other engines", () => {
+    expect(
+      buildServerTtsPreferences({
+        ...DEFAULT_VOICE_ASSISTANT_SETTINGS,
+        ttsProvider: "deepgram",
+        ttsVoice: "aura-2-orion-en",
+      }),
+    ).toEqual({
+      ttsProvider: "deepgram",
+      elevenlabsModel: "eleven_v4_turbo",
+      elevenlabsVoice: "SAz9YHcvj6GT2YYXdXww",
+      deepgramVoice: "aura-2-orion-en",
+    });
+    expect(
+      buildServerTtsPreferences({
+        ...DEFAULT_VOICE_ASSISTANT_SETTINGS,
+        ttsProvider: "openai",
+        ttsVoice: "coral",
+      }),
+    ).not.toHaveProperty("deepgramVoice");
+  });
+
+  it("posts TTS preferences to the server config endpoint and tolerates failures", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      jsonResponse(JSON.parse(String(init?.body))),
+    );
+    const settings = updateVoiceAssistantSettings({
+      ttsProvider: "elevenlabs",
+      elevenlabsVoice: "cgSgspJ2msm6clMCkdW9",
+      elevenlabsModel: "eleven_v4",
+    }).voiceAssistant;
+
+    const saved = await syncVoiceTtsPreferencesToServer(
+      { baseUrl: "http://localhost:3773/", headers: { authorization: "Bearer t" } },
+      settings,
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(saved).toEqual({
+      ttsProvider: "elevenlabs",
+      elevenlabsModel: "eleven_v4",
+      elevenlabsVoice: "cgSgspJ2msm6clMCkdW9",
+    });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe("http://localhost:3773/api/mattr/voice-assistant/config");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer t");
+
+    const failing = vi.fn(async () => jsonResponse({ error: "nope" }, 500));
+    await expect(
+      syncVoiceTtsPreferencesToServer(
+        { baseUrl: "http://localhost:3773" },
+        settings,
+        failing as unknown as typeof fetch,
+      ),
+    ).resolves.toBeNull();
+    const throwing = vi.fn(async () => {
+      throw new TypeError("offline");
+    });
+    await expect(
+      syncVoiceTtsPreferencesToServer(
+        { baseUrl: "http://localhost:3773" },
+        settings,
+        throwing as unknown as typeof fetch,
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it("speaks assistant replies with the selected ElevenLabs voice and model", async () => {
+    const spokenRequests: VoiceSpeakRequest[] = [];
+    updateVoiceAssistantSettings({
+      ttsProvider: "elevenlabs",
+      elevenlabsVoice: "XrExE9yKIg1WjnnlVkGX",
+      elevenlabsModel: "eleven_v3_conversational",
+    });
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: () => undefined,
+      transcribePcm: async () => "",
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: (async () =>
+        jsonResponse({
+          route: "assistant",
+          spokenReply: "All three threads are green.",
+          displayReply: "All green.",
+          expectFollowUp: false,
+          toolResults: [],
+          clientActions: [],
+        } satisfies VoiceAssistantTurnResponse)) as unknown as typeof fetch,
+      createTtsPlayer: () => ({
+        speak: async (req) => {
+          spokenRequests.push(req);
+        },
+        stop: vi.fn(),
+        isSpeaking: () => false,
+      }),
+    });
+
+    setMode("assistant");
+    await submitUtterance("how are my threads doing");
+    expect(spokenRequests).toEqual([
+      {
+        text: "All three threads are green.",
+        provider: "elevenlabs",
+        voice: "XrExE9yKIg1WjnnlVkGX",
+        model: "eleven_v3_conversational",
+        speed: 1.08,
+      },
+    ]);
   });
 });
 

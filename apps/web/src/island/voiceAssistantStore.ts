@@ -16,6 +16,9 @@ import type {
   VoiceBriefingKind,
   VoiceBriefingRequest,
   VoiceBriefingResponse,
+  VoiceServerTtsPreferences,
+  VoiceSpeakRequest,
+  VoiceAssistantSettings,
   VoiceWorkspaceApprovalSummary,
   VoiceWorkspaceContext,
 } from "../../../../antimatter/voice-assistant/types";
@@ -446,6 +449,67 @@ function shouldSpeakReply(
   );
 }
 
+/** Provider-specific speak fields: ElevenLabs uses its own voice id and model. */
+export function buildVoiceSpeakOptions(
+  settings: VoiceAssistantSettings,
+): Omit<VoiceSpeakRequest, "text"> {
+  if (settings.ttsProvider === "elevenlabs") {
+    return {
+      provider: "elevenlabs",
+      voice: settings.elevenlabsVoice,
+      model: settings.elevenlabsModel,
+      speed: settings.ttsSpeed,
+    };
+  }
+  return {
+    provider: settings.ttsProvider,
+    ...(settings.ttsVoice ? { voice: settings.ttsVoice } : {}),
+    ...(settings.ttsProvider === "auto" ? { model: settings.elevenlabsModel } : {}),
+    speed: settings.ttsSpeed,
+  };
+}
+
+/**
+ * Server defaults for clients that send no provider (the iPhone app). The Deepgram voice is
+ * only sent when ttsVoice is a Deepgram voice, so an OpenAI or macOS pick doesn't clear it.
+ */
+export function buildServerTtsPreferences(
+  settings: VoiceAssistantSettings,
+): Partial<VoiceServerTtsPreferences> {
+  const deepgramVoice =
+    settings.ttsProvider === "auto" || settings.ttsProvider === "deepgram"
+      ? settings.ttsVoice.startsWith("aura-2-") || settings.ttsVoice === ""
+        ? { deepgramVoice: settings.ttsVoice }
+        : {}
+      : {};
+  return {
+    ttsProvider: settings.ttsProvider,
+    elevenlabsModel: settings.elevenlabsModel,
+    elevenlabsVoice: settings.elevenlabsVoice,
+    ...deepgramVoice,
+  };
+}
+
+export async function syncVoiceTtsPreferencesToServer(
+  apiConfig: VoiceTtsApiConfig,
+  settings: VoiceAssistantSettings = getIslandSettings().voiceAssistant,
+  fetchImpl: typeof fetch = fetch,
+): Promise<VoiceServerTtsPreferences | null> {
+  try {
+    const base = apiConfig.baseUrl.replace(/\/+$/, "");
+    const response = await fetchImpl(`${base}/api/mattr/voice-assistant/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...apiConfig.headers },
+      credentials: apiConfig.credentials ?? "include",
+      body: JSON.stringify(buildServerTtsPreferences(settings)),
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as VoiceServerTtsPreferences;
+  } catch {
+    return null;
+  }
+}
+
 async function speakText(text: string): Promise<void> {
   const trimmed = text.trim();
   if (!trimmed) return;
@@ -456,12 +520,7 @@ async function speakText(text: string): Promise<void> {
   emit({ phase: "speaking", speaking: true });
   vadCapture?.setSpeakingDuck(true);
   try {
-    await player.speak({
-      text: trimmed,
-      provider: voiceSettings.ttsProvider,
-      ...(voiceSettings.ttsVoice ? { voice: voiceSettings.ttsVoice } : {}),
-      speed: voiceSettings.ttsSpeed,
-    });
+    await player.speak({ text: trimmed, ...buildVoiceSpeakOptions(voiceSettings) });
   } finally {
     vadCapture?.setSpeakingDuck(false);
     if (state.speaking || state.outputLevel !== 0) {

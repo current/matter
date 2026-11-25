@@ -3030,7 +3030,6 @@
   "036a9e92ccc51abe": "Always talk to mattr to manage projects, threads, and tools",
   "6a50ea79630acf7e": "Direct dictation",
   "331a592dcf21c8c4": "Dictate directly into the selected thread",
-  "097e829332e35dd1": "Auto (Deepgram, OpenAI, macOS, Browser)",
   "e0481496c3e81875": "Deepgram Aura-2",
   "bad25bdb6195a3aa": "OpenAI TTS",
   "995ce4b264e964a8": "macOS native voice",
@@ -3079,7 +3078,6 @@
   "79b4088a08073f96": "Default voice routing",
   "26df19ebd2c37532": "Choose whether voice input routes smartly across chats & mattr Assistant, always asks mattr, or dictates directly.",
   "17c6bbb8bb3cdc9a": "Spoken voice (TTS)",
-  "83876307f6022ef0": "Engine used for assistant replies and spoken thread briefings. Auto uses Deepgram Aura-2 if configured, then OpenAI TTS, then macOS voice.",
   "e2c6751f7461bd55": "Spoken voice provider",
   "af4b7734da1d5ce7": "Голос",
   "e4e2019581aa85bd": "Choose the OpenAI voice used for spoken replies.",
@@ -3416,7 +3414,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "на компьютере, который открыл эту страницу"]
+      "c": [
+        " ",
+        "на компьютере, который открыл эту страницу"
+      ]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3428,7 +3429,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "· этот доступ получит любой, кто это запустит"]
+      "c": [
+        " ",
+        "· этот доступ получит любой, кто это запустит"
+      ]
     }
   ],
   "c54cc9c75db9dc58": "Подтверждайте только тот вход, который вы только что начали.",
@@ -13183,5 +13187,47 @@
   "27d76249d09eb69f": "Гид по ревью готов",
   "faa3bb26abb39c93": "Не удалось создать гид по ревью",
   "b7df38b7d8792d78": "Открыть гид",
-  "9e91e9a77b664e4e": "Не удалось запустить гид по ревью"
+  "9e91e9a77b664e4e": "Не удалось запустить гид по ревью",
+  "d2139272ab95c99e": "Auto (ElevenLabs, Deepgram, OpenAI, macOS, Browser)",
+  "232f0e22ed9fed7c": "ElevenLabs",
+  "b276eb3ea2779ced": "Eleven v4 Turbo (fast, recommended)",
+  "ff3fbbdb0d35b311": "Eleven Flash v2.5 (lowest latency)",
+  "de61ceecf325e37b": "Eleven v3 Conversational (expressive)",
+  "5199f62c8a24336e": "Eleven v4 (studio quality)",
+  "09691162a09ad611": "River (relaxed, default)",
+  "158c8947dbcfe0d2": "Sarah (reassuring)",
+  "532c5b72c7a3731a": "Jessica (playful)",
+  "f11bee6725ceb6e8": "Eric (smooth)",
+  "7f0842f973acf3e8": "Roger (laid-back)",
+  "26beabb290e01378": "Will (relaxed optimist)",
+  "9285255eef723577": "Bella (professional)",
+  "cb6947daa9f7264c": "Matilda (knowledgeable)",
+  "a238972107f31bcf": "Charlie (deep, energetic)",
+  "134bc148e45e0a10": "Chris (down-to-earth)",
+  "08b179e96ddcbbf9": "Could not save ElevenLabs API key.",
+  "18a1f86fb6436b27": "ElevenLabs API key saved locally.",
+  "b64a1dcd43a52b05": "ElevenLabs API key removed.",
+  "5ebab0140a67c608": "That does not look like an ElevenLabs voice ID.",
+  "e8e45ae345edbcde": "Engine used for assistant replies and spoken thread briefings, on this device and the mattr iPhone app. Auto uses ElevenLabs if configured, then Deepgram Aura-2, OpenAI TTS, then macOS voice.",
+  "50deb8c3129e6479": "ElevenLabs model",
+  "7a9c23a07cce2faa": "Eleven v4 Turbo balances latency, cost, and natural prosody.",
+  "5bf7fd32e9cfb7ad": "ElevenLabs voice",
+  "efd54661dbe3b2c6": "Pick a conversational voice or paste a voice ID from your library.",
+  "3da21c842b6975a0": "Custom voice ({voiceId})",
+  "78041789785c3555": "Custom voice ID",
+  "b6fa76976d8b434b": "Custom ElevenLabs voice ID",
+  "e3c0952ad52ac819": "ElevenLabs API key",
+  "3dab4e8c6b470adb": "Powers ElevenLabs voices for spoken replies on desktop and mobile. Stored locally with owner-only permissions.",
+  "f35f7c31450b6aae": "Paste ElevenLabs API key",
+  "2bc3819674e31891": "Configured",
+  "dab1607c14cbd7c4": "Not set",
+  "b601c1541f09e5b4": "Use voice",
+  "fff9a71717eec000": "Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for voice output.",
+  "68a50f7dde938d62": "idle",
+  "a8bb33ecf6b4aa2c": "thinking",
+  "3d11a160a55b2fa9": "searching",
+  "5058ecba646c02fb": "error",
+  "234c7a786ed8a202": "needs attention",
+  "f0cdc6e629fe2c45": "offline",
+  "ccf9c30f78333ae2": "{name} ({status})"
 }

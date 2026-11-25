@@ -789,6 +789,248 @@ describe("VoiceTtsService", () => {
   );
 });
 
+const makeTtsTestLayer = (prefix: string) => {
+  const configLayer = ServerConfig.layerTest(process.cwd(), { prefix }).pipe(
+    Layer.provide(NodeServices.layer),
+  );
+  return Layer.mergeAll(
+    configLayer,
+    NodeServices.layer,
+    VoiceTtsService.layer.pipe(
+      Layer.provide(configLayer),
+      Layer.provide(ServerSettings.layerTest({})),
+      Layer.provide(
+        Layer.succeed(SecretResolver.SecretResolver, {
+          read: () => Effect.succeed([]),
+          label: () => Effect.succeed("test"),
+          invalidate: () => Effect.void,
+        } as unknown as SecretResolver.SecretResolver["Service"]),
+      ),
+      Layer.provide(FetchHttpClient.layer),
+      Layer.provide(ProcessRunner.layer),
+      Layer.provide(NodeServices.layer),
+    ),
+  );
+};
+
+const mp3Response = (bytes: Uint8Array) =>
+  new Response(bytes, { status: 200, headers: { "content-type": "audio/mpeg" } });
+
+describe("VoiceTtsService ElevenLabs", () => {
+  it.effect("synthesizes MP3 via ElevenLabs with xi-api-key, River, and Eleven v4 Turbo", () =>
+    Effect.gen(function* () {
+      const mp3Bytes = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
+      const upstream = vi.fn<typeof fetch>(async () => mp3Response(mp3Bytes));
+
+      const [status, audio] = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        const saved = yield* tts.saveCredentials({ elevenlabsApiKey: " xi-test-key " });
+        const spoken = yield* tts
+          .speak({ text: "Hello from **ElevenLabs**.", provider: "elevenlabs" })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+        return [saved, spoken] as const;
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-tts-")));
+
+      assert.strictEqual(status.elevenlabsConfigured, true);
+      assert.notInclude(JSON.stringify(status), "xi-test-key");
+      assert.strictEqual(audio.contentType, "audio/mpeg");
+      assert.deepStrictEqual(audio.bytes, mp3Bytes);
+      assert.strictEqual(upstream.mock.calls.length, 1);
+      const [url, init] = upstream.mock.calls[0]!;
+      assert.strictEqual(
+        String(url),
+        "https://api.elevenlabs.io/v1/text-to-speech/SAz9YHcvj6GT2YYXdXww?output_format=mp3_44100_128",
+      );
+      assert.strictEqual(new Headers(init?.headers).get("xi-api-key"), "xi-test-key");
+      assert.deepStrictEqual(JSON.parse(String(init?.body)), {
+        text: "Hello from ElevenLabs.",
+        model_id: "eleven_v4_turbo",
+        voice_settings: { stability: 0.45, similarity_boost: 0.78 },
+      });
+    }),
+  );
+
+  it.effect("allowlists ElevenLabs models and accepts custom voice ids", () =>
+    Effect.gen(function* () {
+      const upstream = vi.fn<typeof fetch>(async () => mp3Response(new Uint8Array([1])));
+      yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
+        yield* tts
+          .speak({
+            text: "One.",
+            provider: "elevenlabs",
+            voice: "customVoiceId1234567890",
+            model: "eleven_flash_v2_5",
+          })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+        yield* tts
+          .speak({
+            text: "Two.",
+            provider: "elevenlabs",
+            voice: "../../v1/user",
+            model: "eleven_multilingual_evil",
+          })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-allow-")));
+
+      const [firstUrl, firstInit] = upstream.mock.calls[0]!;
+      assert.include(String(firstUrl), "/text-to-speech/customVoiceId1234567890?");
+      assert.strictEqual(JSON.parse(String(firstInit?.body)).model_id, "eleven_flash_v2_5");
+      const [secondUrl, secondInit] = upstream.mock.calls[1]!;
+      assert.include(String(secondUrl), "/text-to-speech/SAz9YHcvj6GT2YYXdXww?");
+      assert.strictEqual(JSON.parse(String(secondInit?.body)).model_id, "eleven_v4_turbo");
+    }),
+  );
+
+  it.effect("auto prefers ElevenLabs and falls back to Deepgram when ElevenLabs fails", () =>
+    Effect.gen(function* () {
+      const dgBytes = new Uint8Array([0xff, 0xfb]);
+      const upstream = vi.fn<typeof fetch>(async (input) =>
+        String(input).startsWith("https://api.elevenlabs.io/")
+          ? new Response("quota", { status: 401 })
+          : mp3Response(dgBytes),
+      );
+
+      const [info, audio] = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key", deepgramApiKey: "dg-key" });
+        const available = yield* tts.getAvailableTtsInfo;
+        const spoken = yield* tts
+          .speak({ text: "Fallback please." })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+        return [available, spoken] as const;
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-fallback-")));
+
+      assert.strictEqual(info.elevenlabsAvailable, true);
+      assert.strictEqual(info.deepgramAvailable, true);
+      assert.strictEqual(info.defaultProvider, "elevenlabs");
+      assert.include(info.elevenlabsModels, "eleven_v4_turbo");
+      assert.include(info.elevenlabsVoices, "SAz9YHcvj6GT2YYXdXww");
+      assert.deepStrictEqual(audio.bytes, dgBytes);
+      assert.deepStrictEqual(
+        upstream.mock.calls.map(([url]) => new URL(String(url)).host),
+        ["api.elevenlabs.io", "api.deepgram.com"],
+      );
+    }),
+  );
+
+  it.effect("uses saved server preferences when a client sends no provider", () =>
+    Effect.gen(function* () {
+      const upstream = vi.fn<typeof fetch>(async () => mp3Response(new Uint8Array([1])));
+
+      const [saved, info] = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key", deepgramApiKey: "dg-key" });
+        const prefs = yield* tts.saveTtsPreferences({
+          ttsProvider: "deepgram",
+          deepgramVoice: "aura-2-luna-en",
+          elevenlabsModel: "not-a-model",
+        });
+        yield* tts
+          .speak({ text: "Deepgram from the phone." })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+
+        yield* tts.saveTtsPreferences({
+          ttsProvider: "elevenlabs",
+          elevenlabsVoice: "EXAVITQu4vr4xnSDxMaL",
+          elevenlabsModel: "eleven_v3_conversational",
+        });
+        yield* tts
+          .speak({ text: "ElevenLabs from the phone." })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+        return [prefs, yield* tts.getAvailableTtsInfo] as const;
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-prefs-")));
+
+      assert.deepStrictEqual(saved, {
+        ttsProvider: "deepgram",
+        elevenlabsModel: "eleven_v4_turbo",
+        elevenlabsVoice: "SAz9YHcvj6GT2YYXdXww",
+        deepgramVoice: "aura-2-luna-en",
+      });
+      assert.deepStrictEqual(info.preferences, {
+        ttsProvider: "elevenlabs",
+        elevenlabsModel: "eleven_v3_conversational",
+        elevenlabsVoice: "EXAVITQu4vr4xnSDxMaL",
+        deepgramVoice: "aura-2-luna-en",
+      });
+      assert.strictEqual(info.defaultProvider, "elevenlabs");
+      const [dgUrl] = upstream.mock.calls[0]!;
+      assert.strictEqual(
+        String(dgUrl),
+        "https://api.deepgram.com/v1/speak?model=aura-2-luna-en&encoding=mp3",
+      );
+      const [elUrl, elInit] = upstream.mock.calls[1]!;
+      assert.include(String(elUrl), "/text-to-speech/EXAVITQu4vr4xnSDxMaL?");
+      assert.strictEqual(JSON.parse(String(elInit?.body)).model_id, "eleven_v3_conversational");
+    }),
+  );
+
+  it.effect("server browser preference disables server TTS for auto requests", () =>
+    Effect.gen(function* () {
+      const upstream = vi.fn<typeof fetch>(async () => mp3Response(new Uint8Array([1])));
+      const error = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
+        yield* tts.saveTtsPreferences({ ttsProvider: "browser" });
+        return yield* tts
+          .speak({ text: "Hello." })
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream), Effect.flip);
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-browser-")));
+
+      assert.strictEqual(error._tag, "VoiceTtsUnavailableError");
+      assert.strictEqual(upstream.mock.calls.length, 0);
+    }),
+  );
+
+  it.effect("merges ElevenLabs and Deepgram keys in one owner-only secrets file", () =>
+    Effect.gen(function* () {
+      yield* Effect.gen(function* () {
+        const config = yield* ServerConfig.ServerConfig;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        const secretsPath = path.join(config.stateDir, "mattr-voice-secrets.json");
+
+        yield* tts.saveDeepgramApiKey("dg-key");
+        const status = yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
+        assert.strictEqual(status.deepgramConfigured, true);
+        assert.strictEqual(status.deepgramAvailable, true);
+        assert.strictEqual(status.elevenlabsConfigured, true);
+        assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
+          deepgramApiKey: "dg-key",
+          elevenlabsApiKey: "xi-key",
+        });
+        assert.strictEqual((yield* fs.stat(secretsPath)).mode & 0o777, 0o600);
+
+        yield* tts.saveCredentials({ elevenlabsApiKey: "" });
+        assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
+          deepgramApiKey: "dg-key",
+        });
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-secrets-")));
+    }),
+  );
+
+  it.effect("keeps speech-to-text on Deepgram even when only ElevenLabs is configured", () =>
+    Effect.gen(function* () {
+      const upstream = vi.fn<typeof fetch>(async () => Response.json({}));
+      const error = yield* Effect.gen(function* () {
+        const tts = yield* VoiceTtsService.VoiceTtsService;
+        yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
+        return yield* tts
+          .transcribeDeepgram(new Uint8Array([0x52, 0x49, 0x46, 0x46]), "en")
+          .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream), Effect.flip);
+      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-stt-")));
+
+      const envKey = process.env.DEEPGRAM_API_KEY?.trim();
+      if (!envKey) {
+        assert.strictEqual(error._tag, "VoiceTtsUnavailableError");
+      }
+      assert.isFalse(upstream.mock.calls.some(([url]) => String(url).includes("elevenlabs")));
+    }),
+  );
+});
+
 describe("voiceAssistantFluxWs", () => {
   it("parses Deepgram Flux Connected, TurnInfo, and Error events", () => {
     assert.deepStrictEqual(

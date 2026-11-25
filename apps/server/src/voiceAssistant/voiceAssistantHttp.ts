@@ -18,6 +18,7 @@ import type {
   VoiceAssistantTurnRequest,
   VoiceBriefingRequest,
   VoiceCredentialsStatus,
+  VoiceServerTtsPreferences,
   VoiceSpeakRequest,
   VoiceTranscribeResponse,
 } from "../../../../antimatter/voice-assistant/types.ts";
@@ -119,20 +120,30 @@ const VoiceBriefingRequestSchema = Schema.Struct({
 const VoiceSpeakRequestSchema = Schema.Struct({
   text: Schema.String,
   provider: Schema.optional(
-    Schema.Literals(["auto", "deepgram", "openai", "macos", "browser", "off"]),
+    Schema.Literals(["auto", "elevenlabs", "deepgram", "openai", "macos", "browser", "off"]),
   ),
   voice: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
   speed: Schema.optional(Schema.Number),
 });
 
 const VoiceCredentialsRequestSchema = Schema.Struct({
-  deepgramApiKey: Schema.String,
+  deepgramApiKey: Schema.optional(Schema.String),
+  elevenlabsApiKey: Schema.optional(Schema.String),
+});
+
+const VoiceConfigRequestSchema = Schema.Struct({
+  ttsProvider: Schema.optional(Schema.String),
+  elevenlabsModel: Schema.optional(Schema.String),
+  elevenlabsVoice: Schema.optional(Schema.String),
+  deepgramVoice: Schema.optional(Schema.String),
 });
 
 const decodeTurnRequest = Schema.decodeUnknownEffect(VoiceTurnRequestSchema);
 const decodeBriefingRequest = Schema.decodeUnknownEffect(VoiceBriefingRequestSchema);
 const decodeSpeakRequest = Schema.decodeUnknownEffect(VoiceSpeakRequestSchema);
 const decodeCredentialsRequest = Schema.decodeUnknownEffect(VoiceCredentialsRequestSchema);
+const decodeConfigRequest = Schema.decodeUnknownEffect(VoiceConfigRequestSchema);
 
 const authenticateOperate = Effect.fnUntraced(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -366,10 +377,53 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
             { status: 400, headers: NO_STORE_HEADERS },
           );
         }
-        const status: VoiceCredentialsStatus = yield* tts.saveDeepgramApiKey(
-          decoded.value.deepgramApiKey,
-        );
+        const status: VoiceCredentialsStatus = yield* tts.saveCredentials(decoded.value);
         return HttpServerResponse.jsonUnsafe(status, { headers: NO_STORE_HEADERS });
+      }).pipe(catchAuthErrors),
+    );
+
+    const credentialsStatusRoute = HttpRouter.add(
+      "GET",
+      "/api/mattr/voice-assistant/credentials",
+      Effect.gen(function* () {
+        yield* authenticateOperate();
+        const status: VoiceCredentialsStatus = yield* tts.getCredentialsStatus;
+        return HttpServerResponse.jsonUnsafe(status, { headers: NO_STORE_HEADERS });
+      }).pipe(catchAuthErrors),
+    );
+
+    const configGetRoute = HttpRouter.add(
+      "GET",
+      "/api/mattr/voice-assistant/config",
+      Effect.gen(function* () {
+        yield* authenticateOperate();
+        const preferences: VoiceServerTtsPreferences = yield* tts.getTtsPreferences;
+        return HttpServerResponse.jsonUnsafe(preferences, { headers: NO_STORE_HEADERS });
+      }).pipe(catchAuthErrors),
+    );
+
+    const configSaveRoute = HttpRouter.add(
+      "POST",
+      "/api/mattr/voice-assistant/config",
+      Effect.gen(function* () {
+        yield* authenticateOperate();
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const raw = yield* request.json.pipe(Effect.option);
+        if (raw._tag === "None") {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_json" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const decoded = yield* decodeConfigRequest(raw.value).pipe(Effect.option);
+        if (decoded._tag === "None") {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_request" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const preferences: VoiceServerTtsPreferences = yield* tts.saveTtsPreferences(decoded.value);
+        return HttpServerResponse.jsonUnsafe(preferences, { headers: NO_STORE_HEADERS });
       }).pipe(catchAuthErrors),
     );
 
@@ -380,6 +434,9 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
       ttsInfoRoute,
       transcribeRoute,
       credentialsRoute,
+      credentialsStatusRoute,
+      configGetRoute,
+      configSaveRoute,
       makeVoiceAssistantFluxRoute(tts),
     );
   }),

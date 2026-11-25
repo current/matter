@@ -1,16 +1,69 @@
 export type VoiceAssistantInteractionMode = "smart" | "assistant" | "dictation" | "voice-mode";
 
-export type VoiceTtsProvider = "auto" | "deepgram" | "openai" | "macos" | "browser" | "off";
+export type VoiceTtsProvider =
+  | "auto"
+  | "elevenlabs"
+  | "deepgram"
+  | "openai"
+  | "macos"
+  | "browser"
+  | "off";
+
+export const ELEVENLABS_TTS_MODELS = [
+  "eleven_v4_turbo",
+  "eleven_flash_v2_5",
+  "eleven_v3_conversational",
+  "eleven_v4",
+] as const;
+
+export type ElevenLabsTtsModel = (typeof ELEVENLABS_TTS_MODELS)[number];
+
+export const DEFAULT_ELEVENLABS_MODEL: ElevenLabsTtsModel = "eleven_v4_turbo";
+
+/** Premade conversational voices verified on the account; River is the default. */
+export const ELEVENLABS_PREMADE_VOICES = [
+  { id: "SAz9YHcvj6GT2YYXdXww", name: "River" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah" },
+  { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica" },
+  { id: "cjVigY5qzO86Huf0OWal", name: "Eric" },
+  { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger" },
+  { id: "bIHbv24MWmeRgasZH58o", name: "Will" },
+  { id: "hpp4J3VqNfWAUOO0d1Us", name: "Bella" },
+  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda" },
+  { id: "IKne3meq5aSn9XLyUdCD", name: "Charlie" },
+  { id: "iP95p4xoKVk53GoZ742B", name: "Chris" },
+] as const;
+
+export const DEFAULT_ELEVENLABS_VOICE = "SAz9YHcvj6GT2YYXdXww";
+
+/** Server-side TTS defaults, used when a client (e.g. the iPhone app) sends no provider. */
+export interface VoiceServerTtsPreferences {
+  readonly ttsProvider: VoiceTtsProvider;
+  readonly elevenlabsModel: ElevenLabsTtsModel;
+  readonly elevenlabsVoice: string;
+  readonly deepgramVoice: string;
+}
+
+export const DEFAULT_VOICE_SERVER_TTS_PREFERENCES: VoiceServerTtsPreferences = {
+  ttsProvider: "auto",
+  elevenlabsModel: DEFAULT_ELEVENLABS_MODEL,
+  elevenlabsVoice: DEFAULT_ELEVENLABS_VOICE,
+  deepgramVoice: "",
+};
 
 export interface VoiceAssistantSettings {
   /** Default mode when opening voice in Island or Voice Mode. */
   readonly defaultMode: "smart" | "assistant" | "dictation";
   /** Speak assistant responses aloud automatically in assistant/voice mode. */
   readonly speakReplies: boolean;
-  /** TTS engine preference. "auto" prefers Deepgram Aura-2 if configured, else OpenAI, else macOS say, else browser speechSynthesis. */
+  /** TTS engine preference. "auto" uses the server default, else ElevenLabs, Deepgram Aura-2, OpenAI, macOS say, then browser speechSynthesis. */
   readonly ttsProvider: VoiceTtsProvider;
   /** Voice name (e.g. "aura-2-thalia-en" for Deepgram; "coral" for OpenAI; "Samantha" for macOS; or empty for default). */
   readonly ttsVoice: string;
+  /** ElevenLabs model id (allowlisted). */
+  readonly elevenlabsModel: ElevenLabsTtsModel;
+  /** ElevenLabs voice id (premade or custom). */
+  readonly elevenlabsVoice: string;
   /** Speech playback rate (0.8 to 1.5). */
   readonly ttsSpeed: number;
   /** Automatically keep listening for follow-ups in Hands-Free Voice Mode. */
@@ -32,6 +85,8 @@ export const DEFAULT_VOICE_ASSISTANT_SETTINGS: VoiceAssistantSettings = {
   speakReplies: true,
   ttsProvider: "auto",
   ttsVoice: "",
+  elevenlabsModel: DEFAULT_ELEVENLABS_MODEL,
+  elevenlabsVoice: DEFAULT_ELEVENLABS_VOICE,
   ttsSpeed: 1.08,
   handsFreeAutoListen: true,
   bargeInEnabled: true,
@@ -185,17 +240,23 @@ export interface VoiceSpeakRequest {
   readonly text: string;
   readonly provider?: VoiceTtsProvider | undefined;
   readonly voice?: string | undefined;
+  /** ElevenLabs model override; ignored by other providers. */
+  readonly model?: string | undefined;
   readonly speed?: number | undefined;
 }
 
 export interface VoiceAvailableTtsInfo {
+  readonly elevenlabsAvailable: boolean;
   readonly deepgramAvailable: boolean;
   readonly openaiAvailable: boolean;
   readonly macosAvailable: boolean;
   readonly defaultProvider: Exclude<VoiceTtsProvider, "auto" | "off">;
+  readonly elevenlabsModels: ReadonlyArray<string>;
+  readonly elevenlabsVoices: ReadonlyArray<string>;
   readonly deepgramVoices: ReadonlyArray<string>;
   readonly openaiVoices: ReadonlyArray<string>;
   readonly macosVoices: ReadonlyArray<string>;
+  readonly preferences: VoiceServerTtsPreferences;
 }
 
 export interface VoiceTranscribeResponse {
@@ -203,6 +264,11 @@ export interface VoiceTranscribeResponse {
   readonly provider: "deepgram";
 }
 
+/** Never carries raw keys, only whether each provider is configured. */
 export interface VoiceCredentialsStatus {
+  /** Kept for older clients; same as deepgramConfigured. */
   readonly deepgramAvailable: boolean;
+  readonly deepgramConfigured: boolean;
+  readonly elevenlabsConfigured: boolean;
+  readonly openaiConfigured: boolean;
 }

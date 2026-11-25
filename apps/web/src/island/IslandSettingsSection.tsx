@@ -19,15 +19,23 @@ import { environmentSummaries } from "../state/presentation";
 import { usePreparedConnection } from "../state/session";
 import { SiriWaveVisual } from "./SiriWave";
 import {
+  ELEVENLABS_VOICE_ID_PATTERN,
   updateIslandSettings,
   updateVoiceAssistantSettings,
   useIslandSettings,
 } from "./islandSettingsStore";
-import { setVoiceAssistantModalOpen } from "./voiceAssistantStore";
+import {
+  buildVoiceSpeakOptions,
+  setVoiceAssistantModalOpen,
+  syncVoiceTtsPreferencesToServer,
+} from "./voiceAssistantStore";
 import type { IslandShortcutMode } from "../../../../antimatter/island/types";
 import type {
+  ElevenLabsTtsModel,
+  VoiceAssistantSettings,
   VoiceAvailableTtsInfo,
   VoiceCredentialsStatus,
+  VoiceSpeakRequest,
   VoiceTtsProvider,
 } from "../../../../antimatter/voice-assistant/types";
 
@@ -84,7 +92,8 @@ const TTS_PROVIDER_OPTIONS: ReadonlyArray<{
   readonly value: VoiceTtsProvider;
   readonly label: string;
 }> = [
-  { value: "auto", label: msg("Auto (Deepgram, OpenAI, macOS, Browser)") },
+  { value: "auto", label: msg("Auto (ElevenLabs, Deepgram, OpenAI, macOS, Browser)") },
+  { value: "elevenlabs", label: msg("ElevenLabs") },
   { value: "deepgram", label: msg("Deepgram Aura-2") },
   { value: "openai", label: msg("OpenAI TTS") },
   { value: "macos", label: msg("macOS native voice") },
@@ -120,7 +129,47 @@ const OPENAI_VOICE_OPTIONS: ReadonlyArray<{
   { value: "shimmer", label: msg("Shimmer (expressive)") },
 ];
 
+const ELEVENLABS_MODEL_OPTIONS: ReadonlyArray<{
+  readonly value: ElevenLabsTtsModel;
+  readonly label: string;
+}> = [
+  { value: "eleven_v4_turbo", label: msg("Eleven v4 Turbo (fast, recommended)") },
+  { value: "eleven_flash_v2_5", label: msg("Eleven Flash v2.5 (lowest latency)") },
+  { value: "eleven_v3_conversational", label: msg("Eleven v3 Conversational (expressive)") },
+  { value: "eleven_v4", label: msg("Eleven v4 (studio quality)") },
+];
+
+const ELEVENLABS_VOICE_OPTIONS: ReadonlyArray<{
+  readonly value: string;
+  readonly label: string;
+}> = [
+  { value: "SAz9YHcvj6GT2YYXdXww", label: msg("River (relaxed, default)") },
+  { value: "EXAVITQu4vr4xnSDxMaL", label: msg("Sarah (reassuring)") },
+  { value: "cgSgspJ2msm6clMCkdW9", label: msg("Jessica (playful)") },
+  { value: "cjVigY5qzO86Huf0OWal", label: msg("Eric (smooth)") },
+  { value: "CwhRBWXzGAHq8TQ4Fs17", label: msg("Roger (laid-back)") },
+  { value: "bIHbv24MWmeRgasZH58o", label: msg("Will (relaxed optimist)") },
+  { value: "hpp4J3VqNfWAUOO0d1Us", label: msg("Bella (professional)") },
+  { value: "XrExE9yKIg1WjnnlVkGX", label: msg("Matilda (knowledgeable)") },
+  { value: "IKne3meq5aSn9XLyUdCD", label: msg("Charlie (deep, energetic)") },
+  { value: "iP95p4xoKVk53GoZ742B", label: msg("Chris (down-to-earth)") },
+];
+
 const DEFAULT_VOICE_SENTINEL = "__default__";
+
+type CredentialProvider = "deepgram" | "elevenlabs";
+
+function CredentialStatusBadge({ configured }: { readonly configured: boolean }) {
+  return configured ? (
+    <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-2xs font-medium text-success">
+      <T>Configured</T>
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">
+      <T>Not set</T>
+    </span>
+  );
+}
 
 interface VoiceApiConfig {
   readonly baseUrl: string;
@@ -149,9 +198,9 @@ function buildVoiceApiConfig(
   return { baseUrl, headers, credentials: "include" };
 }
 
-async function postDeepgramCredentials(
+async function postVoiceCredentials(
   api: VoiceApiConfig,
-  deepgramApiKey: string,
+  body: { readonly deepgramApiKey: string } | { readonly elevenlabsApiKey: string },
 ): Promise<
   | { readonly ok: true; readonly status: VoiceCredentialsStatus }
   | { readonly ok: false; readonly reason: "http" | "network" }
@@ -164,7 +213,7 @@ async function postDeepgramCredentials(
         ...api.headers,
       },
       credentials: api.credentials,
-      body: JSON.stringify({ deepgramApiKey }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       return { ok: false, reason: "http" };
@@ -178,12 +227,7 @@ async function postDeepgramCredentials(
 
 async function fetchAndPlayVoicePreview(
   api: VoiceApiConfig,
-  payload: {
-    readonly text: string;
-    readonly provider: VoiceTtsProvider;
-    readonly voice?: string;
-    readonly speed: number;
-  },
+  payload: VoiceSpeakRequest,
   audioRef: { current: HTMLAudioElement | null },
   urlRef: { current: string | null },
 ): Promise<"ok" | "http_error" | "play_error"> {
@@ -242,8 +286,11 @@ export function IslandSettingsSection() {
 
   const [previewListening, setPreviewListening] = useState(false);
   const [deepgramAvailable, setDeepgramAvailable] = useState(false);
+  const [elevenlabsAvailable, setElevenlabsAvailable] = useState(false);
   const [deepgramKeyInput, setDeepgramKeyInput] = useState("");
-  const [savingKey, setSavingKey] = useState(false);
+  const [elevenlabsKeyInput, setElevenlabsKeyInput] = useState("");
+  const [customVoiceInput, setCustomVoiceInput] = useState("");
+  const [savingKey, setSavingKey] = useState<CredentialProvider | null>(null);
   const [testingVoice, setTestingVoice] = useState(false);
   const [credentialFeedback, setCredentialFeedback] = useState<{
     readonly kind: "ok" | "error";
@@ -252,7 +299,7 @@ export function IslandSettingsSection() {
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const testAudioUrlRef = useRef<string | null>(null);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads Deepgram credential status from the connected server
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads TTS credential status from the connected server
   useEffect(() => {
     let disposed = false;
     const api = buildVoiceApiConfig(prepared);
@@ -266,6 +313,7 @@ export function IslandSettingsSection() {
         const info = (await response.json()) as Partial<VoiceAvailableTtsInfo>;
         if (!disposed) {
           setDeepgramAvailable(info.deepgramAvailable === true);
+          setElevenlabsAvailable(info.elevenlabsAvailable === true);
         }
       })
       .catch(() => undefined);
@@ -288,32 +336,69 @@ export function IslandSettingsSection() {
     };
   }, []);
 
-  const handleSaveDeepgramKey = async (nextKey: string) => {
-    setSavingKey(true);
+  const updateTtsSettings = (patch: Partial<VoiceAssistantSettings>) => {
+    const next = updateVoiceAssistantSettings(patch);
+    void syncVoiceTtsPreferencesToServer(buildVoiceApiConfig(prepared), next.voiceAssistant);
+  };
+
+  const handleSaveKey = async (provider: CredentialProvider, nextKey: string) => {
+    setSavingKey(provider);
     setCredentialFeedback(null);
-    const result = await postDeepgramCredentials(buildVoiceApiConfig(prepared), nextKey);
-    setSavingKey(false);
+    const result = await postVoiceCredentials(
+      buildVoiceApiConfig(prepared),
+      provider === "elevenlabs" ? { elevenlabsApiKey: nextKey } : { deepgramApiKey: nextKey },
+    );
+    setSavingKey(null);
     if (!result.ok) {
       setCredentialFeedback({
         kind: "error",
         text:
-          result.reason === "http"
-            ? gt("Could not save Deepgram API key.")
-            : gt("Could not reach the mattr server."),
+          result.reason === "network"
+            ? gt("Could not reach the mattr server.")
+            : provider === "elevenlabs"
+              ? gt("Could not save ElevenLabs API key.")
+              : gt("Could not save Deepgram API key."),
       });
       return;
     }
     setDeepgramAvailable(result.status.deepgramAvailable);
-    setDeepgramKeyInput("");
+    setElevenlabsAvailable(result.status.elevenlabsConfigured === true);
+    if (provider === "elevenlabs") {
+      setElevenlabsKeyInput("");
+    } else {
+      setDeepgramKeyInput("");
+    }
     window.dispatchEvent(new Event("mattr:voice-credentials-changed"));
+    const stillConfigured =
+      provider === "elevenlabs"
+        ? result.status.elevenlabsConfigured === true
+        : result.status.deepgramAvailable;
     setCredentialFeedback({
       kind: "ok",
       text: nextKey.trim()
-        ? gt("Deepgram API key saved locally.")
-        : result.status.deepgramAvailable
+        ? provider === "elevenlabs"
+          ? gt("ElevenLabs API key saved locally.")
+          : gt("Deepgram API key saved locally.")
+        : stillConfigured
           ? gt("Cleared saved key (using environment variable).")
-          : gt("Deepgram API key removed."),
+          : provider === "elevenlabs"
+            ? gt("ElevenLabs API key removed.")
+            : gt("Deepgram API key removed."),
     });
+  };
+
+  const handleUseCustomVoice = () => {
+    const voiceId = customVoiceInput.trim();
+    if (!ELEVENLABS_VOICE_ID_PATTERN.test(voiceId)) {
+      setCredentialFeedback({
+        kind: "error",
+        text: gt("That does not look like an ElevenLabs voice ID."),
+      });
+      return;
+    }
+    setCredentialFeedback(null);
+    setCustomVoiceInput("");
+    updateTtsSettings({ elevenlabsVoice: voiceId });
   };
 
   const handleTestVoice = async () => {
@@ -323,9 +408,10 @@ export function IslandSettingsSection() {
       buildVoiceApiConfig(prepared),
       {
         text: gt("Hey! Voice Mode is ready whenever you want to talk through your threads."),
-        provider: va.ttsProvider === "off" ? "auto" : va.ttsProvider,
-        ...(va.ttsVoice ? { voice: va.ttsVoice } : {}),
-        speed: va.ttsSpeed,
+        ...buildVoiceSpeakOptions({
+          ...va,
+          ttsProvider: va.ttsProvider === "off" ? "auto" : va.ttsProvider,
+        }),
       },
       testAudioRef,
       testAudioUrlRef,
@@ -362,6 +448,38 @@ export function IslandSettingsSection() {
   const matchedVoiceOption = voiceOptions.find((item) => item.value === va.ttsVoice);
   const selectedVoiceValue = matchedVoiceOption ? matchedVoiceOption.value : DEFAULT_VOICE_SENTINEL;
   const selectedVoiceLabel = matchedVoiceOption ? matchedVoiceOption.label : defaultVoiceLabel;
+
+  const showElevenLabsPickers =
+    va.ttsProvider === "elevenlabs" || (va.ttsProvider === "auto" && elevenlabsAvailable);
+  const activeElevenLabsModel =
+    ELEVENLABS_MODEL_OPTIONS.find((item) => item.value === va.elevenlabsModel) ??
+    ELEVENLABS_MODEL_OPTIONS[0]!;
+  const matchedElevenLabsVoice = ELEVENLABS_VOICE_OPTIONS.find(
+    (item) => item.value === va.elevenlabsVoice,
+  );
+
+  const testVoiceButton = (
+    <Button
+      type="button"
+      size="xs"
+      variant="outline"
+      disabled={testingVoice}
+      onClick={() => void handleTestVoice()}
+    >
+      <Volume2Icon className="size-3.5" />
+      {testingVoice ? <T>Playing...</T> : <T>Test voice</T>}
+    </Button>
+  );
+
+  const credentialFeedbackLine = credentialFeedback ? (
+    <p
+      className={`mt-1.5 text-xs ${
+        credentialFeedback.kind === "error" ? "text-destructive" : "text-muted-foreground"
+      }`}
+    >
+      {credentialFeedback.text}
+    </p>
+  ) : null;
 
   return (
     <>
@@ -537,14 +655,14 @@ export function IslandSettingsSection() {
         <SettingsRow
           title={gt("Spoken voice (TTS)")}
           description={gt(
-            "Engine used for assistant replies and spoken thread briefings. Auto uses Deepgram Aura-2 if configured, then OpenAI TTS, then macOS voice.",
+            "Engine used for assistant replies and spoken thread briefings, on this device and the mattr iPhone app. Auto uses ElevenLabs if configured, then Deepgram Aura-2, OpenAI TTS, then macOS voice.",
           )}
           control={
             <Select
               value={va.ttsProvider}
               onValueChange={(value) => {
                 if (value) {
-                  updateVoiceAssistantSettings({ ttsProvider: value as VoiceTtsProvider });
+                  updateTtsSettings({ ttsProvider: value as VoiceTtsProvider });
                 }
               }}
             >
@@ -560,7 +678,93 @@ export function IslandSettingsSection() {
               </SelectPopup>
             </Select>
           }
-        />
+        >
+          <div className="mt-3 flex items-center gap-2">{testVoiceButton}</div>
+          {credentialFeedbackLine}
+        </SettingsRow>
+
+        {showElevenLabsPickers ? (
+          <>
+            <SettingsRow
+              title={gt("ElevenLabs model")}
+              description={gt("Eleven v4 Turbo balances latency, cost, and natural prosody.")}
+              control={
+                <Select
+                  value={activeElevenLabsModel.value}
+                  onValueChange={(value) => {
+                    const option = ELEVENLABS_MODEL_OPTIONS.find((item) => item.value === value);
+                    if (option) updateTtsSettings({ elevenlabsModel: option.value });
+                  }}
+                >
+                  <SelectTrigger size="sm" aria-label={gt("ElevenLabs model")}>
+                    <SelectValue>{messages(activeElevenLabsModel.label)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup align="end" alignItemWithTrigger={false}>
+                    {ELEVENLABS_MODEL_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {messages(option.label)}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              }
+            />
+            <SettingsRow
+              title={gt("ElevenLabs voice")}
+              description={gt("Pick a conversational voice or paste a voice ID from your library.")}
+              control={
+                <Select
+                  value={va.elevenlabsVoice}
+                  onValueChange={(value) => {
+                    if (value) updateTtsSettings({ elevenlabsVoice: value });
+                  }}
+                >
+                  <SelectTrigger size="sm" aria-label={gt("ElevenLabs voice")}>
+                    <SelectValue>
+                      {matchedElevenLabsVoice
+                        ? messages(matchedElevenLabsVoice.label)
+                        : gt("Custom voice ({voiceId})", { voiceId: va.elevenlabsVoice })}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup align="end" alignItemWithTrigger={false}>
+                    {matchedElevenLabsVoice ? null : (
+                      <SelectItem value={va.elevenlabsVoice}>
+                        {gt("Custom voice ({voiceId})", { voiceId: va.elevenlabsVoice })}
+                      </SelectItem>
+                    )}
+                    {ELEVENLABS_VOICE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {messages(option.label)}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              }
+            >
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Input
+                  size="sm"
+                  className="max-w-xs flex-1"
+                  value={customVoiceInput}
+                  onChange={(event) => setCustomVoiceInput(event.target.value)}
+                  placeholder={gt("Custom voice ID")}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label={gt("Custom ElevenLabs voice ID")}
+                />
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={customVoiceInput.trim().length === 0}
+                  onClick={handleUseCustomVoice}
+                >
+                  <T>Use voice</T>
+                </Button>
+              </div>
+            </SettingsRow>
+          </>
+        ) : null}
 
         {showVoicePicker ? (
           <SettingsRow
@@ -575,9 +779,9 @@ export function IslandSettingsSection() {
                 value={selectedVoiceValue}
                 onValueChange={(value) => {
                   if (value === DEFAULT_VOICE_SENTINEL) {
-                    updateVoiceAssistantSettings({ ttsVoice: "" });
+                    updateTtsSettings({ ttsVoice: "" });
                   } else if (value) {
-                    updateVoiceAssistantSettings({ ttsVoice: value });
+                    updateTtsSettings({ ttsVoice: value });
                   }
                 }}
               >
@@ -602,29 +806,68 @@ export function IslandSettingsSection() {
         <SettingsRow
           title={
             <span className="inline-flex items-center gap-2">
+              <span>{gt("ElevenLabs API key")}</span>
+              <CredentialStatusBadge configured={elevenlabsAvailable} />
+            </span>
+          }
+          description={gt(
+            "Powers ElevenLabs voices for spoken replies on desktop and mobile. Stored locally with owner-only permissions.",
+          )}
+        >
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Input
+              type="password"
+              size="sm"
+              className="max-w-xs flex-1"
+              value={elevenlabsKeyInput}
+              onChange={(event) => setElevenlabsKeyInput(event.target.value)}
+              placeholder={
+                elevenlabsAvailable
+                  ? gt("Enter new key to replace saved key")
+                  : gt("Paste ElevenLabs API key")
+              }
+              autoComplete="off"
+              aria-label={gt("ElevenLabs API key")}
+            />
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              disabled={savingKey !== null || elevenlabsKeyInput.trim().length === 0}
+              onClick={() => void handleSaveKey("elevenlabs", elevenlabsKeyInput)}
+            >
+              {savingKey === "elevenlabs" ? <T>Saving...</T> : <T>Save</T>}
+            </Button>
+            {elevenlabsAvailable ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={savingKey !== null}
+                onClick={() => void handleSaveKey("elevenlabs", "")}
+              >
+                <T>Clear</T>
+              </Button>
+            ) : null}
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            <T>
+              Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for
+              voice output.
+            </T>
+          </p>
+        </SettingsRow>
+
+        <SettingsRow
+          title={
+            <span className="inline-flex items-center gap-2">
               <span>{gt("Deepgram API key")}</span>
-              {deepgramAvailable ? (
-                <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-2xs font-medium text-success">
-                  <T>Connected</T>
-                </span>
-              ) : null}
+              <CredentialStatusBadge configured={deepgramAvailable} />
             </span>
           }
           description={gt(
             "Powers low-latency Deepgram Aura-2 voices and Nova-3 speech recognition on desktop and mobile. Stored locally with owner-only permissions.",
           )}
-          control={
-            <Button
-              type="button"
-              size="xs"
-              variant="outline"
-              disabled={testingVoice}
-              onClick={() => void handleTestVoice()}
-            >
-              <Volume2Icon className="size-3.5" />
-              {testingVoice ? <T>Playing...</T> : <T>Test voice</T>}
-            </Button>
-          }
         >
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Input
@@ -645,32 +888,23 @@ export function IslandSettingsSection() {
               type="button"
               size="xs"
               variant="outline"
-              disabled={savingKey || deepgramKeyInput.trim().length === 0}
-              onClick={() => void handleSaveDeepgramKey(deepgramKeyInput)}
+              disabled={savingKey !== null || deepgramKeyInput.trim().length === 0}
+              onClick={() => void handleSaveKey("deepgram", deepgramKeyInput)}
             >
-              {savingKey ? <T>Saving...</T> : <T>Save</T>}
+              {savingKey === "deepgram" ? <T>Saving...</T> : <T>Save</T>}
             </Button>
             {deepgramAvailable ? (
               <Button
                 type="button"
                 size="xs"
                 variant="ghost"
-                disabled={savingKey}
-                onClick={() => void handleSaveDeepgramKey("")}
+                disabled={savingKey !== null}
+                onClick={() => void handleSaveKey("deepgram", "")}
               >
                 <T>Clear</T>
               </Button>
             ) : null}
           </div>
-          {credentialFeedback ? (
-            <p
-              className={`mt-1.5 text-xs ${
-                credentialFeedback.kind === "error" ? "text-destructive" : "text-muted-foreground"
-              }`}
-            >
-              {credentialFeedback.text}
-            </p>
-          ) : null}
         </SettingsRow>
 
         <SettingsRow

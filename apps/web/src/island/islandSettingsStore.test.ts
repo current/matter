@@ -35,6 +35,23 @@ describe("islandSettingsStore", () => {
     expect(getIslandSettings()).toEqual(next);
   });
 
+  it("accepts ElevenLabs provider, allowlisted models, and voice ids", () => {
+    const next = updateVoiceAssistantSettings({
+      ttsProvider: "elevenlabs",
+      elevenlabsModel: "eleven_flash_v2_5",
+      elevenlabsVoice: " IKne3meq5aSn9XLyUdCD ",
+    });
+    expect(next.voiceAssistant.ttsProvider).toBe("elevenlabs");
+    expect(next.voiceAssistant.elevenlabsModel).toBe("eleven_flash_v2_5");
+    expect(next.voiceAssistant.elevenlabsVoice).toBe("IKne3meq5aSn9XLyUdCD");
+
+    const rejected = normalizeIslandSettings({
+      voiceAssistant: { elevenlabsModel: "eleven_bogus", elevenlabsVoice: "../etc" },
+    });
+    expect(rejected.voiceAssistant.elevenlabsModel).toBe("eleven_v4_turbo");
+    expect(rejected.voiceAssistant.elevenlabsVoice).toBe("SAz9YHcvj6GT2YYXdXww");
+  });
+
   it("merges partial voiceAssistant updates and clamps numeric bounds", () => {
     const next = updateVoiceAssistantSettings({
       defaultMode: "assistant",
