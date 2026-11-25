@@ -42,6 +42,7 @@ import {
   type ThreadNotificationObservation,
 } from "./ThreadNotificationCoordinator.logic";
 import { toastManager } from "./ui/toast";
+import { getIslandSettings } from "../island/islandSettingsStore";
 
 interface NotificationState extends ThreadNotificationObservation {
   readonly raw: OrchestrationV2ThreadShell;
@@ -204,6 +205,9 @@ export function startThreadNotifications(
     }
     if (
       !hasDesktopNotifications(mode) ||
+      (window.desktopBridge?.island &&
+        getIslandSettings().enabled &&
+        getIslandSettings().showNotifications) ||
       (document.visibilityState === "visible" && document.hasFocus()) ||
       typeof Notification === "undefined" ||
       Notification.permission !== "granted"

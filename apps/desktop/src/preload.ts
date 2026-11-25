@@ -51,7 +51,7 @@ if (clientPlatform === "darwin") {
   const syncWindowControlInset = () => {
     document.documentElement.style.setProperty(
       "--desktop-window-controls-inset",
-      `${83 / webFrame.getZoomFactor()}px`,
+      `${89 / webFrame.getZoomFactor()}px`,
     );
   };
   window.addEventListener("DOMContentLoaded", syncWindowControlInset, { once: true });
@@ -568,6 +568,20 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.on(IpcChannels.PREVIEW_FIND_RESULT_CHANNEL, wrappedListener);
       return () =>
         ipcRenderer.removeListener(IpcChannels.PREVIEW_FIND_RESULT_CHANNEL, wrappedListener);
+    },
+  },
+  island: {
+    syncSnapshot: (snapshot) => ipcRenderer.invoke("desktop:island-sync-snapshot", snapshot),
+    updateSettings: (settings) => ipcRenderer.invoke("desktop:island-update-settings", settings),
+    openPanel: (options) => ipcRenderer.invoke("desktop:island-open-panel", options),
+    closePanel: () => ipcRenderer.invoke("desktop:island-close-panel"),
+    onAction: (listener) => {
+      const wrappedListener = (_event: Electron.IpcRendererEvent, action: unknown) => {
+        if (typeof action !== "object" || action === null) return;
+        listener(action);
+      };
+      ipcRenderer.on("desktop:island-action", wrappedListener);
+      return () => ipcRenderer.removeListener("desktop:island-action", wrappedListener);
     },
   },
 } satisfies DesktopBridge);

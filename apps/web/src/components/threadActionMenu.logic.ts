@@ -185,9 +185,9 @@ export function buildThreadActionMenuItems(
             ? {
                 id: "unsettle" as const,
                 label: resolve(msg("Un-settle thread")),
-                icon: "circle-check",
+                icon: "undo",
               }
-            : { id: "settle" as const, label: resolve(msg("Settle thread")), icon: "circle-check" },
+            : { id: "settle" as const, label: resolve(msg("Settle thread")), icon: "archive" },
         ]
       : []),
     ...(state.supports.snooze
@@ -313,7 +313,7 @@ export function buildThreadActionMenuItems(
     {
       id: "archive",
       label: resolve(msg("Archive thread")),
-      icon: "archive",
+      icon: "eye-off",
       disabled: state.isRunning,
       separatorBefore: true,
     },

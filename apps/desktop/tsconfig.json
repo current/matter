@@ -10,6 +10,10 @@
     "vite.config.ts",
     "../../scripts/lib",
     "../../antimatter/rebrand.ts",
-    "../../antimatter/liveUi.ts"
+    "../../antimatter/liveUi.ts",
+    "../../antimatter/island/types.ts",
+    "../../antimatter/island/siriWaveShaders.ts",
+    "../../antimatter/island/MacControlTapMonitor.ts",
+    "../../antimatter/island/islandHtml.ts"
   ]
 }

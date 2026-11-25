@@ -2995,6 +2995,38 @@
   "6c7cf4790065f7ed": "Loslösen konnte nicht rückgängig gemacht werden",
   "43073cef5cd7321c": "Erledigen konnte nicht rückgängig gemacht werden",
   "61b715e068806a25": "Thread „dieser Thread“ löschen?",
+  "af567a4a93361418": "Control tap (⌃)",
+  "70075578a12cafe1": "Tap Control alone from any app",
+  "7dd88048d07847c3": "Option tap (⌥)",
+  "b2524f46bfac2ecc": "Tap Option alone from any app",
+  "ae012e25c9d9af40": "⌘⇧Space",
+  "4651e57cf87f1d8e": "Standard global shortcut",
+  "90a258fff61fd77e": "Aus",
+  "a04a3a3d6bdf0d1b": "Open only from notifications or Settings",
+  "79763f50b604623d": "mattr Island",
+  "577b5b10cb68a805": "Floating Island",
+  "0c21b764d0d2e01c": "Show a pill at the notch when a thread finishes or needs you, and reply by voice from any app.",
+  "2fd737b095ccfe91": "Enable mattr Island",
+  "a7b188d3c08354a5": "Global shortcut",
+  "b80ca485b15ff3ee": "Opens the floating session panel over any app. Tap again while open to dictate.",
+  "2638fbedcbb710ad": "Island global shortcut",
+  "c39f89031a4681c8": "Notch notifications",
+  "48b085637e7b05a3": "Hang a pill from the notch when a thread finishes, asks a question, or needs approval while mattr is in the background.",
+  "01904de83606bf2b": "Enable notch notifications",
+  "6ce4e5dc4a6a80d9": "Show recent messages",
+  "617040a4a0d03903": "Display the thread's latest prompt, tool calls, and reply above the Siri Wave.",
+  "868c32c43cd03a3b": "Show recent messages in Island",
+  "c2fc50c0ac64f34d": "Voice visual",
+  "13fa64a4702c96da": "Lilt Siri Wave (GLSL): animates live with your voice and switches to fluid dots while transcribing.",
+  "26ebf66d1cef18d6": "Idle",
+  "016a9883f68e37f3": "Preview active",
+  "db08c9b128e5f479": "Open Island",
+  "1d160d4ad1e53219": "Allow once",
+  "98392ae1bfb83082": "In dieser Sitzung immer erlauben",
+  "b00bb66bdfe9885d": "File edit",
+  "2fd7d8be3c15e402": "File read",
+  "b625f31721dea699": "MCP tool",
+  "1756175d7ed2cc87": "Tool approval",
   "4fa610c76542a4c0": "Seitenleiste eingeblendet",
   "9dddd0641bbf697d": "Seitenleiste ausgeblendet",
   "5ff49c8addea4bf3": "Zu groß zum Kopieren.",
@@ -3237,10 +3269,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "auf dem Computer, der diese Seite geöffnet hat"
-      ]
+      "c": [" ", "auf dem Computer, der diese Seite geöffnet hat"]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3252,10 +3281,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· wer es ausführt, erhält diesen Zugriff"
-      ]
+      "c": [" ", "· wer es ausführt, erhält diesen Zugriff"]
     }
   ],
   "c54cc9c75db9dc58": "Genehmige nur eine Anmeldung, die du gerade selbst gestartet hast.",
@@ -3555,7 +3581,6 @@
   "1ed68d1bf9db2d7a": "Keine Aufwandsstufen",
   "9fe9687b0d482c7d": "Abbrechen",
   "be5989cafc1c0759": "Ablehnen",
-  "98392ae1bfb83082": "In dieser Sitzung immer erlauben",
   "6a03aa0ca9085274": "Genehmigen",
   "b031a0756856e051": "Weitere Genehmigungsoptionen",
   "cfa5d26f22e0c364": "Mehr",
@@ -8945,7 +8970,6 @@
   "d3866ead082d14e5": "Tastenkürzel hinzufügen",
   "d4345c90894a3220": "keybindings.json öffnen",
   "e56a8d51219efaa0": "Keine Tastenkürzel entsprechen deiner Suche.",
-  "90a258fff61fd77e": "Aus",
   "4060244a7079a0d2": "Wenn ich darum bitte",
   "e88c9d8769544731": "Automatisch",
   "f29d1dade4dde8aa": "Agenten senden kein Feedback an das T3-Team.",
@@ -11912,6 +11936,7 @@
   "a4b39948180f0b96": "neuer thread projekt anbieter reasoning aufwand",
   "a4946fb2bb1e9537": "ausweich agent anbieter nutzung aufgebraucht neue threads",
   "a5965c45cbba81b3": "neuer thread standard laufzeitmodus beaufsichtigt genehmigungen änderungen automatisch annehmen vollzugriff",
+  "50f8568703a9d0cf": "floating notch pill voice siri wave dictation control tap option tap shortcut",
   "9dc52895a2561e0a": "Farbschema",
   "a4db56afef75963c": "darstellung hell dunkel system modus",
   "d7bccc302862b538": "Designs",

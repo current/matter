@@ -43,6 +43,8 @@
     "../../antimatter/icons/plugin.ts",
     "../../antimatter/icons/sfSymbolIcon.ts",
     "../../antimatter/icons/sf-symbol-map.ts",
+    "../../antimatter/island/types.ts",
+    "../../antimatter/island/siriWaveShaders.ts",
     "../../scripts/lib/tagged-source-version.ts",
     "../../scripts/lib/third-party-licenses.ts"
   ]

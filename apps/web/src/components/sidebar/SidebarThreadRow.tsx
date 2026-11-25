@@ -41,8 +41,8 @@ import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
   AlarmClockIcon,
   AlarmClockOffIcon,
+  ArchiveIcon,
   ArrowRightLeftIcon,
-  CheckIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   CircleDashedIcon,
@@ -565,7 +565,7 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
   ),
   settle: (
     <>
-      <CircleCheckIcon aria-hidden className="size-3" />
+      <ArchiveIcon aria-hidden className="size-3" />
       <T>Settle</T>
     </>
   ),
@@ -1513,7 +1513,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           />
                         }
                       >
-                        <CheckIcon className="size-3" />
+                        <ArchiveIcon className="size-3" />
                       </TooltipTrigger>
                       <TooltipPopup side="top">
                         <T>Settle thread</T>
@@ -1717,7 +1717,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                               />
                             }
                           >
-                            <CheckIcon className="size-3.5" />
+                            <ArchiveIcon className="size-3.5" />
                             <T>Settle</T>
                           </TooltipTrigger>
                           <TooltipPopup>

@@ -149,7 +149,7 @@ const DEFAULT_GLASS_OPACITY: GlassOpacity = 80;
 
 export const ShellMaterial = Schema.Literals(["solid", "transparent", "blur", "liquid-glass"]);
 export type ShellMaterial = typeof ShellMaterial.Type;
-export const DEFAULT_SHELL_MATERIAL: ShellMaterial = "solid";
+const DEFAULT_SHELL_MATERIAL: ShellMaterial = "solid";
 
 export const MIN_SHELL_GRAIN = 0;
 export const MAX_SHELL_GRAIN = 100;
@@ -160,7 +160,7 @@ export const ShellGrain = Schema.Int.check(
   }),
 );
 export type ShellGrain = typeof ShellGrain.Type;
-export const DEFAULT_SHELL_GRAIN: ShellGrain = 0;
+const DEFAULT_SHELL_GRAIN: ShellGrain = 0;
 
 export const MIN_APPEARANCE_CONTRAST = 50;
 export const MAX_APPEARANCE_CONTRAST = 200;

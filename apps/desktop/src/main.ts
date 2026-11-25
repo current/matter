@@ -81,6 +81,7 @@ import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
 import * as DesktopWslServerTree from "./wsl/DesktopWslServerTree.ts";
+import * as DesktopIsland from "./island/DesktopIsland.ts";
 
 if (process.argv.includes("--version")) {
   try {
@@ -158,6 +159,7 @@ const layerDesktopFoundation = Layer.mergeAll(
   DesktopObservability.layer,
   DesktopRendererHistory.layer,
   AppleSpeech.layer,
+  DesktopIsland.layer,
 ).pipe(Layer.provideMerge(layerDesktopEnvironment));
 
 const layerDesktopSsh = layerDesktopSshEnvironment.pipe(

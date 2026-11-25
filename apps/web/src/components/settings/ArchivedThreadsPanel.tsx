@@ -4,7 +4,7 @@ import { contextMenuSourceOf } from "../../contextMenuSource";
 import { m as resolveMessage } from "~/i18n/messages";
 import { settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 import { Spinner } from "~/components/ui/spinner";
-import { ArchiveIcon, ArchiveX, Trash2Icon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Trash2Icon } from "lucide-react";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { presentThreadShell } from "@t3tools/client-runtime/state/shell";
 import {
@@ -35,7 +35,7 @@ const ARCHIVE_ACTIONS = [
     label: msg("Unarchive"),
     threadLabel: msg("Unarchive {title}"),
     failureTitle: msg("Failed to unarchive thread"),
-    Icon: ArchiveX,
+    Icon: EyeIcon,
   },
   {
     action: "delete",
@@ -326,7 +326,7 @@ export function ArchivedThreadsPanel() {
                 {isLoadingArchive ? (
                   <Spinner size="sm" tone="muted" />
                 ) : (
-                  <ArchiveIcon className="size-3.5 text-muted-foreground" />
+                  <EyeOffIcon className="size-3.5 text-muted-foreground" />
                 )}
                 {isLoadingArchive
                   ? gt("Loading archived threads")

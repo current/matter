@@ -8,12 +8,12 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
-  ArchiveIcon,
-  FlaskConicalIcon,
   BotIcon,
   createLucideIcon,
   CalendarClockIcon,
+  EyeOffIcon,
   FileDiffIcon,
+  FlaskConicalIcon,
   FolderTreeIcon,
   GitBranchIcon,
   GlobeIcon,
@@ -114,7 +114,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/maintenance": WrenchIcon,
   "/settings/labs": FlaskConicalIcon,
   "/settings/about": InfoIcon,
-  "/settings/archived": ArchiveIcon,
+  "/settings/archived": EyeOffIcon,
 };
 
 // Detail pages without a nav entry highlight the page that links to them.

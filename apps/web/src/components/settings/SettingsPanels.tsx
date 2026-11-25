@@ -2,6 +2,7 @@ import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m as resolveMessage } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
 import { NotificationSettings } from "./NotificationSettings";
+import { IslandSettingsSection } from "../../island/IslandSettingsSection";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { CheckIcon } from "lucide-react";
 import { msg, T, useGT, useMessages } from "gt-react";
@@ -508,6 +509,10 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity
       ? [gt("Glass opacity")]
       : []),
+    ...(settings.shellMaterial !== DEFAULT_UNIFIED_SETTINGS.shellMaterial
+      ? [gt("Shell material")]
+      : []),
+    ...(settings.shellGrain !== DEFAULT_UNIFIED_SETTINGS.shellGrain ? [gt("Shell grain")] : []),
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme
       ? [gt("Diff colors")]
       : []),
@@ -735,6 +740,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       screenReaderWindowTitle: DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle,
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
+      shellMaterial: DEFAULT_UNIFIED_SETTINGS.shellMaterial,
+      shellGrain: DEFAULT_UNIFIED_SETTINGS.shellGrain,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
@@ -877,6 +884,8 @@ export function GeneralSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      <IslandSettingsSection />
 
       <SettingsSection id="sidebar" title={gt("Sidebar")}>
         <SettingsRow

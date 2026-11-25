@@ -1251,6 +1251,14 @@ export interface DesktopBridge {
     prepare: (locale: string) => Promise<DesktopAppleSpeechResult>;
     transcribe: (input: { locale: string; pcm: Uint8Array }) => Promise<DesktopAppleSpeechResult>;
   };
+  /** mattr Island floating notch pill & voice session bridge. */
+  island?: {
+    syncSnapshot: (snapshot: unknown) => Promise<void>;
+    updateSettings: (settings: unknown) => Promise<void>;
+    openPanel: (options?: { readonly startVoice?: boolean }) => Promise<void>;
+    closePanel: () => Promise<void>;
+    onAction: (listener: (action: unknown) => void) => () => void;
+  };
 }
 
 /** Renderer callback invoked by Electron with a fresh user gesture before display-media capture. */

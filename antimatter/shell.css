@@ -247,8 +247,8 @@
   }
 
   [data-sidebar-state="collapsed"] > [data-slot="sidebar-inset"] {
-    /* Clear traffic lights + sidebar toggle + mattr wordmark + history chevrons (~188pt). */
-    --workspace-titlebar-content-left: 196px;
+    /* Clear traffic lights (89pt inset) + sidebar toggle + mattr wordmark + history chevrons (~194pt). */
+    --workspace-titlebar-content-left: 204px;
     margin-inline-start: var(--mattr-shell-gap);
   }
 
