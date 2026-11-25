@@ -77,7 +77,7 @@ export function buildIslandHtml(): string {
     position: absolute;
     top: 0;
     left: 0;
-    width: 188px;
+    width: 200px;
     height: 37px;
     overflow: hidden;
     pointer-events: auto;
@@ -94,7 +94,7 @@ export function buildIslandHtml(): string {
     top: 0;
     left: 50%;
     transform: translateX(-50%);
-    width: 188px;
+    width: 200px;
     min-height: 37px;
     color: var(--island-fg);
   }
@@ -1279,7 +1279,7 @@ export function buildIslandHtml(): string {
 
   const STAGE_HEIGHT = 600;
   const CARD_WIDTH = 472;
-  const NOTCH_PILL_WIDTH = 456;
+  const NOTCH_PILL_WIDTH = 468;
   const CAPSULE_PILL_WIDTH = 320;
   const CAPSULE_FLASH_WIDTH = 228;
   const CAPSULE_RUNNING_WIDTH = 236;
@@ -1289,7 +1289,7 @@ export function buildIslandHtml(): string {
 
   let metrics = {
     hasNotch: true,
-    notchWidth: 188,
+    notchWidth: 200,
     notchHeight: 37,
     windowWidth: 560,
   };
@@ -1400,7 +1400,7 @@ export function buildIslandHtml(): string {
   // Independent velocity-preserving springs: retargeting keeps (pos, vel), so every state
   // change (hover, click, new request, voice) interrupts mid-flight with zero jump.
   const springs = {
-    w: makeSpring(188, 0.05),
+    w: makeSpring(200, 0.05),
     h: makeSpring(37, 0.05),
     earR: makeSpring(6, 0.02),
     botR: makeSpring(11, 0.02),
@@ -1812,11 +1812,11 @@ export function buildIslandHtml(): string {
       return { kind: "pill", pillKind: "voice-mode", assistant };
     }
 
-    // Passive notch status only while mattr is in the background.
-    if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) {
+    if (!snapshot.settings.showNotifications) {
       if (assistantActive) return { kind: "pill", pillKind: "voice-mode", assistant };
       return hoverView();
     }
+    if (assistantActive) return { kind: "pill", pillKind: "voice-mode", assistant };
     if (items.length > 0) return { kind: "pill", pillKind: "attention", items };
     if (done.length > 0) return { kind: "pill", pillKind: "done", done };
     if (agents.length > 0) return { kind: "pill", pillKind: "running", agents };
@@ -3616,7 +3616,7 @@ export function buildIslandHtml(): string {
     if (geomState === "docked") {
       if (!metrics.hasNotch) return false;
       // Strictly confined to the physical camera cutout
-      const halfHitW = Math.min(92, metrics.notchWidth / 2);
+      const halfHitW = Math.min(100, metrics.notchWidth / 2);
       return x >= cx - halfHitW && x <= cx + halfHitW && y >= 0 && y <= metrics.notchHeight;
     }
 
@@ -3753,7 +3753,7 @@ export function buildIslandHtml(): string {
     const changedNotch = next.hasNotch !== metrics.hasNotch;
     metrics = {
       hasNotch: Boolean(next.hasNotch),
-      notchWidth: Number(next.notchWidth) || 188,
+      notchWidth: Number(next.notchWidth) || 200,
       notchHeight: Number(next.notchHeight) || 37,
       windowWidth: Number(next.windowWidth) || 560,
     };

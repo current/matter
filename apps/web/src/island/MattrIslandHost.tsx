@@ -286,7 +286,7 @@ export function MattrIslandHost() {
                 completedRunId !== null &&
                 completedRunId !== prevRunId &&
                 raw.archivedAt === null &&
-                !mainFocusedRef.current
+                !(mainFocusedRef.current && key === routeThreadKeyRef.current)
               ) {
                 setDoneNotifications((existing) => {
                   const filtered = existing.filter((entry) => entry.key !== key);
@@ -396,12 +396,7 @@ export function MattrIslandHost() {
   for (const [key, entry] of shellsByKey) {
     if (entry.status === "approval" || entry.status === "input") {
       watchedDetailKeys.add(key);
-    } else if (
-      entry.status === "running" &&
-      !mainWindowFocused &&
-      watchedRunning < MAX_WATCHED_RUNNING_THREADS
-    ) {
-      // Live activity only shows in the notch while mattr is in the background.
+    } else if (entry.status === "running" && watchedRunning < MAX_WATCHED_RUNNING_THREADS) {
       watchedDetailKeys.add(key);
       watchedRunning += 1;
     }

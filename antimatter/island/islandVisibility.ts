@@ -22,7 +22,7 @@ export function shouldKeepIslandWindowAlive(
   if (snapshot.voice.phase !== "idle") return true;
   if (snapshot.assistant?.handsFreeActive) return true;
   if (snapshot.assistant && ACTIVE_ASSISTANT_PHASES.has(snapshot.assistant.phase)) return true;
-  if (!snapshot.settings.showNotifications || snapshot.mainWindowFocused) return false;
+  if (!snapshot.settings.showNotifications) return false;
   return (
     snapshot.pendingApprovals.length > 0 ||
     snapshot.pendingUserInputs.length > 0 ||

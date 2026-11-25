@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
+import {
+  ISLAND_WINDOW_HEIGHT,
+  ISLAND_WINDOW_WIDTH,
+  NOTCHED_DISPLAY_NOTCH_WIDTH,
+  computeIslandPlacement,
+} from "../../../../antimatter/island/islandPlacement.ts";
 import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
+import { buildIslandWindowOptions } from "./DesktopIsland.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
   type IslandSnapshot,
@@ -80,6 +87,21 @@ describe("mattr Island HTML & Lilt Siri Wave shaders", () => {
     }
   });
 
+  it("keeps live activity pills visible while mattr is focused and flanks the physical camera notch", () => {
+    const html = buildIslandHtml();
+    // Passive pill rendering must NOT suppress when mattr's main window is focused.
+    const resolveMatch = html.match(/function resolveEffectiveView\(\) \{[\s\S]*?\n  \}/);
+    expect(resolveMatch).not.toBeNull();
+    expect(resolveMatch![0]).not.toContain("snapshot.mainWindowFocused");
+
+    // Compact notched pill places status on left/right wings flanking the center notch cutout.
+    expect(html).toContain("grid-template-columns:1fr ${notchW}px 1fr");
+    expect(html).toContain('<div class="pill-wing left">');
+    expect(html).toContain('<div class="notch-cutout"></div>');
+    expect(html).toContain('<div class="pill-wing right">');
+    expect(html).toContain(`notchWidth: ${NOTCHED_DISPLAY_NOTCH_WIDTH}`);
+  });
+
   it("matches Lilt's state-to-stretch curve for Siri Wave", () => {
     expect(siriWaveStretch("idle", 0.9)).toBe(0.45);
     expect(siriWaveStretch("error", 0.9)).toBe(0.45);
@@ -153,6 +175,52 @@ function makeSnapshot(overrides: Partial<IslandSnapshot> = {}): IslandSnapshot {
   };
 }
 
+describe("computeIslandPlacement & buildIslandWindowOptions", () => {
+  it("anchors the window flush to display.bounds.y (never workArea.y) and clears the hardware notch", () => {
+    const macBookPro14 = {
+      bounds: { x: 0, y: 0, width: 1512, height: 982 },
+      workArea: { x: 0, y: 34, width: 1512, height: 881 },
+    };
+    const placement = computeIslandPlacement(macBookPro14, true);
+    expect(placement.bounds).toEqual({
+      x: Math.round((1512 - ISLAND_WINDOW_WIDTH) / 2),
+      y: 0,
+      width: ISLAND_WINDOW_WIDTH,
+      height: ISLAND_WINDOW_HEIGHT,
+    });
+    expect(placement.bounds.y).not.toBe(macBookPro14.workArea.y);
+    expect(placement.metrics.hasNotch).toBe(true);
+    // Must exceed physical 185-192pt MacBook Pro/Air camera notch width so wings never overlap it.
+    expect(placement.metrics.notchWidth).toBeGreaterThanOrEqual(200);
+    expect(placement.metrics.notchHeight).toBe(34);
+  });
+
+  it("anchors external and secondary displays to display.bounds.y without notch ears", () => {
+    const externalDisplay = {
+      bounds: { x: 1512, y: -120, width: 2560, height: 1440 },
+      workArea: { x: 1512, y: -95, width: 2560, height: 1415 },
+    };
+    const placement = computeIslandPlacement(externalDisplay, true);
+    expect(placement.bounds.x).toBe(1512 + Math.round((2560 - ISLAND_WINDOW_WIDTH) / 2));
+    expect(placement.bounds.y).toBe(-120);
+    expect(placement.bounds.y).not.toBe(externalDisplay.workArea.y);
+    expect(placement.metrics.hasNotch).toBe(false);
+  });
+
+  it("configures macOS panel options so AppKit never clamps the window below the menu bar", () => {
+    const bounds = { x: 476, y: 0, width: ISLAND_WINDOW_WIDTH, height: ISLAND_WINDOW_HEIGHT };
+    const macOptions = buildIslandWindowOptions(bounds, "/tmp/island-preload.cjs", true);
+    expect(macOptions.y).toBe(0);
+    expect(macOptions.enableLargerThanScreen).toBe(true);
+    expect(macOptions.type).toBe("panel");
+    expect(macOptions.roundedCorners).toBe(false);
+    expect(macOptions.hiddenInMissionControl).toBe(true);
+    expect(macOptions.frame).toBe(false);
+    expect(macOptions.transparent).toBe(true);
+    expect(macOptions.hasShadow).toBe(false);
+  });
+});
+
 describe("shouldKeepIslandWindowAlive", () => {
   it("stays docked on notched displays and hides when disabled", () => {
     expect(shouldKeepIslandWindowAlive(makeSnapshot(), false, true)).toBe(true);
@@ -165,15 +233,47 @@ describe("shouldKeepIslandWindowAlive", () => {
     ).toBe(false);
   });
 
-  it("keeps the floating capsule up for running agents while mattr is in the background", () => {
+  it("keeps the Island visible for active agents whether mattr is focused or in the background", () => {
     const running = makeSnapshot({ recentThreads: [makeThread("running")] });
     expect(shouldKeepIslandWindowAlive(running, false, false)).toBe(true);
     expect(shouldKeepIslandWindowAlive({ ...running, mainWindowFocused: true }, false, false)).toBe(
-      false,
+      true,
+    );
+    expect(shouldKeepIslandWindowAlive({ ...running, mainWindowFocused: true }, false, true)).toBe(
+      true,
     );
     expect(
       shouldKeepIslandWindowAlive(
+        makeSnapshot({
+          mainWindowFocused: true,
+          doneNotifications: [
+            {
+              key: "env:thread",
+              environmentId: "env",
+              threadId: "thread",
+              threadTitle: "Done thread",
+              completedAt: 1_700_000_000_000,
+            },
+          ],
+        }),
+        false,
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      shouldKeepIslandWindowAlive(
         makeSnapshot({ recentThreads: [makeThread("idle")] }),
+        false,
+        false,
+      ),
+    ).toBe(false);
+    expect(
+      shouldKeepIslandWindowAlive(
+        makeSnapshot({
+          mainWindowFocused: true,
+          recentThreads: [makeThread("running")],
+          settings: { ...DEFAULT_ISLAND_SETTINGS, showNotifications: false },
+        }),
         false,
         false,
       ),

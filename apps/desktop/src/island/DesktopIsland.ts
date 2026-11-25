@@ -7,6 +7,12 @@ import * as Electron from "electron";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { startMacSingleTapModifierMonitor } from "../../../../antimatter/island/MacControlTapMonitor.ts";
 import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
+import {
+  ISLAND_WINDOW_WIDTH,
+  NOTCHED_DISPLAY_NOTCH_WIDTH,
+  computeIslandPlacement,
+  type ComputedIslandPlacement,
+} from "../../../../antimatter/island/islandPlacement.ts";
 import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
@@ -25,10 +31,45 @@ import {
   type IslandWindowCommand,
 } from "../../../../antimatter/island/types.ts";
 
-const ISLAND_WINDOW_WIDTH = 560;
-const ISLAND_WINDOW_HEIGHT = 600;
 const ISLAND_FALLBACK_SHORTCUT = "CommandOrControl+Shift+Space";
 const HIDE_FALLBACK_TIMEOUT_MS = 420;
+
+export function buildIslandWindowOptions(
+  bounds: ComputedIslandPlacement["bounds"],
+  preloadPath: string,
+  isMac: boolean,
+): Electron.BrowserWindowConstructorOptions {
+  return {
+    ...bounds,
+    show: false,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    // Required on macOS so AppKit does not clamp y down to display.workArea.y on showInactive()/show().
+    enableLargerThanScreen: true,
+    backgroundColor: "#00000000",
+    ...(isMac
+      ? {
+          type: "panel" as const,
+          roundedCorners: false,
+          hiddenInMissionControl: true,
+        }
+      : {}),
+    webPreferences: {
+      preload: preloadPath,
+      backgroundThrottling: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  };
+}
 
 export class DesktopIsland extends Context.Service<
   DesktopIsland,
@@ -43,35 +84,11 @@ export class DesktopIsland extends Context.Service<
   }
 >()("@t3tools/desktop/island/DesktopIsland") {}
 
-interface ComputedNotchPlacement {
-  readonly bounds: Electron.Rectangle;
-  readonly metrics: IslandDisplayMetrics;
-}
-
-function computeNotchPlacement(isMac: boolean): ComputedNotchPlacement {
+function computeNotchPlacement(isMac: boolean): ComputedIslandPlacement {
   const display =
     Electron.screen.getDisplayNearestPoint(Electron.screen.getCursorScreenPoint()) ??
     Electron.screen.getPrimaryDisplay();
-  const { x, y, width } = display.bounds;
-  const topInset = Math.max(0, display.workArea.y - display.bounds.y);
-  // Notched MacBooks reserve 32-38pt at the top edge vs 24-25pt for standard macOS menu bars.
-  const hasNotch = isMac && topInset >= 30;
-  const notchHeight = hasNotch ? Math.min(40, Math.max(32, topInset)) : 34;
-  const notchWidth = hasNotch ? 188 : 168;
-  return {
-    bounds: {
-      x: Math.round(x + (width - ISLAND_WINDOW_WIDTH) / 2),
-      y,
-      width: ISLAND_WINDOW_WIDTH,
-      height: ISLAND_WINDOW_HEIGHT,
-    },
-    metrics: {
-      hasNotch,
-      notchWidth,
-      notchHeight,
-      windowWidth: ISLAND_WINDOW_WIDTH,
-    },
-  };
+  return computeIslandPlacement(display, isMac);
 }
 
 export const layer = Layer.effect(
@@ -85,7 +102,7 @@ export const layer = Layer.effect(
     let latestSnapshot: IslandSnapshot | null = null;
     let latestMetrics: IslandDisplayMetrics = {
       hasNotch: isMac,
-      notchWidth: 188,
+      notchWidth: NOTCHED_DISPLAY_NOTCH_WIDTH,
       notchHeight: 37,
       windowWidth: ISLAND_WINDOW_WIDTH,
     };
@@ -182,6 +199,8 @@ export const layer = Layer.effect(
       if (screenListenerAttached) return;
       screenListenerAttached = true;
       Electron.screen.on("display-metrics-changed", repositionIsland);
+      Electron.screen.on("display-added", repositionIsland);
+      Electron.screen.on("display-removed", repositionIsland);
     };
 
     const ensureIslandWindow = (): Electron.BrowserWindow => {
@@ -192,36 +211,20 @@ export const layer = Layer.effect(
       const preloadPath = environment.path.join(environment.dirname, "island-preload.cjs");
       const placement = computeNotchPlacement(isMac);
       latestMetrics = placement.metrics;
-      const win = new Electron.BrowserWindow({
-        ...placement.bounds,
-        show: false,
-        frame: false,
-        transparent: true,
-        hasShadow: false,
-        resizable: false,
-        movable: false,
-        minimizable: false,
-        maximizable: false,
-        fullscreenable: false,
-        skipTaskbar: true,
-        backgroundColor: "#00000000",
-        ...(isMac ? { type: "panel" as const } : {}),
-        webPreferences: {
-          preload: preloadPath,
-          backgroundThrottling: false,
-          contextIsolation: true,
-          nodeIntegration: false,
-          sandbox: true,
-        },
-      });
+      const win = new Electron.BrowserWindow(
+        buildIslandWindowOptions(placement.bounds, preloadPath, isMac),
+      );
 
-      win.setAlwaysOnTop(true, isMac ? "screen-saver" : "floating");
       if (isMac) {
+        win.setAlwaysOnTop(true, "screen-saver", 1);
         win.setVisibleOnAllWorkspaces(true, {
           visibleOnFullScreen: true,
           skipTransformProcessType: true,
         });
+      } else {
+        win.setAlwaysOnTop(true, "floating");
       }
+      win.setBounds(placement.bounds, false);
       win.setIgnoreMouseEvents(true, { forward: true });
 
       islandReady = false;
@@ -276,6 +279,8 @@ export const layer = Layer.effect(
           } else {
             win.showInactive();
           }
+          // Re-apply bounds after show so macOS never clamps y down to workArea.y.
+          repositionIsland();
         }
       } else {
         scheduleDeferredHide();
@@ -291,6 +296,7 @@ export const layer = Layer.effect(
       win.setIgnoreMouseEvents(false);
       win.show();
       win.focus();
+      repositionIsland();
       const dispatch = () => sendCommandToIsland({ type: "toggle-voice-panel", startVoice: true });
       if (islandReady) {
         dispatch();
@@ -397,6 +403,7 @@ export const layer = Layer.effect(
       islandWindow.setIgnoreMouseEvents(false);
       islandWindow.show();
       islandWindow.focus();
+      repositionIsland();
     };
 
     const onAnimationIdle = (event: Electron.IpcMainEvent) => {
@@ -473,6 +480,8 @@ export const layer = Layer.effect(
         Electron.ipcMain.removeListener(ISLAND_ANIMATION_IDLE_CHANNEL, onAnimationIdle);
         if (screenListenerAttached) {
           Electron.screen.removeListener("display-metrics-changed", repositionIsland);
+          Electron.screen.removeListener("display-added", repositionIsland);
+          Electron.screen.removeListener("display-removed", repositionIsland);
         }
         if (islandWindow && !islandWindow.isDestroyed()) {
           islandWindow.destroy();
@@ -523,6 +532,7 @@ export const layer = Layer.effect(
           win.setIgnoreMouseEvents(false);
           win.show();
           win.focus();
+          repositionIsland();
           const dispatch = () =>
             sendCommandToIsland({
               type: "open-voice-panel",
