@@ -33,8 +33,28 @@
     border-color: rgb(255 255 255 / 3%);
   }
 
+  /* The sidebar is part of the frame: one flat color, without the grain that would lift it. */
   [data-slot="sidebar-wrapper"] [data-slot="sidebar-inner"] {
     background-color: var(--mattr-frame);
+    background-image: none;
+  }
+
+  /* The top row is plain frame, like a browser toolbar: no stage artwork behind it, so its
+     controls keep their usual colors instead of the artwork's white. */
+  [data-slot="sidebar-wrapper"] .sidebar-stage-backdrop {
+    display: none;
+  }
+
+  [data-slot="sidebar-wrapper"] .drag-region .text-white,
+  [data-slot="sidebar-wrapper"] :is(.drag-region, [data-sidebar-control]) button.text-white\/90 {
+    --control-icon-color: var(--contrast-muted-foreground);
+    color: var(--foreground);
+  }
+
+  [data-slot="sidebar-wrapper"]
+    :is(.drag-region, [data-sidebar-control])
+    button.text-white\/90:is(:hover, [data-pressed]) {
+    background-color: var(--accent);
   }
 
   /* The top row is window frame, so it drags the window like a titlebar. */
