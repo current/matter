@@ -139,3 +139,13 @@ it("defaults relay and Clerk config from antimatter/build-env.mjs when unset", a
   expect(config.extra?.clerk?.publishableKey).toBe("pk_live_Y2xlcmsudDMuY29kZXMk");
   expect(config.extra?.clerk?.jwtTemplate).toBe("t3-relay");
 });
+
+it("blackholes expo-observe and strips Axiom observability traces", async () => {
+  const config = await loadConfig(undefined, { T3CODE_IOS_PERSONAL_TEAM: "1" });
+  expect(config.extra?.eas?.observe?.endpointUrl).toBe("https://observe.invalid");
+  expect(config.extra?.observability).toEqual({
+    tracesUrl: null,
+    tracesDataset: null,
+    tracesToken: null,
+  });
+});

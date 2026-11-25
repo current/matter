@@ -7,13 +7,19 @@ import { vi } from "vite-plus/test";
 import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
 import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
 
-import { setConnectionTracesEnabled } from "./diagnosticsSetting";
+import { connectionTracesEnabled, setConnectionTracesEnabled } from "./diagnosticsSetting";
 import * as Tracing from "./tracing";
 
 vi.mock("expo-constants", () => ({
   default: {
     expoConfig: {
-      extra: {},
+      extra: {
+        observability: {
+          tracesUrl: "https://api.axiom.test/v1/traces",
+          tracesDataset: "mobile-traces",
+          tracesToken: "public-ingest-token",
+        },
+      },
     },
   },
 }));
@@ -32,37 +38,43 @@ const layerTracingTo = (fetchFn: typeof fetch) =>
     },
   ).pipe(Layer.provide(layerRemoteHttpClient(fetchFn)));
 
-it.effect.each([false, true])("gates relay sends and preserves typed failures (%s)", (enabled) => {
-  setConnectionTracesEnabled(enabled);
-  const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
-  const layerTracing = layerTracingTo(fetchFn);
-  const failure = { durationNanos: 1n };
-  const layerTracedApplication = Layer.effectDiscard(
-    Effect.fail(failure).pipe(
-      Effect.withSpan("mobile.test.failed-span"),
-      withRelayClientTracing,
-      Effect.exit,
-      Effect.flatMap((exit) => {
-        const reason = exit._tag === "Failure" ? exit.cause.reasons[0] : undefined;
-        return reason && Cause.isFailReason(reason)
-          ? Effect.sync(() => {
-              expect(reason.error).toBe(failure);
-            })
-          : Effect.die(new Error("Expected the original typed failure."));
-      }),
-    ),
-  ).pipe(Layer.provide(layerTracing));
-
-  return Layer.build(layerTracedApplication).pipe(
-    Effect.scoped,
-    Effect.andThen(
-      Effect.sync(() => {
-        expect(fetchFn).toHaveBeenCalledTimes(Number(enabled));
-        if (!enabled) return;
-        expect(new TextDecoder().decode(fetchFn.mock.calls[0]?.[1]?.body as Uint8Array)).toContain(
-          "mobile.test.failed-span",
-        );
-      }),
-    ),
-  );
+it("always disables resolveTracingConfig and connectionTracesEnabled in mattr", () => {
+  expect(Tracing.resolveTracingConfig()).toBeNull();
+  expect(connectionTracesEnabled()).toBe(false);
+  setConnectionTracesEnabled(true);
+  expect(connectionTracesEnabled()).toBe(false);
 });
+
+it.effect.each([false, true])(
+  "never exports relay spans and preserves typed failures (%s)",
+  (enabled) => {
+    setConnectionTracesEnabled(enabled);
+    const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
+    const layerTracing = layerTracingTo(fetchFn);
+    const failure = { durationNanos: 1n };
+    const layerTracedApplication = Layer.effectDiscard(
+      Effect.fail(failure).pipe(
+        Effect.withSpan("mobile.test.failed-span"),
+        withRelayClientTracing,
+        Effect.exit,
+        Effect.flatMap((exit) => {
+          const reason = exit._tag === "Failure" ? exit.cause.reasons[0] : undefined;
+          return reason && Cause.isFailReason(reason)
+            ? Effect.sync(() => {
+                expect(reason.error).toBe(failure);
+              })
+            : Effect.die(new Error("Expected the original typed failure."));
+        }),
+      ),
+    ).pipe(Layer.provide(layerTracing));
+
+    return Layer.build(layerTracedApplication).pipe(
+      Effect.scoped,
+      Effect.andThen(
+        Effect.sync(() => {
+          expect(fetchFn).not.toHaveBeenCalled();
+        }),
+      ),
+    );
+  },
+);

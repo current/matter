@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { hasCloudPublicConfig } from "./publicConfig.ts";
+import {
+  hasCloudPublicConfig,
+  relayTelemetryEnabled,
+  resolveRelayTracingConfig,
+  setServerRelayTelemetry,
+} from "./publicConfig.ts";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -74,5 +79,17 @@ describe("hasCloudPublicConfig", () => {
 
       expect(hasCloudPublicConfig()).toBe(true);
     });
+  });
+});
+
+describe("relay tracing", () => {
+  it("always disables relay telemetry and tracing config even when env vars are set", () => {
+    vi.stubEnv("VITE_RELAY_OTLP_TRACES_URL", "https://telemetry.example.test/v1/traces");
+    vi.stubEnv("VITE_RELAY_OTLP_TRACES_DATASET", "relay-test");
+    vi.stubEnv("VITE_RELAY_OTLP_TRACES_TOKEN", "test-token");
+    setServerRelayTelemetry(true);
+
+    expect(relayTelemetryEnabled()).toBe(false);
+    expect(resolveRelayTracingConfig()).toBeNull();
   });
 });

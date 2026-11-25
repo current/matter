@@ -100,13 +100,16 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
         (typeof existingClerk.jwtTemplate === "string" && existingClerk.jwtTemplate.trim()) ||
         BUILD_ENV.T3CODE_CLERK_JWT_TEMPLATE,
     },
+    observability: {
+      tracesUrl: null,
+      tracesDataset: null,
+      tracesToken: null,
+    },
     eas: {
       ...existingEas,
       observe: {
         ...existingObserve,
-        endpointUrl:
-          (typeof existingObserve.endpointUrl === "string" && existingObserve.endpointUrl.trim()) ||
-          new URL("/v1/mobile/observe", relayUrl).toString(),
+        endpointUrl: "https://observe.invalid",
       },
     },
   };

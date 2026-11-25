@@ -17,6 +17,7 @@ Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 - Commit and push finished work to `main` yourself; don't ask Chris first. Run `vp run check:changed` before pushing; land worktree branches as described under Working in parallel. Only the lead pushes; workers never do. Every push that changes more than Markdown builds and publishes a release.
 - Never create a new repo named `current/t3code`: installed builds from before the rename find updates through GitHub's redirect from that name.
 - Never write to `~/.antimatter/userdata`: it is the live app's database, and the chat you are running in lives there.
+- Outbound T3 telemetry is hard-disabled across server, web, desktop, and mobile (PostHog/`ingest.t3.codes` analytics in `AnalyticsService`, Axiom relay client OTLP tracing via `isRelayTracingEnabled` / `publicConfig`, and mobile `expo-observe` crash reporting pointed to `https://observe.invalid` with dispatching off), while T3 Connect relay/Clerk auth, local logs/resource monitoring, and user-configured OTLP export remain intact.
 
 ## Branding
 
