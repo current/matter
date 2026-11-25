@@ -23,6 +23,8 @@ const shell = (title: string, body: string) => `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <title>${escapeHtml(title)}</title>
     <style>${STYLES}</style>
   </head>

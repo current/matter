@@ -26,6 +26,19 @@ describe("antimatter/rebrand", () => {
   it("rebrands product and project file names without breaking ids or GitHub App name", () => {
     expect(rebrandCopy("Open T3 Code and T3 Connect")).toBe("Open mattr and mattr Connect");
     expect(rebrandCopy("Install T3 Code for GitHub")).toBe("Install T3 Code for GitHub");
+    expect(rebrandCopy("Link T3 Chat Pro")).toBe("Link T3 Chat Pro");
+    expect(rebrandCopy("Listing T3 threads and Reading a T3 thread")).toBe(
+      "Listing mattr threads and Reading a mattr thread",
+    );
+    expect(rebrandCopy("Use T3 desktop, T3 server, T3 Server, T3 home, T3 process, T3 tool")).toBe(
+      "Use mattr desktop, mattr server, mattr Server, mattr home, mattr process, mattr tool",
+    );
+    expect(rebrandCopy("https://poke.com/integrations/new?name=T3%20Code&url=x")).toBe(
+      "https://poke.com/integrations/new?name=mattr&url=x",
+    );
+    expect(rebrandCopy("T3 requests zero data retention; T3 could not ask")).toBe(
+      "mattr requests zero data retention; mattr could not ask",
+    );
     expect(rebrandCopy('Read t3.json and label: "t3.json"')).toBe(
       'Read mattr.json and label: "mattr.json"',
     );
@@ -161,6 +174,48 @@ describe("antimatter/rebrand", () => {
           for (const match of transformed.matchAll(jsxT)) {
             const plain = match[1]!.replace(/<[^>]*>/g, " ").replace(/\{[^}]*\}/g, " ");
             if (/\bsettl/i.test(plain)) {
+              remaining.push(`${NodePath.relative(REPO_ROOT, file)}: <T>${plain.trim()}</T>`);
+            }
+          }
+        }
+      }
+    }
+
+    expect(remaining).toEqual([]);
+  });
+
+  it("leaves no un-rebranded user-facing T3 product copy across client and desktop sources", () => {
+    const roots = [
+      NodePath.join(REPO_ROOT, "apps/web/src"),
+      NodePath.join(REPO_ROOT, "apps/desktop/src"),
+      NodePath.join(REPO_ROOT, "packages/client-runtime/src"),
+      NodePath.join(REPO_ROOT, "packages/shared/src"),
+    ];
+    const i18nCall = /\b(?:msg|gt)\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
+    const jsxT = /<T(?:\s[^>]*)?>([\s\S]*?)<\/T>/g;
+    // Third-party/external product names that must stay intact for interop.
+    const stripAllowedExternalNames = (text: string) =>
+      text
+        .replace(/\bT3 Code for GitHub\b/g, "")
+        .replace(/\bT3 Chat\b/g, "")
+        .replace(/\bT3 team\b/g, "");
+    const remaining: string[] = [];
+
+    for (const root of roots) {
+      for (const file of walkSourceFiles(root)) {
+        const raw = NodeFS.readFileSync(file, "utf8");
+        const transformed = rebrandSource(raw, file);
+
+        for (const match of transformed.matchAll(i18nCall)) {
+          const text = stripAllowedExternalNames(match[1]!.slice(1, -1));
+          if (/\bT3\b/.test(text)) {
+            remaining.push(`${NodePath.relative(REPO_ROOT, file)}: ${match[1]!.slice(1, -1)}`);
+          }
+        }
+        if (file.endsWith(".tsx")) {
+          for (const match of transformed.matchAll(jsxT)) {
+            const plain = match[1]!.replace(/<[^>]*>/g, " ").replace(/\{[^}]*\}/g, " ");
+            if (/\bT3\b/.test(stripAllowedExternalNames(plain))) {
               remaining.push(`${NodePath.relative(REPO_ROOT, file)}: <T>${plain.trim()}</T>`);
             }
           }

@@ -5,12 +5,34 @@ import type { Plugin } from "vite-plus";
 // JSX can wrap a name across lines; keeping its newlines keeps line numbers and spacing.
 const keepNewlines = (whitespace: string) => whitespace.replace(/[^\n]/g, "");
 const REPLACEMENTS: ReadonlyArray<
-  readonly [RegExp, (match: string, whitespace: string) => string]
+  readonly [RegExp, (match: string, whitespace: string, noun?: string) => string]
 > = [
   [/\bT3(\s+)Connect\b/g, (_match, whitespace) => `mattr${whitespace}Connect`],
   // No trailing \b so suffixed forms ("T3 Codes") match. The GitHub App keeps its real name.
   [/\bT3(\s+)Code(?! for GitHub)/g, (_match, whitespace) => `mattr${keepNewlines(whitespace)}`],
+  [/\bT3%20Code\b/g, () => "mattr"],
+  [/\bT3(\s+)(threads?\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(desktop\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(home\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(process\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [
+    /\bT3(\s+)(system footprint\b)/g,
+    (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`,
+  ],
+  [/\bT3(\s+)(operations\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(tool\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(project file\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [
+    /\bT3(\s+)(requests zero data retention\b)/g,
+    (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`,
+  ],
+  [/\bT3(\s+)(could not\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
 ];
+
+const SERVER_NAME_REPLACEMENT: readonly [
+  RegExp,
+  (match: string, whitespace: string, noun: string) => string,
+] = [/\bT3(\s+)([Ss]erver\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun}`];
 
 // The project file is mattr.json now. A string that is exactly "t3.json" is a settings-source id
 // shared with the server (except the inheritance label), and the schema URL must stay upstream's.
@@ -194,7 +216,10 @@ const SETTINGS_ARCHIVED_KEY = /"\/settings\/archived"\s*:\s*$/;
 
 const RUNTIME_SERVER_ERROR_HELPER = `
 function __mattrRebrandServerError(text: string): string {
-  let result = text;
+  let result = text
+    .replace(/\\bT3(\\s+)Connect\\b/g, "mattr$1Connect")
+    .replace(/\\bT3\\s+Code(?! for GitHub)/g, "mattr")
+    .replace(/\\bT3(\\s+)(threads?|[Ss]erver|home)\\b/g, "mattr$1$2");
   if (/\\bThread\\b.*\\barchiv/i.test(result)) {
     result = result
       .replace(/\\barchiving\\b/g, "hiding")
@@ -267,17 +292,21 @@ export function rebrandTerminologyInSource(code: string, filePath: string): stri
   return next;
 }
 
-export function rebrandCopy(text: string): string {
-  return rebrandProjectFile(
-    REPLACEMENTS.reduce(
-      (result, [pattern, replacement]) => result.replace(pattern, replacement),
-      text,
-    ),
+export function rebrandCopy(text: string, options?: { readonly skipServerName?: boolean }): string {
+  const replaced = REPLACEMENTS.reduce(
+    (result, [pattern, replacement]) => result.replace(pattern, replacement),
+    text,
   );
+  const withServer = options?.skipServerName
+    ? replaced
+    : replaced.replace(SERVER_NAME_REPLACEMENT[0], SERVER_NAME_REPLACEMENT[1]);
+  return rebrandProjectFile(withServer);
 }
 
 export function rebrandSource(code: string, filePath: string): string {
-  const branded = rebrandCopy(code);
+  // errors/transport.ts matches raw WebSocket error messages from upstream servers.
+  const skipServerName = /\/errors\/transport\.ts$/.test(filePath);
+  const branded = rebrandCopy(code, { skipServerName });
   return /\.(ts|tsx)$/.test(filePath) ? rebrandTerminologyInSource(branded, filePath) : branded;
 }
 
@@ -302,14 +331,20 @@ export function mattrRebrandPlugin(): Plugin {
 }
 
 // The desktop main process also builds data paths and IDs from "T3 Code", so only its
-// translatable dialog copy (msg("…")) is rewritten.
+// translatable dialog copy (msg("…")) and desktop i18n catalogs are rewritten.
 export function mattrDesktopCopyPlugin() {
   return {
     name: "antimatter:rebrand-desktop-copy",
     transform(code: string, id: string) {
-      if (process.env.VITEST || !/\/apps\/desktop\/src\/.*\.ts$/.test(id)) return null;
+      if (process.env.VITEST) return null;
+      const path = id.split("?")[0] ?? id;
+      if (/\/apps\/desktop\/src\/i18n\/translations\/[^/]+\.json$/.test(path)) {
+        const next = rebrandCopy(code);
+        return next === code ? null : { code: next, map: null };
+      }
+      if (!/\/apps\/desktop\/src\/.*\.ts$/.test(path)) return null;
       const next = code.replace(/\bmsg\(\s*"(?:[^"\\]|\\.)*"/g, (match) =>
-        rebrandSource(match, id),
+        rebrandSource(match, path),
       );
       return next === code ? null : { code: next, map: null };
     },
