@@ -1,0 +1,207 @@
+name: Kestrel nightly
+
+# Builds Kestrel (this fork) whenever T3 Code ships a new nightly, or when
+# main changes. Each build merges the newest upstream nightly into main, builds
+# the macOS app, signs it with the fork's self-signed certificate, and publishes
+# a prerelease. The app's update button reads those releases.
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md"]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Build even if nothing changed"
+        type: boolean
+        default: false
+
+concurrency:
+  group: kestrel-nightly
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM: pingdotgg/t3code
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  plan:
+    name: Check for a new upstream nightly
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      upstream_tag: ${{ steps.plan.outputs.upstream_tag }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # Upstream's own workflows need T3's private runners and secrets. Keep
+      # only this one running in the fork.
+      - name: Disable upstream workflows
+        run: |
+          gh workflow list --all --json name,path,state \
+            --jq '.[] | select(.state == "active" and (.path | endswith("kestrel-nightly.yml") | not)) | .path' |
+          while read -r path; do
+            echo "Disabling ${path}"
+            gh workflow disable "$(basename "$path")" || true
+          done
+
+      - id: plan
+        name: Decide whether to build
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          upstream_tag=$(gh release list -R "$UPSTREAM" --limit 30 --json tagName,isDraft \
+            --jq '[.[] | select(.isDraft | not) | .tagName | select(test("-nightly\\.[0-9]{8}\\.[0-9]+$"))][0]')
+          if [[ -z "$upstream_tag" ]]; then
+            echo "No upstream nightly found." >&2
+            exit 1
+          fi
+          main_sha=$(git rev-parse HEAD)
+          marker="kestrel-build: ${upstream_tag} ${main_sha}"
+
+          releases=$(gh release list --limit 100 --json tagName --jq '.[].tagName')
+          last=$(printf '%s\n' "$releases" | head -n1)
+          last_marker=""
+          if [[ -n "$last" ]]; then
+            last_marker=$(gh release view "$last" --json body --jq '.body' | grep -o 'kestrel-build: [^ ]* [0-9a-f]*' || true)
+          fi
+
+          if [[ "$marker" == "$last_marker" && "${FORCE:-false}" != "true" ]]; then
+            echo "Already built ${upstream_tag} with main ${main_sha}."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Kestrel versions extend upstream's run number with two digits, so
+          # 0.1.12-nightly.20261124.5209 becomes ...520901, ...520902 for
+          # rebuilds, and the next upstream nightly (5210 -> 521001) is newer.
+          base=${upstream_tag#v}
+          prefix=${base%.*}
+          run=${base##*.}
+          count=$(printf '%s\n' "$releases" | grep -c "^v${prefix//./\\.}\\.${run}[0-9][0-9]$" || true)
+          version=$(printf '%s.%s%02d' "$prefix" "$run" "$((count + 1))")
+
+          echo "Building ${version} from ${upstream_tag} and main ${main_sha}."
+          {
+            echo "build=true"
+            echo "upstream_tag=${upstream_tag}"
+            echo "version=${version}"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ needs.plan.outputs.version }}
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      UPSTREAM_TAG: ${{ needs.plan.outputs.upstream_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream nightly
+        id: merge
+        run: |
+          set -euo pipefail
+          echo "main_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git config user.name "kestrel-bot"
+          git config user.email "kestrel-bot@users.noreply.github.com"
+          git fetch --no-tags "https://github.com/${UPSTREAM}.git" "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+          if ! git merge --no-edit "${UPSTREAM_TAG}"; then
+            files=$(git diff --name-only --diff-filter=U)
+            git merge --abort
+            title="Kestrel: merge conflict with ${UPSTREAM_TAG}"
+            body=$(printf 'Merging upstream `%s` into `main` conflicts in:\n\n```\n%s\n```\n\nResolve it locally: `git fetch upstream --tags && git merge %s`, then push main. Builds resume on the push.\n' "$UPSTREAM_TAG" "$files" "$UPSTREAM_TAG")
+            if [[ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]]; then
+              gh issue create --title "$title" --body "$body" || true
+            fi
+            echo "::error::Merge conflict with ${UPSTREAM_TAG}: ${files//$'\n'/, }"
+            exit 1
+          fi
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+
+      - name: Import signing certificate
+        env:
+          KESTREL_SIGNING_P12: ${{ secrets.KESTREL_SIGNING_P12 }}
+          KESTREL_SIGNING_P12_PASSWORD: ${{ secrets.KESTREL_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/kestrel.keychain-db"
+          keychain_password=$(openssl rand -hex 16)
+          printf '%s' "$KESTREL_SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/kestrel.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/kestrel.p12" -k "$keychain" -P "$KESTREL_SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          rm "$RUNNER_TEMP/kestrel.p12"
+          identity=$(security find-identity -p codesigning "$keychain" | awk '/Kestrel/ {print $2; exit}')
+          test -n "$identity"
+          echo "KESTREL_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "KESTREL_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Build macOS app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          T3CODE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+          T3CODE_CLERK_JWT_TEMPLATE: ${{ vars.CLERK_JWT_TEMPLATE }}
+          T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ vars.CLERK_CLI_OAUTH_CLIENT_ID }}
+          T3CODE_RELAY_URL: ${{ vars.RELAY_URL }}
+        run: |
+          vp run dist:desktop:artifact \
+            --platform mac --target dmg --arch arm64 \
+            --build-version "$VERSION" --verbose
+
+      - name: Sign with the Kestrel certificate
+        run: node kestrel/sign-mac-release.mjs --release-dir release --identity "$KESTREL_IDENTITY" --keychain "$KESTREL_KEYCHAIN"
+
+      - name: Publish release
+        env:
+          MAIN_SHA: ${{ steps.merge.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          {
+            gh release view "$UPSTREAM_TAG" -R "$UPSTREAM" --json body --jq '.body'
+            echo
+            echo "---"
+            echo "Kestrel build of upstream [${UPSTREAM_TAG}](https://github.com/${UPSTREAM}/releases/tag/${UPSTREAM_TAG}) with main at ${MAIN_SHA:0:12}."
+            echo
+            echo "<!-- kestrel-build: ${UPSTREAM_TAG} ${MAIN_SHA} -->"
+          } > "$RUNNER_TEMP/notes.md"
+          shopt -s nullglob
+          gh release create "v${VERSION}" \
+            --prerelease \
+            --target "$MAIN_SHA" \
+            --title "Kestrel Nightly ${VERSION}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            release/*.zip release/*.dmg release/*.blockmap release/*-mac.yml
+
+      - name: Prune old releases
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[15:][].tagName' |
+          while read -r tag; do
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
+
+      - name: Remove signing keychain
+        if: always()
+        run: security delete-keychain "$KESTREL_KEYCHAIN" 2>/dev/null || true
