@@ -14,7 +14,7 @@ Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 
 - Keep fork changes small and in fork-only files (`antimatter/`) where possible. CI merges the newest upstream nightly at every build, so edits inside busy upstream files become merge conflicts.
 - Don't merge upstream into `main` by hand unless a build opens an "Antimatter: merge conflict" issue.
-- Commit and push finished work to `main` yourself; don't ask Chris first. Run `vp run check:changed` before pushing. Only the lead pushes; workers never do. Every push that changes more than Markdown builds and publishes a release.
+- Commit and push finished work to `main` yourself; don't ask Chris first. Run `vp run check:changed` before pushing; land worktree branches as described under Working in parallel. Only the lead pushes; workers never do. Every push that changes more than Markdown builds and publishes a release.
 - Never create a new repo named `current/t3code`: installed builds from before the rename find updates through GitHub's redirect from that name.
 - Never write to `~/.antimatter/userdata`: it is the live app's database, and the chat you are running in lives there.
 
@@ -70,7 +70,9 @@ When Chris asks for UI changes with options or prototypes, show a side-by-side c
 Our workflow is built for speed: parallelize with subagents whenever it gets the work done faster.
 
 - Every new thread sizes its task before starting. If it splits into two or more independent pieces (different files, or research beside implementation), the thread acts as the orchestrator: it plans, starts the pieces as subagents in parallel (several `Agent` calls in one message), works its own piece meanwhile, then reviews and integrates. Use subagents for broad searches and exploration too, so the lead's context stays small.
-- One task per thread. Independent tasks get their own thread in their own worktree (new thread → worktree; `Setup Worktree` runs `vp i`). Each worktree gets its own dev data and ports, so several dev windows can run at once.
+- One task per thread, one checkout per thread. `mattr.json` sets `defaultThreadEnvMode: "worktree"`, so new threads (composer, `t3_thread_launch`, scheduled tasks) start in their own worktree and branch beside the repo; `Setup Worktree` runs `vp i`, and each worktree gets its own dev data and ports. Threads sharing one checkout see each other's half-done edits: `check:changed` fails on files they didn't touch and commits pick up other work. Don't work in the main checkout (first line of `git worktree list`); it stays clean on `main` for landing and `ship-local`. Choose Local in the composer only for a few-line fix.
+- Found someone else's uncommitted changes in your checkout? Leave them alone: commit only your own paths (`git commit -- <paths>`) and judge `check:changed` by your own files.
+- Landing a worktree branch: commit, `git rebase main` (worktrees share the repo's branches), `vp run check:changed`, then `git -C <main checkout> merge --ff-only <branch>` and `git -C <main checkout> push origin main`. If the fast-forward fails, `main` moved: rebase and retry.
 - Inside one task, the lead plans, splits the work into packages that touch different files, and hands them out, following the account order in Chris's global instructions (Claude main subagents first, then `codex`, `codex-alt`, `claude-alt-2`; never `claude-alt` unless it is under pace). Workers get absolute paths and a separate worktree (`isolation: "worktree"`), and never push.
 - The lead reviews each piece, merges into one branch, does one integrated pass in the dev window, then pushes.
 - UI options parallelize well: one worker per option mockup, the lead assembles the comparison page.
