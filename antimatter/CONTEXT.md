@@ -38,6 +38,14 @@ Two paths, same result:
 
 Installing or quitting the live app interrupts every running chat (history is kept). Run `--install` only when Chris asks for it, after checking no other thread is running, and send your final reply before the quit delay ends.
 
+## Live UI
+
+For web-only changes Chris can skip installs: with the installed mattr open, `node antimatter/live-ui.mjs` (from the checkout being edited) serves its web UI with hot reload, and reloading mattr (Cmd+R) switches the window to it. Running chats are untouched because they live in the app's backend process, not the window. Stopping the script and reloading goes back to the bundled UI.
+
+- How: the script runs Vite on 127.0.0.1:5799 pinned to the installed app's version and writes `~/.antimatter/live-ui.json` while it runs. `antimatter/liveUi.ts`, hooked once into `apps/desktop/src/electron/ElectronProtocol.ts`, checks that file and the server on every page load and proxies `t3code://app` to it, otherwise serves the bundled files.
+- Only renderer code reloads (`apps/web`, `packages/*` UI, `antimatter/` web code). Electron main, preload, Island windows and server changes still need `ship-local --install`, as do UI changes that depend on a newer server than the installed one.
+- Agents don't start it unasked: reloading the live window is Chris's call. Agents test in the dev window below.
+
 ## Testing UI changes
 
 Test in the separate **mattr (Dev)** desktop window, not the browser or the in-app preview panel:

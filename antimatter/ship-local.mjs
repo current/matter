@@ -10,6 +10,8 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
+import { BUILD_ENV } from "./build-env.mjs";
+
 const { values } = NodeUtil.parseArgs({
   options: {
     install: { type: "boolean", default: false },
@@ -27,15 +29,6 @@ const UPSTREAM_URL = "https://github.com/pingdotgg/t3code.git";
 const FORK_URL = "https://github.com/current/mattr.git";
 const NODE = "node@26.13.1";
 const BUNDLE_ID = "com.current.antimatter";
-// Public build config, the same values as the workflow's repository variables.
-const BUILD_ENV = {
-  CSC_IDENTITY_AUTO_DISCOVERY: "false",
-  T3CODE_DESKTOP_UPDATE_REPOSITORY: "current/mattr",
-  T3CODE_CLERK_PUBLISHABLE_KEY: "pk_live_Y2xlcmsudDMuY29kZXMk",
-  T3CODE_CLERK_JWT_TEMPLATE: "t3-relay",
-  T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: "hzxSgY2cH10sDU2r",
-  T3CODE_RELAY_URL: "https://relay.t3.codes",
-};
 
 const started = Date.now();
 const step = (label) => console.log(`\n▸ ${label} (${Math.round((Date.now() - started) / 1000)}s)`);

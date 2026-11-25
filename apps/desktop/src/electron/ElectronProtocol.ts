@@ -12,6 +12,8 @@ import * as Scope from "effect/Scope";
 
 import * as Electron from "electron";
 
+import { resolveMattrLiveUiOrigin } from "../../../../antimatter/liveUi.ts";
+
 export const DESKTOP_HOST = "app";
 const DESKTOP_PRODUCTION_SCHEME = "t3code";
 const DESKTOP_DEVELOPMENT_SCHEME = "t3code-dev";
@@ -258,6 +260,13 @@ export const make = Effect.gen(function* () {
           try: () => {
             Electron.protocol.handle(input.scheme, async (request) => {
               if ("assetDirectory" in input) {
+                // mattr: serve the UI from antimatter/live-ui.mjs while it runs (antimatter/liveUi.ts).
+                const liveUiOrigin = await resolveMattrLiveUiOrigin(request);
+                if (liveUiOrigin !== undefined) {
+                  return runPromise(
+                    proxyRequest(request, liveUiOrigin, contentSecurityPolicy).pipe(Effect.orDie),
+                  );
+                }
                 return withContentSecurityPolicy(
                   await runPromise(serveDesktopAsset(request, input.assetDirectory)),
                   contentSecurityPolicy,
