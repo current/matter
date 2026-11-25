@@ -7,6 +7,7 @@ import {
   type ShellMaterial,
 } from "@t3tools/contracts/settings";
 import { isElectron } from "../../env";
+import { MattrSidebarLayoutSetting } from "../sidebar/mattr/MattrSidebarLayoutSetting";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
@@ -131,6 +132,8 @@ export function MattrShellAppearanceSettings() {
           </div>
         }
       />
+
+      <MattrSidebarLayoutSetting />
     </>
   );
 }

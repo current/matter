@@ -260,6 +260,8 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { BotsSidebarSection } from "./bots/BotsSidebarSection";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
+import { MattrCustomSidebarHost } from "./sidebar/mattr/MattrCustomSidebarHost";
+import { useMattrSidebarLayout } from "./sidebar/mattr/mattrSidebarStore";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { TooltipProvider, TooltipScrollDismissArea } from "./ui/tooltip";
 import {
@@ -928,6 +930,12 @@ function readRouteThreadKey(router: AnyRouter): string | null {
 }
 
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
+  const [mattrLayout] = useMattrSidebarLayout();
+  if (mattrLayout !== "classic") return <MattrCustomSidebarHost layout={mattrLayout} />;
+  return <ClassicSidebar routeReveal={routeReveal} />;
+}
+
+function ClassicSidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
   const gt = useGT();
   const messages = useMessages();
   const {
