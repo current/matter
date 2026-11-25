@@ -147,6 +147,21 @@ export const GlassOpacity = Schema.Int.check(
 export type GlassOpacity = typeof GlassOpacity.Type;
 const DEFAULT_GLASS_OPACITY: GlassOpacity = 80;
 
+export const ShellMaterial = Schema.Literals(["solid", "transparent", "blur", "liquid-glass"]);
+export type ShellMaterial = typeof ShellMaterial.Type;
+export const DEFAULT_SHELL_MATERIAL: ShellMaterial = "solid";
+
+export const MIN_SHELL_GRAIN = 0;
+export const MAX_SHELL_GRAIN = 100;
+export const ShellGrain = Schema.Int.check(
+  Schema.isBetween({
+    minimum: MIN_SHELL_GRAIN,
+    maximum: MAX_SHELL_GRAIN,
+  }),
+);
+export type ShellGrain = typeof ShellGrain.Type;
+export const DEFAULT_SHELL_GRAIN: ShellGrain = 0;
+
 export const MIN_APPEARANCE_CONTRAST = 50;
 export const MAX_APPEARANCE_CONTRAST = 200;
 export const AppearanceContrast = Schema.Int.check(
@@ -495,6 +510,10 @@ export const ClientSettingsSchema = Schema.Struct({
   glassOpacity: GlassOpacity.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_GLASS_OPACITY)),
   ),
+  shellMaterial: ShellMaterial.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_MATERIAL)),
+  ),
+  shellGrain: ShellGrain.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_GRAIN))),
   fontSizeInterface: InterfaceFontSize.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_INTERFACE_FONT_SIZE)),
   ),
@@ -2136,6 +2155,8 @@ export const ClientSettingsPatch = Schema.Struct({
   diffLayout: Schema.optionalKey(DiffLayout),
   environmentIdentificationMode: Schema.optionalKey(EnvironmentIdentificationMode),
   glassOpacity: Schema.optionalKey(GlassOpacity),
+  shellMaterial: Schema.optionalKey(ShellMaterial),
+  shellGrain: Schema.optionalKey(ShellGrain),
   onboardingCompletedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   fontSizeInterface: Schema.optionalKey(InterfaceFontSize),
   fontSizePrompt: Schema.optionalKey(PromptFontSize),

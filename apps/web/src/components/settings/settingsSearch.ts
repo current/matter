@@ -367,6 +367,22 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("transparent transparency solid menus dialogs composer")],
   },
   {
+    id: "shell-material",
+    title: msg("Shell material"),
+    to: "/settings/appearance",
+    desktopOnly: true,
+    searchTerms: [
+      msg("window frame sidebar transparent transparency blur vibrancy liquid glass frosted solid"),
+    ],
+  },
+  {
+    // Prefixed because the slider control already owns the `shell-grain` id.
+    id: "setting-shell-grain",
+    title: msg("Shell grain"),
+    to: "/settings/appearance",
+    searchTerms: [msg("texture noise arc film paper sidebar frame shell")],
+  },
+  {
     id: "diff-color-scheme",
     title: msg("Diff colors"),
     to: "/settings/diffs",

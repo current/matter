@@ -35,6 +35,7 @@ import {
 } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
 import { AdvancedSettings } from "./AdvancedSettings";
+import { MattrShellAppearanceSettings } from "./MattrShellAppearanceSettings";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
@@ -268,6 +269,8 @@ export function AppearanceSettingsPanel() {
             </div>
           }
         />
+
+        <MattrShellAppearanceSettings />
 
         <SettingsRow
           {...searchableSetting("chat-width")}

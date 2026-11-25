@@ -29,14 +29,119 @@
   }
 
   /* Only a faint rim at the card's edge, like a dark browser's page. */
-  .dark [data-slot="sidebar-wrapper"] > [data-slot="sidebar-inset"] {
+  .dark
+    [data-slot="sidebar-wrapper"]
+    > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])),
+  .dark [data-slot="sidebar-inset"] [data-chat-header] + div,
+  .dark [data-slot="sidebar-inset"] [data-workspace-page-header] + *,
+  .dark
+    [data-slot="sidebar-inset"]
+    [data-preview-panel-mode="inline"]
+    [data-right-panel-surface-content] {
     border-color: rgb(255 255 255 / 3%);
   }
 
-  /* The sidebar is part of the frame: one flat color, without the grain that would lift it. */
+  /* The sidebar is part of the frame: transparent so the outer shell's color, material, and
+     optional grain carry straight across without a seam or double-stacked tint. */
   [data-slot="sidebar-wrapper"] [data-slot="sidebar-inner"] {
-    background-color: var(--mattr-frame);
+    background-color: transparent;
     background-image: none;
+  }
+
+  /* Optical 1pt downward nudge in the 38pt bar so the visible gaps below macOS's 1pt top window
+     rim and above the card match (paired with MACOS_WINDOW_BUTTON_OPTICAL_Y_OFFSET in DesktopWindow). */
+  [data-slot="sidebar-wrapper"] > [data-sidebar-control] > *,
+  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"]) .drag-region > *,
+  [data-slot="sidebar-inset"] [data-chat-header] > *,
+  [data-slot="sidebar-inset"] [data-workspace-page-header] > *,
+  [data-slot="sidebar-inset"] [data-right-panel-tabbar] > *,
+  [data-slot="sidebar-inset"] [data-workspace-titlebar-controls] > * {
+    translate: 0 1px;
+  }
+
+  /* Translucent, frosted blur, and Liquid Glass window materials let the native desktop backdrop
+     show through the outer frame and sidebar while the inset page card stays solid and crisp. */
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]),
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) body {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  html[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: color-mix(in srgb, var(--sidebar) 70%, transparent);
+  }
+
+  html.dark[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: rgb(17 19 19 / 68%);
+  }
+
+  html[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: color-mix(in srgb, var(--sidebar) 46%, transparent);
+  }
+
+  html.dark[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: rgb(17 19 19 / 46%);
+  }
+
+  html[data-mattr-shell-material="liquid-glass"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: color-mix(in srgb, var(--sidebar) 20%, transparent);
+  }
+
+  html.dark[data-mattr-shell-material="liquid-glass"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame: rgb(17 19 19 / 24%);
+  }
+
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-slot="sidebar-wrapper"]
+    > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])),
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-slot="sidebar-inset"]
+    :is(
+      [data-chat-header] + div,
+      [data-workspace-page-header] + *,
+      [data-preview-panel-mode="inline"] [data-right-panel-surface-content]
+    ) {
+    border-color: rgb(0 0 0 / 8%);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+  }
+
+  html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-slot="sidebar-wrapper"]
+    > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])),
+  html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-slot="sidebar-inset"]
+    :is(
+      [data-chat-header] + div,
+      [data-workspace-page-header] + *,
+      [data-preview-panel-mode="inline"] [data-right-panel-surface-content]
+    ) {
+    border-color: rgb(255 255 255 / 7%);
+    box-shadow: 0 2px 12px rgb(0 0 0 / 0.24);
+  }
+
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-mattr-collapsed-header] {
+    background-color: transparent;
+    background-image: none;
+    transition: none;
+  }
+
+  /* Arc-style tactile monochrome grain baked into the outer shell background (zero extra overlay
+     compositing layers). The inset page card stays clean. */
+  html[data-mattr-shell-grain="on"] [data-slot="sidebar-wrapper"] {
+    background-image: var(--mattr-shell-grain);
+    background-repeat: repeat;
+    background-size: 180px 180px;
+  }
+
+  html[data-mattr-shell-grain="on"]:is(
+      :not([data-mattr-shell-material]),
+      [data-mattr-shell-material="solid"]
+    )
+    [data-mattr-collapsed-header] {
+    background-image: var(--mattr-shell-grain);
+    background-repeat: repeat;
+    background-size: 180px 180px;
   }
 
   /* The top row is plain frame, like a browser toolbar: no stage artwork behind it, so its
@@ -70,52 +175,120 @@
     border-inline-width: 0;
   }
 
+  /* Pages with a header place that header and the right-side panel controls directly in the 38pt
+     shell topbar, while the rounded inset card begins right underneath it. */
   [data-slot="sidebar-wrapper"] > [data-slot="sidebar-inset"] {
-    --workspace-topbar-height: 44px;
-    --workspace-controls-top: var(--mattr-frame-titlebar);
-    --workspace-controls-right: calc(var(--mattr-shell-gap) + 0.75rem);
-    --workspace-titlebar-content-left: var(--workspace-gutter-start);
+    --workspace-topbar-height: var(--mattr-frame-titlebar);
+    --workspace-controls-top: 0px;
+    --workspace-controls-right: calc(var(--mattr-shell-gap) + 0.25rem);
     --background: var(--mattr-canvas);
     align-self: stretch;
     height: auto;
     min-height: 0;
-    margin: var(--mattr-frame-titlebar) var(--mattr-shell-gap) var(--mattr-shell-gap) 0;
+    margin: 0 var(--mattr-shell-gap) var(--mattr-shell-gap) 0;
+    background-color: transparent;
+    background-image: none;
+  }
+
+  /* Fallback for headerless routes: keep the entire inset region as a card below the 38pt bar. */
+  [data-slot="sidebar-wrapper"]
+    > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])) {
+    --workspace-topbar-height: 44px;
+    --workspace-controls-top: var(--mattr-frame-titlebar);
+    --workspace-controls-right: calc(var(--mattr-shell-gap) + 0.75rem);
+    --workspace-titlebar-content-left: var(--workspace-gutter-start);
+    margin-top: var(--mattr-frame-titlebar);
+    background-color: var(--mattr-canvas);
     overflow: clip;
     border: 1px solid var(--border);
     border-radius: var(--mattr-shell-radius);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   }
 
-  [data-sidebar-state="collapsed"] > [data-slot="sidebar-inset"] {
+  [data-slot="sidebar-inset"] > div,
+  [data-slot="sidebar-inset"] [data-chat-column],
+  [data-slot="sidebar-inset"] div:has(> [data-workspace-page-header]),
+  [data-slot="sidebar-inset"] [data-preview-panel-mode="inline"] {
+    background-color: transparent;
+    background-image: none;
+    border-inline-start-width: 0;
+  }
+
+  [data-slot="sidebar-inset"] [data-chat-header],
+  [data-slot="sidebar-inset"] [data-workspace-page-header],
+  [data-slot="sidebar-inset"] [data-right-panel-tabbar] {
+    position: relative;
+    z-index: 10;
+    background-color: transparent;
+    background-image: none;
+    border-bottom-color: transparent;
+  }
+
+  /* Align the header title cleanly with the rounded inset card edge when the sidebar is open. */
+  [data-sidebar-state="expanded"] [data-slot="sidebar-inset"] [data-chat-header] {
+    padding-inline-start: 10px;
+  }
+
+  [data-slot="sidebar-inset"] [data-chat-header] + div,
+  [data-slot="sidebar-inset"] [data-workspace-page-header] + *,
+  [data-slot="sidebar-inset"]
+    [data-preview-panel-mode="inline"]
+    [data-right-panel-surface-content] {
+    background-color: var(--mattr-canvas);
+    overflow: clip;
+    border: 1px solid var(--border);
+    border-radius: var(--mattr-shell-radius);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  /* Split-card gap when an inline right panel (diffs, preview, browser) is open beside chat. */
+  [data-slot="sidebar-inset"] [data-preview-panel-mode="inline"] {
     margin-inline-start: var(--mattr-shell-gap);
   }
 
-  /* The closed sidebar's titlebar row (MattrCollapsedSidebarHeader). Opaque, so the sidebar's
-     own row doesn't show through while it slides away. */
+  [data-sidebar-state="collapsed"] > [data-slot="sidebar-inset"] {
+    /* Clear traffic lights + sidebar toggle + mattr wordmark + history chevrons (~188pt). */
+    --workspace-titlebar-content-left: 196px;
+    margin-inline-start: var(--mattr-shell-gap);
+  }
+
+  /* The closed sidebar's titlebar row (MattrCollapsedSidebarHeader). Narrow when closed so it
+     never covers the page header beside it in the unified 38pt shell bar. */
   [data-mattr-collapsed-header] {
     background-color: var(--mattr-frame);
   }
 
-  /* Even spacing along the titlebar row: about 11.5pt of empty space between the traffic lights,
-     the toggle, the wordmark and each history chevron. Narrow buttons keep the thin chevrons from
-     sitting a full button apart. */
+  [data-mattr-collapsed-header][data-state="closed"] {
+    width: fit-content;
+  }
+
+  /* The titlebar row reads as three groups, in visible gaps: traffic lights, 18pt (the inset in
+     apps/desktop/src/preload.ts), toggle + wordmark 12pt apart, 16pt, then the history chevrons as
+     one 8pt pair. Narrow buttons keep the thin chevrons from sitting a full button apart. */
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     div:has(> button > svg.lucide-arrow-left) {
-    margin-inline-start: 2px;
+    margin-inline-start: 7.5px;
   }
 
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     button:has(> svg:is(.lucide-arrow-left, .lucide-arrow-right)) {
-    width: 16px;
+    width: 14px;
+  }
+
+  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
+    .drag-region
+    button:has(> svg.lucide-arrow-right) {
+    margin-inline-start: -1.5px;
   }
 
   /* SF's chevron.right sits 1.5pt right of centre in its frame. */
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
-    button:has(> svg.lucide-arrow-right) {
-    margin-inline-start: -1.5px;
+    button
+    > svg.lucide-arrow-right {
+    translate: -1.5px 0;
   }
 }
 

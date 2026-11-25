@@ -11,7 +11,11 @@ import * as Semaphore from "effect/Semaphore";
 import * as Electron from "electron";
 import { msg } from "gt-i18n";
 
-import { type DesktopSnapShotEvent, DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts";
+import {
+  type DesktopSnapShotEvent,
+  DEFAULT_CLIENT_SETTINGS,
+  type ShellMaterial,
+} from "@t3tools/contracts";
 
 import * as DesktopAssets from "../app/DesktopAssets.ts";
 import * as DesktopClerk from "../app/DesktopClerk.ts";
@@ -45,6 +49,7 @@ import { m } from "../i18n/messages.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
 import { makeQuitShortcutHandler } from "./QuitHold.ts";
 import { copyContextMenuImage } from "./ContextMenuImage.ts";
+import { applyWindowShellMaterial, cleanupWindowShellMaterial } from "./MattrShellMaterial.ts";
 import { installMainWindowRemoteRequestHeaderPolicy } from "./RemoteRequestHeaders.ts";
 
 const TITLEBAR_HEIGHT = 40;
@@ -61,6 +66,8 @@ class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyE
 const MACOS_WORKSPACE_TOPBAR_HEIGHT = 38;
 const MACOS_WINDOW_BUTTON_X = 20;
 const MACOS_WINDOW_BUTTON_RADIUS = 7;
+// Offset 1pt below mathematical center so the visible gaps below macOS's 1pt top rim and above the dark card match.
+const MACOS_WINDOW_BUTTON_OPTICAL_Y_OFFSET = 1;
 
 function parseMailtoAddress(rawUrl: string): Option.Option<string> {
   let url: URL;
@@ -83,7 +90,8 @@ function syncMacosWindowButtons(window: Electron.BrowserWindow): void {
     x: MACOS_WINDOW_BUTTON_X,
     y: Math.round(
       (MACOS_WORKSPACE_TOPBAR_HEIGHT * window.webContents.getZoomFactor()) / 2 -
-        MACOS_WINDOW_BUTTON_RADIUS,
+        MACOS_WINDOW_BUTTON_RADIUS +
+        MACOS_WINDOW_BUTTON_OPTICAL_Y_OFFSET,
     ),
   });
 }
@@ -331,7 +339,10 @@ function getWindowTitleBarOptions(
       titleBarStyle: "hiddenInset",
       trafficLightPosition: {
         x: MACOS_WINDOW_BUTTON_X,
-        y: MACOS_WORKSPACE_TOPBAR_HEIGHT / 2 - MACOS_WINDOW_BUTTON_RADIUS,
+        y:
+          MACOS_WORKSPACE_TOPBAR_HEIGHT / 2 -
+          MACOS_WINDOW_BUTTON_RADIUS +
+          MACOS_WINDOW_BUTTON_OPTICAL_Y_OFFSET,
       },
     };
   }
@@ -346,24 +357,30 @@ function getWindowTitleBarOptions(
   };
 }
 
-function syncWindowAppearance(
+const syncWindowAppearance = Effect.fn("DesktopWindow.syncWindowAppearance")(function* (
   window: Electron.BrowserWindow,
   hasTitleBarOverlay: boolean,
   shouldUseDarkColors: boolean,
   platform: NodeJS.Platform,
-): Effect.Effect<void> {
-  return Effect.sync(() => {
-    if (window.isDestroyed()) {
-      return;
-    }
+  shellMaterial: ShellMaterial,
+) {
+  if (window.isDestroyed()) {
+    return;
+  }
 
-    window.setBackgroundColor(getInitialWindowBackgroundColor(shouldUseDarkColors));
-    const { titleBarOverlay } = getWindowTitleBarOptions(shouldUseDarkColors, platform);
-    if (hasTitleBarOverlay && typeof titleBarOverlay === "object") {
-      window.setTitleBarOverlay(titleBarOverlay);
-    }
+  yield* applyWindowShellMaterial(window, {
+    material: shellMaterial,
+    solidBackgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
+    platform,
   });
-}
+  if (window.isDestroyed()) {
+    return;
+  }
+  const { titleBarOverlay } = getWindowTitleBarOptions(shouldUseDarkColors, platform);
+  if (hasTitleBarOverlay && typeof titleBarOverlay === "object") {
+    window.setTitleBarOverlay(titleBarOverlay);
+  }
+});
 
 type RevealSubscription = (listener: () => void) => void;
 
@@ -412,6 +429,7 @@ export const make = Effect.gen(function* () {
   );
   let flushMainWindowBounds: Effect.Effect<void> = Effect.void;
   let remoteRequestHeaderOwner: Electron.BrowserWindow | null = null;
+  let currentShellMaterial: ShellMaterial = DEFAULT_CLIENT_SETTINGS.shellMaterial;
 
   const dismissConnectingSplash = Effect.gen(function* () {
     const splash = yield* Ref.getAndSet(splashWindowRef, Option.none());
@@ -455,6 +473,13 @@ export const make = Effect.gen(function* () {
     const iconPaths = yield* assets.iconPaths;
     const iconOption = getIconOption(iconPaths, environment.platform);
     const shouldUseDarkColors = yield* electronTheme.shouldUseDarkColors;
+    const persistedClientSettings = yield* clientSettings.get.pipe(
+      Effect.orElseSucceed(() => Option.none()),
+    );
+    currentShellMaterial = Option.match(persistedClientSettings, {
+      onNone: () => currentShellMaterial,
+      onSome: (settings) => settings.shellMaterial,
+    });
     const persistedSettings = yield* desktopSettings.get;
     const persistedBounds = persistedSettings.mainWindowBounds;
     const displayBoundsResult = yield* Effect.sync(() => {
@@ -486,7 +511,10 @@ export const make = Effect.gen(function* () {
       show: false,
       autoHideMenuBar: true,
       ...(environment.platform === "darwin" ? { disableAutoHideCursor: true } : {}),
-      backgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
+      backgroundColor:
+        currentShellMaterial === "solid"
+          ? getInitialWindowBackgroundColor(shouldUseDarkColors)
+          : "#00000000",
       ...iconOption,
       title: environment.displayName,
       ...getWindowTitleBarOptions(shouldUseDarkColors, environment.platform),
@@ -512,6 +540,13 @@ export const make = Effect.gen(function* () {
     yield* rendererHistory.register(window.webContents, { surface: "main" });
     if (environment.platform === "darwin") {
       window.setAutoHideCursor(false);
+    }
+    if (currentShellMaterial !== "solid") {
+      yield* applyWindowShellMaterial(window, {
+        material: currentShellMaterial,
+        solidBackgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
+        platform: environment.platform,
+      });
     }
     let boundsPersistFiber: Fiber.Fiber<void, never> | undefined;
     let pendingBoundsPersistFiber: Fiber.Fiber<void, never> | undefined;
@@ -1066,6 +1101,7 @@ export const make = Effect.gen(function* () {
     }
 
     window.on("closed", () => {
+      cleanupWindowShellMaterial(window);
       if (!backendHasStarted) mainClosedDuringStartup = true;
       clearDevelopmentLoadRetry();
       clearBoundsPersist();
@@ -1275,8 +1311,23 @@ export const make = Effect.gen(function* () {
     }),
     syncAppearance: Effect.gen(function* () {
       const shouldUseDarkColors = yield* electronTheme.shouldUseDarkColors;
+      const persistedClientSettings = yield* clientSettings.get.pipe(
+        Effect.orElseSucceed(() => Option.none()),
+      );
+      currentShellMaterial = Option.match(persistedClientSettings, {
+        onNone: () => currentShellMaterial,
+        onSome: (settings) => settings.shellMaterial,
+      });
+      const mainWindow = yield* electronWindow.main;
+      const activeMain = Option.getOrNull(mainWindow);
       yield* electronWindow.syncAllAppearance((window, { titleBarOverlay }) =>
-        syncWindowAppearance(window, titleBarOverlay, shouldUseDarkColors, environment.platform),
+        syncWindowAppearance(
+          window,
+          titleBarOverlay,
+          shouldUseDarkColors,
+          environment.platform,
+          window === activeMain ? currentShellMaterial : "solid",
+        ),
       );
     }).pipe(Effect.withSpan("desktop.window.syncAppearance")),
   });
