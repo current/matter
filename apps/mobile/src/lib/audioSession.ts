@@ -62,7 +62,13 @@ export function isAudioSessionOwner(token: AudioSessionToken): boolean {
 
 export function activateAudioSession(
   token: AudioSessionToken,
-  options: { readonly nativePlayback?: boolean; readonly allowBluetoothRecording?: boolean } = {},
+  options: {
+    readonly nativePlayback?: boolean;
+    readonly allowBluetoothRecording?: boolean;
+    /** Keeps audio running with the screen locked or the app backgrounded (hands-free voice). */
+    readonly shouldPlayInBackground?: boolean;
+    readonly shouldRouteThroughEarpiece?: boolean;
+  } = {},
 ): Promise<boolean> {
   return enqueue(async () => {
     if (!isAudioSessionOwner(token)) return false;
@@ -73,9 +79,12 @@ export function activateAudioSession(
       ...(token.kind === "recording" && options.allowBluetoothRecording === false
         ? { allowBluetoothRecording: false }
         : {}),
+      ...(options.shouldRouteThroughEarpiece === undefined
+        ? {}
+        : { shouldRouteThroughEarpiece: options.shouldRouteThroughEarpiece }),
       interruptionMode: "doNotMix",
       playsInSilentMode: true,
-      shouldPlayInBackground: false,
+      shouldPlayInBackground: options.shouldPlayInBackground ?? false,
     });
     if (!isAudioSessionOwner(token)) return false;
     await setIsAudioActiveAsync(true);
@@ -88,7 +97,9 @@ export function releaseAudioSession(token: AudioSessionToken): Promise<void> {
   return enqueue(async () => {
     if (owner !== token) return;
     try {
-      if (token.kind === "recording") await setAudioModeAsync({ allowsRecording: false });
+      if (token.kind === "recording") {
+        await setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false });
+      }
     } finally {
       if (owner === token) {
         if (token.kind === "recording") await setIsAudioActiveAsync(false);

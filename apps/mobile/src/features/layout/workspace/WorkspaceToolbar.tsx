@@ -1,7 +1,12 @@
 import { msg, useGT, useMessages } from "gt-react-native";
 import { useActiveNewTask } from "../../../state/active-new-task";
 import { Toolbar } from "../../../components/ui/Toolbar";
-import { useFocusEffect, useIsFocused, useNavigationState } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useNavigationState,
+} from "@react-navigation/native";
 import { use, useCallback, useEffect, useRef } from "react";
 import { isDuoDevice } from "../../../lib/device-type";
 import { useDeviceType } from "../../../native/native-layout-metrics";
@@ -37,6 +42,7 @@ export function WorkspaceToolbar(props: {
   const gt = useGT();
   const m = useMessages();
   const workspace = useWorkspaceTabs()!;
+  const navigation = useNavigation();
   const activeNewTask = useActiveNewTask();
   const deviceType = useDeviceType();
   const sidebarTabs = useSidebarWorkspaceTabs();
@@ -220,6 +226,12 @@ export function WorkspaceToolbar(props: {
               onPress={focusSearch}
             />
           )}
+          <Toolbar.Button
+            identifier="workspace-voice-mode"
+            accessibilityLabel={gt("Voice mode")}
+            icon="waveform"
+            onPress={() => navigation.navigate("MattrVoiceMode")}
+          />
         </Toolbar>
       )}
       <Toolbar placement="bottom">
