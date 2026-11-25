@@ -27,7 +27,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import {
   GitCommandError,
   type GitCommandFailureReason,
-  T3_PROJECT_FILE_NAME,
   type ReviewBranchCommitsInput,
   type ReviewDiffChangeType,
   type ReviewDiffFileContentsInput,
@@ -60,6 +59,7 @@ import {
 import { makeIsServerInternalPath } from "../auth/serverInternalPaths.ts";
 import * as ServerConfig from "../config.ts";
 import { sourceControlDefinitions } from "../sourceControl/sourceControlDefinitions.ts";
+import { showProjectFile } from "../project/MattrProjectFile.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 /** T3's record of the branch, named as on the host, that a branch was cut from. */
@@ -5770,11 +5770,10 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   ) {
     // `git show` does not read a lone - as the previous checkout either.
     const ref = refName === "-" ? "@{-1}" : refName;
-    const projectFile = yield* executeGit(
-      "GitVcsDriver.createWorktree.readProjectFile",
-      cwd,
-      ["show", `${ref}:${T3_PROJECT_FILE_NAME}`],
-      { allowNonZeroExit: true },
+    const projectFile = yield* showProjectFile((name) =>
+      executeGit("GitVcsDriver.createWorktree.readProjectFile", cwd, ["show", `${ref}:${name}`], {
+        allowNonZeroExit: true,
+      }),
     );
     if (projectFile.exitCode !== 0) return null;
     const file = parseT3ProjectFile(projectFile.stdout);
@@ -6159,11 +6158,13 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           options?.submodules != null
             ? null
             : // Read HEAD for the same reason: sparse patterns can leave t3.json out too.
-              yield* executeGit(
-                "GitVcsDriver.createWorktree.readProjectFile",
-                worktreePath,
-                ["show", `HEAD:${T3_PROJECT_FILE_NAME}`],
-                { allowNonZeroExit: true },
+              yield* showProjectFile((name) =>
+                executeGit(
+                  "GitVcsDriver.createWorktree.readProjectFile",
+                  worktreePath,
+                  ["show", `HEAD:${name}`],
+                  { allowNonZeroExit: true },
+                ),
               ).pipe(
                 Effect.flatMap((result) => {
                   if (result.exitCode !== 0) return Effect.succeed(null);

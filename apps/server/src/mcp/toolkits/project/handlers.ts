@@ -9,7 +9,6 @@ import {
   type TaskFolderError,
   type Project as ProjectRecord,
   type ServerProvider,
-  T3_PROJECT_FILE_NAME,
 } from "@t3tools/contracts";
 import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
@@ -44,6 +43,7 @@ import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as OrchestrationMcp from "../../OrchestratorMcpService.ts";
 import { newCommandId, readCaller, resolveProjectId, unavailable } from "../../threadAccess.ts";
 import { ProjectToolkit } from "./tools.ts";
+import { readProjectFileString } from "../../../project/MattrProjectFile.ts";
 
 const isAboveCeilingError = Schema.is(OrchestratorRuntimeModeAboveCeilingError);
 
@@ -118,9 +118,10 @@ const projectFileThreadEnvMode = Effect.fn("mcp.projectFileThreadEnvMode")(funct
   workspaceRoot: string,
 ) {
   const fileSystem = yield* FileSystem.FileSystem;
-  const contents = yield* fileSystem
-    .readFileString(`${workspaceRoot}/${T3_PROJECT_FILE_NAME}`)
-    .pipe(Effect.orElseSucceed(() => null));
+  const contents = yield* readProjectFileString(
+    fileSystem,
+    (name) => `${workspaceRoot}/${name}`,
+  ).pipe(Effect.orElseSucceed(() => null));
   return resolveProjectFileBackedSetting(
     "defaultThreadEnvMode",
     null,

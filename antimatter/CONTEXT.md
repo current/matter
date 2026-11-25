@@ -14,7 +14,7 @@ Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 
 - Keep fork changes small and in fork-only files (`antimatter/`) where possible. CI merges the newest upstream nightly at every build, so edits inside busy upstream files become merge conflicts.
 - Don't merge upstream into `main` by hand unless a build opens an "Antimatter: merge conflict" issue.
-- Only the lead pushes to `main`. Every push that changes more than Markdown builds and publishes a release.
+- Commit and push finished work to `main` yourself; don't ask Chris first. Run `vp run check:changed` before pushing. Only the lead pushes; workers never do. Every push that changes more than Markdown builds and publishes a release.
 - Never create a new repo named `current/t3code`: installed builds from before the rename find updates through GitHub's redirect from that name.
 - Never write to `~/.antimatter/userdata`: it is the live app's database, and the chat you are running in lives there.
 
@@ -25,7 +25,7 @@ Upstream's `AGENTS.md` and `docs/internals/` still apply to the code itself.
 - The "star T3 Code on GitHub" prompt is off (`apps/web/src/components/GitHubStarPrompt.tsx`).
 - Logo: `apps/web/src/components/T3Wordmark.tsx` renders the mattr logo. App icon: `assets/nightly/app-icon.icon`.
 - Keep as is (renaming breaks data, updates or interop): app id `com.current.antimatter`, `~/.antimatter` and `~/Library/Application Support/antimatter`, the signing certificate, the `t3` CLI, `t3code://`, `t3.codes` URLs, the "T3 Code for GitHub" app name.
-- Open decision: the project config file is still `t3.json` (the UI says so too).
+- Project file: `mattr.json` (`T3_PROJECT_FILE_NAME` in `packages/contracts/src/t3ProjectFile.ts`). A project without one still uses upstream's `t3.json`: server reads go through `apps/server/src/project/MattrProjectFile.ts`, and the rebrand plugin renames it in UI copy. Read new project-file call sites through those helpers.
 
 ## Releases
 

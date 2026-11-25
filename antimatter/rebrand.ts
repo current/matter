@@ -12,12 +12,27 @@ const REPLACEMENTS: ReadonlyArray<
   [/\bT3(\s+)Code(?! for GitHub)/g, (_match, whitespace) => `mattr${keepNewlines(whitespace)}`],
 ];
 
+// The project file is mattr.json now. A string that is exactly "t3.json" is a settings-source id
+// shared with the server (except the inheritance label), and the schema URL must stay upstream's.
+const PROJECT_FILE_COPY = /(?<!schema\/)\bt3\.json\b/g;
+const rebrandProjectFile = (text: string) =>
+  text
+    .replace(PROJECT_FILE_COPY, (match, offset: number, whole: string) => {
+      const before = whole[offset - 1];
+      const isWholeString =
+        before !== undefined && `"'\``.includes(before) && whole[offset + match.length] === before;
+      return isWholeString ? match : "mattr.json";
+    })
+    .replace(/\blabel: "t3\.json"/g, 'label: "mattr.json"');
+
 const CLIENT_SOURCE = /\/(apps\/web\/src|packages\/[^/]+\/src)\//;
 
 export function rebrandCopy(text: string): string {
-  return REPLACEMENTS.reduce(
-    (result, [pattern, replacement]) => result.replace(pattern, replacement),
-    text,
+  return rebrandProjectFile(
+    REPLACEMENTS.reduce(
+      (result, [pattern, replacement]) => result.replace(pattern, replacement),
+      text,
+    ),
   );
 }
 

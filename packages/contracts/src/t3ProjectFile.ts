@@ -5,7 +5,8 @@ import { ThreadEnvMode, WorktreeSubmodules } from "./environment.ts";
 import { ProjectScriptIcon } from "./project.ts";
 import type { ProjectScopedServerSettingKey, ServerSettings } from "./settings.ts";
 
-export const T3_PROJECT_FILE_NAME = "t3.json";
+// mattr: renamed from t3.json, which still works (apps/server/src/project/MattrProjectFile.ts).
+export const T3_PROJECT_FILE_NAME = "mattr.json";
 
 export const T3_PROJECT_FILE_SCHEMA_URL = "https://t3.codes/schema/t3.json";
 

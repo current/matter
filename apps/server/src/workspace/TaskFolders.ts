@@ -57,6 +57,7 @@ import * as LayoutCommandApprovals from "./LayoutCommandApprovals.ts";
 import * as TaskFolderStore from "./TaskFolderStore.ts";
 import { projectFolders, parseGitmodulesPaths } from "./WorkspaceFolders.ts";
 import { withWorkspaceLease } from "./workspaceLease.ts";
+import { readProjectFileString } from "../project/MattrProjectFile.ts";
 
 // Each worktree is a checkout: enough at once to finish four repositories together, few enough
 // to leave Git's server-wide process slots to running threads.
@@ -382,7 +383,7 @@ const make = Effect.gen(function* () {
 
   // A project that lays its own thread folder out says so in its `t3.json`.
   const projectFile = (projectRoot: string) =>
-    fileSystem.readFileString(path.join(projectRoot, T3_PROJECT_FILE_NAME)).pipe(
+    readProjectFileString(fileSystem, (name) => path.join(projectRoot, name)).pipe(
       Effect.map(parseT3ProjectFile),
       Effect.orElseSucceed(() => null),
     );

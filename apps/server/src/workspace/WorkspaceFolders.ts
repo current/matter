@@ -14,7 +14,6 @@ import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
 import { splitsSurrogatePair } from "@t3tools/shared/assistantCitations";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
-import { T3_PROJECT_FILE_NAME } from "@t3tools/contracts";
 import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -27,6 +26,7 @@ import * as Schema from "effect/Schema";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import { isWithinRoot } from "./KnownWorkspaces.ts";
 import * as TaskFolderStore from "./TaskFolderStore.ts";
+import { readProjectFileString } from "../project/MattrProjectFile.ts";
 
 /** A tracked folder a thread works in, besides its own cwd. */
 export interface ThreadFolder {
@@ -286,9 +286,9 @@ export const discoverFolders = Effect.fn("WorkspaceFolders.discover")(function* 
   const root = path.resolve(expandHomePath(workspaceRoot.trim(), yield* HostProcess.HomeDirectory));
   const ignored = (
     parseT3ProjectFile(
-      yield* fileSystem
-        .readFileString(path.join(root, T3_PROJECT_FILE_NAME))
-        .pipe(Effect.orElseSucceed(() => "")),
+      yield* readProjectFileString(fileSystem, (name) => path.join(root, name)).pipe(
+        Effect.orElseSucceed(() => ""),
+      ),
     )?.ignoreRepositories ?? []
   ).map((entry) => path.resolve(root, entry));
   // Everything the scan could find would be dropped, so skip the walk.
