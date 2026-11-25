@@ -1,121 +1,117 @@
 <p align="center">
-  <a href="https://t3.codes">
-    <img src="./assets/prod/t3-black-web-icon-192x192.png" width="80" height="80" alt="T3 Code logo" />
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./antimatter/readme/mattr-mark-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="./antimatter/readme/mattr-mark-light.svg" />
+    <img src="./antimatter/readme/mattr-mark-dark.svg" width="44" height="50" alt="mattr" />
+  </picture>
 </p>
 
-<h1 align="center">T3 Code</h1>
-
-<p align="center">The open-source control plane for coding agents.</p>
+<h1 align="center">mattr</h1>
 
 <p align="center">
-  <a href="https://t3.codes/download"><strong>Download</strong></a> ·
-  <a href="https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824">iOS</a> ·
-  <a href="https://play.google.com/store/apps/details?id=com.t3tools.t3code">Android</a> ·
-  <a href="https://app.t3.codes">Web</a> ·
-  <a href="./docs/README.md">Docs</a> ·
-  <a href="https://discord.gg/jn4EGJjrvv">Discord</a>
+  a personal fork of t3 code, stripped of telemetry and rebuilt around native macOS craft, modular add-ons, and hands-free voice.
 </p>
 
 <p align="center">
-  <a href="https://t3.codes">
-    <img src="./.github/readme/hero.webp" width="100%" alt="T3 Code on desktop with a finished Claude thread, next to the phone app asking to approve a command from Codex" />
-  </a>
+  <a href="https://github.com/current/mattr/releases">releases</a> ·
+  <a href="https://github.com/pingdotgg/t3code">upstream</a> ·
+  <a href="./docs/README.md">docs</a> ·
+  <a href="./antimatter/CONTEXT.md">fork notes</a> ·
+  <a href="./LICENSE">mit</a>
 </p>
 
-T3 Code runs the coding agents on your machine and gives them one fast interface. Start a thread at your desk, then approve the next step from your phone.
+<p align="center">
+  <img src="./antimatter/readme/hero-shell.png" width="100%" alt="mattr macOS shell with 38pt frameless topbar, liquid-glass material, Arc-style film grain, inset dark card, SF Symbols, and notch Dynamic Island" />
+</p>
 
-It works with Claude Code, Codex, Cursor, OpenCode, Grok Build, Antigravity, Kiro, Pi, Muse Code, fx, and any [ACP](./docs/user/providers-acp.md) agent. If an agent is set up on your computer, T3 Code can control it.
+mattr tracks [`pingdotgg/t3code`](https://github.com/pingdotgg/t3code) nightly and runs your local coding agents (claude code, codex, cursor, opencode, grok build, antigravity, kiro, pi, muse code, fx, and any [ACP](./docs/user/providers-acp.md) agent) inside one fast, native-feeling workspace across desktop, web, and iOS.
 
-## What you get
+## what's different from upstream
 
-- **Your subscriptions.** T3 Code does not resell tokens. It drives the agents you are already signed in to.
-- **Every agent in one place.** Change models in the middle of a thread. Let Claude hand a task to Codex.
-- **Desktop, web, and phone.** One server, and every client shows the same threads. There are apps for iOS and Android.
-- **Remote ready.** Run agents on any machine. Connect over your local network, Tailscale, or [T3 Connect](./docs/user/remote-access.md).
-- **Git built in.** Each thread can work in its own worktree. Review the diff, then commit, push, and open a pull request with one button.
-- **Fast.** Performance is a feature here. We measure it, and we treat a dropped frame as a bug.
-- **Open.** Source code is MIT licensed. If you don't like something, fork it under your own branding (see [Trademarks and forks](#trademarks-and-forks)).
+### macOS shell & customization
 
-## Install
+- **38pt frameless window** — browser-style outer frame with optically aligned macOS traffic lights, an inset dark page card directly below the topbar, and a transparent sidebar with zero seam.
+- **shell materials & film grain** — native `NSGlassEffectView` `liquid-glass`, `blur`, `transparent`, and `solid` materials, paired with monochrome Arc-style SVG film grain (`0–100%`) across the outer frame and sidebar.
+- **build-time Apple SF Symbols** — lucide icons are swapped for native SF Symbols extracted on the build Mac via Swift (falling back to lucide off macOS, with zero Apple glyphs committed).
+- **inbox & spaces sidebars** — switchable attention inbox (default), spaces, or classic sidebar layouts, plus settings rendered in-card instead of a modal.
 
-### Desktop app
+### zero outbound telemetry
 
-[Download T3 Code](https://t3.codes/download) for macOS, Windows, or Linux. You can also use a package manager:
+- PostHog (`ingest.t3.codes`), Axiom relay OTLP tracing, and mobile `expo-observe` crash reporting are hard-disabled across server, web, desktop, and mobile.
+- `mattr connect` relay, local logs, resource monitoring, and any user-configured OTLP export remain intact.
 
-| Platform       | Command                                                              |
-| -------------- | -------------------------------------------------------------------- |
-| macOS          | `brew install --cask t3-code`                                        |
-| Windows        | `winget install T3Tools.T3Code` or `scoop install extras/t3code`     |
-| Arch Linux     | `yay -S t3code-bin`                                                  |
-| Nix            | `nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code`         |
-| Debian, Ubuntu | `.deb` from [Releases](https://github.com/pingdotgg/t3code/releases) |
+### dynamic island & hands-free voice
 
-### Command line
+- **macOS notch pill** — floating Dynamic Island for live thread state, quick approvals, and hands-free voice control.
+- **Lilt GLSL Siri Wave** — 1:1 WebGL shaders across the notch pill, composer waveform, and in-thread voice mode.
+- **low-latency voice pipeline** — Deepgram Flux streaming STT, ElevenLabs `eleven_v4_turbo` streaming sentence TTS with full voice tuning, and speech-verified barge-in.
+- **workspace brain & in-thread voice mode** — server-hydrated workspace Q&A and codebase research, plus a ChatGPT-style in-thread voice mode on desktop and iOS.
 
-This installs the `t3` command. Run `t3` to start the server and open the web app.
+### modular add-ons
+
+every optional integration is **off by default** in settings → add-ons. disabled add-ons render no UI, run no background work, and add zero MCP tokens to agent context.
+
+<p align="center">
+  <img src="./antimatter/readme/addons-voice.png" width="100%" alt="mattr modular off-by-default add-ons alongside the in-thread voice mode with Lilt GLSL Siri Wave" />
+</p>
+
+| add-on            | transport / runtime        | what it adds                                                                      |
+| ----------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| `grok bot`        | loopback CDP (`:9222`)     | chat with local Grok Bot teammates in the sidebar with character silhouettes      |
+| `devin bot`       | loopback CDP (`:9223`)     | v3 messages and "needs you" inbox tickets surfaced as pending requests            |
+| `claude cloud`    | `claude` CLI + opt-in MCP  | offload heavy work to Claude Cloud VMs, send follow-ups, and `--teleport` locally |
+| `voice assistant` | local server + notch / web | hands-free summaries, agent steering, workspace Q&A, and in-thread voice mode     |
+
+### fork extras
+
+- **account fallback with exclusions** — automatically switches to another account with usage left when one runs out, with per-account exclusions (`fallbackExcludedInstanceIds`).
+- **stalled turn flags** — flags running turns with no agent activity for 10 minutes.
+- **multi-project delegation** — delegate tasks across local projects from one thread.
+- **phone pairing & iOS sideloading** — Tailscale HTTPS pairing links serve mattr's bundled web UI and installable PWA directly; free Apple ID iOS builds work out of the box via `T3CODE_IOS_PERSONAL_TEAM=1`.
+- **automatic upstream nightly merges** — CI merges the newest upstream nightly tag into every macOS arm64 prerelease and re-signs with the fork's certificate.
+- **`mattr.json` project config** — reads `mattr.json` first and falls back to upstream's `t3.json`.
+
+## install & build
+
+### prebuilt macOS releases
+
+download the latest signed macOS arm64 build from [GitHub Releases](https://github.com/current/mattr/releases). installed builds pick up new CI prereleases through the in-app updater.
+
+### local development
 
 ```bash
-curl -fsSL https://t3.codes/install.sh | sh
+vp i
+vp run dev:desktop
 ```
 
-On Windows, in PowerShell:
+runs a separate **mattr (Dev)** window beside any installed app with isolated dev state (`~/.antimatter/dev`) and hot-reloading web UI.
 
-```powershell
-irm https://t3.codes/install.ps1 | iex
+### local signed build & install
+
+```bash
+node antimatter/ship-local.mjs --install
 ```
 
-To try it once without an install, run `npx t3@latest`.
+merges the newest upstream nightly in a separate build checkout (`../mattr-ship`), builds and signs with `~/.antimatter-signing`, replaces `/Applications/mattr.app`, and reopens it. omit `--install` to build without replacing the running app.
 
-### Phone
+### live UI hot-reload
 
-Get the app from the [App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or [Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code). Then follow [remote access](./docs/user/remote-access.md) to connect it to your computer.
+```bash
+node antimatter/live-ui.mjs
+```
 
-### Sign in to an agent
+serves renderer changes on `127.0.0.1:5799` so pressing `Cmd+R` in the installed mattr window reloads the UI without interrupting running chats in the backend process.
 
-T3 Code needs one agent that is installed and signed in. For example, install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`, or install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`.
+### iOS personal-team sideloading
 
-[Provider setup](./docs/user/install.md#providers) has the steps for each agent. [Install T3 Code](./docs/user/install.md) covers nightly builds, AppImage, WSL, and NixOS.
+```bash
+T3CODE_IOS_PERSONAL_TEAM=1 vp run mobile:install ios
+```
 
-## "Wait, what are you selling me?"
+defaults the bundle id to `com.current.antimatter.mobile`, strips paid-only entitlements (`aps-environment`, associated domains, OTA updates), and signs with a free Apple ID personal team (override `T3CODE_IOS_APPLE_TEAM_ID` and `T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID` as needed).
 
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
+## credits & license
 
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork the source code and build the tool that you want, under your own name and branding.
+mattr is an unofficial personal fork built on [`pingdotgg/t3code`](https://github.com/pingdotgg/t3code). it is not affiliated with or endorsed by T3 Tools, Inc.
 
-## Documentation
-
-- [Install and first run](./docs/user/install.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Source control](./docs/user/source-control.md)
-- [Connect outside agents over MCP](./docs/user/outside-agents.md)
-- [FAQ](./docs/user/faq.md)
-
-[All docs](./docs/README.md) has the full list.
-
-## Contributing
-
-We have limited review capacity. Small, focused fixes are the most likely to be merged. Features need an approved discussion first.
-
-- Read [CONTRIBUTING.md](./CONTRIBUTING.md) before you report a bug or open a pull request.
-- Put feature requests in [Ideas](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
-- Build from source with the [development runbook](./docs/operations/00_development.md#first-checkout). The [architecture overview](./docs/internals/01_architecture.md) explains how it works.
-- Get help in [Discord](https://discord.gg/jn4EGJjrvv).
-
-## License
-
-The source code in this repository is licensed under the [MIT License](./LICENSE).
-
-## Trademarks and forks
-
-The MIT license applies **only to the source code**. It does not grant any rights to T3 Tools, Inc.'s trademarks, branding, or trade dress, including the **T3 Code** name, wordmark, logos, and application icons.
-
-If you fork, redistribute, or build on T3 Code's source code:
-
-- **Use your own branding.** Replace the T3 Code name, wordmark, logos, and application icons in any public fork, redistributed build, website, package, or app store listing.
-- **Be explicitly clear that your project is unofficial.** Do not use the T3 Code name, wordmark, logo, or branding in your own projects without making it unmistakably clear that your project is unofficial and not affiliated with or endorsed by T3 Tools, Inc.
-
-Using our name, wordmark, logo, or branding in a way that suggests official status or affiliation is trademark infringement and unlawful. **Any project indicating or implying that it is an official version of T3 Code when it is not will be pursued to the full extent of the law.**
-
-See [TRADEMARK.md](./TRADEMARK.md) for the full trademark and branding policy.
+source code is licensed under the [MIT License](./LICENSE). T3 Tools, Inc.'s trademarks and branding are not covered by the MIT license — see [TRADEMARK.md](./TRADEMARK.md).
