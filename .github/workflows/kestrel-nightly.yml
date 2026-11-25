@@ -104,7 +104,7 @@ jobs:
     name: Build ${{ needs.plan.outputs.version }}
     needs: plan
     if: needs.plan.outputs.build == 'true'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     env:
       VERSION: ${{ needs.plan.outputs.version }}
