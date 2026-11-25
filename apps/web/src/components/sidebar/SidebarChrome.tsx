@@ -203,17 +203,25 @@ function SidebarUtilityItem({
   icon,
   label,
   onClick,
+  isActive = false,
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
+  isActive?: boolean;
 }) {
   return (
     <SidebarMenuItem className="shrink-0">
       <Tooltip>
         <TooltipTrigger
           render={
-            <SidebarMenuButton aria-label={label} onClick={onClick} size="icon">
+            <SidebarMenuButton
+              aria-label={label}
+              aria-current={isActive ? "page" : undefined}
+              isActive={isActive}
+              onClick={onClick}
+              size="icon"
+            >
               {icon}
             </SidebarMenuButton>
           }
@@ -231,6 +239,9 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const { isMobile, setOpenMobile } = useSidebar();
   const isOnUtilityPage = useLocation({
     select: (location) => isSidebarUtilityPage(location.pathname),
+  });
+  const isOnSettingsPage = useLocation({
+    select: (location) => location.pathname.startsWith("/settings"),
   });
   const pullRequestsSupported = usePullRequestsSupported();
   const issuesSupported = useIssuesSupported();
@@ -284,6 +295,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             icon={<SettingsIcon />}
             label={gt("Settings")}
             onClick={handleSettingsClick}
+            isActive={isOnSettingsPage}
           />
           {pullRequestsSupported ? (
             <SidebarUtilityItem

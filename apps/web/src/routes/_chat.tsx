@@ -1,4 +1,4 @@
-import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect, useMatches } from "@tanstack/react-router";
 
 import { ThreadRouteView } from "../components/ThreadRouteView";
 import { GlobalVoiceInputIndicator } from "../components/chat/GlobalVoiceInputIndicator";
@@ -13,15 +13,21 @@ import { useShownThreadRouteTarget } from "../hooks/useShownThreadRouteTarget";
 function ChatRouteLayout() {
   // Render both routes here so draft promotion keeps the same ChatView mounted.
   const { shownTarget, modalOpen } = useShownThreadRouteTarget();
+  // mattr: Settings is a page in the shell card, so the thread under it stays mounted but hidden.
+  const settingsOpen = useMatches({
+    select: (matches) => matches.some((match) => match.pathname.startsWith("/settings")),
+  });
   return (
     <>
       {shownTarget?.kind === "server" && !modalOpen ? (
         <ThreadLinkPrompt threadRef={shownTarget.threadRef} />
       ) : null}
       {shownTarget ? (
-        <ThreadRouteView target={shownTarget} background={modalOpen} />
+        <ThreadRouteView target={shownTarget} background={modalOpen} hidden={settingsOpen} />
       ) : modalOpen ? (
-        <SidebarInset className="h-dvh" />
+        settingsOpen ? null : (
+          <SidebarInset className="h-dvh" />
+        )
       ) : (
         <Outlet />
       )}

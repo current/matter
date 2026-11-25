@@ -58,9 +58,11 @@ export function useOpenThreadFamily(threadRef: ScopedThreadRef | null, missing: 
 export function ThreadRouteView({
   target,
   background = false,
+  hidden = false,
 }: {
   target: ThreadRouteTarget;
   background?: boolean;
+  hidden?: boolean;
 }) {
   const navigate = useNavigate();
   const draftId = target.kind === "draft" ? target.draftId : null;
@@ -238,6 +240,7 @@ export function ThreadRouteView({
     <SidebarInset
       className="h-svh min-h-0 overflow-hidden overscroll-y-none md:h-dvh"
       inert={background}
+      hidden={hidden}
     >
       <BackgroundThreadContext value={background}>
         <HiddenThreadContext value={background}>{view}</HiddenThreadContext>

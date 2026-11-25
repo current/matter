@@ -1137,15 +1137,15 @@ it("opening Settings without a page event closes the composer model picker and p
 
   // The desktop menu's open-settings accelerator navigates with no key or pointer event in the page.
   await act(() => router.navigate({ to: "/settings" }));
-  await expect.element(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "Settings" })).toBeVisible();
   await expect.element(search).not.toBeInTheDocument();
 
   await act(() => router.navigate({ to: "/draft/$draftId", params: { draftId } }));
   await page.getByRole("button", { name: /^Permissions: / }).click();
-  // The modal Settings dialog aria-hides everything outside it, so match text, not role.
+  // Match text, not role: the permissions popup text is what must disappear.
   const permissions = page.getByText("Allow commands and edits without prompts.").last();
   await expect.element(permissions).toBeVisible();
   await act(() => router.navigate({ to: "/settings" }));
-  await expect.element(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "Settings" })).toBeVisible();
   await expect.element(permissions).not.toBeInTheDocument();
 });
