@@ -287,6 +287,19 @@
     margin-inline-start: -1.5px;
   }
 
+  /* The 14pt chevrons are too narrow for a hover backdrop: hover only brightens the glyph. */
+  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
+    .drag-region
+    button:has(> svg:is(.lucide-arrow-left, .lucide-arrow-right)) {
+    --control-icon-color: var(--contrast-muted-foreground);
+    background-color: transparent;
+
+    &:is(:hover, [data-pressed]):not(:disabled) {
+      --control-icon-color: var(--foreground);
+      background-color: transparent;
+    }
+  }
+
   /* SF's chevron.right sits 1.5pt right of centre in its frame. */
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
@@ -328,7 +341,7 @@
   }
 
   /* Right after a toggle (data-mattr-settling, set by MattrCollapsedSidebarHeader), the chat
-     glides to its new lane and the docked details card fades in instead of popping. Only then:
+     glides to its new lane. Only then:
      a transition on the lane would trail every frame of a window or sidebar resize. */
   [data-mattr-settling] [data-chat-canvas] {
     transition:
@@ -336,15 +349,30 @@
       --chat-lane-inset-end var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
   }
 
-  [data-mattr-settling] [data-thread-details-panel="inline"] {
-    transition:
-      opacity 200ms ease-out,
-      translate var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
+  /* Right panels, the terminal drawer and the docked details card slide on the sidebar's curve.
+     panelAnimations.ts turns upstream's panel animations on; data-panel-animations is off for
+     the first frames of a navigation, so switching threads doesn't replay these. */
+  [data-panel-animations="true"]
+    :is([data-preview-panel-mode], div:has(> div > [data-terminal-owner="drawer"])) {
+    transition-timing-function: var(--mattr-sidebar-ease);
+  }
 
-    @starting-style {
-      opacity: 0;
-      translate: 16px 0;
-    }
+  /* The drawer rises from the bottom edge instead of unrolling from its header. */
+  [data-panel-animations="true"] div:has(> [data-terminal-owner="drawer"]) {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  [data-panel-animations="true"] [data-thread-details-panel="inline"] {
+    animation: mattr-panel-in var(--mattr-sidebar-duration) var(--mattr-sidebar-ease) both;
+  }
+}
+
+@keyframes mattr-panel-in {
+  from {
+    opacity: 0;
+    translate: 16px 0;
   }
 }
 

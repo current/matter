@@ -26,6 +26,7 @@ import { useKnownTerminalSessions, useTerminalDrawerSessions } from "../state/te
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useThreadTerminalActions } from "./terminal/useThreadTerminalActions";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
+import { usePanelOpenAfterPaint } from "../panelAnimations";
 import { resolveTerminalWorktreePath } from "./ChatView.logic";
 
 /** Where a drawer or panel opens new terminals when a script run overrides the thread's own. */
@@ -82,6 +83,7 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
     selectThreadTerminalUiState(state.terminalUiStateByThreadKey, threadRef),
   );
   const visible = active && terminalUiState.terminalOpen;
+  const expanded = usePanelOpenAfterPaint(visible);
   const metadata = useTerminalDrawerSessions(threadRef.environmentId, threadId);
   const knownTerminalSessions = metadata?.sessions;
   const snapshotId = metadata?.snapshotId;
@@ -202,10 +204,10 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
     <div
       className={cn(
         "grid shrink-0 overflow-clip",
-        active ? (visible ? "grid-rows-[1fr]" : "grid-rows-[0fr]") : "hidden",
+        active ? (expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]") : "hidden",
         active &&
           "[[data-panel-animations=true]_&]:transition-[grid-template-rows] [[data-panel-animations=true]_&]:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:ease-out",
-        active && visible && "[[data-panel-animations=true]_&]:starting:grid-rows-[0fr]!",
+        active && expanded && "[[data-panel-animations=true]_&]:starting:grid-rows-[0fr]!",
       )}
     >
       <div className="min-h-0 overflow-clip">

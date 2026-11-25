@@ -17,6 +17,7 @@ import { canReturnFocusTo, workspaceAreaProps } from "../../lib/workspaceFocus";
 import { cn } from "~/lib/utils";
 
 import { RightPanelResizeHandle } from "./RightPanelResizeHandle";
+import { usePanelOpenAfterPaint } from "../../panelAnimations";
 
 export type PreviewPanelMode = "inline" | "sheet" | "sidebar" | "embedded";
 
@@ -74,6 +75,7 @@ function PreviewPanelShellFrame(
   const isInline = props.mode === "inline";
   const collapsible = isInline && props.open !== undefined;
   const open = props.open ?? true;
+  const expanded = usePanelOpenAfterPaint(open);
   const maximized = props.maximized ?? false;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const returnedFocus = useRef(false);
@@ -85,21 +87,21 @@ function PreviewPanelShellFrame(
   // never starts one; the next open or close re-enables it in its own commit,
   // so nothing waits for a paint.
   const [widthTransition, setWidthTransition] = useState(() => ({
-    open,
+    open: expanded,
     width,
     maximized,
     enabled: true,
   }));
   if (
-    widthTransition.open !== open ||
+    widthTransition.open !== expanded ||
     widthTransition.width !== width ||
     widthTransition.maximized !== maximized
   ) {
     setWidthTransition({
-      open,
+      open: expanded,
       width,
       maximized,
-      enabled: widthTransition.open !== open,
+      enabled: widthTransition.open !== expanded,
     });
   }
   const suppressWidthTransition = collapsible && !widthTransition.enabled;
@@ -179,7 +181,7 @@ function PreviewPanelShellFrame(
               [RESIZABLE_WIDTH_PROPERTY]: `${width}px`,
               width: maximized
                 ? "100%"
-                : collapsible && !open
+                : collapsible && !expanded
                   ? "0px"
                   : `var(${RESIZABLE_WIDTH_PROPERTY})`,
               transitionDuration: suppressWidthTransition ? "0ms" : undefined,
