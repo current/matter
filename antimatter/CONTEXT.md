@@ -59,8 +59,11 @@ When Chris asks for UI changes with options or prototypes, show a side-by-side c
 
 ## Working in parallel
 
+Our workflow is built for speed: parallelize with subagents whenever it gets the work done faster.
+
+- Every new thread sizes its task before starting. If it splits into two or more independent pieces (different files, or research beside implementation), the thread acts as the orchestrator: it plans, starts the pieces as subagents in parallel (several `Agent` calls in one message), works its own piece meanwhile, then reviews and integrates. Use subagents for broad searches and exploration too, so the lead's context stays small.
 - One task per thread. Independent tasks get their own thread in their own worktree (new thread → worktree; `Setup Worktree` runs `vp i`). Each worktree gets its own dev data and ports, so several dev windows can run at once.
 - Inside one task, the lead plans, splits the work into packages that touch different files, and hands them out, following the account order in Chris's global instructions (Claude main subagents first, then `codex`, `codex-alt`, `claude-alt-2`; never `claude-alt` unless it is under pace). Workers get absolute paths and a separate worktree (`isolation: "worktree"`), and never push.
 - The lead reviews each piece, merges into one branch, does one integrated pass in the dev window, then pushes.
 - UI options parallelize well: one worker per option mockup, the lead assembles the comparison page.
-- Don't parallelize work that edits the same files, or that is a handful of tool calls.
+- Work alone only when the task is a handful of tool calls or the pieces would edit the same files.
