@@ -1,5 +1,6 @@
 import type { BotActivityState } from "@t3tools/contracts";
 
+import { cn } from "../../lib/utils";
 import type { BotAvatarProps } from "./BotAvatarRenderer";
 import {
   GrokBotCharacter,
@@ -53,18 +54,47 @@ export function grokBotCharacterSize(size: number): GrokBotCharacterSize {
   return "lg";
 }
 
+function exactPixelSizeClass(size: number): string | undefined {
+  switch (size) {
+    case 16:
+      return "size-4";
+    case 18:
+      return "size-[18px]";
+    case 20:
+      return "size-5";
+    case 22:
+      return "size-[22px]";
+    case 24:
+      return "size-6";
+    case 32:
+      return "size-8";
+    case 36:
+      return "size-9";
+    case 40:
+      return "size-10";
+    case 44:
+      return "size-11";
+    case 48:
+      return "size-12";
+    default:
+      return undefined;
+  }
+}
+
 /** Draws a Grok Bot Bot as its own character; loaded only once a Grok Bot avatar renders. */
 export function GrokBotAvatar({ bot, size, activity, className }: BotAvatarProps) {
   const avatar = bot.avatar;
+  const resolvedClassName = cn(exactPixelSizeClass(size), className);
   return (
     <GrokBotCharacter
       name={bot.name}
+      seed={avatar?.kind === "parametric" ? (avatar.seed ?? bot.remoteBotId) : bot.remoteBotId}
       avatarDataUrl={avatar?.kind === "data-url" ? avatar.dataUrl : null}
       shape={avatar?.kind === "parametric" ? avatar.shape : null}
       color={avatar?.kind === "parametric" ? avatar.color : null}
       activityState={grokBotCharacterActivity({ bot, activity })}
       size={grokBotCharacterSize(size)}
-      {...(className === undefined ? {} : { className })}
+      {...(resolvedClassName ? { className: resolvedClassName } : {})}
     />
   );
 }

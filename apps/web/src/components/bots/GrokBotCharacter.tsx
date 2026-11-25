@@ -16,23 +16,53 @@ export type GrokBotActivityState =
 
 export type GrokBotCharacterSize = "xs" | "sm" | "md" | "lg";
 
-export type GrokBotShapeId = "blob" | "squircle" | "pill" | "capsule" | "cloud" | "star-blob";
+export type GrokBotShapeId =
+  | "blob"
+  | "squircle"
+  | "square"
+  | "pebble"
+  | "pill"
+  | "capsule"
+  | "tablet"
+  | "cylinder"
+  | "bean"
+  | "egg"
+  | "cloud"
+  | "clover"
+  | "flower"
+  | "star-blob"
+  | "four-point"
+  | "diamond"
+  | "hex"
+  | "wedge"
+  | "shield"
+  | "dome"
+  | "arch"
+  | "teardrop"
+  | "leaf"
+  | "heart"
+  | "house";
 
 export type GrokBotPaletteId =
-  | "cobalt"
-  | "emerald"
-  | "amber"
+  | "black"
+  | "gray"
+  | "brown"
   | "crimson"
-  | "violet"
-  | "indigo"
+  | "coral"
+  | "amber"
+  | "emerald"
   | "teal"
-  | "coral";
+  | "cobalt"
+  | "indigo"
+  | "violet"
+  | "magenta";
 
 export interface GrokBotCharacterProps {
   readonly name: string;
-  readonly avatarDataUrl?: string | null;
-  readonly shape?: string | null;
-  readonly color?: string | null;
+  readonly seed?: string | null | undefined;
+  readonly avatarDataUrl?: string | null | undefined;
+  readonly shape?: string | null | undefined;
+  readonly color?: string | null | undefined;
   readonly activityState: GrokBotActivityState;
   readonly size?: GrokBotCharacterSize;
   readonly reducedMotion?: boolean;
@@ -42,84 +72,260 @@ export interface GrokBotCharacterProps {
 export interface GrokBotPaletteSpec {
   readonly id: GrokBotPaletteId;
   readonly bodyFill: string;
+  readonly bodyFrom: string;
+  readonly bodyTo: string;
   readonly highlightFill: string;
   readonly strokeFill: string;
   readonly eyeFill: string;
-  readonly pupilFill: string;
+}
+
+export interface GrokBotEyeSpec {
+  readonly width: number;
+  readonly height: number;
+  readonly tiltDeg: number;
+  readonly offsetY: number;
 }
 
 export interface GrokBotExpressionSpec {
   readonly state: GrokBotActivityState;
-  readonly eyeOffsetX: number;
-  readonly eyeOffsetY: number;
-  readonly eyeRadiusX: number;
-  readonly eyeRadiusY: number;
-  readonly pupilOffsetX: number;
-  readonly pupilOffsetY: number;
-  readonly showGlint: boolean;
+  readonly gazeX: number;
+  readonly gazeY: number;
+  readonly leftEye: GrokBotEyeSpec;
+  readonly rightEye: GrokBotEyeSpec;
   readonly closedEyes: boolean;
-  readonly concernedBrows: boolean;
-  readonly mouthPath: string;
   readonly motionEligible: boolean;
   readonly ringClassName: string;
   readonly badgeClassName: string | null;
 }
 
+interface ShapeGeometry {
+  readonly path: string;
+  readonly eyeCenterY: number;
+  readonly eyeHalfGap: number;
+  readonly eyeScale: number;
+}
+
 const MAX_AVATAR_DATA_URL_LENGTH = 512 * 1024;
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/png", "image/webp", "image/jpeg"]);
 
-const SHAPES: readonly GrokBotShapeId[] = [
+// Curated auto-hash pool matching Grok Bot's primary geometric silhouettes.
+const AUTO_SHAPES: readonly GrokBotShapeId[] = [
   "blob",
   "squircle",
-  "pill",
-  "capsule",
+  "pebble",
   "cloud",
+  "tablet",
+  "hex",
+  "teardrop",
+  "diamond",
+  "clover",
   "star-blob",
 ];
 
 const SHAPE_ALIASES: Readonly<Record<string, GrokBotShapeId>> = {
   blob: "blob",
+  sphere: "blob",
   circle: "blob",
   round: "blob",
   orb: "blob",
-  drop: "blob",
   squircle: "squircle",
-  square: "squircle",
-  box: "squircle",
-  cube: "squircle",
+  square: "square",
+  box: "square",
+  cube: "square",
+  pebble: "pebble",
   pill: "pill",
   oval: "pill",
-  egg: "pill",
   capsule: "capsule",
-  pebble: "capsule",
-  bean: "capsule",
+  tablet: "tablet",
+  cylinder: "cylinder",
+  bean: "bean",
+  egg: "egg",
   cloud: "cloud",
-  clover: "cloud",
   puff: "cloud",
+  clover: "clover",
+  flower: "flower",
+  starflower: "flower",
   "star-blob": "star-blob",
   star: "star-blob",
+  star6: "star-blob",
   starblob: "star-blob",
   sun: "star-blob",
-  flower: "star-blob",
-  gem: "star-blob",
-  hex: "star-blob",
+  "four-point": "four-point",
+  sparkle: "four-point",
+  diamond: "diamond",
+  gem: "diamond",
+  crystal: "diamond",
+  hex: "hex",
+  hexagon: "hex",
+  wedge: "wedge",
+  triangle: "wedge",
+  shield: "shield",
+  dome: "dome",
+  arch: "arch",
+  teardrop: "teardrop",
+  drop: "teardrop",
+  leaf: "leaf",
+  heart: "heart",
+  heartchubby: "heart",
+  house: "house",
 };
 
-// Original clean-room silhouettes drawn in a 48x48 viewBox.
-const SHAPE_PATHS: Readonly<Record<GrokBotShapeId, string>> = {
-  blob: "M24 5C34.2 5 42.5 11.4 42.8 22.4C43.1 33.8 35.6 42.8 24.4 43C12.8 43.2 5.2 35.4 5.2 24.2C5.2 12.6 13.8 5 24 5Z",
-  squircle:
-    "M24 5C37.2 5 43 10.8 43 24C43 37.2 37.2 43 24 43C10.8 43 5 37.2 5 24C5 10.8 10.8 5 24 5Z",
-  pill: "M24 4C33.4 4 39.5 10.2 39.5 19.5V28.5C39.5 37.8 33.4 44 24 44C14.6 44 8.5 37.8 8.5 28.5V19.5C8.5 10.2 14.6 4 24 4Z",
-  capsule:
-    "M19.5 8.5H28.5C37.8 8.5 44 14.6 44 24C44 33.4 37.8 39.5 28.5 39.5H19.5C10.2 39.5 4 33.4 4 24C4 14.6 10.2 8.5 19.5 8.5Z",
-  cloud:
-    "M17.5 11.5C20.2 7.4 27.8 7.4 30.5 11.5C36.5 10.8 42.4 15.6 41.8 22.2C44.2 26.8 41.2 33.8 35.6 35.2C33.4 40.4 26.6 42.6 21.8 39.8C16.8 42.2 10.4 39.4 9.6 33.8C4.8 31.6 3.8 24.6 7.4 20.6C7.2 14.4 12.2 10.6 17.5 11.5Z",
-  "star-blob":
-    "M24 4.5C27.4 4.5 29.4 8.2 32.5 9.6C35.6 11 39.8 10.2 41.6 13.1C43.4 16 41.2 19.8 41.6 23.2C42 26.6 44.8 29.6 43.2 32.8C41.6 36 37.2 35.6 34.4 37.8C31.6 40 30.4 43.8 26.8 44C23.2 44.2 21 40.8 17.6 39.8C14.2 38.8 10.2 40.4 7.8 37.8C5.4 35.2 7.2 31.2 6.4 27.8C5.6 24.4 3.4 21.6 4.8 18.2C6.2 14.8 10.4 15 13 12.6C15.6 10.2 16.8 6.4 20.2 5.4C21.5 5 22.8 4.5 24 4.5Z",
+// Sculptural 48x48 silhouettes calibrated with Grok Bot's optical eye placement per body form.
+const SHAPE_GEOMETRY: Readonly<Record<GrokBotShapeId, ShapeGeometry>> = {
+  blob: {
+    path: "M24.2 5.2C34.4 5.2 42.4 11.8 42.6 23.2C42.8 34.4 35.4 42.8 23.8 42.8C12.6 42.8 5.4 35 5.4 23.8C5.4 12.6 13.8 5.2 24.2 5.2Z",
+    eyeCenterY: 24.5,
+    eyeHalfGap: 6.1,
+    eyeScale: 1,
+  },
+  squircle: {
+    path: "M24 5C37.5 5 43 10.5 43 24C43 37.5 37.5 43 24 43C10.5 43 5 37.5 5 24C5 10.5 10.5 5 24 5Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 6.3,
+    eyeScale: 1,
+  },
+  square: {
+    path: "M13.2 6H34.8C38.8 6 42 9.2 42 13.2V34.8C42 38.8 38.8 42 34.8 42H13.2C9.2 42 6 38.8 6 34.8V13.2C6 9.2 9.2 6 13.2 6Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 6.2,
+    eyeScale: 0.98,
+  },
+  pebble: {
+    path: "M24 7.5C35.2 7.5 43.2 13.6 43.2 24.2C43.2 34.8 35.4 40.5 24 40.5C12.6 40.5 4.8 34.8 4.8 24.2C4.8 13.6 12.8 7.5 24 7.5Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 6.4,
+    eyeScale: 0.98,
+  },
+  pill: {
+    path: "M24 4.5C33 4.5 39 10.5 39 19.5V28.5C39 37.5 33 43.5 24 43.5C15 43.5 9 37.5 9 28.5V19.5C9 10.5 15 4.5 24 4.5Z",
+    eyeCenterY: 24.2,
+    eyeHalfGap: 5.5,
+    eyeScale: 0.96,
+  },
+  capsule: {
+    path: "M19.5 8.5H28.5C37.5 8.5 43.5 14.5 43.5 24C43.5 33.5 37.5 39.5 28.5 39.5H19.5C10.5 39.5 4.5 33.5 4.5 24C4.5 14.5 10.5 8.5 19.5 8.5Z",
+    eyeCenterY: 24.2,
+    eyeHalfGap: 6.4,
+    eyeScale: 0.95,
+  },
+  tablet: {
+    path: "M15 5H33C37.4 5 40.5 8.1 40.5 12.5V35.5C40.5 39.9 37.4 43 33 43H15C10.6 43 7.5 39.9 7.5 35.5V12.5C7.5 8.1 10.6 5 15 5Z",
+    eyeCenterY: 23.6,
+    eyeHalfGap: 6,
+    eyeScale: 0.96,
+  },
+  cylinder: {
+    path: "M24 5.5C33.4 5.5 39.5 8.4 39.5 14.8V33.2C39.5 39.6 33.4 42.5 24 42.5C14.6 42.5 8.5 39.6 8.5 33.2V14.8C8.5 8.4 14.6 5.5 24 5.5Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 5.8,
+    eyeScale: 0.98,
+  },
+  bean: {
+    path: "M24.8 6.4C34.2 5.4 42.2 12.2 42 22.8C41.8 33.8 33.6 42.4 22.8 42C12.8 41.6 5.6 34.4 6.2 24.2C6.8 14.2 15.2 7.4 24.8 6.4Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 5.8,
+    eyeScale: 0.96,
+  },
+  egg: {
+    path: "M24 5C31.8 5 40.5 15.6 40.5 27.2C40.5 36.8 33.4 43 24 43C14.6 43 7.5 36.8 7.5 27.2C7.5 15.6 16.2 5 24 5Z",
+    eyeCenterY: 26,
+    eyeHalfGap: 5.6,
+    eyeScale: 0.96,
+  },
+  cloud: {
+    path: "M17.2 11.8C19.8 7.2 28.2 7.2 30.8 11.8C36.8 10.8 42.6 15.6 41.8 22.2C44.4 26.8 41.4 33.6 35.8 35C33.4 40.2 26.8 42.4 22 39.8C17 42.2 10.6 39.4 9.6 33.8C4.8 31.6 3.8 24.6 7.4 20.6C7 14.4 12 10.8 17.2 11.8Z",
+    eyeCenterY: 25,
+    eyeHalfGap: 5.7,
+    eyeScale: 0.92,
+  },
+  clover: {
+    path: "M24 11.8C27.2 5.2 38.2 6.8 38.2 15.6C38.2 18.6 36.8 21.4 34.8 23.4C41.8 24.2 43.2 35.2 35.4 38.6C31.8 40.2 27.4 39.2 24 36.2C20.6 39.2 16.2 40.2 12.6 38.6C4.8 35.2 6.2 24.2 13.2 23.4C11.2 21.4 9.8 18.6 9.8 15.6C9.8 6.8 20.8 5.2 24 11.8Z",
+    eyeCenterY: 24.6,
+    eyeHalfGap: 5.8,
+    eyeScale: 0.94,
+  },
+  flower: {
+    path: "M24 5C28.2 5 31 8.4 31.6 11.8C35 10.4 39.6 12 41 16C42.4 20 40 23.8 37.6 25.8C40.4 28.2 41.6 32.8 39 36.2C36.4 39.6 31.8 39.2 28.8 37.4C27.8 40.8 24.2 43.2 20.2 42.4C16.2 41.6 14.4 37.8 14.8 34.6C11.2 35.2 7.2 32.8 6.4 28.6C5.6 24.4 8.2 21 11 19.6C8.6 16.8 8.2 12.2 11.2 9.2C14.2 6.2 18.4 7.2 20.6 9.4C21.4 6.8 22.4 5 24 5Z",
+    eyeCenterY: 24.6,
+    eyeHalfGap: 5.4,
+    eyeScale: 0.9,
+  },
+  "star-blob": {
+    path: "M24 4.8C27.2 4.8 29.2 8.4 32.2 9.8C35.2 11.2 39.4 10.4 41.2 13.2C43 16 40.8 19.8 41.2 23C41.6 26.2 44.2 29.4 42.6 32.6C41 35.8 36.8 35.4 34 37.6C31.2 39.8 30 43.4 26.6 43.6C23.2 43.8 21 40.4 17.8 39.4C14.6 38.4 10.6 40 8.2 37.4C5.8 34.8 7.6 31 6.8 27.6C6 24.2 3.8 21.4 5.2 18C6.6 14.6 10.6 14.8 13.2 12.4C15.8 10 17 6.4 20.4 5.4C21.6 5 22.8 4.8 24 4.8Z",
+    eyeCenterY: 24.8,
+    eyeHalfGap: 5.4,
+    eyeScale: 0.9,
+  },
+  "four-point": {
+    path: "M24 4.2C26.4 14.6 33.4 21.6 43.8 24C33.4 26.4 26.4 33.4 24 43.8C21.6 33.4 14.6 26.4 4.2 24C14.6 21.6 21.6 14.6 24 4.2Z",
+    eyeCenterY: 24,
+    eyeHalfGap: 4.5,
+    eyeScale: 0.78,
+  },
+  diamond: {
+    path: "M24 5.2C26.2 5.2 28.2 6.2 29.8 7.8L40.2 18.2C43.4 21.4 43.4 26.6 40.2 29.8L29.8 40.2C26.6 43.4 21.4 43.4 18.2 40.2L7.8 29.8C4.6 26.6 4.6 21.4 7.8 18.2L18.2 7.8C19.8 6.2 21.8 5.2 24 5.2Z",
+    eyeCenterY: 24.2,
+    eyeHalfGap: 5.4,
+    eyeScale: 0.9,
+  },
+  hex: {
+    path: "M21.2 5.8C22.9 4.8 25.1 4.8 26.8 5.8L38.6 12.6C40.3 13.6 41.4 15.4 41.4 17.4V30.6C41.4 32.6 40.3 34.4 38.6 35.4L26.8 42.2C25.1 43.2 22.9 43.2 21.2 42.2L9.4 35.4C7.7 34.4 6.6 32.6 6.6 30.6V17.4C6.6 15.4 7.7 13.6 9.4 12.6L21.2 5.8Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 6.2,
+    eyeScale: 0.98,
+  },
+  wedge: {
+    path: "M20.4 8.2C22 5.4 26 5.4 27.6 8.2L41.8 33C43.4 35.8 41.4 39.4 38.2 39.4H9.8C6.6 39.4 4.6 35.8 6.2 33L20.4 8.2Z",
+    eyeCenterY: 27.8,
+    eyeHalfGap: 5.5,
+    eyeScale: 0.9,
+  },
+  shield: {
+    path: "M24 5.5C31.2 5.5 38.6 7.8 40.4 10.6C41.4 12.2 41.6 14.4 41.4 18.2C40.8 29.8 34.8 38.4 26.4 42.4C24.9 43.1 23.1 43.1 21.6 42.4C13.2 38.4 7.2 29.8 6.6 18.2C6.4 14.4 6.6 12.2 7.6 10.6C9.4 7.8 16.8 5.5 24 5.5Z",
+    eyeCenterY: 23.4,
+    eyeHalfGap: 5.7,
+    eyeScale: 0.96,
+  },
+  dome: {
+    path: "M24 6.5C34.4 6.5 42 14.2 42 25.2V34.5C42 38.4 38.8 41.5 34.9 41.5H13.1C9.2 41.5 6 38.4 6 34.5V25.2C6 14.2 13.6 6.5 24 6.5Z",
+    eyeCenterY: 25.2,
+    eyeHalfGap: 5.8,
+    eyeScale: 0.95,
+  },
+  arch: {
+    path: "M24 5C33.4 5 40.2 11.8 40.2 21.4V36.4C40.2 39.8 37.4 42.5 34 42.5H14C10.6 42.5 7.8 39.8 7.8 36.4V21.4C7.8 11.8 14.6 5 24 5Z",
+    eyeCenterY: 24.4,
+    eyeHalfGap: 5.6,
+    eyeScale: 0.95,
+  },
+  teardrop: {
+    path: "M24 5.4C26 5.4 39.8 18.6 39.8 28.4C39.8 37.2 32.8 43 24 43C15.2 43 8.2 37.2 8.2 28.4C8.2 18.6 22 5.4 24 5.4Z",
+    eyeCenterY: 27.6,
+    eyeHalfGap: 5.4,
+    eyeScale: 0.92,
+  },
+  leaf: {
+    path: "M37.4 8.2C40 10.8 42.2 17.8 40.2 26C38.2 34.6 31.2 41.4 22.6 42.2C15.8 42.8 10.2 40.2 8.2 38C5.8 35.4 5.4 28.4 7.8 20.6C10.2 12.8 17.6 6.8 26.8 6C31.8 5.6 35.4 6.4 37.4 8.2Z",
+    eyeCenterY: 24.6,
+    eyeHalfGap: 5.6,
+    eyeScale: 0.92,
+  },
+  heart: {
+    path: "M24 12.6C27.2 6.8 36.6 6.2 40.8 12.4C44.6 18 42.2 26.8 35.6 33.4L27.4 41.2C25.5 43 22.5 43 20.6 41.2L12.4 33.4C5.8 26.8 3.4 18 7.2 12.4C11.4 6.2 20.8 6.8 24 12.6Z",
+    eyeCenterY: 24.2,
+    eyeHalfGap: 5.5,
+    eyeScale: 0.9,
+  },
+  house: {
+    path: "M21.4 6.8C22.9 5.6 25.1 5.6 26.6 6.8L39.8 17.6C41.2 18.7 42 20.4 42 22.2V35.8C42 39.2 39.2 42 35.8 42H12.2C8.8 42 6 39.2 6 35.8V22.2C6 20.4 6.8 18.7 8.2 17.6L21.4 6.8Z",
+    eyeCenterY: 27.2,
+    eyeHalfGap: 5.8,
+    eyeScale: 0.94,
+  },
 };
 
-const PALETTE_ORDER: readonly GrokBotPaletteId[] = [
+// Auto-hash color pool excludes black (matching Grok Bot's own deterministic auto palette).
+const AUTO_PALETTE_ORDER: readonly GrokBotPaletteId[] = [
   "cobalt",
   "emerald",
   "amber",
@@ -131,79 +337,96 @@ const PALETTE_ORDER: readonly GrokBotPaletteId[] = [
 ];
 
 const PALETTE_ALIASES: Readonly<Record<string, GrokBotPaletteId>> = {
-  cobalt: "cobalt",
-  blue: "cobalt",
-  sky: "cobalt",
-  cyan: "cobalt",
-  azure: "cobalt",
+  black: "black",
+  obsidian: "black",
+  charcoal: "black",
+  noir: "black",
+  mono: "black",
+  gray: "gray",
+  grey: "gray",
+  slate: "gray",
+  silver: "gray",
+  zinc: "gray",
+  brown: "brown",
+  bronze: "brown",
+  espresso: "brown",
+  sand: "brown",
+  crimson: "crimson",
+  red: "crimson",
+  vermilion: "crimson",
+  rose: "crimson",
+  coral: "coral",
+  orange: "coral",
+  peach: "coral",
+  salmon: "coral",
+  amber: "amber",
+  yellow: "amber",
+  gold: "amber",
   emerald: "emerald",
   green: "emerald",
   mint: "emerald",
   lime: "emerald",
-  amber: "amber",
-  yellow: "amber",
-  gold: "amber",
-  orange: "amber",
-  crimson: "crimson",
-  red: "crimson",
-  rose: "crimson",
+  teal: "teal",
+  cyan: "teal",
+  aqua: "teal",
+  turquoise: "teal",
+  cobalt: "cobalt",
+  blue: "cobalt",
+  sky: "cobalt",
+  azure: "cobalt",
+  indigo: "indigo",
+  periwinkle: "indigo",
   violet: "violet",
   purple: "violet",
   lavender: "violet",
-  magenta: "violet",
-  pink: "violet",
-  indigo: "indigo",
-  periwinkle: "indigo",
-  teal: "teal",
-  aqua: "teal",
-  turquoise: "teal",
-  coral: "coral",
-  peach: "coral",
-  salmon: "coral",
+  magenta: "magenta",
+  pink: "magenta",
+  fuchsia: "magenta",
 };
 
-function makeSemanticPalette(
+function makePalette(
   id: GrokBotPaletteId,
-  bodyFill: string,
-  eyeFill: string,
+  bodyFrom: string,
+  bodyTo: string,
+  strokeFill: string,
+  eyeFill = "#ffffff",
+  highlightFill = "#ffffff",
 ): GrokBotPaletteSpec {
   return {
     id,
-    bodyFill,
-    highlightFill: `color-mix(in oklch, ${bodyFill} 70%, var(--background))`,
-    strokeFill: `color-mix(in oklch, ${bodyFill} 76%, var(--foreground))`,
+    bodyFill: bodyTo,
+    bodyFrom,
+    bodyTo,
+    highlightFill,
+    strokeFill,
     eyeFill,
-    pupilFill: "var(--foreground)",
   };
 }
 
+// Calibrated against Grok Bot v1.3.0's 135deg gradient palette, refined for dark and light mattr cards.
 const PALETTES: Readonly<Record<GrokBotPaletteId, GrokBotPaletteSpec>> = {
-  cobalt: makeSemanticPalette("cobalt", "var(--info)", "var(--background)"),
-  emerald: makeSemanticPalette("emerald", "var(--success)", "var(--background)"),
-  amber: makeSemanticPalette("amber", "var(--warning)", "var(--background)"),
-  crimson: makeSemanticPalette("crimson", "var(--error)", "var(--background)"),
-  violet: makeSemanticPalette("violet", "var(--guest)", "var(--background)"),
-  indigo: makeSemanticPalette("indigo", "var(--update)", "var(--background)"),
-  teal: makeSemanticPalette(
-    "teal",
-    "color-mix(in oklch, var(--success) 56%, var(--info))",
-    "var(--background)",
-  ),
-  coral: makeSemanticPalette(
-    "coral",
-    "color-mix(in oklch, var(--warning) 44%, var(--error))",
-    "var(--background)",
-  ),
+  black: makePalette("black", "#34373e", "#14161a", "rgb(255 255 255 / 0.16)"),
+  gray: makePalette("gray", "#9499a3", "#60656f", "rgb(255 255 255 / 0.16)"),
+  brown: makePalette("brown", "#aa815b", "#755132", "rgb(255 255 255 / 0.14)"),
+  crimson: makePalette("crimson", "#f54354", "#c41b2c", "rgb(255 255 255 / 0.14)"),
+  coral: makePalette("coral", "#ff7e29", "#d65100", "rgb(255 255 255 / 0.14)"),
+  amber: makePalette("amber", "#f8a523", "#cf7800", "rgb(255 255 255 / 0.14)"),
+  emerald: makePalette("emerald", "#15c978", "#058f50", "rgb(255 255 255 / 0.14)"),
+  teal: makePalette("teal", "#1dc4b2", "#068c7d", "rgb(255 255 255 / 0.14)"),
+  cobalt: makePalette("cobalt", "#3a97ff", "#0e6fe0", "rgb(255 255 255 / 0.16)"),
+  indigo: makePalette("indigo", "#6b78f7", "#444ec9", "rgb(255 255 255 / 0.16)"),
+  violet: makePalette("violet", "#9b6bff", "#6a3ad6", "rgb(255 255 255 / 0.16)"),
+  magenta: makePalette("magenta", "#f04e9f", "#bd1c6f", "rgb(255 255 255 / 0.14)"),
 };
 
-const OFFLINE_PALETTE: GrokBotPaletteSpec = {
-  id: "cobalt",
-  bodyFill: "var(--muted)",
-  highlightFill: "var(--secondary)",
-  strokeFill: "var(--border)",
-  eyeFill: "var(--muted-foreground)",
-  pupilFill: "var(--muted-foreground)",
-};
+const OFFLINE_PALETTE: GrokBotPaletteSpec = makePalette(
+  "gray",
+  "#4c515b",
+  "#33373f",
+  "rgb(255 255 255 / 0.10)",
+  "#cbd1db",
+  "#ffffff",
+);
 
 const SIZE_CLASSES: Readonly<Record<GrokBotCharacterSize, string>> = {
   xs: "size-4",
@@ -312,10 +535,12 @@ export function resolveGrokBotShape(
 ): GrokBotShapeId {
   if (typeof shape === "string") {
     const normalized = shape.trim().toLowerCase();
-    const mapped = SHAPE_ALIASES[normalized];
-    if (mapped) return mapped;
+    if (normalized !== "auto") {
+      const mapped = SHAPE_ALIASES[normalized];
+      if (mapped) return mapped;
+    }
   }
-  return SHAPES[hashSeed(`shape:${fallbackSeed}`) % SHAPES.length]!;
+  return AUTO_SHAPES[hashSeed(`shape:${fallbackSeed}`) % AUTO_SHAPES.length]!;
 }
 
 export function resolveGrokBotPalette(
@@ -324,10 +549,12 @@ export function resolveGrokBotPalette(
 ): GrokBotPaletteSpec {
   if (typeof color === "string") {
     const normalized = color.trim().toLowerCase();
-    const mapped = PALETTE_ALIASES[normalized];
-    if (mapped) return PALETTES[mapped];
+    if (normalized !== "auto") {
+      const mapped = PALETTE_ALIASES[normalized];
+      if (mapped) return PALETTES[mapped];
+    }
   }
-  const id = PALETTE_ORDER[hashSeed(`color:${fallbackSeed}`) % PALETTE_ORDER.length]!;
+  const id = AUTO_PALETTE_ORDER[hashSeed(`color:${fallbackSeed}`) % AUTO_PALETTE_ORDER.length]!;
   return PALETTES[id];
 }
 
@@ -338,16 +565,11 @@ export function resolveGrokBotExpression(
     case "working":
       return {
         state: "working",
-        eyeOffsetX: 0,
-        eyeOffsetY: 0,
-        eyeRadiusX: 3.1,
-        eyeRadiusY: 2.3,
-        pupilOffsetX: 0.4,
-        pupilOffsetY: 0,
-        showGlint: true,
+        gazeX: 0.7,
+        gazeY: 0,
+        leftEye: { width: 4.5, height: 7.4, tiltDeg: 0, offsetY: 0 },
+        rightEye: { width: 4.5, height: 7.4, tiltDeg: 0, offsetY: 0 },
         closedEyes: false,
-        concernedBrows: false,
-        mouthPath: "M20.5 31.2H27.5",
         motionEligible: true,
         ringClassName: "ring-1 ring-inset ring-primary/50",
         badgeClassName: "bg-primary",
@@ -355,16 +577,11 @@ export function resolveGrokBotExpression(
     case "thinking":
       return {
         state: "thinking",
-        eyeOffsetX: 0.8,
-        eyeOffsetY: -1.6,
-        eyeRadiusX: 3,
-        eyeRadiusY: 3.2,
-        pupilOffsetX: 0.9,
-        pupilOffsetY: -1.1,
-        showGlint: true,
+        gazeX: 1.5,
+        gazeY: -1.6,
+        leftEye: { width: 4.4, height: 8.8, tiltDeg: -6, offsetY: 0 },
+        rightEye: { width: 4.4, height: 7.4, tiltDeg: -6, offsetY: -0.4 },
         closedEyes: false,
-        concernedBrows: false,
-        mouthPath: "M21.5 31.6Q24 30.8 26.8 31.4",
         motionEligible: true,
         ringClassName: "ring-1 ring-inset ring-info/50",
         badgeClassName: "bg-info",
@@ -372,16 +589,11 @@ export function resolveGrokBotExpression(
     case "searching":
       return {
         state: "searching",
-        eyeOffsetX: 1.8,
-        eyeOffsetY: -0.2,
-        eyeRadiusX: 3.1,
-        eyeRadiusY: 3.1,
-        pupilOffsetX: 1.3,
-        pupilOffsetY: 0,
-        showGlint: true,
+        gazeX: 1.9,
+        gazeY: -0.2,
+        leftEye: { width: 5.2, height: 8.6, tiltDeg: 0, offsetY: 0 },
+        rightEye: { width: 4, height: 6.8, tiltDeg: 0, offsetY: 0.2 },
         closedEyes: false,
-        concernedBrows: false,
-        mouthPath: "M21 31.5Q24 32.3 27 31.5",
         motionEligible: true,
         ringClassName: "ring-1 ring-inset ring-info/50",
         badgeClassName: "bg-info",
@@ -389,16 +601,11 @@ export function resolveGrokBotExpression(
     case "waiting":
       return {
         state: "waiting",
-        eyeOffsetX: 0,
-        eyeOffsetY: 0,
-        eyeRadiusX: 3.2,
-        eyeRadiusY: 3.6,
-        pupilOffsetX: 0,
-        pupilOffsetY: 0.2,
-        showGlint: true,
+        gazeX: 0,
+        gazeY: 0.7,
+        leftEye: { width: 4.8, height: 5.4, tiltDeg: 0, offsetY: 0 },
+        rightEye: { width: 4.8, height: 5.4, tiltDeg: 0, offsetY: 0 },
         closedEyes: false,
-        concernedBrows: false,
-        mouthPath: "M21.8 31.6A2.2 1.2 0 0 0 26.2 31.6",
         motionEligible: true,
         ringClassName: "ring-1 ring-inset ring-warning/50",
         badgeClassName: "bg-warning",
@@ -406,16 +613,11 @@ export function resolveGrokBotExpression(
     case "error":
       return {
         state: "error",
-        eyeOffsetX: 0,
-        eyeOffsetY: 0.6,
-        eyeRadiusX: 2.8,
-        eyeRadiusY: 2.8,
-        pupilOffsetX: 0,
-        pupilOffsetY: 0.4,
-        showGlint: false,
+        gazeX: 0,
+        gazeY: 0.5,
+        leftEye: { width: 4.2, height: 7.8, tiltDeg: -22, offsetY: 0 },
+        rightEye: { width: 4.2, height: 7.8, tiltDeg: 22, offsetY: 0 },
         closedEyes: false,
-        concernedBrows: true,
-        mouthPath: "M20.5 33Q24 30.4 27.5 33",
         motionEligible: false,
         ringClassName: "ring-1 ring-inset ring-error/70",
         badgeClassName: "bg-error",
@@ -423,16 +625,11 @@ export function resolveGrokBotExpression(
     case "attention":
       return {
         state: "attention",
-        eyeOffsetX: 0,
-        eyeOffsetY: -0.5,
-        eyeRadiusX: 3.4,
-        eyeRadiusY: 3.8,
-        pupilOffsetX: 0,
-        pupilOffsetY: -0.3,
-        showGlint: true,
+        gazeX: 0,
+        gazeY: -0.7,
+        leftEye: { width: 4.9, height: 11.2, tiltDeg: 0, offsetY: 0 },
+        rightEye: { width: 4.9, height: 11.2, tiltDeg: 0, offsetY: 0 },
         closedEyes: false,
-        concernedBrows: false,
-        mouthPath: "M21.5 31.4Q24 33.4 26.5 31.4",
         motionEligible: true,
         ringClassName: "ring-2 ring-inset ring-warning",
         badgeClassName: "bg-warning",
@@ -440,16 +637,11 @@ export function resolveGrokBotExpression(
     case "offline":
       return {
         state: "offline",
-        eyeOffsetX: 0,
-        eyeOffsetY: 0.5,
-        eyeRadiusX: 3,
-        eyeRadiusY: 1.5,
-        pupilOffsetX: 0,
-        pupilOffsetY: 0,
-        showGlint: false,
+        gazeX: 0,
+        gazeY: 0.8,
+        leftEye: { width: 5.4, height: 2.2, tiltDeg: 0, offsetY: 0 },
+        rightEye: { width: 5.4, height: 2.2, tiltDeg: 0, offsetY: 0 },
         closedEyes: true,
-        concernedBrows: false,
-        mouthPath: "M21.5 31.8H26.5",
         motionEligible: false,
         ringClassName: "ring-1 ring-inset ring-border",
         badgeClassName: null,
@@ -457,16 +649,11 @@ export function resolveGrokBotExpression(
     case "idle":
       return {
         state: "idle",
-        eyeOffsetX: 0,
-        eyeOffsetY: 0,
-        eyeRadiusX: 3,
-        eyeRadiusY: 3.3,
-        pupilOffsetX: 0,
-        pupilOffsetY: 0,
-        showGlint: true,
+        gazeX: 0,
+        gazeY: 0,
+        leftEye: { width: 4.5, height: 9.8, tiltDeg: 0, offsetY: 0 },
+        rightEye: { width: 4.5, height: 9.8, tiltDeg: 0, offsetY: 0 },
         closedEyes: false,
-        concernedBrows: false,
-        mouthPath: "M20.6 31.2Q24 33.4 27.4 31.2",
         motionEligible: false,
         ringClassName: "",
         badgeClassName: null,
@@ -496,6 +683,7 @@ function readReducedMotionServerSnapshot(): boolean {
 
 export function GrokBotCharacter({
   name,
+  seed,
   avatarDataUrl,
   shape,
   color,
@@ -511,13 +699,18 @@ export function GrokBotCharacter({
     readReducedMotionSnapshot,
     readReducedMotionServerSnapshot,
   );
-  const clipId = `grok-bot-clip-${useId().replaceAll(":", "")}`;
+  const instanceId = useId().replaceAll(":", "");
+  const gradId = `grok-bot-grad-${instanceId}`;
+  const sheenId = `grok-bot-sheen-${instanceId}`;
+  const clipId = `grok-bot-clip-${instanceId}`;
 
+  const fallbackSeed = seed && seed.trim().length > 0 ? seed : name;
   const safeAvatarUrl = sanitizeAvatarDataUrl(avatarDataUrl);
   const expression = resolveGrokBotExpression(activityState);
-  const shapeId = resolveGrokBotShape(shape, name);
+  const shapeId = resolveGrokBotShape(shape, fallbackSeed);
+  const geometry = SHAPE_GEOMETRY[shapeId];
   const palette =
-    activityState === "offline" ? OFFLINE_PALETTE : resolveGrokBotPalette(color, name);
+    activityState === "offline" ? OFFLINE_PALETTE : resolveGrokBotPalette(color, fallbackSeed);
   const shouldAnimate =
     expression.motionEligible && reducedMotion !== true && !systemReducedMotion && isInViewport;
 
@@ -541,11 +734,20 @@ export function GrokBotCharacter({
 
   const statusText = m(ACTIVITY_LABELS[activityState]);
   const ariaLabel = m(msg("{name} ({status})", { name, status: statusText }));
-  const showMicroDetails = size !== "xs";
+  const showSheen = size !== "xs";
+  const smallBoost = size === "xs" ? 1.12 : 1;
 
-  const leftEyeX = 18.2 + expression.eyeOffsetX;
-  const rightEyeX = 29.8 + expression.eyeOffsetX;
-  const eyeY = 22.2 + expression.eyeOffsetY;
+  const leftCx = 24 - geometry.eyeHalfGap + expression.gazeX;
+  const rightCx = 24 + geometry.eyeHalfGap + expression.gazeX;
+  const baseCy = geometry.eyeCenterY + expression.gazeY;
+
+  const leftW = expression.leftEye.width * geometry.eyeScale * smallBoost;
+  const leftH = expression.leftEye.height * geometry.eyeScale;
+  const leftCy = baseCy + expression.leftEye.offsetY;
+
+  const rightW = expression.rightEye.width * geometry.eyeScale * smallBoost;
+  const rightH = expression.rightEye.height * geometry.eyeScale;
+  const rightCy = baseCy + expression.rightEye.offsetY;
 
   return (
     <span
@@ -560,7 +762,7 @@ export function GrokBotCharacter({
       className={cn(
         "relative inline-flex shrink-0 select-none items-center justify-center rounded-full align-middle",
         SIZE_CLASSES[size],
-        activityState === "offline" && "opacity-65",
+        activityState === "offline" && "opacity-70",
         safeAvatarUrl && "overflow-hidden bg-muted",
         safeAvatarUrl && expression.ringClassName,
         className,
@@ -575,114 +777,88 @@ export function GrokBotCharacter({
           className="size-full object-cover"
         />
       ) : (
-        <svg
-          viewBox="0 0 48 48"
-          aria-hidden="true"
-          className={cn("size-full overflow-visible", shouldAnimate && "animate-status-pulse")}
-        >
+        <svg viewBox="0 0 48 48" aria-hidden="true" className="size-full overflow-visible">
           <defs>
+            <linearGradient id={gradId} x1="12%" y1="8%" x2="88%" y2="92%">
+              <stop offset="0%" stopColor={palette.bodyFrom} />
+              <stop offset="100%" stopColor={palette.bodyTo} />
+            </linearGradient>
+            {showSheen ? (
+              <radialGradient id={sheenId} cx="32%" cy="22%" r="58%">
+                <stop offset="0%" stopColor={palette.highlightFill} stopOpacity="0.22" />
+                <stop offset="60%" stopColor={palette.highlightFill} stopOpacity="0.04" />
+                <stop offset="100%" stopColor={palette.highlightFill} stopOpacity="0" />
+              </radialGradient>
+            ) : null}
             <clipPath id={clipId}>
-              <path d={SHAPE_PATHS[shapeId]} />
+              <path d={geometry.path} />
             </clipPath>
           </defs>
 
           <path
-            d={SHAPE_PATHS[shapeId]}
-            fill={palette.bodyFill}
+            d={geometry.path}
+            fill={`url(#${gradId})`}
             stroke={palette.strokeFill}
-            strokeWidth={size === "xs" ? 1.5 : 1.2}
+            strokeWidth={size === "xs" ? 1.5 : 1.1}
           />
 
-          {showMicroDetails ? (
-            <ellipse
-              cx="20"
-              cy="12.5"
-              rx="11"
-              ry="4.5"
-              fill={palette.highlightFill}
-              opacity="0.35"
+          {showSheen ? (
+            <rect
+              x="0"
+              y="0"
+              width="48"
+              height="48"
+              fill={`url(#${sheenId})`}
               clipPath={`url(#${clipId})`}
             />
           ) : null}
 
-          {expression.closedEyes ? (
-            <g
-              fill="none"
-              stroke={palette.eyeFill}
-              strokeWidth={size === "xs" ? 2.4 : 2}
-              strokeLinecap="round"
-            >
-              <path
-                d={`M${leftEyeX - 3} ${eyeY}Q${leftEyeX} ${eyeY + 2.2} ${leftEyeX + 3} ${eyeY}`}
-              />
-              <path
-                d={`M${rightEyeX - 3} ${eyeY}Q${rightEyeX} ${eyeY + 2.2} ${rightEyeX + 3} ${eyeY}`}
-              />
-            </g>
-          ) : (
-            <g>
-              <ellipse
-                cx={leftEyeX}
-                cy={eyeY}
-                rx={expression.eyeRadiusX}
-                ry={expression.eyeRadiusY}
-                fill={palette.eyeFill}
-              />
-              <ellipse
-                cx={rightEyeX}
-                cy={eyeY}
-                rx={expression.eyeRadiusX}
-                ry={expression.eyeRadiusY}
-                fill={palette.eyeFill}
-              />
-              <circle
-                cx={leftEyeX + expression.pupilOffsetX}
-                cy={eyeY + expression.pupilOffsetY}
-                r={size === "xs" ? 1.5 : 1.35}
-                fill={palette.pupilFill}
-              />
-              <circle
-                cx={rightEyeX + expression.pupilOffsetX}
-                cy={eyeY + expression.pupilOffsetY}
-                r={size === "xs" ? 1.5 : 1.35}
-                fill={palette.pupilFill}
-              />
-              {expression.showGlint && showMicroDetails ? (
-                <g fill={palette.eyeFill} opacity="0.9">
-                  <circle cx={leftEyeX + 0.9} cy={eyeY - 1.1} r="0.65" />
-                  <circle cx={rightEyeX + 0.9} cy={eyeY - 1.1} r="0.65" />
-                </g>
-              ) : null}
-            </g>
-          )}
-
-          {expression.concernedBrows ? (
-            <g fill="none" stroke={palette.eyeFill} strokeWidth="1.7" strokeLinecap="round">
-              <path d={`M${leftEyeX - 3.2} ${eyeY - 4.2}L${leftEyeX + 2.4} ${eyeY - 5.6}`} />
-              <path d={`M${rightEyeX + 3.2} ${eyeY - 4.2}L${rightEyeX - 2.4} ${eyeY - 5.6}`} />
-            </g>
-          ) : null}
-
-          {showMicroDetails ? (
-            <path
-              d={expression.mouthPath}
-              fill="none"
-              stroke={palette.eyeFill}
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          ) : null}
-
-          {activityState === "thinking" && showMicroDetails ? (
-            <g fill={palette.eyeFill} opacity="0.85">
-              <circle cx="35.5" cy="13.5" r="1.2" />
-              <circle cx="39" cy="10.2" r="1.7" />
-            </g>
-          ) : null}
-
-          {activityState === "attention" && showMicroDetails ? (
-            <circle cx="36.5" cy="12" r="2.2" fill="var(--warning)" />
-          ) : null}
+          <g className={cn(shouldAnimate && "animate-status-pulse")}>
+            {expression.closedEyes ? (
+              <g
+                fill="none"
+                stroke={palette.eyeFill}
+                strokeWidth={size === "xs" ? 2.6 : 2.2}
+                strokeLinecap="round"
+              >
+                <path
+                  d={`M${leftCx - 3} ${leftCy - 0.3}Q${leftCx} ${leftCy + 2.3} ${leftCx + 3} ${leftCy - 0.3}`}
+                />
+                <path
+                  d={`M${rightCx - 3} ${rightCy - 0.3}Q${rightCx} ${rightCy + 2.3} ${rightCx + 3} ${rightCy - 0.3}`}
+                />
+              </g>
+            ) : (
+              <g fill={palette.eyeFill}>
+                <rect
+                  x={leftCx - leftW / 2}
+                  y={leftCy - leftH / 2}
+                  width={leftW}
+                  height={leftH}
+                  rx={leftW / 2}
+                  ry={leftW / 2}
+                  transform={
+                    expression.leftEye.tiltDeg !== 0
+                      ? `rotate(${expression.leftEye.tiltDeg} ${leftCx} ${leftCy})`
+                      : undefined
+                  }
+                />
+                <rect
+                  x={rightCx - rightW / 2}
+                  y={rightCy - rightH / 2}
+                  width={rightW}
+                  height={rightH}
+                  rx={rightW / 2}
+                  ry={rightW / 2}
+                  transform={
+                    expression.rightEye.tiltDeg !== 0
+                      ? `rotate(${expression.rightEye.tiltDeg} ${rightCx} ${rightCy})`
+                      : undefined
+                  }
+                />
+              </g>
+            )}
+          </g>
         </svg>
       )}
 
@@ -691,7 +867,7 @@ export function GrokBotCharacter({
           aria-hidden="true"
           data-slot="grok-bot-activity-badge"
           className={cn(
-            "pointer-events-none absolute right-0 bottom-0 rounded-full ring-1 ring-inset ring-background",
+            "pointer-events-none absolute -right-0.5 -bottom-0.5 rounded-full ring-2 ring-background",
             BADGE_SIZE_CLASSES[size],
             expression.badgeClassName,
             shouldAnimate && "animate-status-pulse",

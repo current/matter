@@ -54,35 +54,56 @@ describe("sanitizeAvatarDataUrl", () => {
 });
 
 describe("deterministic shape & color mapping", () => {
-  it("maps explicit shapes and aliases consistently and hashes deterministically when omitted", () => {
+  it("maps real Grok Bot shapes and aliases consistently and hashes deterministically for auto/unknown", () => {
     expect(resolveGrokBotShape("blob", "Researcher")).toBe("blob");
     expect(resolveGrokBotShape("squircle", "Researcher")).toBe("squircle");
+    expect(resolveGrokBotShape("square", "Researcher")).toBe("square");
+    expect(resolveGrokBotShape("diamond", "Researcher")).toBe("diamond");
+    expect(resolveGrokBotShape("gem", "Researcher")).toBe("diamond");
     expect(resolveGrokBotShape("pill", "Researcher")).toBe("pill");
     expect(resolveGrokBotShape("capsule", "Researcher")).toBe("capsule");
     expect(resolveGrokBotShape("cloud", "Researcher")).toBe("cloud");
     expect(resolveGrokBotShape("star-blob", "Researcher")).toBe("star-blob");
     expect(resolveGrokBotShape("STAR", "Researcher")).toBe("star-blob");
-    expect(resolveGrokBotShape("square", "Researcher")).toBe("squircle");
+    expect(resolveGrokBotShape("teardrop", "Researcher")).toBe("teardrop");
 
     const fallbackA = resolveGrokBotShape(undefined, "Release Bot");
-    const fallbackB = resolveGrokBotShape(null, "Release Bot");
+    const fallbackB = resolveGrokBotShape("auto", "Release Bot");
+    const fallbackNull = resolveGrokBotShape(null, "Release Bot");
     const fallbackUnknown = resolveGrokBotShape("unknown-shape-v9", "Release Bot");
     expect(fallbackA).toBe(fallbackB);
+    expect(fallbackA).toBe(fallbackNull);
     expect(fallbackA).toBe(fallbackUnknown);
   });
 
-  it("maps explicit color tokens and falls back deterministically using theme CSS variables", () => {
+  it("maps explicit Grok Bot colors including black, red, gray, brown, blue, and auto deterministically", () => {
+    const black = resolveGrokBotPalette("black", "Nightwatch");
+    expect(black.id).toBe("black");
+    expect(black.eyeFill).toBe("#ffffff");
+    expect(black.bodyTo).toBe("#14161a");
+
+    const red = resolveGrokBotPalette("red", "Alert Bot");
+    expect(red.id).toBe("crimson");
+    expect(red.eyeFill).toBe("#ffffff");
+
     const cobalt = resolveGrokBotPalette("blue", "Bot");
     expect(cobalt.id).toBe("cobalt");
-    expect(cobalt.bodyFill).toContain("var(--");
 
     const emerald = resolveGrokBotPalette("emerald", "Bot");
     expect(emerald.id).toBe("emerald");
 
-    const fallback1 = resolveGrokBotPalette(undefined, "Daily Triage");
-    const fallback2 = resolveGrokBotPalette("not-a-color", "Daily Triage");
-    expect(fallback1).toEqual(fallback2);
-    expect(fallback1.bodyFill).not.toMatch(/#[0-9a-f]{3,8}/i);
+    const gray = resolveGrokBotPalette("gray", "Bot");
+    expect(gray.id).toBe("gray");
+
+    const brown = resolveGrokBotPalette("brown", "Bot");
+    expect(brown.id).toBe("brown");
+
+    const fallbackAuto = resolveGrokBotPalette("auto", "Daily Triage");
+    const fallbackUndefined = resolveGrokBotPalette(undefined, "Daily Triage");
+    const fallbackUnknown = resolveGrokBotPalette("not-a-color", "Daily Triage");
+    expect(fallbackAuto).toEqual(fallbackUndefined);
+    expect(fallbackAuto).toEqual(fallbackUnknown);
+    expect(fallbackAuto.id).not.toBe("black");
   });
 });
 
@@ -98,7 +119,7 @@ describe("GrokBotCharacter rendering & activity states", () => {
     "offline",
   ];
 
-  it("renders a sanitized raster avatar image and falls back to clean-room SVG on SVG XSS data URLs", () => {
+  it("renders a sanitized raster avatar image and falls back to geometric SVG on SVG XSS data URLs", () => {
     const validHtml = renderToStaticMarkup(
       createElement(GrokBotCharacter, {
         name: "Ops Bot",
@@ -116,7 +137,7 @@ describe("GrokBotCharacter rendering & activity states", () => {
         name: "Ops Bot",
         avatarDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
         shape: "cloud",
-        color: "violet",
+        color: "black",
         activityState: "idle",
         size: "md",
       }),
@@ -124,15 +145,16 @@ describe("GrokBotCharacter rendering & activity states", () => {
     expect(rejectedHtml).not.toContain("<img");
     expect(rejectedHtml).toContain("<svg");
     expect(rejectedHtml).toContain('data-shape="cloud"');
-    expect(rejectedHtml).toContain('data-palette="violet"');
+    expect(rejectedHtml).toContain('data-palette="black"');
+    expect(rejectedHtml).toContain('fill="#ffffff"');
   });
 
-  it("covers all 8 activity states with distinct expressions and respects reducedMotion and idle stillness", () => {
+  it("draws sculptural capsule eyes without emoji mouths and covers all 8 activity states with distinct expressions", () => {
     const expressions = ALL_STATES.map((state) => resolveGrokBotExpression(state));
     const distinctSignatures = new Set(
       expressions.map(
         (spec) =>
-          `${spec.eyeOffsetX}:${spec.eyeOffsetY}:${spec.eyeRadiusX}:${spec.eyeRadiusY}:${spec.closedEyes}:${spec.concernedBrows}:${spec.mouthPath}`,
+          `${spec.gazeX}:${spec.gazeY}:${spec.leftEye.width}:${spec.leftEye.height}:${spec.leftEye.tiltDeg}:${spec.rightEye.width}:${spec.rightEye.height}:${spec.rightEye.tiltDeg}:${spec.closedEyes}`,
       ),
     );
     expect(distinctSignatures.size).toBe(ALL_STATES.length);
@@ -141,6 +163,7 @@ describe("GrokBotCharacter rendering & activity states", () => {
       const html = renderToStaticMarkup(
         createElement(GrokBotCharacter, {
           name: "Atlas",
+          color: "black",
           activityState: state,
           size: "lg",
         }),
@@ -149,6 +172,9 @@ describe("GrokBotCharacter rendering & activity states", () => {
       expect(html).toContain(`data-activity-state="${state}"`);
       expect(html).toContain("Atlas");
       expect(html).toContain("<svg");
+      // Never renders cartoony pupils/ellipses from the old emoji-smiley design.
+      expect(html).not.toContain("<ellipse");
+      expect(html).not.toContain("<circle");
 
       if (state === "idle" || state === "offline" || state === "error") {
         expect(html).toContain('data-animated="false"');
@@ -168,7 +194,7 @@ describe("GrokBotCharacter rendering & activity states", () => {
     expect(reducedHtml).not.toContain("animate-status-pulse");
   });
 
-  it("simplifies micro-details at xs sidebar size while keeping bold readable eyes", () => {
+  it("omits subtle sheen at xs sidebar size while preserving crisp capsule eyes", () => {
     const xsHtml = renderToStaticMarkup(
       createElement(GrokBotCharacter, {
         name: "Tiny",
@@ -189,7 +215,7 @@ describe("GrokBotCharacter rendering & activity states", () => {
     );
     expect(xsHtml).toContain("size-4");
     expect(lgHtml).toContain("size-12");
-    expect(xsHtml).not.toContain('opacity="0.35"');
-    expect(lgHtml).toContain('opacity="0.35"');
+    expect(xsHtml).not.toContain("radialGradient");
+    expect(lgHtml).toContain("radialGradient");
   });
 });

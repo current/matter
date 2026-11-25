@@ -372,7 +372,125 @@ export function deduplicateGrokBotMessages(
  * Touches only renderer UI stores (roster/transcript); never reads tokens, cookies, or Keychain.
  */
 const RENDERER_STORE_HELPER_SNIPPET = `
+  const findGrokShellProps = () => {
+    const root = document.getElementById("root");
+    if (!root) return null;
+    const containerKey = Object.keys(root).find((k) => k.startsWith("__reactContainer$"));
+    if (!containerKey) return null;
+    const start = root[containerKey] && root[containerKey].current ? root[containerKey].current : root[containerKey];
+    const stack = start ? [start] : [];
+    let visited = 0;
+    while (stack.length > 0 && visited < 1500) {
+      const f = stack.pop();
+      visited += 1;
+      if (!f) continue;
+      const p = f.memoizedProps;
+      if (p && typeof p === "object" && Array.isArray(p.agents) && p.transcriptActionsRef && p.screenInputs) {
+        return p;
+      }
+      if (f.sibling) stack.push(f.sibling);
+      if (f.child) stack.push(f.child);
+    }
+    return null;
+  };
+
+  const extractShellText = (entry) => {
+    if (!entry || typeof entry !== "object") return "";
+    if (entry.kind === "message") {
+      if (typeof entry.content === "string") return entry.content;
+      if (typeof entry.text === "string") return entry.text;
+      return "";
+    }
+    if (entry.kind === "send-message") {
+      if (typeof entry.message === "string") return entry.message;
+      if (entry.message && typeof entry.message === "object") {
+        if (typeof entry.message.content === "string") return entry.message.content;
+        if (typeof entry.message.text === "string") return entry.message.text;
+      }
+      return "";
+    }
+    return "";
+  };
+
+  const mapShellEntries = (entries, cursor) => {
+    const normalized = [];
+    for (let i = 0; i < entries.length; i += 1) {
+      const e = entries[i];
+      if (!e || (e.kind !== "message" && e.kind !== "send-message")) continue;
+      const text = extractShellText(e).trim();
+      if (!text) continue;
+      normalized.push({
+        id: e.id || String(e.seq ?? i),
+        seq: e.seq ?? null,
+        role: e.kind === "send-message" ? "assistant" : (e.role || "assistant"),
+        text,
+        timestampMs: e.timestampMs ?? e.createdAtMs ?? null,
+        clientNonce: e.clientNonce ?? null,
+        replyToId: e.replyToId ?? null,
+        isStreaming: Boolean(e.isStreaming),
+      });
+    }
+    const pageSize = 50;
+    const endIdx = cursor && /^\\d+$/.test(cursor) ? Math.min(normalized.length, Number(cursor)) : normalized.length;
+    const startIdx = Math.max(0, endIdx - pageSize);
+    return {
+      messages: normalized.slice(startIdx, endIdx),
+      nextCursor: startIdx > 0 ? String(startIdx) : null,
+      hasMore: startIdx > 0,
+    };
+  };
+
   const findStores = () => {
+    const shell = findGrokShellProps();
+    if (shell) {
+      const selectAndWait = async (botId) => {
+        if (shell.currentAgentId === botId) return findGrokShellProps() || shell;
+        const select = shell.screenInputs && typeof shell.screenInputs.selectAgent === "function"
+          ? shell.screenInputs.selectAgent
+          : typeof shell.openAgentChat === "function"
+            ? shell.openAgentChat
+            : null;
+        if (!select) return null;
+        select(botId);
+        for (let attempt = 0; attempt < 25; attempt += 1) {
+          await new Promise((r) => setTimeout(r, 80));
+          const fresh = findGrokShellProps();
+          if (fresh && fresh.currentAgentId === botId) return fresh;
+        }
+        return findGrokShellProps();
+      };
+      return {
+        roster: { agents: shell.agents },
+        transcript: {
+          getMessages: async (botId, cursor) => {
+            const exists = shell.agents.some((a) => a && a.id === botId);
+            if (!exists) return null;
+            const active = await selectAndWait(botId);
+            const reader = active && active.transcriptActionsRef && active.transcriptActionsRef.current && active.transcriptActionsRef.current.readEntries;
+            if (typeof reader !== "function") return { messages: [], nextCursor: null, hasMore: false };
+            const entries = await reader();
+            return mapShellEntries(Array.isArray(entries) ? entries : [], cursor);
+          },
+          sendMessage: async (botId, text) => {
+            const exists = shell.agents.some((a) => a && a.id === botId);
+            if (!exists) throw new Error("bot_not_found");
+            const active = await selectAndWait(botId);
+            const composer = active && active.screenInputs && active.screenInputs.composer;
+            if (!composer || typeof composer.submitPrompt !== "function") throw new Error("no_composer");
+            await composer.submitPrompt(text, []);
+            return { id: null };
+          },
+          cancelRun: async () => {
+            const fresh = findGrokShellProps() || shell;
+            const actions = fresh && fresh.screenInputs && fresh.screenInputs.composer && fresh.screenInputs.composer.sendActions;
+            if (actions && typeof actions.cancelQueued === "function") {
+              await actions.cancelQueued();
+            }
+          },
+        },
+      };
+    }
+
     const rootEl = document.querySelector(".sand-agent-item") || document.querySelector("#root") || document.body;
     if (!rootEl) return null;
     const fiberKey = Object.keys(rootEl).find((k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"));
@@ -420,12 +538,12 @@ export function buildDiscoverBotsExpression(): string {
         avatarShape: a && (a.avatarShape ?? a.shape),
         avatarColor: a && (a.avatarColor ?? a.color),
         status: a && (a.status ?? a.activityState),
-        isRunning: Boolean(a && a.isRunning),
+        isRunning: Boolean(a && (a.isRunning || a.isRunningTurn || a.isComposingMessage)),
         awaitingUserResponse: Boolean(a && a.awaitingUserResponse),
         unreadCount: a && a.unreadCount,
         hasUnread: Boolean(a && a.hasUnread),
-        lastMessagePreview: a && (a.lastMessagePreview ?? a.preview),
-        lastActivityAtMs: a && (a.lastActivityAtMs ?? a.updatedAtMs),
+        lastMessagePreview: a && (a.lastMessagePreview ?? a.preview ?? (a.lastEntry && a.lastEntry.text)),
+        lastActivityAtMs: a && (a.lastActivityAtMs ?? a.lastActivityAt ?? a.updatedAtMs ?? a.updatedAt),
       }));
       return { ok: true, data: { bots } };
     } catch {
