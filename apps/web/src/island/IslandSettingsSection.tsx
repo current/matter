@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import { msg, T, useGT, useMessages } from "gt-react";
 import { RadioIcon, Volume2Icon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -13,7 +13,11 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
-import { SettingsRow, SettingsSection } from "../components/settings/settingsLayout";
+import {
+  SettingResetButton,
+  SettingsRow,
+  SettingsSection,
+} from "../components/settings/settingsLayout";
 import { usePrimaryEnvironmentId } from "../state/environments";
 import { environmentSummaries } from "../state/presentation";
 import { usePreparedConnection } from "../state/session";
@@ -30,13 +34,14 @@ import {
   syncVoiceTtsPreferencesToServer,
 } from "./voiceAssistantStore";
 import type { IslandShortcutMode } from "../../../../antimatter/island/types";
-import type {
-  ElevenLabsTtsModel,
-  VoiceAssistantSettings,
-  VoiceAvailableTtsInfo,
-  VoiceCredentialsStatus,
-  VoiceSpeakRequest,
-  VoiceTtsProvider,
+import {
+  DEFAULT_ELEVENLABS_VOICE_SETTINGS,
+  type ElevenLabsTtsModel,
+  type VoiceAssistantSettings,
+  type VoiceAvailableTtsInfo,
+  type VoiceCredentialsStatus,
+  type VoiceSpeakRequest,
+  type VoiceTtsProvider,
 } from "../../../../antimatter/voice-assistant/types";
 
 const SHORTCUT_OPTIONS: ReadonlyArray<{
@@ -398,7 +403,21 @@ export function IslandSettingsSection() {
     }
     setCredentialFeedback(null);
     setCustomVoiceInput("");
-    updateTtsSettings({ elevenlabsVoice: voiceId });
+    updateTtsSettings({ elevenlabsCustomVoiceId: voiceId });
+  };
+
+  const handleClearCustomVoice = () => {
+    setCredentialFeedback(null);
+    setCustomVoiceInput("");
+    updateTtsSettings({ elevenlabsCustomVoiceId: "" });
+  };
+
+  const sliderStyle = (value: number, min: number, max: number): CSSProperties => {
+    const ratio = (value - min) / (max - min);
+    return {
+      "--settings-slider-progress": `${ratio * 100}%`,
+      "--settings-slider-fill-offset": `${0.5 - ratio}rem`,
+    } as CSSProperties;
   };
 
   const handleTestVoice = async () => {
@@ -711,19 +730,25 @@ export function IslandSettingsSection() {
             />
             <SettingsRow
               title={gt("ElevenLabs voice")}
-              description={gt("Pick a conversational voice or paste a voice ID from your library.")}
+              description={gt(
+                "Pick a conversational voice or paste a custom voice ID from your library to override it.",
+              )}
               control={
                 <Select
                   value={va.elevenlabsVoice}
                   onValueChange={(value) => {
-                    if (value) updateTtsSettings({ elevenlabsVoice: value });
+                    if (value) {
+                      updateTtsSettings({ elevenlabsVoice: value, elevenlabsCustomVoiceId: "" });
+                    }
                   }}
                 >
                   <SelectTrigger size="sm" aria-label={gt("ElevenLabs voice")}>
                     <SelectValue>
-                      {matchedElevenLabsVoice
-                        ? messages(matchedElevenLabsVoice.label)
-                        : gt("Custom voice ({voiceId})", { voiceId: va.elevenlabsVoice })}
+                      {va.elevenlabsCustomVoiceId
+                        ? gt("Custom voice ({voiceId})", { voiceId: va.elevenlabsCustomVoiceId })
+                        : matchedElevenLabsVoice
+                          ? messages(matchedElevenLabsVoice.label)
+                          : gt("Custom voice ({voiceId})", { voiceId: va.elevenlabsVoice })}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -747,7 +772,11 @@ export function IslandSettingsSection() {
                   className="max-w-xs flex-1"
                   value={customVoiceInput}
                   onChange={(event) => setCustomVoiceInput(event.target.value)}
-                  placeholder={gt("Custom voice ID")}
+                  placeholder={
+                    va.elevenlabsCustomVoiceId
+                      ? gt("Active custom ID: {voiceId}", { voiceId: va.elevenlabsCustomVoiceId })
+                      : gt("Custom voice ID (overrides preset)")
+                  }
                   autoComplete="off"
                   spellCheck={false}
                   aria-label={gt("Custom ElevenLabs voice ID")}
@@ -761,8 +790,195 @@ export function IslandSettingsSection() {
                 >
                   <T>Use voice</T>
                 </Button>
+                {va.elevenlabsCustomVoiceId ? (
+                  <Button type="button" size="xs" variant="ghost" onClick={handleClearCustomVoice}>
+                    <T>Clear</T>
+                  </Button>
+                ) : null}
               </div>
             </SettingsRow>
+
+            <SettingsRow
+              title={gt("Voice stability")}
+              description={gt("Lower values sound more expressive; higher values sound steadier.")}
+              resetAction={
+                va.elevenlabsStability !== DEFAULT_ELEVENLABS_VOICE_SETTINGS.stability ? (
+                  <SettingResetButton
+                    ariaLabel={gt("Reset voice stability to default")}
+                    onClick={() =>
+                      updateTtsSettings({
+                        elevenlabsStability: DEFAULT_ELEVENLABS_VOICE_SETTINGS.stability,
+                      })
+                    }
+                  />
+                ) : null
+              }
+              control={
+                <div className="flex w-full items-center gap-3 sm:w-52">
+                  <output
+                    className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                    htmlFor="elevenlabs-stability"
+                  >
+                    {va.elevenlabsStability.toFixed(2)}
+                  </output>
+                  <input
+                    id="elevenlabs-stability"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={va.elevenlabsStability}
+                    style={sliderStyle(va.elevenlabsStability, 0, 1)}
+                    className="settings-slider min-w-0 flex-1"
+                    aria-label={gt("ElevenLabs voice stability")}
+                    onChange={(event) =>
+                      updateTtsSettings({ elevenlabsStability: Number(event.currentTarget.value) })
+                    }
+                  />
+                </div>
+              }
+            />
+
+            <SettingsRow
+              title={gt("Similarity boost")}
+              description={gt("Controls how closely the output matches the original voice.")}
+              resetAction={
+                va.elevenlabsSimilarityBoost !==
+                DEFAULT_ELEVENLABS_VOICE_SETTINGS.similarityBoost ? (
+                  <SettingResetButton
+                    ariaLabel={gt("Reset similarity boost to default")}
+                    onClick={() =>
+                      updateTtsSettings({
+                        elevenlabsSimilarityBoost:
+                          DEFAULT_ELEVENLABS_VOICE_SETTINGS.similarityBoost,
+                      })
+                    }
+                  />
+                ) : null
+              }
+              control={
+                <div className="flex w-full items-center gap-3 sm:w-52">
+                  <output
+                    className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                    htmlFor="elevenlabs-similarity"
+                  >
+                    {va.elevenlabsSimilarityBoost.toFixed(2)}
+                  </output>
+                  <input
+                    id="elevenlabs-similarity"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={va.elevenlabsSimilarityBoost}
+                    style={sliderStyle(va.elevenlabsSimilarityBoost, 0, 1)}
+                    className="settings-slider min-w-0 flex-1"
+                    aria-label={gt("ElevenLabs similarity boost")}
+                    onChange={(event) =>
+                      updateTtsSettings({
+                        elevenlabsSimilarityBoost: Number(event.currentTarget.value),
+                      })
+                    }
+                  />
+                </div>
+              }
+            />
+
+            <SettingsRow
+              title={gt("Style & emotion")}
+              description={gt("Amplifies vocal expressiveness and cadence.")}
+              resetAction={
+                va.elevenlabsStyle !== DEFAULT_ELEVENLABS_VOICE_SETTINGS.style ? (
+                  <SettingResetButton
+                    ariaLabel={gt("Reset voice style to default")}
+                    onClick={() =>
+                      updateTtsSettings({
+                        elevenlabsStyle: DEFAULT_ELEVENLABS_VOICE_SETTINGS.style,
+                      })
+                    }
+                  />
+                ) : null
+              }
+              control={
+                <div className="flex w-full items-center gap-3 sm:w-52">
+                  <output
+                    className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                    htmlFor="elevenlabs-style"
+                  >
+                    {va.elevenlabsStyle.toFixed(2)}
+                  </output>
+                  <input
+                    id="elevenlabs-style"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={va.elevenlabsStyle}
+                    style={sliderStyle(va.elevenlabsStyle, 0, 1)}
+                    className="settings-slider min-w-0 flex-1"
+                    aria-label={gt("ElevenLabs style and emotion")}
+                    onChange={(event) =>
+                      updateTtsSettings({ elevenlabsStyle: Number(event.currentTarget.value) })
+                    }
+                  />
+                </div>
+              }
+            />
+
+            <SettingsRow
+              title={gt("Voice speed")}
+              description={gt("Adjust speaking pace for ElevenLabs on Mac and iPhone.")}
+              resetAction={
+                va.elevenlabsSpeed !== DEFAULT_ELEVENLABS_VOICE_SETTINGS.speed ? (
+                  <SettingResetButton
+                    ariaLabel={gt("Reset voice speed to default")}
+                    onClick={() =>
+                      updateTtsSettings({
+                        elevenlabsSpeed: DEFAULT_ELEVENLABS_VOICE_SETTINGS.speed,
+                      })
+                    }
+                  />
+                ) : null
+              }
+              control={
+                <div className="flex w-full items-center gap-3 sm:w-52">
+                  <output
+                    className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                    htmlFor="elevenlabs-speed"
+                  >
+                    {`${va.elevenlabsSpeed.toFixed(2)}×`}
+                  </output>
+                  <input
+                    id="elevenlabs-speed"
+                    type="range"
+                    min={0.7}
+                    max={1.2}
+                    step={0.05}
+                    value={va.elevenlabsSpeed}
+                    style={sliderStyle(va.elevenlabsSpeed, 0.7, 1.2)}
+                    className="settings-slider min-w-0 flex-1"
+                    aria-label={gt("ElevenLabs voice speed")}
+                    onChange={(event) =>
+                      updateTtsSettings({ elevenlabsSpeed: Number(event.currentTarget.value) })
+                    }
+                  />
+                </div>
+              }
+            />
+
+            <SettingsRow
+              title={gt("Speaker boost")}
+              description={gt("Enhances vocal clarity and presence over speakers or headphones.")}
+              control={
+                <Switch
+                  checked={va.elevenlabsUseSpeakerBoost}
+                  onCheckedChange={(checked) =>
+                    updateTtsSettings({ elevenlabsUseSpeakerBoost: checked })
+                  }
+                  aria-label={gt("ElevenLabs speaker boost")}
+                />
+              }
+            />
           </>
         ) : null}
 

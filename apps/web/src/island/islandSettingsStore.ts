@@ -43,6 +43,18 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
   return Math.min(max, Math.max(min, value));
 }
 
+function clampRounded(value: unknown, min: number, max: number, fallback: number): number {
+  return Math.round(clampNumber(value, min, max, fallback) * 100) / 100;
+}
+
+function normalizeCustomElevenLabsVoiceId(value: unknown, fallback: string): string {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return "";
+  return ELEVENLABS_VOICE_ID_PATTERN.test(trimmed) ? trimmed : fallback;
+}
+
 function normalizeVoiceAssistantSettings(
   raw: unknown,
   base: VoiceAssistantSettings = DEFAULT_VOICE_ASSISTANT_SETTINGS,
@@ -71,6 +83,23 @@ function normalizeVoiceAssistantSettings(
       ELEVENLABS_VOICE_ID_PATTERN.test(parsed.elevenlabsVoice.trim())
         ? parsed.elevenlabsVoice.trim()
         : base.elevenlabsVoice,
+    elevenlabsCustomVoiceId: normalizeCustomElevenLabsVoiceId(
+      parsed.elevenlabsCustomVoiceId,
+      base.elevenlabsCustomVoiceId,
+    ),
+    elevenlabsStability: clampRounded(parsed.elevenlabsStability, 0, 1, base.elevenlabsStability),
+    elevenlabsSimilarityBoost: clampRounded(
+      parsed.elevenlabsSimilarityBoost,
+      0,
+      1,
+      base.elevenlabsSimilarityBoost,
+    ),
+    elevenlabsStyle: clampRounded(parsed.elevenlabsStyle, 0, 1, base.elevenlabsStyle),
+    elevenlabsSpeed: clampRounded(parsed.elevenlabsSpeed, 0.7, 1.2, base.elevenlabsSpeed),
+    elevenlabsUseSpeakerBoost:
+      typeof parsed.elevenlabsUseSpeakerBoost === "boolean"
+        ? parsed.elevenlabsUseSpeakerBoost
+        : base.elevenlabsUseSpeakerBoost,
     ttsSpeed: clampNumber(parsed.ttsSpeed, 0.8, 1.5, base.ttsSpeed),
     handsFreeAutoListen:
       typeof parsed.handsFreeAutoListen === "boolean"

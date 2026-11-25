@@ -462,17 +462,33 @@ describe("ElevenLabs TTS preferences", () => {
         ttsVoice: "aura-2-luna-en",
         elevenlabsVoice: "EXAVITQu4vr4xnSDxMaL",
         elevenlabsModel: "eleven_flash_v2_5",
+        elevenlabsCustomVoiceId: "CustomVoiceOverride1234",
+        elevenlabsStyle: 0.35,
       }),
     ).toEqual({
       provider: "elevenlabs",
-      voice: "EXAVITQu4vr4xnSDxMaL",
+      voice: "CustomVoiceOverride1234",
       model: "eleven_flash_v2_5",
       speed: 1.08,
+      elevenlabsVoiceSettings: {
+        stability: 0.5,
+        similarityBoost: 0.75,
+        style: 0.35,
+        speed: 1,
+        useSpeakerBoost: true,
+      },
     });
     expect(buildVoiceSpeakOptions(DEFAULT_VOICE_ASSISTANT_SETTINGS)).toEqual({
       provider: "auto",
       model: "eleven_v4_turbo",
       speed: 1.08,
+      elevenlabsVoiceSettings: {
+        stability: 0.5,
+        similarityBoost: 0.75,
+        style: 0.15,
+        speed: 1,
+        useSpeakerBoost: true,
+      },
     });
     expect(
       buildVoiceSpeakOptions({
@@ -495,6 +511,12 @@ describe("ElevenLabs TTS preferences", () => {
       elevenlabsModel: "eleven_v4_turbo",
       elevenlabsVoice: "SAz9YHcvj6GT2YYXdXww",
       deepgramVoice: "aura-2-orion-en",
+      customVoiceId: "",
+      stability: 0.5,
+      similarityBoost: 0.75,
+      style: 0.15,
+      speed: 1,
+      useSpeakerBoost: true,
     });
     expect(
       buildServerTtsPreferences({
@@ -524,6 +546,12 @@ describe("ElevenLabs TTS preferences", () => {
       ttsProvider: "elevenlabs",
       elevenlabsModel: "eleven_v4",
       elevenlabsVoice: "cgSgspJ2msm6clMCkdW9",
+      customVoiceId: "",
+      stability: 0.5,
+      similarityBoost: 0.75,
+      style: 0.15,
+      speed: 1,
+      useSpeakerBoost: true,
     });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(String(url)).toBe("http://localhost:3773/api/mattr/voice-assistant/config");
@@ -589,6 +617,13 @@ describe("ElevenLabs TTS preferences", () => {
         voice: "XrExE9yKIg1WjnnlVkGX",
         model: "eleven_v3_conversational",
         speed: 1.08,
+        elevenlabsVoiceSettings: {
+          stability: 0.5,
+          similarityBoost: 0.75,
+          style: 0.15,
+          speed: 1,
+          useSpeakerBoost: true,
+        },
       },
     ]);
   });

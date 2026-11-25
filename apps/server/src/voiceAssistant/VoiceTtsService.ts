@@ -13,10 +13,13 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import {
   DEFAULT_ELEVENLABS_MODEL,
   DEFAULT_ELEVENLABS_VOICE,
+  DEFAULT_ELEVENLABS_VOICE_SETTINGS,
   DEFAULT_VOICE_SERVER_TTS_PREFERENCES,
   ELEVENLABS_PREMADE_VOICES,
   ELEVENLABS_TTS_MODELS,
   type ElevenLabsTtsModel,
+  type ElevenLabsVoiceSettings,
+  type ElevenLabsVoiceSettingsPatch,
   type VoiceAvailableTtsInfo,
   type VoiceCredentialsStatus,
   type VoiceServerTtsPreferences,
@@ -46,7 +49,7 @@ const DEFAULT_MACOS_VOICES = ["Samantha", "Alex", "Karen", "Daniel", "Moira"] as
 const DEEPGRAM_SPEAK_URL = "https://api.deepgram.com/v1/speak";
 const DEEPGRAM_LISTEN_URL = "https://api.deepgram.com/v1/listen";
 const ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech";
-const ELEVENLABS_VOICE_SETTINGS = { stability: 0.45, similarity_boost: 0.78 } as const;
+const ELEVENLABS_STREAM_QUERY = "output_format=mp3_44100_64&optimize_streaming_latency=3";
 const ELEVENLABS_VOICE_IDS = ELEVENLABS_PREMADE_VOICES.map((voice) => voice.id);
 const VOICE_SECRETS_FILENAME = "mattr-voice-secrets.json";
 const VOICE_CONFIG_FILENAME = "mattr-voice-config.json";
@@ -162,12 +165,31 @@ export interface VoiceCredentialsPatch {
   readonly elevenlabsApiKey?: string | undefined;
 }
 
+export interface VoiceServerTtsPreferencesPatch {
+  readonly ttsProvider?: string | undefined;
+  readonly elevenlabsModel?: string | undefined;
+  readonly elevenlabsVoice?: string | undefined;
+  readonly deepgramVoice?: string | undefined;
+  readonly customVoiceId?: string | undefined;
+  readonly stability?: number | undefined;
+  readonly similarityBoost?: number | undefined;
+  readonly style?: number | undefined;
+  readonly speed?: number | undefined;
+  readonly useSpeakerBoost?: boolean | undefined;
+}
+
 const VoiceConfigJsonSchema = Schema.fromJsonString(
   Schema.Struct({
     ttsProvider: Schema.optional(Schema.String),
     elevenlabsModel: Schema.optional(Schema.String),
     elevenlabsVoice: Schema.optional(Schema.String),
     deepgramVoice: Schema.optional(Schema.String),
+    customVoiceId: Schema.optional(Schema.String),
+    stability: Schema.optional(Schema.Number),
+    similarityBoost: Schema.optional(Schema.Number),
+    style: Schema.optional(Schema.Number),
+    speed: Schema.optional(Schema.Number),
+    useSpeakerBoost: Schema.optional(Schema.Boolean),
   }),
 );
 const decodeVoiceConfigJson = Schema.decodeUnknownEffect(VoiceConfigJsonSchema);
@@ -208,7 +230,7 @@ export class VoiceTtsService extends Context.Service<
     readonly getCredentialsStatus: Effect.Effect<VoiceCredentialsStatus>;
     readonly getTtsPreferences: Effect.Effect<VoiceServerTtsPreferences>;
     readonly saveTtsPreferences: (
-      patch: Partial<Record<keyof VoiceServerTtsPreferences, string | undefined>>,
+      patch: VoiceServerTtsPreferencesPatch,
     ) => Effect.Effect<VoiceServerTtsPreferences>;
     readonly resolveDeepgramApiKey: () => Effect.Effect<string | null>;
   }
@@ -316,11 +338,56 @@ function sanitizeElevenLabsModel(model: string | undefined, fallback?: string): 
   return matchElevenLabsModel(model) ?? matchElevenLabsModel(fallback) ?? DEFAULT_ELEVENLABS_MODEL;
 }
 
+function clampUnit(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.round(Math.min(max, Math.max(min, value)) * 100) / 100;
+}
+
+function normalizeElevenLabsVoiceSettings(
+  raw: ElevenLabsVoiceSettingsPatch | undefined,
+  base: ElevenLabsVoiceSettings = DEFAULT_ELEVENLABS_VOICE_SETTINGS,
+): ElevenLabsVoiceSettings {
+  return {
+    stability: clampUnit(raw?.stability, 0, 1, base.stability),
+    similarityBoost: clampUnit(raw?.similarityBoost, 0, 1, base.similarityBoost),
+    style: clampUnit(raw?.style, 0, 1, base.style),
+    speed: clampUnit(raw?.speed, 0.7, 1.2, base.speed),
+    useSpeakerBoost:
+      typeof raw?.useSpeakerBoost === "boolean" ? raw.useSpeakerBoost : base.useSpeakerBoost,
+  };
+}
+
+function sanitizeCustomElevenLabsVoiceId(
+  value: string | undefined,
+  fallback: string | undefined,
+): string {
+  if (value === undefined) return matchElevenLabsVoice(fallback) ?? "";
+  if (value.trim().length === 0) return "";
+  return matchElevenLabsVoice(value) ?? matchElevenLabsVoice(fallback) ?? "";
+}
+
 function normalizeTtsPreferences(
-  raw: Partial<Record<keyof VoiceServerTtsPreferences, string | undefined>>,
+  raw: VoiceServerTtsPreferencesPatch,
   base: VoiceServerTtsPreferences = DEFAULT_VOICE_SERVER_TTS_PREFERENCES,
 ): VoiceServerTtsPreferences {
   const provider = VALID_PREFERENCE_PROVIDERS.find((value) => value === raw.ttsProvider?.trim());
+  const baseVoiceSettings = normalizeElevenLabsVoiceSettings({
+    stability: base.stability,
+    similarityBoost: base.similarityBoost,
+    style: base.style,
+    speed: base.speed,
+    useSpeakerBoost: base.useSpeakerBoost,
+  });
+  const voiceSettings = normalizeElevenLabsVoiceSettings(
+    {
+      stability: raw.stability,
+      similarityBoost: raw.similarityBoost,
+      style: raw.style,
+      speed: raw.speed,
+      useSpeakerBoost: raw.useSpeakerBoost,
+    },
+    baseVoiceSettings,
+  );
   return {
     ttsProvider: provider ?? base.ttsProvider,
     elevenlabsModel: sanitizeElevenLabsModel(raw.elevenlabsModel, base.elevenlabsModel),
@@ -329,6 +396,12 @@ function normalizeTtsPreferences(
       raw.deepgramVoice === undefined
         ? base.deepgramVoice
         : (matchDeepgramVoice(raw.deepgramVoice) ?? ""),
+    customVoiceId: sanitizeCustomElevenLabsVoiceId(raw.customVoiceId, base.customVoiceId),
+    stability: voiceSettings.stability,
+    similarityBoost: voiceSettings.similarityBoost,
+    style: voiceSettings.style,
+    speed: voiceSettings.speed,
+    useSpeakerBoost: voiceSettings.useSpeakerBoost,
   };
 }
 
@@ -590,15 +663,22 @@ const make = Effect.gen(function* () {
     readonly text: string;
     readonly voice: string;
     readonly model: ElevenLabsTtsModel;
+    readonly voiceSettings: ElevenLabsVoiceSettings;
   }) {
-    const url = `${ELEVENLABS_TTS_URL}/${encodeURIComponent(input.voice)}?output_format=mp3_44100_128`;
+    const url = `${ELEVENLABS_TTS_URL}/${encodeURIComponent(input.voice)}/stream?${ELEVENLABS_STREAM_QUERY}`;
     const request = HttpClientRequest.post(url).pipe(
       HttpClientRequest.setHeader("xi-api-key", input.apiKey),
       HttpClientRequest.setHeader("accept", "audio/mpeg"),
       HttpClientRequest.bodyJsonUnsafe({
         text: input.text,
         model_id: input.model,
-        voice_settings: ELEVENLABS_VOICE_SETTINGS,
+        voice_settings: {
+          stability: input.voiceSettings.stability,
+          similarity_boost: input.voiceSettings.similarityBoost,
+          style: input.voiceSettings.style,
+          speed: input.voiceSettings.speed,
+          use_speaker_boost: input.voiceSettings.useSpeakerBoost,
+        },
       }),
     );
     return yield* executeAudioRequest("elevenlabs", request);
@@ -825,11 +905,25 @@ const make = Effect.gen(function* () {
           case "elevenlabs": {
             const apiKey = yield* resolveElevenLabsKey();
             if (!apiKey) return null;
+            const preferredVoice =
+              matchElevenLabsVoice(preferences.customVoiceId) ?? preferences.elevenlabsVoice;
+            const savedVoiceSettings = normalizeElevenLabsVoiceSettings({
+              stability: preferences.stability,
+              similarityBoost: preferences.similarityBoost,
+              style: preferences.style,
+              speed: preferences.speed,
+              useSpeakerBoost: preferences.useSpeakerBoost,
+            });
+            const voiceSettings = normalizeElevenLabsVoiceSettings(
+              req.elevenlabsVoiceSettings,
+              savedVoiceSettings,
+            );
             return yield* speakWithElevenLabs({
               apiKey,
               text,
-              voice: sanitizeElevenLabsVoice(req.voice, preferences.elevenlabsVoice),
+              voice: sanitizeElevenLabsVoice(req.voice, preferredVoice),
               model: sanitizeElevenLabsModel(req.model, preferences.elevenlabsModel),
+              voiceSettings,
             });
           }
           case "deepgram": {

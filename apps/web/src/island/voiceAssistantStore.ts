@@ -453,22 +453,32 @@ function shouldSpeakReply(
   );
 }
 
-/** Provider-specific speak fields: ElevenLabs uses its own voice id and model. */
+/** Provider-specific speak fields: ElevenLabs uses its own voice id, model, and voice settings. */
 export function buildVoiceSpeakOptions(
   settings: VoiceAssistantSettings,
 ): Omit<VoiceSpeakRequest, "text"> {
+  const elevenlabsVoiceSettings = {
+    stability: settings.elevenlabsStability,
+    similarityBoost: settings.elevenlabsSimilarityBoost,
+    style: settings.elevenlabsStyle,
+    speed: settings.elevenlabsSpeed,
+    useSpeakerBoost: settings.elevenlabsUseSpeakerBoost,
+  };
   if (settings.ttsProvider === "elevenlabs") {
     return {
       provider: "elevenlabs",
-      voice: settings.elevenlabsVoice,
+      voice: settings.elevenlabsCustomVoiceId || settings.elevenlabsVoice,
       model: settings.elevenlabsModel,
       speed: settings.ttsSpeed,
+      elevenlabsVoiceSettings,
     };
   }
   return {
     provider: settings.ttsProvider,
     ...(settings.ttsVoice ? { voice: settings.ttsVoice } : {}),
-    ...(settings.ttsProvider === "auto" ? { model: settings.elevenlabsModel } : {}),
+    ...(settings.ttsProvider === "auto"
+      ? { model: settings.elevenlabsModel, elevenlabsVoiceSettings }
+      : {}),
     speed: settings.ttsSpeed,
   };
 }
@@ -490,6 +500,12 @@ export function buildServerTtsPreferences(
     ttsProvider: settings.ttsProvider,
     elevenlabsModel: settings.elevenlabsModel,
     elevenlabsVoice: settings.elevenlabsVoice,
+    customVoiceId: settings.elevenlabsCustomVoiceId,
+    stability: settings.elevenlabsStability,
+    similarityBoost: settings.elevenlabsSimilarityBoost,
+    style: settings.elevenlabsStyle,
+    speed: settings.elevenlabsSpeed,
+    useSpeakerBoost: settings.elevenlabsUseSpeakerBoost,
     ...deepgramVoice,
   };
 }

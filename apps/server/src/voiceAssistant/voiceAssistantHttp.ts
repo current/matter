@@ -56,6 +56,14 @@ const VoiceThreadSummarySchema = Schema.Struct({
   latestUserMessage: Schema.NullOr(Schema.String),
   latestAssistantMessage: Schema.NullOr(Schema.String),
   isActive: Schema.optionalKey(Schema.Boolean),
+  parentThreadId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  parentThreadTitle: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  relationshipToParent: Schema.optionalKey(Schema.NullOr(Schema.Literal("subagent"))),
+  activeChildCount: Schema.optionalKey(Schema.Number),
+  childTitles: Schema.optionalKey(Schema.Array(Schema.String)),
+  providerInstanceId: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  model: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  branch: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 
 const VoiceApprovalSummarySchema = Schema.Struct({
@@ -69,6 +77,11 @@ const VoiceApprovalSummarySchema = Schema.Struct({
   reason: Schema.NullOr(Schema.String),
 });
 
+const VoiceQuestionOptionSchema = Schema.Struct({
+  label: Schema.String,
+  description: Schema.optional(Schema.String),
+});
+
 const VoiceQuestionSummarySchema = Schema.Struct({
   environmentId: Schema.String,
   threadId: Schema.String,
@@ -79,7 +92,9 @@ const VoiceQuestionSummarySchema = Schema.Struct({
       id: Schema.String,
       header: Schema.String,
       question: Schema.String,
+      isMultiSelect: Schema.optional(Schema.Boolean),
       options: Schema.Array(Schema.String),
+      optionDetails: Schema.optional(Schema.Array(VoiceQuestionOptionSchema)),
     }),
   ),
 });
@@ -107,6 +122,14 @@ const VoiceTurnRequestSchema = Schema.Struct({
   }),
 });
 
+const ElevenLabsVoiceSettingsPatchSchema = Schema.Struct({
+  stability: Schema.optional(Schema.Number),
+  similarityBoost: Schema.optional(Schema.Number),
+  style: Schema.optional(Schema.Number),
+  speed: Schema.optional(Schema.Number),
+  useSpeakerBoost: Schema.optional(Schema.Boolean),
+});
+
 const VoiceSpeakOptionsSchema = Schema.Struct({
   provider: Schema.optional(
     Schema.Literals(["auto", "elevenlabs", "deepgram", "openai", "macos", "browser", "off"]),
@@ -114,6 +137,7 @@ const VoiceSpeakOptionsSchema = Schema.Struct({
   voice: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   speed: Schema.optional(Schema.Number),
+  elevenlabsVoiceSettings: Schema.optional(ElevenLabsVoiceSettingsPatchSchema),
 });
 
 /** `/turn` plus how to speak it; `speak: null` streams text only. */
@@ -141,6 +165,7 @@ const VoiceSpeakRequestSchema = Schema.Struct({
   voice: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   speed: Schema.optional(Schema.Number),
+  elevenlabsVoiceSettings: Schema.optional(ElevenLabsVoiceSettingsPatchSchema),
 });
 
 const VoiceCredentialsRequestSchema = Schema.Struct({
@@ -153,6 +178,12 @@ const VoiceConfigRequestSchema = Schema.Struct({
   elevenlabsModel: Schema.optional(Schema.String),
   elevenlabsVoice: Schema.optional(Schema.String),
   deepgramVoice: Schema.optional(Schema.String),
+  customVoiceId: Schema.optional(Schema.String),
+  stability: Schema.optional(Schema.Number),
+  similarityBoost: Schema.optional(Schema.Number),
+  style: Schema.optional(Schema.Number),
+  speed: Schema.optional(Schema.Number),
+  useSpeakerBoost: Schema.optional(Schema.Boolean),
 });
 
 const decodeTurnRequest = Schema.decodeUnknownEffect(VoiceTurnRequestSchema);
@@ -458,29 +489,37 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
       }).pipe(catchAuthErrors),
     );
 
+    const saveConfigHandler = Effect.gen(function* () {
+      yield* authenticateOperate();
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const raw = yield* request.json.pipe(Effect.option);
+      if (raw._tag === "None") {
+        return HttpServerResponse.jsonUnsafe(
+          { error: "invalid_json" },
+          { status: 400, headers: NO_STORE_HEADERS },
+        );
+      }
+      const decoded = yield* decodeConfigRequest(raw.value).pipe(Effect.option);
+      if (decoded._tag === "None") {
+        return HttpServerResponse.jsonUnsafe(
+          { error: "invalid_request" },
+          { status: 400, headers: NO_STORE_HEADERS },
+        );
+      }
+      const preferences: VoiceServerTtsPreferences = yield* tts.saveTtsPreferences(decoded.value);
+      return HttpServerResponse.jsonUnsafe(preferences, { headers: NO_STORE_HEADERS });
+    }).pipe(catchAuthErrors);
+
     const configSaveRoute = HttpRouter.add(
       "POST",
       "/api/mattr/voice-assistant/config",
-      Effect.gen(function* () {
-        yield* authenticateOperate();
-        const request = yield* HttpServerRequest.HttpServerRequest;
-        const raw = yield* request.json.pipe(Effect.option);
-        if (raw._tag === "None") {
-          return HttpServerResponse.jsonUnsafe(
-            { error: "invalid_json" },
-            { status: 400, headers: NO_STORE_HEADERS },
-          );
-        }
-        const decoded = yield* decodeConfigRequest(raw.value).pipe(Effect.option);
-        if (decoded._tag === "None") {
-          return HttpServerResponse.jsonUnsafe(
-            { error: "invalid_request" },
-            { status: 400, headers: NO_STORE_HEADERS },
-          );
-        }
-        const preferences: VoiceServerTtsPreferences = yield* tts.saveTtsPreferences(decoded.value);
-        return HttpServerResponse.jsonUnsafe(preferences, { headers: NO_STORE_HEADERS });
-      }).pipe(catchAuthErrors),
+      saveConfigHandler,
+    );
+
+    const configPutRoute = HttpRouter.add(
+      "PUT",
+      "/api/mattr/voice-assistant/config",
+      saveConfigHandler,
     );
 
     return Layer.mergeAll(
@@ -494,6 +533,7 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
       credentialsStatusRoute,
       configGetRoute,
       configSaveRoute,
+      configPutRoute,
       makeVoiceAssistantFluxRoute(tts),
     );
   }),

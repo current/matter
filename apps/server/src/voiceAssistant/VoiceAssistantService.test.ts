@@ -10,6 +10,7 @@ import {
   ProjectId,
   ProviderInstanceId,
   ThreadId,
+  type OrchestrationV2ServerCommand,
   type OrchestrationV2ThreadProjection,
   type Project,
   type ServerProvider,
@@ -78,14 +79,19 @@ function makeTestHarness(options: {
     readonly workspaceRoot: string;
   };
   readonly onLaunchThread?: (input: ThreadLaunchService.ThreadLaunchInput) => void;
+  readonly onDispatch?: (
+    command: OrchestrationV2ServerCommand,
+  ) => Effect.Effect<{ readonly sequence: number }, Error>;
   readonly threadProjections?: Readonly<Record<string, OrchestrationV2ThreadProjection>>;
   readonly projectsById?: Readonly<Record<string, Project>>;
   readonly settings?: Parameters<typeof ServerSettings.layerTest>[0];
+  readonly secretValues?: Readonly<Record<string, string>>;
 }) {
   let replyIndex = 0;
   const llmPrompts: Array<string> = [];
   const launchedInputs: Array<ThreadLaunchService.ThreadLaunchInput> = [];
   const createdNames: Array<string> = [];
+  const dispatchedCommands: Array<OrchestrationV2ServerCommand> = [];
   const projectMap = new Map<string, Project>(Object.entries(options.projectsById ?? {}));
 
   const fakeProvider = {
@@ -112,7 +118,10 @@ function makeTestHarness(options: {
     ),
     Layer.provide(
       Layer.succeed(SecretResolver.SecretResolver, {
-        read: () => Effect.succeed([]),
+        read: (ref: { readonly key?: string }) => {
+          const val = ref?.key ? options.secretValues?.[ref.key] : undefined;
+          return Effect.succeed(val ? [{ value: val }] : []);
+        },
         label: () => Effect.succeed("test"),
         invalidate: () => Effect.void,
       } as unknown as SecretResolver.SecretResolver["Service"]),
@@ -224,9 +233,46 @@ function makeTestHarness(options: {
     ),
     Layer.provide(
       Layer.succeed(ThreadManagementService.ThreadManagementService, {
+        dispatch: (command: OrchestrationV2ServerCommand) => {
+          dispatchedCommands.push(command);
+          if (options.onDispatch) {
+            return options.onDispatch(command) as never;
+          }
+          return Effect.succeed({ sequence: dispatchedCommands.length, storedEvents: [] } as never);
+        },
+        listProjectThreads: () =>
+          Effect.succeed(
+            Object.values(options.threadProjections ?? {}).map((projection) => ({
+              id: projection.thread.id,
+              projectId: projection.thread.projectId,
+              title: projection.thread.title,
+              lineage: projection.thread.lineage ?? {
+                parentThreadId: null,
+                relationshipToParent: null,
+                rootThreadId: projection.thread.id,
+              },
+              delegatedFrom: undefined,
+              settledOverride: null,
+              settledAt: null,
+              snoozedUntil: undefined,
+              updatedAt: projection.thread.updatedAt,
+            })),
+          ),
         getThreadShell: (threadId: ThreadId) => {
           const projection = options.threadProjections?.[threadId];
           return Effect.succeed(projection ? projection.thread : null);
+        },
+        getThreadRecords: (threadId: ThreadId) => {
+          const projection = options.threadProjections?.[threadId];
+          return projection
+            ? Effect.succeed({
+                thread: projection.thread,
+                runs: projection.runs ?? [],
+                messages: projection.messages ?? [],
+                runtimeRequests: projection.runtimeRequests ?? [],
+                turnItems: projection.turnItems ?? [],
+              } as never)
+            : Effect.fail(new Error(`Missing thread ${threadId}`) as never);
         },
         getThreadProjection: (threadId: ThreadId) => {
           const projection = options.threadProjections?.[threadId];
@@ -260,7 +306,7 @@ function makeTestHarness(options: {
     Layer.provide(NodeServices.layer),
   );
 
-  return { layer, llmPrompts, launchedInputs, createdNames };
+  return { layer, llmPrompts, launchedInputs, createdNames, dispatchedCommands };
 }
 
 // Read once outside Effect code: a developer key in the shell changes the expected error.
@@ -412,76 +458,470 @@ describe("VoiceAssistantService", () => {
     }),
   );
 
-  it.effect("maps client approval and dictation actions to contract shapes", () =>
-    Effect.gen(function* () {
-      const approvalPlan = JSON.stringify({
-        route: "approval",
-        actions: [{ type: "respond_approval", decision: "acceptForSession" }],
-        spokenReply: "Approved for this session.",
-        displayReply: "Approved for session",
-        expectFollowUp: false,
-      });
+  it.effect(
+    "executes local approvals directly on server, forwards remote approvals to client, and maps dictation",
+    () =>
+      Effect.gen(function* () {
+        const approvalPlan = JSON.stringify({
+          route: "approval",
+          actions: [{ type: "respond_approval", decision: "acceptForSession" }],
+          spokenReply: "Approved for this session.",
+          displayReply: "Approved for session",
+          expectFollowUp: false,
+        });
 
-      const harness = makeTestHarness({ llmReplies: [approvalPlan] });
+        const harness = makeTestHarness({ llmReplies: [approvalPlan, approvalPlan] });
 
-      const approvalResult = yield* VoiceAssistantService.VoiceAssistantService.pipe(
-        Effect.flatMap((service) =>
-          service.handleTurn({
-            utterance: "Allow that for this session",
-            mode: "smart",
-            history: [],
-            context: emptyContext({
-              pendingApprovals: [
+        const localApprovalResult = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "Allow that for this session",
+              mode: "smart",
+              history: [],
+              context: emptyContext({
+                pendingApprovals: [
+                  {
+                    environmentId: LOCAL_ENV_ID,
+                    threadId: "thread-1",
+                    threadTitle: "Deploy Script",
+                    requestId: "req-42",
+                    requestKind: "command",
+                    title: "Run npm test",
+                    detail: "npm test",
+                    reason: null,
+                  },
+                ],
+              }),
+            }),
+          ),
+          Effect.provide(harness.layer),
+        );
+
+        assert.strictEqual(localApprovalResult.route, "approval");
+        assert.deepStrictEqual(localApprovalResult.clientActions, []);
+        assert.strictEqual(localApprovalResult.toolResults[0]?.tool, "respond_approval");
+        assert.strictEqual(localApprovalResult.toolResults[0]?.ok, true);
+        assert.strictEqual(harness.dispatchedCommands.length, 1);
+        assert.deepStrictEqual(
+          {
+            type: harness.dispatchedCommands[0]?.type,
+            threadId: (harness.dispatchedCommands[0] as { threadId?: string })?.threadId,
+            requestId: (harness.dispatchedCommands[0] as { requestId?: string })?.requestId,
+            decision: (harness.dispatchedCommands[0] as { decision?: string })?.decision,
+          },
+          {
+            type: "runtime-request.respond",
+            threadId: "thread-1",
+            requestId: "req-42",
+            decision: "acceptForSession",
+          },
+        );
+
+        const remoteEnvId = EnvironmentId.make("env-remote-vps");
+        const remoteApprovalResult = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "Allow that for this session",
+              mode: "smart",
+              history: [],
+              context: emptyContext({
+                pendingApprovals: [
+                  {
+                    environmentId: remoteEnvId,
+                    threadId: "thread-remote-1",
+                    threadTitle: "Remote Deploy",
+                    requestId: "req-remote-42",
+                    requestKind: "command",
+                    title: "Run deploy",
+                    detail: "deploy.sh",
+                    reason: null,
+                  },
+                ],
+              }),
+            }),
+          ),
+          Effect.provide(harness.layer),
+        );
+
+        assert.deepStrictEqual(remoteApprovalResult.clientActions, [
+          {
+            type: "respond-approval",
+            environmentId: remoteEnvId,
+            threadId: "thread-remote-1",
+            requestId: "req-remote-42",
+            decision: "acceptForSession",
+          },
+        ]);
+
+        const dictationResult = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "Fix the retry backoff in WebSocket client",
+              mode: "dictation",
+              history: [],
+              context: emptyContext({ composerFocused: true }),
+            }),
+          ),
+          Effect.provide(harness.layer),
+        );
+
+        assert.strictEqual(dictationResult.route, "dictation");
+        assert.strictEqual(dictationResult.spokenReply, "");
+        assert.deepStrictEqual(dictationResult.clientActions, [
+          {
+            type: "insert-dictation",
+            text: "Fix the retry backoff in WebSocket client",
+            autoSend: false,
+          },
+        ]);
+      }),
+  );
+
+  it.effect(
+    "resolves natural-language answers (option numbers, partial labels, single-question shorthand) and executes respond_question / dismiss_question directly on server",
+    () =>
+      Effect.gen(function* () {
+        const questionContext = emptyContext({
+          pendingQuestions: [
+            {
+              environmentId: LOCAL_ENV_ID,
+              threadId: "thread-voice-q",
+              threadTitle: "Voice Mode Polish",
+              requestId: "req-q-99",
+              questions: [
                 {
-                  environmentId: LOCAL_ENV_ID,
-                  threadId: "thread-1",
-                  threadTitle: "Deploy Script",
-                  requestId: "req-42",
-                  requestKind: "command",
-                  title: "Run npm test",
-                  detail: "npm test",
-                  reason: null,
+                  id: "bitrate_choice",
+                  header: "Bitrate",
+                  question: "Which ElevenLabs bitrate should we use?",
+                  options: ["64kbps streaming (Recommended)", "128kbps standard"],
                 },
               ],
+            },
+          ],
+        });
+
+        // Pure helper unit assertions
+        assert.deepStrictEqual(
+          VoiceAssistantService.resolveQuestionAnswers(
+            { answer: "option 2" },
+            questionContext.pendingQuestions[0],
+          ),
+          { bitrate_choice: "128kbps standard" },
+        );
+        assert.deepStrictEqual(
+          VoiceAssistantService.resolveQuestionAnswers(
+            { bitrate_choice: "1" },
+            questionContext.pendingQuestions[0],
+          ),
+          { bitrate_choice: "64kbps streaming (Recommended)" },
+        );
+        assert.deepStrictEqual(
+          VoiceAssistantService.resolveQuestionAnswers(
+            { default: "128kbps" },
+            questionContext.pendingQuestions[0],
+          ),
+          { bitrate_choice: "128kbps standard" },
+        );
+
+        const respondPlan = JSON.stringify({
+          route: "question",
+          actions: [
+            {
+              type: "respond_question",
+              threadTitle: "voice mode",
+              answers: { answer: "the first one" },
+            },
+          ],
+          spokenReply: "Got it, I selected 64kbps streaming for Voice Mode Polish.",
+          displayReply: "Answered Voice Mode Polish",
+          expectFollowUp: false,
+        });
+        const dismissPlan = JSON.stringify({
+          route: "question",
+          actions: [{ type: "dismiss_question", threadTitle: "voice mode" }],
+          spokenReply: "Dismissed that question.",
+          displayReply: "Dismissed question",
+          expectFollowUp: false,
+        });
+
+        const harness = makeTestHarness({ llmReplies: [respondPlan, dismissPlan] });
+
+        const answered = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "Pick option 1",
+              mode: "voice-mode",
+              history: [],
+              context: questionContext,
             }),
-          }),
-        ),
-        Effect.provide(harness.layer),
-      );
+          ),
+          Effect.provide(harness.layer),
+        );
 
-      assert.strictEqual(approvalResult.route, "approval");
-      assert.deepStrictEqual(approvalResult.clientActions, [
-        {
-          type: "respond-approval",
-          environmentId: LOCAL_ENV_ID,
-          threadId: "thread-1",
-          requestId: "req-42",
-          decision: "acceptForSession",
-        },
-      ]);
+        assert.deepStrictEqual(answered.clientActions, []);
+        assert.strictEqual(answered.toolResults[0]?.tool, "respond_question");
+        assert.strictEqual(answered.toolResults[0]?.ok, true);
+        assert.deepStrictEqual(
+          {
+            type: harness.dispatchedCommands[0]?.type,
+            threadId: (harness.dispatchedCommands[0] as { threadId?: string })?.threadId,
+            requestId: (harness.dispatchedCommands[0] as { requestId?: string })?.requestId,
+            answers: (harness.dispatchedCommands[0] as { answers?: unknown })?.answers,
+          },
+          {
+            type: "runtime-request.respond",
+            threadId: "thread-voice-q",
+            requestId: "req-q-99",
+            answers: { bitrate_choice: "64kbps streaming (Recommended)" },
+          },
+        );
 
-      const dictationResult = yield* VoiceAssistantService.VoiceAssistantService.pipe(
-        Effect.flatMap((service) =>
-          service.handleTurn({
-            utterance: "Fix the retry backoff in WebSocket client",
-            mode: "dictation",
-            history: [],
-            context: emptyContext({ composerFocused: true }),
-          }),
-        ),
-        Effect.provide(harness.layer),
-      );
+        const dismissed = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "Skip that question",
+              mode: "voice-mode",
+              history: [],
+              context: questionContext,
+            }),
+          ),
+          Effect.provide(harness.layer),
+        );
 
-      assert.strictEqual(dictationResult.route, "dictation");
-      assert.strictEqual(dictationResult.spokenReply, "");
-      assert.deepStrictEqual(dictationResult.clientActions, [
-        {
-          type: "insert-dictation",
-          text: "Fix the retry backoff in WebSocket client",
-          autoSend: false,
-        },
-      ]);
-    }),
+        assert.deepStrictEqual(dismissed.clientActions, []);
+        assert.strictEqual(dismissed.toolResults[0]?.tool, "dismiss_question");
+        assert.strictEqual(dismissed.toolResults[0]?.ok, true);
+        assert.strictEqual(harness.dispatchedCommands[1]?.type, "thread.user-input.dismiss");
+      }),
+  );
+
+  it("scrubs <think> blocks and leaked third-person meta-narration from spoken replies", () => {
+    assert.strictEqual(
+      VoiceAssistantService.scrubVoiceReasoning(
+        "<think>Let me analyze the threats.</think> You have two threads running right now.",
+      ),
+      "You have two threads running right now.",
+    );
+    assert.strictEqual(
+      VoiceAssistantService.scrubVoiceReasoning(
+        "User is asking about actual threats related to sub-agents. Your main thread has two subagents running.",
+      ),
+      "Your main thread has two subagents running.",
+    );
+
+    const parsed = VoiceAssistantService.parseVoiceAssistantPlan(
+      '<think>internal chain of thought</think>{"route":"assistant","actions":[],"spokenReply":"Thinking: User is asking about threads. You have one active thread.","displayReply":"1 active thread","expectFollowUp":false}',
+    );
+    assert.strictEqual(parsed.spokenReply, "You have one active thread.");
+    assert.notInclude(parsed.spokenReply, "<think>");
+    assert.notInclude(parsed.spokenReply, "User is asking");
+  });
+
+  it.effect(
+    "uses OpenRouter google/gemini-2.5-flash with reasoning effort none and falls back to openai/gpt-4.1-mini on failure",
+    () =>
+      Effect.gen(function* () {
+        const upstream = vi.fn<typeof fetch>(async (_input, init) => {
+          const body = JSON.parse(String(init?.body)) as {
+            readonly model: string;
+            readonly reasoning?: { readonly effort?: string };
+          };
+          if (body.model === "google/gemini-2.5-flash") {
+            return new Response("upstream overloaded", { status: 503 });
+          }
+          return Response.json({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    route: "assistant",
+                    actions: [],
+                    spokenReply: "Everything looks healthy.",
+                    displayReply: "All healthy",
+                    expectFollowUp: false,
+                  }),
+                },
+              },
+            ],
+          });
+        });
+
+        const harness = makeTestHarness({
+          settings: {
+            cloudSpeechCredentials: {
+              openrouter: "or-test-key",
+            } as never,
+          },
+        });
+
+        const result = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "How are my threads looking?",
+              mode: "voice-mode",
+              history: [],
+              context: emptyContext(),
+            }),
+          ),
+          Effect.provideService(FetchHttpClient.Fetch, upstream),
+          Effect.provide(harness.layer),
+        );
+
+        assert.strictEqual(result.spokenReply, "Everything looks healthy.");
+        assert.strictEqual(upstream.mock.calls.length, 2);
+        const firstBody = JSON.parse(String(upstream.mock.calls[0]![1]?.body));
+        assert.strictEqual(firstBody.model, "google/gemini-2.5-flash");
+        assert.deepStrictEqual(firstBody.reasoning, { effort: "none" });
+        const secondBody = JSON.parse(String(upstream.mock.calls[1]![1]?.body));
+        assert.strictEqual(secondBody.model, "openai/gpt-4.1-mini");
+        assert.isUndefined(secondBody.reasoning);
+      }),
+  );
+
+  it.effect(
+    "supports search_workspace across threads and project files while skipping secrets, and enforces path-traversal and secret rejection on read_project_file",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tempRoot = yield* fs.makeTempDirectoryScoped({ prefix: "mattr-voice-search-" });
+        yield* fs.makeDirectory(path.join(tempRoot, "docs"), { recursive: true });
+        yield* fs.makeDirectory(path.join(tempRoot, "apps/server"), { recursive: true });
+        yield* fs.writeFileString(
+          path.join(tempRoot, "docs/grok-bot.md"),
+          "# Grok Bot Integration\nGrok Bot connects over loopback CDP on port 9222 and never launches Grok Bot.app.\n",
+        );
+        yield* fs.writeFileString(
+          path.join(tempRoot, ".env"),
+          "GROK_BOT_SECRET=super-secret-value-never-leak\n",
+        );
+        yield* fs.writeFileString(
+          path.join(tempRoot, "mattr-voice-secrets.json"),
+          '{"elevenlabsApiKey":"top-secret-key"}\n',
+        );
+
+        const projectId = ProjectId.make("project-mattr");
+        const now = DateTime.nowUnsafe();
+        const project: Project = {
+          id: projectId,
+          title: "mattr",
+          workspaceRoot: tempRoot,
+          repositoryIdentity: null,
+          faviconPath: null,
+          defaultModelSelection: null,
+          defaultThreadEnvMode: null,
+          autoPull: false,
+          projectIcon: null,
+          scripts: [],
+          trackedFolders: [],
+          pinnedAt: null,
+          archivedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+        } as unknown as Project;
+
+        const searchPlan = JSON.stringify({
+          route: "assistant",
+          actions: [{ type: "search_workspace", query: "Grok Bot CDP", depth: "deep" }],
+          spokenReply: "Let me look that up.",
+          displayReply: "Searching workspace…",
+          expectFollowUp: false,
+        });
+        const synthesisReply = JSON.stringify({
+          route: "assistant",
+          actions: [],
+          spokenReply:
+            "Grok Bot connects over loopback CDP on port 9222 and never launches the app itself.",
+          displayReply: "Grok Bot uses loopback CDP on port 9222",
+          expectFollowUp: true,
+        });
+
+        const harness = makeTestHarness({
+          llmReplies: [searchPlan, synthesisReply],
+          projectsById: { [projectId]: project },
+          threadProjections: {
+            "thread-grok": {
+              thread: {
+                id: ThreadId.make("thread-grok"),
+                projectId,
+                title: "Grok Bot Setup",
+                deletedAt: null,
+                updatedAt: now,
+              },
+              runs: [],
+              messages: [
+                {
+                  id: "m1",
+                  role: "assistant",
+                  text: "Configured Grok Bot CDP probe on port 9222.",
+                },
+              ],
+            } as unknown as OrchestrationV2ThreadProjection,
+          },
+        });
+
+        const searchResult = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "How does the Grok Bot integration work? Dig deeper.",
+              mode: "voice-mode",
+              history: [],
+              context: emptyContext(),
+            }),
+          ),
+          Effect.provide(harness.layer),
+        );
+
+        assert.strictEqual(searchResult.toolResults[0]?.tool, "search_workspace");
+        assert.strictEqual(searchResult.toolResults[0]?.ok, true);
+        assert.include(harness.llmPrompts[1] ?? "", "loopback CDP on port 9222");
+        assert.include(harness.llmPrompts[1] ?? "", "Grok Bot Setup");
+        assert.notInclude(harness.llmPrompts[1] ?? "", "super-secret-value-never-leak");
+        assert.notInclude(harness.llmPrompts[1] ?? "", "top-secret-key");
+
+        // Verify read_project_file succeeds on valid doc and blocks traversal + secret files
+        const securityPlan = JSON.stringify({
+          route: "assistant",
+          actions: [
+            { type: "read_project_file", projectName: "mattr", relativePath: "docs/grok-bot.md" },
+            { type: "read_project_file", projectName: "mattr", relativePath: "../../etc/passwd" },
+            { type: "read_project_file", projectName: "mattr", relativePath: ".env" },
+            {
+              type: "read_project_file",
+              projectName: "mattr",
+              relativePath: "mattr-voice-secrets.json",
+            },
+          ],
+          spokenReply: "Checking files.",
+          displayReply: "Checking files",
+          expectFollowUp: false,
+        });
+        const securityHarness = makeTestHarness({
+          llmReplies: [securityPlan, synthesisReply],
+          projectsById: { [projectId]: project },
+        });
+        const fileCheck = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+          Effect.flatMap((service) =>
+            service.handleTurn({
+              utterance: "Read the grok bot doc",
+              mode: "voice-mode",
+              history: [],
+              context: emptyContext(),
+            }),
+          ),
+          Effect.provide(securityHarness.layer),
+        );
+
+        assert.strictEqual(fileCheck.toolResults.length, 4);
+        assert.strictEqual(fileCheck.toolResults[0]?.ok, true);
+        assert.strictEqual(fileCheck.toolResults[1]?.ok, false);
+        assert.include(fileCheck.toolResults[1]?.summary.toLowerCase() ?? "", "traversal");
+        assert.strictEqual(fileCheck.toolResults[2]?.ok, false);
+        assert.include(fileCheck.toolResults[2]?.summary.toLowerCase() ?? "", "secret");
+        assert.strictEqual(fileCheck.toolResults[3]?.ok, false);
+        assert.include(fileCheck.toolResults[3]?.summary.toLowerCase() ?? "", "secret");
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
   it.effect(
@@ -962,13 +1402,19 @@ describe("VoiceTtsService ElevenLabs", () => {
       const [url, init] = upstream.mock.calls[0]!;
       assert.strictEqual(
         String(url),
-        "https://api.elevenlabs.io/v1/text-to-speech/SAz9YHcvj6GT2YYXdXww?output_format=mp3_44100_128",
+        "https://api.elevenlabs.io/v1/text-to-speech/SAz9YHcvj6GT2YYXdXww/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
       );
       assert.strictEqual(new Headers(init?.headers).get("xi-api-key"), "xi-test-key");
       assert.deepStrictEqual(JSON.parse(String(init?.body)), {
         text: "Hello from ElevenLabs.",
         model_id: "eleven_v4_turbo",
-        voice_settings: { stability: 0.45, similarity_boost: 0.78 },
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0.15,
+          speed: 1,
+          use_speaker_boost: true,
+        },
       });
     }),
   );
@@ -998,10 +1444,16 @@ describe("VoiceTtsService ElevenLabs", () => {
       }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-allow-")));
 
       const [firstUrl, firstInit] = upstream.mock.calls[0]!;
-      assert.include(String(firstUrl), "/text-to-speech/customVoiceId1234567890?");
+      assert.include(
+        String(firstUrl),
+        "/text-to-speech/customVoiceId1234567890/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
+      );
       assert.strictEqual(JSON.parse(String(firstInit?.body)).model_id, "eleven_flash_v2_5");
       const [secondUrl, secondInit] = upstream.mock.calls[1]!;
-      assert.include(String(secondUrl), "/text-to-speech/SAz9YHcvj6GT2YYXdXww?");
+      assert.include(
+        String(secondUrl),
+        "/text-to-speech/SAz9YHcvj6GT2YYXdXww/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
+      );
       assert.strictEqual(JSON.parse(String(secondInit?.body)).model_id, "eleven_v4_turbo");
     }),
   );
@@ -1070,12 +1522,24 @@ describe("VoiceTtsService ElevenLabs", () => {
         elevenlabsModel: "eleven_v4_turbo",
         elevenlabsVoice: "SAz9YHcvj6GT2YYXdXww",
         deepgramVoice: "aura-2-luna-en",
+        customVoiceId: "",
+        stability: 0.5,
+        similarityBoost: 0.75,
+        style: 0.15,
+        speed: 1,
+        useSpeakerBoost: true,
       });
       assert.deepStrictEqual(info.preferences, {
         ttsProvider: "elevenlabs",
         elevenlabsModel: "eleven_v3_conversational",
         elevenlabsVoice: "EXAVITQu4vr4xnSDxMaL",
         deepgramVoice: "aura-2-luna-en",
+        customVoiceId: "",
+        stability: 0.5,
+        similarityBoost: 0.75,
+        style: 0.15,
+        speed: 1,
+        useSpeakerBoost: true,
       });
       assert.strictEqual(info.defaultProvider, "elevenlabs");
       const [dgUrl] = upstream.mock.calls[0]!;
@@ -1084,9 +1548,55 @@ describe("VoiceTtsService ElevenLabs", () => {
         "https://api.deepgram.com/v1/speak?model=aura-2-luna-en&encoding=mp3",
       );
       const [elUrl, elInit] = upstream.mock.calls[1]!;
-      assert.include(String(elUrl), "/text-to-speech/EXAVITQu4vr4xnSDxMaL?");
+      assert.include(String(elUrl), "/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream?");
       assert.strictEqual(JSON.parse(String(elInit?.body)).model_id, "eleven_v3_conversational");
     }),
+  );
+
+  it.effect(
+    "persists, validates/clamps, and forwards custom ElevenLabs voice_settings and customVoiceId override",
+    () =>
+      Effect.gen(function* () {
+        const upstream = vi.fn<typeof fetch>(async () => mp3Response(new Uint8Array([1, 2])));
+
+        const prefs = yield* Effect.gen(function* () {
+          const tts = yield* VoiceTtsService.VoiceTtsService;
+          yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
+          const saved = yield* tts.saveTtsPreferences({
+            elevenlabsVoice: "SAz9YHcvj6GT2YYXdXww",
+            customVoiceId: "MyCustomLibraryVoice1234",
+            stability: 1.8, // clamps to 1.0
+            similarityBoost: -0.5, // clamps to 0.0
+            style: 0.42,
+            speed: 1.15,
+            useSpeakerBoost: false,
+          });
+          yield* tts
+            .speak({ text: "Custom tuned ElevenLabs voice." })
+            .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+          return saved;
+        }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-tuning-")));
+
+        assert.strictEqual(prefs.customVoiceId, "MyCustomLibraryVoice1234");
+        assert.strictEqual(prefs.stability, 1);
+        assert.strictEqual(prefs.similarityBoost, 0);
+        assert.strictEqual(prefs.style, 0.42);
+        assert.strictEqual(prefs.speed, 1.15);
+        assert.strictEqual(prefs.useSpeakerBoost, false);
+
+        const [url, init] = upstream.mock.calls[0]!;
+        assert.strictEqual(
+          String(url),
+          "https://api.elevenlabs.io/v1/text-to-speech/MyCustomLibraryVoice1234/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
+        );
+        assert.deepStrictEqual(JSON.parse(String(init?.body)).voice_settings, {
+          stability: 1,
+          similarity_boost: 0,
+          style: 0.42,
+          speed: 1.15,
+          use_speaker_boost: false,
+        });
+      }),
   );
 
   it.effect("server browser preference disables server TTS for auto requests", () =>

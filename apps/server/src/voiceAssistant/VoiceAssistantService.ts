@@ -2,6 +2,8 @@ import {
   CommandId,
   MessageId,
   ProjectId,
+  ProviderRequestKind,
+  RuntimeRequestId,
   ThreadId,
   type ModelSelection,
   type RuntimeMode,
@@ -22,6 +24,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -34,7 +37,9 @@ import type {
   VoiceAssistantTurnResponse,
   VoiceBriefingRequest,
   VoiceBriefingResponse,
+  VoiceWorkspaceApprovalSummary,
   VoiceWorkspaceProjectSummary,
+  VoiceWorkspaceQuestionSummary,
   VoiceWorkspaceThreadSummary,
 } from "../../../../antimatter/voice-assistant/types.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -49,11 +54,21 @@ import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import { createJsonStringFieldReader } from "./voiceSentenceChunker.ts";
 import { sanitizeSpeechText } from "./VoiceTtsService.ts";
+import { hydrateVoiceWorkspaceContext } from "./voiceWorkspaceHydrator.ts";
+import {
+  readSafeProjectFile,
+  searchWorkspace,
+  type SafeProjectFileResult,
+  type WorkspaceSearchResult,
+} from "./voiceWorkspaceSearch.ts";
 
 const DIRECT_TURN_TIMEOUT_MS = 15_000;
 const FALLBACK_TURN_TIMEOUT_MS = 25_000;
 const BRIEFING_LLM_TIMEOUT_MS = 4_000;
 const ANTHROPIC_API_VERSION = "2023-06-01";
+const OPENROUTER_PRIMARY_MODEL = "google/gemini-2.5-flash";
+const OPENROUTER_FALLBACK_MODEL = "openai/gpt-4.1-mini";
+const isApprovalRequestKind = Schema.is(ProviderRequestKind);
 
 export type VoicePlannedAction =
   | {
@@ -104,6 +119,7 @@ export type VoicePlannedAction =
       readonly type: "respond_approval";
       readonly environmentId?: string | undefined;
       readonly threadId?: string | undefined;
+      readonly threadTitle?: string | undefined;
       readonly requestId?: string | undefined;
       readonly decision: "accept" | "acceptAlways" | "acceptForSession" | "decline" | "cancel";
     }
@@ -111,6 +127,7 @@ export type VoicePlannedAction =
       readonly type: "respond_question";
       readonly environmentId?: string | undefined;
       readonly threadId?: string | undefined;
+      readonly threadTitle?: string | undefined;
       readonly requestId?: string | undefined;
       readonly answers: Record<string, string | ReadonlyArray<string>>;
     }
@@ -118,7 +135,20 @@ export type VoicePlannedAction =
       readonly type: "dismiss_question";
       readonly environmentId?: string | undefined;
       readonly threadId?: string | undefined;
+      readonly threadTitle?: string | undefined;
       readonly requestId?: string | undefined;
+    }
+  | {
+      readonly type: "search_workspace";
+      readonly query: string;
+      readonly projectName?: string | undefined;
+      readonly depth?: "quick" | "deep" | undefined;
+    }
+  | {
+      readonly type: "read_project_file";
+      readonly projectName?: string | undefined;
+      readonly relativePath: string;
+      readonly maxChars?: number | undefined;
     }
   | {
       readonly type: "navigate_thread";
@@ -204,18 +234,23 @@ Your replies are SPOKEN ALOUD through natural neural TTS (often while the user i
 
 CRITICAL VOICE RULES:
 - spokenReply MUST sound like a real human engineer riding shotgun: warm, natural, crisp spoken English with contractions ("I'm", "it's", "you've") and smooth transitions.
-- Keep spokenReply to 1 to 3 short sentences. Zero markdown, zero backticks, zero bullet lists, zero URLs, zero raw file paths or UUIDs read out loud.
+- Keep spokenReply to 1 to 3 short sentences by default, or up to 4 to 6 natural spoken sentences when the user explicitly asks you to dig deeper, explain more thoroughly, or walk through how something works. Zero markdown, zero backticks, zero bullet lists, zero URLs, zero raw file paths or UUIDs read out loud.
+- NEVER say "User is asking...", "The user wants...", or narrate your internal reasoning or thoughts. Always talk directly to the user in natural second person ("you", "your").
 - Never sound robotic: never say "As an AI", "I have executed the tool", "Action completed successfully", or narrate JSON/tool names. Speak naturally about what you did or found.
-- In mode="voice-mode", be genuinely conversational and proactive like a trusted co-pilot (for example: "Hey! Two threads are humming along right now. The auth refactor is almost done, and the iOS build is waiting on a quick command approval. Want me to approve it?").
-- Conversational greetings, casual banter, brainstorming, open-ended engineering questions, and quick status check-ins work naturally with actions: [] and route: "assistant". Answer warmly and keep the conversation flowing.
+- Voice transcripts frequently mishear workspace terms: threat/threats = thread/threads, matter/madre = mattr, devon = Devin, grock = Grok, sub-agents = delegated child threads. Always interpret naturally in workspace context.
+- When summarizing running threads, group delegated subagents under their parent/main thread (e.g., "Your main thread Antimatter setup check has two subagents running right now: Claude Cloud and Devin Bot."). Never claim you cannot access the main chat: you have authoritative server-side workspace state in context.
+- When the user asks if any threads are waiting on input or approvals, check pendingQuestions and pendingApprovals, name the thread, briefly explain what it's asking, and read the concrete numbered options clearly so they can choose by number or name (set expectFollowUp: true). When they answer with a choice (like "option 1", "the second one", "approve it", or a custom answer), immediately emit respond_question / respond_approval / dismiss_question with the exact threadId, requestId, and answers!
+- When the user asks how something works in their codebase, docs, or past threads (even with no thread open), or asks to "dig deeper" / "explain more thoroughly", emit search_workspace (with depth: "quick" for normal questions or depth: "deep" for thorough explanations) and/or read_project_file or read_thread so you answer from real source files and thread history instead of guessing.
+- In mode="voice-mode", be genuinely conversational and proactive like a trusted co-pilot.
+- Conversational greetings, casual banter, brainstorming, open-ended engineering questions, and quick status check-ins that are already answered by the hydrated workspace context work in ONE single fast turn with actions: [] and route: "assistant".
 - displayReply is a concise 1 to 2 line plain-text summary for the UI card (also zero markdown).
-- Set expectFollowUp to true when you ask a question, offer a next step, need clarification, or expect a natural back-and-forth; false when the user is clearly wrapping up or a one-shot action is complete.
+- Set expectFollowUp to true when you ask a question, read options waiting for a choice, offer a next step, need clarification, or expect a natural back-and-forth; false when the user is clearly wrapping up or a one-shot action is complete.
 
 ROUTING MODES:
 - mode="voice-mode" or mode="assistant": treat every utterance as a live conversation or workspace command for mattr.
 - mode="smart": if context.composerFocused is true AND the utterance sounds like prompt text to type into the active thread (not a command to mattr, not asking about workspace status, not answering an approval/question, not navigating), choose route="dictation" with action { "type": "insert_dictation", "text": "<cleaned text>", "autoSend": false } and empty spokenReply "". Otherwise handle as assistant/approval/question/direct-reply.
 - If there are pending approvals and the user says approve / yes / allow / always allow / deny / reject / cancel, use route="approval" with respond_approval.
-- If there are pending questions and the user answers one, use route="question" with respond_question.
+- If there are pending questions and the user answers one, use route="question" with respond_question (or dismiss_question if they say dismiss/skip/cancel the question).
 - If the user asks to tell or reply to a specific thread (or the active thread), use route="direct-reply" with send_to_thread.
 
 AVAILABLE ACTIONS (return an array in "actions"):
@@ -225,19 +260,23 @@ AVAILABLE ACTIONS (return an array in "actions"):
    - If you emit create_project followed by one or more launch_thread actions in the same turn, set projectName to the new project's title (or omit projectId) and mattr automatically links the newly created projectId!
 3. { "type": "send_to_thread", "threadId": "optional-id", "threadTitle": "optional-title", "text": "message to send", "dispatchMode": "auto" | "steer" | "queue" }
 4. { "type": "read_thread", "threadId": "optional-id", "threadTitle": "optional-title" }
-   - Use when the user asks what a thread is doing or found and the context summary is insufficient. mattr will fetch the recent messages and ask you to summarize them in a follow-up pass.
-5. { "type": "interrupt_thread", "threadId": "optional-id", "threadTitle": "optional-title" }
-6. { "type": "organize_thread", "threadId": "optional-id", "threadTitle": "optional-title", "operation": "settle" | "unsettle" | "archive" | "unarchive" | "pin" | "unpin" | "snooze", "snoozeMinutes": 60 }
-7. { "type": "respond_approval", "environmentId": "...", "threadId": "...", "requestId": "...", "decision": "accept" | "acceptForSession" | "acceptAlways" | "decline" | "cancel" }
-8. { "type": "respond_question", "environmentId": "...", "threadId": "...", "requestId": "...", "answers": { "<questionId>": "<answer>" } }
-9. { "type": "dismiss_question", "environmentId": "...", "threadId": "...", "requestId": "..." }
-10. { "type": "navigate_thread", "environmentId": "...", "threadId": "...", "threadTitle": "optional" }
-11. { "type": "navigate_route", "to": "/settings" }
-12. { "type": "insert_dictation", "text": "...", "autoSend": false }
-13. { "type": "focus_window" }
+   - Fetches recent messages, pending questions/approvals, and child subagent summaries of that thread, then asks you to synthesize a reply.
+5. { "type": "search_workspace", "query": "search terms", "projectName": "optional-project", "depth": "quick" | "deep" }
+   - Searches across workspace threads (titles + messages) AND registered project files/docs/code. Use depth="deep" when asked to dig deeper or give a thorough explanation.
+6. { "type": "read_project_file", "projectName": "optional-project", "relativePath": "path/from/project/root", "maxChars": 4000 }
+   - Reads a bounded excerpt of a specific file inside a registered project root.
+7. { "type": "interrupt_thread", "threadId": "optional-id", "threadTitle": "optional-title" }
+8. { "type": "organize_thread", "threadId": "optional-id", "threadTitle": "optional-title", "operation": "settle" | "unsettle" | "archive" | "unarchive" | "pin" | "unpin" | "snooze", "snoozeMinutes": 60 }
+9. { "type": "respond_approval", "environmentId": "optional", "threadId": "...", "threadTitle": "optional", "requestId": "...", "decision": "accept" | "acceptForSession" | "acceptAlways" | "decline" | "cancel" }
+10. { "type": "respond_question", "environmentId": "optional", "threadId": "...", "threadTitle": "optional", "requestId": "...", "answers": { "<questionId>": "<exact option label or answer>" } }
+11. { "type": "dismiss_question", "environmentId": "optional", "threadId": "...", "threadTitle": "optional", "requestId": "..." }
+12. { "type": "navigate_thread", "environmentId": "optional", "threadId": "...", "threadTitle": "optional" }
+13. { "type": "navigate_route", "to": "/settings" }
+14. { "type": "insert_dictation", "text": "...", "autoSend": false }
+15. { "type": "focus_window" }
 
 OUTPUT FORMAT:
-Return ONLY valid JSON matching:
+Return ONLY valid JSON with keys in this EXACT order ("route" first, "actions" second, "spokenReply" third) so streaming TTS starts speaking immediately:
 {
   "route": "dictation" | "direct-reply" | "approval" | "question" | "assistant",
   "actions": [],
@@ -269,13 +308,13 @@ function buildCompactContextJson(req: VoiceAssistantTurnRequest): string {
     composerFocused: req.context.composerFocused,
     projects: req.context.projects
       .filter((project) => !project.archived)
-      .slice(0, 25)
+      .slice(0, 40)
       .map((project) => ({
         id: project.id,
         title: project.title,
         workspaceRoot: project.workspaceRoot,
       })),
-    threads: req.context.threads.slice(0, 25).map((thread) => ({
+    threads: req.context.threads.slice(0, 40).map((thread) => ({
       environmentId: thread.environmentId,
       threadId: thread.threadId,
       title: thread.title,
@@ -283,10 +322,20 @@ function buildCompactContextJson(req: VoiceAssistantTurnRequest): string {
       projectTitle: thread.projectTitle,
       status: thread.status,
       isActive: thread.isActive ?? false,
+      ...(thread.parentThreadId ? { parentThreadId: thread.parentThreadId } : {}),
+      ...(thread.parentThreadTitle ? { parentThreadTitle: thread.parentThreadTitle } : {}),
+      ...(thread.relationshipToParent ? { relationshipToParent: thread.relationshipToParent } : {}),
+      ...(thread.activeChildCount ? { activeChildCount: thread.activeChildCount } : {}),
+      ...(thread.childTitles && thread.childTitles.length > 0
+        ? { childTitles: thread.childTitles }
+        : {}),
+      ...(thread.providerInstanceId ? { providerInstanceId: thread.providerInstanceId } : {}),
+      ...(thread.model ? { model: thread.model } : {}),
+      ...(thread.branch ? { branch: thread.branch } : {}),
       latestUserMessage: truncate(thread.latestUserMessage, 140) || null,
       latestAssistantMessage: truncate(thread.latestAssistantMessage, 220) || null,
     })),
-    pendingApprovals: req.context.pendingApprovals.slice(0, 10).map((approval) => ({
+    pendingApprovals: req.context.pendingApprovals.slice(0, 15).map((approval) => ({
       environmentId: approval.environmentId,
       threadId: approval.threadId,
       threadTitle: approval.threadTitle,
@@ -296,7 +345,7 @@ function buildCompactContextJson(req: VoiceAssistantTurnRequest): string {
       detail: truncate(approval.detail, 140) || null,
       reason: truncate(approval.reason, 140) || null,
     })),
-    pendingQuestions: req.context.pendingQuestions.slice(0, 10).map((question) => ({
+    pendingQuestions: req.context.pendingQuestions.slice(0, 15).map((question) => ({
       environmentId: question.environmentId,
       threadId: question.threadId,
       threadTitle: question.threadTitle,
@@ -305,7 +354,11 @@ function buildCompactContextJson(req: VoiceAssistantTurnRequest): string {
         id: entry.id,
         header: entry.header,
         question: entry.question,
-        options: entry.options,
+        ...(entry.isMultiSelect ? { isMultiSelect: true } : {}),
+        options:
+          entry.optionDetails && entry.optionDetails.length > 0
+            ? entry.optionDetails
+            : entry.options,
       })),
     })),
     recentHistory: req.history.slice(-8).map((entry) => ({
@@ -321,21 +374,58 @@ function buildTurnUserPrompt(req: VoiceAssistantTurnRequest): string {
   return `Workspace context:\n${buildCompactContextJson(req)}\n\nUser utterance:\n${req.utterance.trim()}`;
 }
 
-function buildReadThreadSynthesisPrompt(input: {
-  readonly utterance: string;
-  readonly excerpts: ReadonlyArray<{
-    readonly threadId: string;
+interface ReadThreadExcerpt {
+  readonly threadId: string;
+  readonly title: string;
+  readonly status: string;
+  readonly parentThreadId?: string | null;
+  readonly messages: ReadonlyArray<{ readonly role: string; readonly text: string }>;
+  readonly pendingQuestions?: ReadonlyArray<VoiceWorkspaceQuestionSummary>;
+  readonly pendingApprovals?: ReadonlyArray<VoiceWorkspaceApprovalSummary>;
+  readonly childSubagents?: ReadonlyArray<{
+    readonly threadId: string | null;
     readonly title: string;
     readonly status: string;
-    readonly messages: ReadonlyArray<{ readonly role: string; readonly text: string }>;
+    readonly progress?: string | undefined;
   }>;
+}
+
+function buildFollowUpSynthesisPrompt(input: {
+  readonly utterance: string;
+  readonly threadExcerpts: ReadonlyArray<ReadThreadExcerpt>;
+  readonly workspaceSearches: ReadonlyArray<WorkspaceSearchResult>;
+  readonly projectFiles: ReadonlyArray<SafeProjectFileResult>;
   readonly otherToolResults: ReadonlyArray<VoiceAssistantToolResult>;
 }): string {
+  const deepRequested =
+    input.workspaceSearches.some((search) => search.depth === "deep") ||
+    input.projectFiles.length > 0 ||
+    /\b(dig deeper|deeper|thorough|more detail|in detail|walk me through|explain more)\b/i.test(
+      input.utterance,
+    );
+  const lengthRule = deepRequested
+    ? "3 to 6 crisp, natural spoken sentences"
+    : "1 to 3 short spoken sentences";
+
   return [
     `The user asked: "${input.utterance}"`,
-    "",
-    "Here are the recent messages read from the requested thread(s):",
-    JSON.stringify(input.excerpts, null, 2),
+    ...(input.threadExcerpts.length > 0
+      ? [
+          "",
+          "Recent thread details (messages, pending questions/approvals, and child subagents):",
+          JSON.stringify(input.threadExcerpts, null, 2),
+        ]
+      : []),
+    ...(input.workspaceSearches.length > 0
+      ? [
+          "",
+          "Workspace search matches (threads and project files):",
+          JSON.stringify(input.workspaceSearches, null, 2),
+        ]
+      : []),
+    ...(input.projectFiles.length > 0
+      ? ["", "Project file excerpts:", JSON.stringify(input.projectFiles, null, 2)]
+      : []),
     ...(input.otherToolResults.length > 0
       ? [
           "",
@@ -350,7 +440,7 @@ function buildReadThreadSynthesisPrompt(input: {
         ]
       : []),
     "",
-    'Now return ONLY JSON with { "route": "assistant", "actions": [], "spokenReply": "...", "displayReply": "...", "expectFollowUp": true|false } summarizing what is happening in natural spoken English (1-3 short sentences, zero markdown or raw paths).',
+    `Now return ONLY valid JSON with keys in exact order { "route": "assistant", "actions": [], "spokenReply": "...", "displayReply": "...", "expectFollowUp": true|false } answering the user directly in natural second-person spoken English (${lengthRule}, zero markdown, zero raw file paths, zero third-person narration).`,
   ].join("\n");
 }
 
@@ -492,6 +582,7 @@ function parsePlannedAction(raw: unknown): VoicePlannedAction | null {
         type: "respond_approval",
         environmentId: normalizeString(record.environmentId),
         threadId: normalizeString(record.threadId),
+        threadTitle: normalizeString(record.threadTitle),
         requestId: normalizeString(record.requestId),
         decision: normalizeDecision(record.decision),
       };
@@ -501,6 +592,7 @@ function parsePlannedAction(raw: unknown): VoicePlannedAction | null {
         type: "respond_question",
         environmentId: normalizeString(record.environmentId),
         threadId: normalizeString(record.threadId),
+        threadTitle: normalizeString(record.threadTitle),
         requestId: normalizeString(record.requestId),
         answers: normalizeAnswers(record.answers),
       };
@@ -510,7 +602,35 @@ function parsePlannedAction(raw: unknown): VoicePlannedAction | null {
         type: "dismiss_question",
         environmentId: normalizeString(record.environmentId),
         threadId: normalizeString(record.threadId),
+        threadTitle: normalizeString(record.threadTitle),
         requestId: normalizeString(record.requestId),
+      };
+    }
+    case "search_workspace": {
+      const query = normalizeString(record.query) ?? normalizeString(record.search);
+      if (!query) return null;
+      const depth = record.depth === "deep" ? "deep" : "quick";
+      return {
+        type: "search_workspace",
+        query,
+        projectName: normalizeString(record.projectName) ?? normalizeString(record.projectTitle),
+        depth,
+      };
+    }
+    case "read_project_file": {
+      const relativePath =
+        normalizeString(record.relativePath) ??
+        normalizeString(record.path) ??
+        normalizeString(record.file);
+      if (!relativePath) return null;
+      return {
+        type: "read_project_file",
+        projectName: normalizeString(record.projectName) ?? normalizeString(record.projectTitle),
+        relativePath,
+        maxChars:
+          typeof record.maxChars === "number" && Number.isFinite(record.maxChars)
+            ? record.maxChars
+            : undefined,
       };
     }
     case "navigate_thread": {
@@ -543,10 +663,37 @@ function parsePlannedAction(raw: unknown): VoicePlannedAction | null {
   }
 }
 
-function parseVoiceAssistantPlan(rawText: string): VoiceAssistantPlan {
-  const trimmed = rawText.trim();
+const LEADING_REASONING_LABEL =
+  /^(?:internal\s+thought|thinking|reasoning|thought|analysis|note\s+to\s+self)\s*:\s*/i;
+
+const LEADING_META_SENTENCE =
+  /^(?:the\s+)?user\s+(?:is\s+(?:asking|saying|requesting|referring|trying|looking)|wants|asked|said|mentioned|meant)[^.!?]*(?:[.!?]+\s*|$)/i;
+
+/** Strips `<think>` blocks and leaked third-person reasoning prefixes so raw thought is never spoken. */
+export function scrubVoiceReasoning(raw: string): string {
+  let cleaned = raw
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, " ")
+    .replace(/<think\b[^>]*>[\s\S]*$/gi, " ")
+    .replace(/<\/think>/gi, " ")
+    .trim();
+
+  // Strip repeated leading reasoning labels or "User is asking..." narration sentences.
+  for (let pass = 0; pass < 4; pass++) {
+    const before = cleaned;
+    cleaned = cleaned.replace(LEADING_REASONING_LABEL, "").trim();
+    cleaned = cleaned.replace(LEADING_META_SENTENCE, "").trim();
+    if (cleaned === before) break;
+  }
+  return cleaned;
+}
+
+export function parseVoiceAssistantPlan(rawText: string): VoiceAssistantPlan {
+  const scrubbedRaw = rawText
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think\b[^>]*>[\s\S]*$/gi, "")
+    .trim();
   try {
-    const extracted = extractJsonObject(trimmed);
+    const extracted = extractJsonObject(scrubbedRaw);
     const parsed: unknown = JSON.parse(extracted);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       const record = parsed as Record<string, unknown>;
@@ -556,9 +703,12 @@ function parseVoiceAssistantPlan(rawText: string): VoiceAssistantPlan {
         .map(parsePlannedAction)
         .filter((action): action is VoicePlannedAction => action !== null);
       const rawSpoken = typeof record.spokenReply === "string" ? record.spokenReply : "";
-      const spokenReply = route === "dictation" ? "" : sanitizeSpeechText(rawSpoken, 600);
+      const spokenReply =
+        route === "dictation" ? "" : sanitizeSpeechText(scrubVoiceReasoning(rawSpoken), 850);
+      const rawDisplay = normalizeString(record.displayReply);
+      const scrubbedDisplay = rawDisplay ? scrubVoiceReasoning(rawDisplay) : undefined;
       const displayReply =
-        normalizeString(record.displayReply) ??
+        (scrubbedDisplay && scrubbedDisplay.length > 0 ? scrubbedDisplay : undefined) ??
         (spokenReply || (route === "dictation" ? "" : "Done."));
       const expectFollowUp = Boolean(record.expectFollowUp);
       return { route, actions, spokenReply, displayReply, expectFollowUp };
@@ -566,7 +716,7 @@ function parseVoiceAssistantPlan(rawText: string): VoiceAssistantPlan {
   } catch {
     // Plain-text reply from a fallback model is still usable as a spoken reply.
   }
-  const fallbackSpoken = sanitizeSpeechText(trimmed, 600) || "Done.";
+  const fallbackSpoken = sanitizeSpeechText(scrubVoiceReasoning(scrubbedRaw), 850) || "Done.";
   return {
     route: "assistant",
     actions: [],
@@ -669,6 +819,246 @@ function matchThreadSummary(
     }
   }
   return bestScore >= 40 ? best : undefined;
+}
+
+const ORDINAL_INDEX: Readonly<Record<string, number>> = {
+  first: 0,
+  "1st": 0,
+  one: 0,
+  second: 1,
+  "2nd": 1,
+  two: 1,
+  third: 2,
+  "3rd": 2,
+  three: 2,
+  fourth: 3,
+  "4th": 3,
+  four: 3,
+  fifth: 4,
+  "5th": 4,
+  five: 4,
+  sixth: 5,
+  "6th": 5,
+  six: 5,
+};
+
+function resolveOptionIndex(raw: string, optionCount: number): number | null {
+  if (optionCount <= 0) return null;
+  const cleaned = raw
+    .trim()
+    .toLowerCase()
+    .replace(/^the\s+/i, "")
+    .replace(/^(?:option|choice|number|item|#)\s*/i, "")
+    .replace(/\s+one$/i, "")
+    .trim();
+  if (cleaned === "last") return optionCount - 1;
+  const digitMatch = /^(\d+)$/.exec(cleaned);
+  if (digitMatch) {
+    const idx = Number.parseInt(digitMatch[1]!, 10) - 1;
+    if (idx >= 0 && idx < optionCount) return idx;
+  }
+  const ordinal = ORDINAL_INDEX[cleaned];
+  if (ordinal !== undefined && ordinal >= 0 && ordinal < optionCount) {
+    return ordinal;
+  }
+  return null;
+}
+
+function resolveOptionLabel(rawValue: string, options: ReadonlyArray<string>): string {
+  const trimmed = rawValue.trim();
+  if (trimmed.length === 0 || options.length === 0) return trimmed;
+
+  const byIndex = resolveOptionIndex(trimmed, options.length);
+  if (byIndex !== null) {
+    return options[byIndex] ?? trimmed;
+  }
+
+  const lower = trimmed.toLowerCase();
+  const exact = options.find((label) => label.toLowerCase() === lower);
+  if (exact) return exact;
+
+  const normalizedQuery = normalizeLookup(trimmed);
+  if (normalizedQuery.length > 0) {
+    const normalizedExact = options.find((label) => normalizeLookup(label) === normalizedQuery);
+    if (normalizedExact) return normalizedExact;
+
+    const startsWithMatches = options.filter((label) =>
+      normalizeLookup(label).startsWith(normalizedQuery),
+    );
+    if (startsWithMatches.length === 1) return startsWithMatches[0]!;
+
+    const includesMatches = options.filter((label) =>
+      normalizeLookup(label).includes(normalizedQuery),
+    );
+    if (includesMatches.length === 1) return includesMatches[0]!;
+
+    let bestLabel: string | undefined;
+    let bestScore = 0;
+    for (const label of options) {
+      const score = fuzzyScore(trimmed, label);
+      if (score > bestScore) {
+        bestScore = score;
+        bestLabel = label;
+      }
+    }
+    if (bestLabel !== undefined && bestScore >= 55) {
+      return bestLabel;
+    }
+  }
+
+  return trimmed;
+}
+
+/**
+ * Resolves natural-language answers (option numbers like "1"/"option 2"/"first", partial label
+ * matches, single-question shorthand keys, and multi-select lists) to exact schema answers keyed
+ * by each question's canonical `id`.
+ */
+export function resolveQuestionAnswers(
+  rawAnswers: Readonly<Record<string, string | ReadonlyArray<string>>>,
+  questionSummary: VoiceWorkspaceQuestionSummary | undefined,
+): Record<string, string | ReadonlyArray<string>> {
+  const entries = Object.entries(rawAnswers);
+  if (entries.length === 0) return {};
+  if (!questionSummary || questionSummary.questions.length === 0) {
+    return { ...rawAnswers };
+  }
+
+  const resolved: Record<string, string | ReadonlyArray<string>> = {};
+  const questions = questionSummary.questions;
+
+  const formatForQuestion = (
+    question: VoiceWorkspaceQuestionSummary["questions"][number],
+    value: string | ReadonlyArray<string>,
+  ): string | ReadonlyArray<string> => {
+    const labels =
+      question.optionDetails && question.optionDetails.length > 0
+        ? question.optionDetails.map((detail) => detail.label)
+        : question.options;
+
+    if (question.isMultiSelect) {
+      const parts: ReadonlyArray<string> =
+        typeof value === "string"
+          ? value
+              .split(/\s*(?:,|and)\s*/i)
+              .map((part) => part.trim())
+              .filter(Boolean)
+          : value;
+      const mapped = parts.map((part) => resolveOptionLabel(part, labels)).filter(Boolean);
+      return [...new Set(mapped)];
+    }
+
+    const single = typeof value === "string" ? value : (value[0] ?? "");
+    return resolveOptionLabel(single, labels);
+  };
+
+  if (questions.length === 1) {
+    const sole = questions[0]!;
+    const exactEntry = rawAnswers[sole.id];
+    const chosen = exactEntry ?? entries[0]?.[1];
+    if (chosen !== undefined) {
+      resolved[sole.id] = formatForQuestion(sole, chosen);
+    }
+    return resolved;
+  }
+
+  const remaining = new Map(entries);
+  for (const [index, question] of questions.entries()) {
+    let matchedKey: string | undefined;
+    if (remaining.has(question.id)) {
+      matchedKey = question.id;
+    } else {
+      for (const candidateKey of remaining.keys()) {
+        if (
+          candidateKey.toLowerCase() === question.header.toLowerCase() ||
+          candidateKey === String(index) ||
+          candidateKey === String(index + 1) ||
+          candidateKey.toLowerCase() === `q${index + 1}` ||
+          fuzzyScore(candidateKey, question.header) >= 60 ||
+          fuzzyScore(candidateKey, question.question) >= 60
+        ) {
+          matchedKey = candidateKey;
+          break;
+        }
+      }
+    }
+    if (matchedKey !== undefined) {
+      const rawValue = remaining.get(matchedKey)!;
+      remaining.delete(matchedKey);
+      resolved[question.id] = formatForQuestion(question, rawValue);
+    }
+  }
+
+  for (const [key, value] of remaining) {
+    resolved[key] = value;
+  }
+  return resolved;
+}
+
+function matchPendingApproval(
+  approvals: ReadonlyArray<VoiceWorkspaceApprovalSummary>,
+  input: {
+    readonly requestId?: string | undefined;
+    readonly threadId?: string | undefined;
+    readonly threadTitle?: string | undefined;
+  },
+): VoiceWorkspaceApprovalSummary | undefined {
+  if (input.requestId) {
+    const byReq = approvals.find((entry) => entry.requestId === input.requestId);
+    if (byReq) return byReq;
+  }
+  if (input.threadId) {
+    const byThread = approvals.find((entry) => entry.threadId === input.threadId);
+    if (byThread) return byThread;
+  }
+  if (input.threadTitle) {
+    let best: VoiceWorkspaceApprovalSummary | undefined;
+    let bestScore = 0;
+    for (const entry of approvals) {
+      const score = fuzzyScore(input.threadTitle, entry.threadTitle);
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry;
+      }
+    }
+    if (best && bestScore >= 40) return best;
+  }
+  if (approvals.length === 1) return approvals[0];
+  if (!input.requestId && !input.threadId && !input.threadTitle) return approvals[0];
+  return undefined;
+}
+
+function matchPendingQuestion(
+  questions: ReadonlyArray<VoiceWorkspaceQuestionSummary>,
+  input: {
+    readonly requestId?: string | undefined;
+    readonly threadId?: string | undefined;
+    readonly threadTitle?: string | undefined;
+  },
+): VoiceWorkspaceQuestionSummary | undefined {
+  if (input.requestId) {
+    const byReq = questions.find((entry) => entry.requestId === input.requestId);
+    if (byReq) return byReq;
+  }
+  if (input.threadId) {
+    const byThread = questions.find((entry) => entry.threadId === input.threadId);
+    if (byThread) return byThread;
+  }
+  if (input.threadTitle) {
+    let best: VoiceWorkspaceQuestionSummary | undefined;
+    let bestScore = 0;
+    for (const entry of questions) {
+      const score = fuzzyScore(input.threadTitle, entry.threadTitle);
+      if (score > bestScore) {
+        bestScore = score;
+        best = entry;
+      }
+    }
+    if (best && bestScore >= 40) return best;
+  }
+  if (questions.length === 1) return questions[0];
+  if (!input.requestId && !input.threadId && !input.threadTitle) return questions[0];
+  return undefined;
 }
 
 function firstTwoSentences(text: string, maxChars: number): string {
@@ -799,6 +1189,8 @@ interface DirectLlmTarget {
   readonly baseUrl: string;
   readonly apiKey: string;
   readonly model: string;
+  readonly fallbackModel?: string | undefined;
+  readonly disableThinking?: boolean | undefined;
 }
 
 const make = Effect.gen(function* () {
@@ -806,6 +1198,7 @@ const make = Effect.gen(function* () {
   const secretResolver = yield* SecretResolver.SecretResolver;
   const httpClient = yield* HttpClient.HttpClient;
   const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
   const textGeneration = yield* TextGeneration.TextGeneration;
   const projectService = yield* ProjectService.ProjectService;
   const managedProjectFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
@@ -884,7 +1277,9 @@ const make = Effect.gen(function* () {
             kind: "openaiCompatible",
             baseUrl: "https://openrouter.ai/api/v1",
             apiKey: apiKey.trim(),
-            model: "openai/gpt-4o-mini",
+            model: OPENROUTER_PRIMARY_MODEL,
+            fallbackModel: OPENROUTER_FALLBACK_MODEL,
+            disableThinking: true,
           };
         }
       }
@@ -929,11 +1324,15 @@ const make = Effect.gen(function* () {
         }),
       );
     } else {
+      const suppressThinking =
+        target.disableThinking === true ||
+        (target.baseUrl.includes("openrouter.ai") && target.model.startsWith("google/gemini"));
       request = HttpClientRequest.post(`${target.baseUrl}/chat/completions`).pipe(
         HttpClientRequest.bodyJsonUnsafe({
           model: target.model,
           temperature: 0.2,
           max_tokens: 1024,
+          ...(suppressThinking ? { reasoning: { effort: "none" } } : {}),
           ...(input.expectJson ? { response_format: { type: "json_object" } } : {}),
           messages: [
             { role: "system", content: input.systemPrompt },
@@ -1015,12 +1414,16 @@ const make = Effect.gen(function* () {
         }),
       );
     } else {
+      const suppressThinking =
+        target.disableThinking === true ||
+        (target.baseUrl.includes("openrouter.ai") && target.model.startsWith("google/gemini"));
       request = HttpClientRequest.post(`${target.baseUrl}/chat/completions`).pipe(
         HttpClientRequest.bodyJsonUnsafe({
           model: target.model,
           temperature: 0.2,
           max_tokens: 1024,
           stream: true,
+          ...(suppressThinking ? { reasoning: { effort: "none" } } : {}),
           ...(input.expectJson ? { response_format: { type: "json_object" } } : {}),
           messages: [
             { role: "system", content: input.systemPrompt },
@@ -1137,40 +1540,60 @@ const make = Effect.gen(function* () {
       Effect.mapError((cause) => new VoiceAssistantLlmError({ stage: "text-generation", cause })),
     );
     const directTarget = yield* resolveDirectLlmTarget(settings);
+    const directCandidates: ReadonlyArray<DirectLlmTarget> =
+      directTarget === null
+        ? []
+        : directTarget.fallbackModel
+          ? [
+              directTarget,
+              {
+                ...directTarget,
+                model: directTarget.fallbackModel,
+                fallbackModel: undefined,
+                disableThinking: false,
+              },
+            ]
+          : [directTarget];
     const onText = input.onText;
-    if (directTarget !== null && onText !== undefined) {
-      let emitted = false;
-      const streamed = yield* streamDirectLlm(
-        directTarget,
-        {
-          systemPrompt: input.systemPrompt,
-          userPrompt: input.userPrompt,
-          expectJson: input.expectJson,
-          timeoutMs: input.directTimeoutMs,
-        },
-        (text) => {
-          emitted = true;
-          return onText(text);
-        },
-      ).pipe(
-        Effect.tapError((cause) =>
-          Effect.logWarning("Streaming voice assistant LLM failed.", { cause }),
-        ),
-        Effect.option,
-      );
-      if (Option.isSome(streamed)) return streamed.value;
-      // Text already sent cannot be taken back, so a stream that broke midway ends the turn.
-      if (emitted) return yield* new VoiceAssistantLlmError({ stage: "direct-http" });
+    if (directCandidates.length > 0 && onText !== undefined) {
+      for (const candidate of directCandidates) {
+        let emitted = false;
+        const streamed = yield* streamDirectLlm(
+          candidate,
+          {
+            systemPrompt: input.systemPrompt,
+            userPrompt: input.userPrompt,
+            expectJson: input.expectJson,
+            timeoutMs: input.directTimeoutMs,
+          },
+          (text) => {
+            emitted = true;
+            return onText(text);
+          },
+        ).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Streaming voice assistant LLM failed.", {
+              model: candidate.model,
+              cause,
+            }),
+          ),
+          Effect.option,
+        );
+        if (Option.isSome(streamed)) return streamed.value;
+        // Text already sent cannot be taken back, so a stream that broke midway ends the turn.
+        if (emitted) return yield* new VoiceAssistantLlmError({ stage: "direct-http" });
+      }
     }
-    if (directTarget !== null) {
-      const directResult = yield* callDirectLlm(directTarget, {
+    for (const candidate of directCandidates) {
+      const directResult = yield* callDirectLlm(candidate, {
         systemPrompt: input.systemPrompt,
         userPrompt: input.userPrompt,
         expectJson: input.expectJson,
         timeoutMs: input.directTimeoutMs,
       }).pipe(
         Effect.tapError((cause) =>
-          Effect.logWarning("Direct voice assistant LLM failed; falling back to TextGeneration.", {
+          Effect.logWarning("Direct voice assistant LLM failed; trying next fallback.", {
+            model: candidate.model,
             cause,
           }),
         ),
@@ -1328,6 +1751,18 @@ const make = Effect.gen(function* () {
       } satisfies VoiceAssistantTurnResponse;
     }
 
+    const localEnvironmentId = yield* serverEnvironment.getEnvironmentId;
+    const hydratedContext = yield* hydrateVoiceWorkspaceContext({
+      reqContext: req.context,
+      localEnvironmentId,
+      projectService,
+      threadManagement,
+    });
+    const hydratedReq: VoiceAssistantTurnRequest = {
+      ...req,
+      context: hydratedContext,
+    };
+
     // Only a plan with no actions can be spoken while it streams: tools may rewrite the reply.
     const planSpoken = spokenStreamer(
       hooks,
@@ -1335,7 +1770,7 @@ const make = Effect.gen(function* () {
     );
     const rawPlanText = yield* runLlm({
       systemPrompt: VOICE_ASSISTANT_SYSTEM_PROMPT,
-      userPrompt: buildTurnUserPrompt(req),
+      userPrompt: buildTurnUserPrompt(hydratedReq),
       expectJson: true,
       directTimeoutMs: DIRECT_TURN_TIMEOUT_MS,
       fallbackTimeoutMs: FALLBACK_TURN_TIMEOUT_MS,
@@ -1354,22 +1789,18 @@ const make = Effect.gen(function* () {
     }
 
     const plan = parseVoiceAssistantPlan(rawPlanText.value);
-    const localEnvironmentId = yield* serverEnvironment.getEnvironmentId;
-    const defaultEnvId = req.context.activeEnvironmentId ?? localEnvironmentId;
+    const defaultEnvId = hydratedContext.activeEnvironmentId ?? localEnvironmentId;
 
     const toolResults: Array<VoiceAssistantToolResult> = [];
     const clientActions: Array<VoiceAssistantClientAction> = [];
     const createdProjects: Array<VoiceWorkspaceProjectSummary> = [];
     const launchedThreads: Array<VoiceWorkspaceThreadSummary> = [];
-    const readThreadExcerpts: Array<{
-      readonly threadId: string;
-      readonly title: string;
-      readonly status: string;
-      readonly messages: ReadonlyArray<{ readonly role: string; readonly text: string }>;
-    }> = [];
+    const readThreadExcerpts: Array<ReadThreadExcerpt> = [];
+    const workspaceSearches: Array<WorkspaceSearchResult> = [];
+    const projectFileExcerpts: Array<SafeProjectFileResult> = [];
 
-    const allKnownProjects = () => [...createdProjects, ...req.context.projects];
-    const allKnownThreads = () => [...launchedThreads, ...req.context.threads];
+    const allKnownProjects = () => [...createdProjects, ...hydratedContext.projects];
+    const allKnownThreads = () => [...launchedThreads, ...hydratedContext.threads];
 
     const resolveProject = Effect.fnUntraced(function* (
       projectId?: string,
@@ -1413,7 +1844,7 @@ const make = Effect.gen(function* () {
     > {
       const matched = matchThreadSummary(
         allKnownThreads(),
-        req.context.activeThreadId,
+        hydratedContext.activeThreadId,
         threadId,
         threadTitle,
       );
@@ -1551,8 +1982,10 @@ const make = Effect.gen(function* () {
         case "launch_thread": {
           let matchedProject = yield* resolveProject(action.projectId, action.projectName);
           if (!matchedProject && !action.projectId && !action.projectName) {
-            const activeThread = req.context.activeThreadId
-              ? req.context.threads.find((thread) => thread.threadId === req.context.activeThreadId)
+            const activeThread = hydratedContext.activeThreadId
+              ? hydratedContext.threads.find(
+                  (thread) => thread.threadId === hydratedContext.activeThreadId,
+                )
               : undefined;
             if (activeThread?.projectId) {
               matchedProject = yield* resolveProject(activeThread.projectId, undefined);
@@ -1738,15 +2171,104 @@ const make = Effect.gen(function* () {
           );
           if (loaded.ok) {
             const latest = ThreadManagementService.latestRun(loaded.projection);
-            const messages = loaded.projection.messages.slice(-6).map((message) => ({
+            const messages = loaded.projection.messages.slice(-8).map((message) => ({
               role: message.role,
               text: truncate(message.text, 600),
             }));
+            const runtimeRequests = loaded.projection.runtimeRequests ?? [];
+            const turnItems = loaded.projection.turnItems ?? [];
+            const pendingQuestions: Array<VoiceWorkspaceQuestionSummary> = [];
+            const pendingApprovals: Array<VoiceWorkspaceApprovalSummary> = [];
+            for (const request of runtimeRequests) {
+              if (request.status !== "pending") continue;
+              if (request.kind === "user_input") {
+                const item = turnItems.find(
+                  (candidate) =>
+                    candidate.type === "user_input_request" && candidate.requestId === request.id,
+                );
+                if (item?.type === "user_input_request") {
+                  pendingQuestions.push({
+                    environmentId: target.environmentId,
+                    threadId: target.threadId,
+                    threadTitle: loaded.projection.thread.title,
+                    requestId: request.id,
+                    questions: item.questions.map((question) => ({
+                      id: question.id,
+                      header: question.header,
+                      question: question.question,
+                      isMultiSelect: question.multiSelect === true,
+                      options: question.options.map((option) => option.label),
+                      optionDetails: question.options.map((option) => ({
+                        label: option.label,
+                        ...(option.description ? { description: option.description } : {}),
+                      })),
+                    })),
+                  });
+                }
+              } else if (isApprovalRequestKind(request.kind)) {
+                const item = turnItems.find(
+                  (candidate) =>
+                    candidate.type === "approval_request" && candidate.requestId === request.id,
+                );
+                const prompt = item?.type === "approval_request" ? item.prompt : undefined;
+                const reason = item?.type === "approval_request" ? item.reason : undefined;
+                const appName = item?.type === "approval_request" ? item.appName : undefined;
+                pendingApprovals.push({
+                  environmentId: target.environmentId,
+                  threadId: target.threadId,
+                  threadTitle: loaded.projection.thread.title,
+                  requestId: request.id,
+                  requestKind: request.kind,
+                  title: truncate(prompt ?? appName, 120) || `${request.kind} approval`,
+                  detail: truncate(prompt, 200) || null,
+                  reason: truncate(reason, 200) || null,
+                });
+              }
+            }
+
+            const childMap = new Map<
+              string,
+              {
+                readonly threadId: string | null;
+                readonly title: string;
+                readonly status: string;
+                readonly progress?: string | undefined;
+              }
+            >();
+            for (const subagent of loaded.projection.subagents ?? []) {
+              const key = subagent.childThreadId ?? subagent.id;
+              childMap.set(key, {
+                threadId: subagent.childThreadId,
+                title: subagent.title ?? truncate(subagent.prompt, 60) ?? "Subagent",
+                status: subagent.status,
+                ...(subagent.progress ? { progress: truncate(subagent.progress, 160) } : {}),
+              });
+            }
+            for (const thread of allKnownThreads()) {
+              if (thread.parentThreadId === target.threadId && !childMap.has(thread.threadId)) {
+                childMap.set(thread.threadId, {
+                  threadId: thread.threadId,
+                  title: thread.title,
+                  status: thread.status,
+                  ...(thread.latestAssistantMessage
+                    ? { progress: truncate(thread.latestAssistantMessage, 160) }
+                    : {}),
+                });
+              }
+            }
+            const childSubagents = [...childMap.values()].slice(0, 8);
+
             readThreadExcerpts.push({
               threadId: target.threadId,
               title: loaded.projection.thread.title,
               status: latest?.status ?? "idle",
+              ...(loaded.projection.thread.lineage?.parentThreadId
+                ? { parentThreadId: loaded.projection.thread.lineage.parentThreadId }
+                : {}),
               messages,
+              ...(pendingQuestions.length > 0 ? { pendingQuestions } : {}),
+              ...(pendingApprovals.length > 0 ? { pendingApprovals } : {}),
+              ...(childSubagents.length > 0 ? { childSubagents } : {}),
             });
             toolResults.push({
               tool: "read_thread",
@@ -1763,6 +2285,102 @@ const make = Effect.gen(function* () {
               summary: loaded.error,
               environmentId: target.environmentId,
               threadId: target.threadId,
+            });
+          }
+          break;
+        }
+
+        case "search_workspace": {
+          const allProjects = allKnownProjects().filter((project) => !project.archived);
+          const scopedProject = action.projectName
+            ? yield* resolveProject(undefined, action.projectName)
+            : undefined;
+          const projectsToSearch = scopedProject ? [scopedProject] : allProjects;
+          const projectTitleById = new Map(
+            allProjects.map((project) => [project.id, project.title]),
+          );
+          const depth = action.depth ?? "quick";
+          const found = yield* searchWorkspace({
+            query: action.query,
+            depth,
+            projects: projectsToSearch,
+            projectTitleById,
+            threadManagement,
+            fileSystem,
+            path,
+          });
+          workspaceSearches.push(found);
+          toolResults.push({
+            tool: "search_workspace",
+            ok: true,
+            summary: `Searched workspace for "${action.query}" (${found.threadHits.length} thread hits, ${found.fileHits.length} file hits).`,
+            environmentId: localEnvironmentId,
+            ...(scopedProject ? { projectId: scopedProject.id } : {}),
+          });
+          break;
+        }
+
+        case "read_project_file": {
+          const allProjects = allKnownProjects().filter((project) => !project.archived);
+          let targetProject = action.projectName
+            ? yield* resolveProject(undefined, action.projectName)
+            : undefined;
+          if (!targetProject && hydratedContext.activeThreadId) {
+            const activeThread = hydratedContext.threads.find(
+              (thread) => thread.threadId === hydratedContext.activeThreadId,
+            );
+            if (activeThread?.projectId) {
+              targetProject = yield* resolveProject(activeThread.projectId, undefined);
+            }
+          }
+          if (!targetProject && allProjects.length === 1) {
+            targetProject = allProjects[0];
+          }
+          const candidateProjects = targetProject ? [targetProject] : allProjects;
+          if (candidateProjects.length === 0) {
+            toolResults.push({
+              tool: "read_project_file",
+              ok: false,
+              summary: "No registered project is available to read files from.",
+            });
+            break;
+          }
+
+          let readOutcome:
+            | { readonly ok: true; readonly result: SafeProjectFileResult }
+            | { readonly ok: false; readonly error: string } = {
+            ok: false,
+            error: `File "${action.relativePath}" was not found.`,
+          };
+          for (const candidate of candidateProjects) {
+            readOutcome = yield* readSafeProjectFile({
+              project: candidate,
+              relativePath: action.relativePath,
+              maxChars: action.maxChars,
+              fileSystem,
+              path,
+            });
+            if (readOutcome.ok) break;
+            // Stop immediately on security/traversal rejections rather than probing other projects.
+            if (!readOutcome.error.includes("was not found")) break;
+          }
+
+          if (readOutcome.ok) {
+            projectFileExcerpts.push(readOutcome.result);
+            toolResults.push({
+              tool: "read_project_file",
+              ok: true,
+              summary: `Read "${readOutcome.result.relativePath}" from ${readOutcome.result.projectTitle}.`,
+              environmentId: localEnvironmentId,
+              projectId: readOutcome.result.projectId,
+            });
+          } else {
+            toolResults.push({
+              tool: "read_project_file",
+              ok: false,
+              summary: readOutcome.error,
+              environmentId: localEnvironmentId,
+              ...(targetProject ? { projectId: targetProject.id } : {}),
             });
           }
           break;
@@ -1898,18 +2516,59 @@ const make = Effect.gen(function* () {
         }
 
         case "respond_approval": {
-          const matchedApproval =
-            (action.requestId
-              ? req.context.pendingApprovals.find((entry) => entry.requestId === action.requestId)
-              : undefined) ??
-            (action.threadId
-              ? req.context.pendingApprovals.find((entry) => entry.threadId === action.threadId)
-              : undefined) ??
-            req.context.pendingApprovals[0];
-          const environmentId = action.environmentId ?? matchedApproval?.environmentId;
+          const matchedApproval = matchPendingApproval(hydratedContext.pendingApprovals, {
+            requestId: action.requestId,
+            threadId: action.threadId,
+            threadTitle: action.threadTitle,
+          });
+          const environmentId =
+            action.environmentId ?? matchedApproval?.environmentId ?? localEnvironmentId;
           const threadId = action.threadId ?? matchedApproval?.threadId;
           const requestId = action.requestId ?? matchedApproval?.requestId;
-          if (environmentId && threadId && requestId) {
+          const threadLabel = matchedApproval?.threadTitle ?? action.threadTitle ?? "the thread";
+          if (!threadId || !requestId) {
+            toolResults.push({
+              tool: "respond_approval",
+              ok: false,
+              summary: "Could not find a matching pending approval.",
+            });
+            break;
+          }
+          const isLocal = !environmentId || environmentId === localEnvironmentId;
+          if (isLocal && typeof threadManagement.dispatch === "function") {
+            const commandId = CommandId.make(yield* newId("voice-approval-respond"));
+            const responded = yield* threadManagement
+              .dispatch({
+                type: "runtime-request.respond",
+                commandId,
+                threadId: ThreadId.make(threadId),
+                requestId: RuntimeRequestId.make(requestId),
+                decision: action.decision,
+              })
+              .pipe(
+                Effect.as({ ok: true as const }),
+                Effect.catch((error) =>
+                  Effect.succeed({ ok: false as const, error: error.message }),
+                ),
+              );
+            toolResults.push(
+              responded.ok
+                ? {
+                    tool: "respond_approval",
+                    ok: true,
+                    summary: `Sent approval decision (${action.decision}) to "${threadLabel}".`,
+                    environmentId: localEnvironmentId,
+                    threadId,
+                  }
+                : {
+                    tool: "respond_approval",
+                    ok: false,
+                    summary: responded.error,
+                    environmentId: localEnvironmentId,
+                    threadId,
+                  },
+            );
+          } else {
             clientActions.push({
               type: "respond-approval",
               environmentId,
@@ -1917,52 +2576,185 @@ const make = Effect.gen(function* () {
               requestId,
               decision: action.decision,
             });
+            toolResults.push({
+              tool: "respond_approval",
+              ok: true,
+              summary: `Forwarded approval decision (${action.decision}) for "${threadLabel}".`,
+              environmentId,
+              threadId,
+            });
           }
           break;
         }
 
         case "respond_question": {
-          const matchedQuestion =
-            (action.requestId
-              ? req.context.pendingQuestions.find((entry) => entry.requestId === action.requestId)
-              : undefined) ??
-            (action.threadId
-              ? req.context.pendingQuestions.find((entry) => entry.threadId === action.threadId)
-              : undefined) ??
-            req.context.pendingQuestions[0];
-          const environmentId = action.environmentId ?? matchedQuestion?.environmentId;
+          const matchedQuestion = matchPendingQuestion(hydratedContext.pendingQuestions, {
+            requestId: action.requestId,
+            threadId: action.threadId,
+            threadTitle: action.threadTitle,
+          });
+          const environmentId =
+            action.environmentId ?? matchedQuestion?.environmentId ?? localEnvironmentId;
           const threadId = action.threadId ?? matchedQuestion?.threadId;
           const requestId = action.requestId ?? matchedQuestion?.requestId;
-          if (environmentId && threadId && requestId) {
+          const threadLabel = matchedQuestion?.threadTitle ?? action.threadTitle ?? "the thread";
+          if (!threadId || !requestId) {
+            toolResults.push({
+              tool: "respond_question",
+              ok: false,
+              summary: "Could not find a matching pending question.",
+            });
+            break;
+          }
+          const resolvedAnswers = resolveQuestionAnswers(action.answers, matchedQuestion);
+          if (Object.keys(resolvedAnswers).length === 0) {
+            toolResults.push({
+              tool: "respond_question",
+              ok: false,
+              summary: `No answer was provided for the pending question on "${threadLabel}".`,
+              environmentId,
+              threadId,
+            });
+            break;
+          }
+          const isLocal = !environmentId || environmentId === localEnvironmentId;
+          if (isLocal && typeof threadManagement.dispatch === "function") {
+            const commandId = CommandId.make(yield* newId("voice-question-respond"));
+            const responded = yield* threadManagement
+              .dispatch({
+                type: "runtime-request.respond",
+                commandId,
+                threadId: ThreadId.make(threadId),
+                requestId: RuntimeRequestId.make(requestId),
+                answers: resolvedAnswers,
+              })
+              .pipe(
+                Effect.as({ ok: true as const }),
+                Effect.catch((error) =>
+                  Effect.succeed({ ok: false as const, error: error.message }),
+                ),
+              );
+            const answerSummary = Object.values(resolvedAnswers)
+              .map((value) => (Array.isArray(value) ? value.join(", ") : value))
+              .join("; ");
+            toolResults.push(
+              responded.ok
+                ? {
+                    tool: "respond_question",
+                    ok: true,
+                    summary: `Answered pending question on "${threadLabel}" with "${truncate(answerSummary, 100)}".`,
+                    environmentId: localEnvironmentId,
+                    threadId,
+                  }
+                : {
+                    tool: "respond_question",
+                    ok: false,
+                    summary: responded.error,
+                    environmentId: localEnvironmentId,
+                    threadId,
+                  },
+            );
+          } else {
             clientActions.push({
               type: "respond-question",
               environmentId,
               threadId,
               requestId,
-              answers: action.answers,
+              answers: resolvedAnswers,
+            });
+            toolResults.push({
+              tool: "respond_question",
+              ok: true,
+              summary: `Forwarded answer for "${threadLabel}".`,
+              environmentId,
+              threadId,
             });
           }
           break;
         }
 
         case "dismiss_question": {
-          const matchedQuestion =
-            (action.requestId
-              ? req.context.pendingQuestions.find((entry) => entry.requestId === action.requestId)
-              : undefined) ??
-            (action.threadId
-              ? req.context.pendingQuestions.find((entry) => entry.threadId === action.threadId)
-              : undefined) ??
-            req.context.pendingQuestions[0];
-          const environmentId = action.environmentId ?? matchedQuestion?.environmentId;
+          const matchedQuestion = matchPendingQuestion(hydratedContext.pendingQuestions, {
+            requestId: action.requestId,
+            threadId: action.threadId,
+            threadTitle: action.threadTitle,
+          });
+          const environmentId =
+            action.environmentId ?? matchedQuestion?.environmentId ?? localEnvironmentId;
           const threadId = action.threadId ?? matchedQuestion?.threadId;
           const requestId = action.requestId ?? matchedQuestion?.requestId;
-          if (environmentId && threadId && requestId) {
+          const threadLabel = matchedQuestion?.threadTitle ?? action.threadTitle ?? "the thread";
+          if (!threadId || !requestId) {
+            toolResults.push({
+              tool: "dismiss_question",
+              ok: false,
+              summary: "Could not find a matching pending question to dismiss.",
+            });
+            break;
+          }
+          const isLocal = !environmentId || environmentId === localEnvironmentId;
+          if (isLocal && typeof threadManagement.dispatch === "function") {
+            const commandId = CommandId.make(yield* newId("voice-question-dismiss"));
+            const dismissed = yield* threadManagement
+              .dispatch({
+                type: "thread.user-input.dismiss",
+                commandId,
+                threadId: ThreadId.make(threadId),
+                requestId: RuntimeRequestId.make(requestId),
+              })
+              .pipe(
+                Effect.as({ ok: true as const }),
+                Effect.catch((error) =>
+                  // Live blocking questions reject `thread.user-input.dismiss` and cancel via `runtime-request.respond`.
+                  error.message.includes("needs an answer")
+                    ? newId("voice-question-cancel").pipe(
+                        Effect.flatMap((cancelId) =>
+                          threadManagement.dispatch({
+                            type: "runtime-request.respond",
+                            commandId: CommandId.make(cancelId),
+                            threadId: ThreadId.make(threadId),
+                            requestId: RuntimeRequestId.make(requestId),
+                            decision: "cancel",
+                          }),
+                        ),
+                        Effect.as({ ok: true as const }),
+                        Effect.catch((cancelError) =>
+                          Effect.succeed({ ok: false as const, error: cancelError.message }),
+                        ),
+                      )
+                    : Effect.succeed({ ok: false as const, error: error.message }),
+                ),
+              );
+            toolResults.push(
+              dismissed.ok
+                ? {
+                    tool: "dismiss_question",
+                    ok: true,
+                    summary: `Dismissed pending question on "${threadLabel}".`,
+                    environmentId: localEnvironmentId,
+                    threadId,
+                  }
+                : {
+                    tool: "dismiss_question",
+                    ok: false,
+                    summary: dismissed.error,
+                    environmentId: localEnvironmentId,
+                    threadId,
+                  },
+            );
+          } else {
             clientActions.push({
               type: "dismiss-question",
               environmentId,
               threadId,
               requestId,
+            });
+            toolResults.push({
+              tool: "dismiss_question",
+              ok: true,
+              summary: `Forwarded dismiss for "${threadLabel}".`,
+              environmentId,
+              threadId,
             });
           }
           break;
@@ -2007,18 +2799,30 @@ const make = Effect.gen(function* () {
       yield* hooks.onToolResults(toolResults, clientActions);
     }
 
-    // One follow-up pass when read_thread fetched detail the initial plan could not see.
-    if (readThreadExcerpts.length > 0) {
+    // One follow-up pass when read_thread, search_workspace, or read_project_file fetched detail
+    // the initial plan could not see.
+    if (
+      readThreadExcerpts.length > 0 ||
+      workspaceSearches.length > 0 ||
+      projectFileExcerpts.length > 0
+    ) {
       const followUpSpoken = spokenStreamer(
         planSpoken.spoken().length > 0 ? undefined : hooks,
         () => true,
       );
       const followUpRaw = yield* runLlm({
         systemPrompt: VOICE_ASSISTANT_SYSTEM_PROMPT,
-        userPrompt: buildReadThreadSynthesisPrompt({
+        userPrompt: buildFollowUpSynthesisPrompt({
           utterance,
-          excerpts: readThreadExcerpts,
-          otherToolResults: toolResults.filter((result) => result.tool !== "read_thread"),
+          threadExcerpts: readThreadExcerpts,
+          workspaceSearches,
+          projectFiles: projectFileExcerpts,
+          otherToolResults: toolResults.filter(
+            (result) =>
+              result.tool !== "read_thread" &&
+              result.tool !== "search_workspace" &&
+              result.tool !== "read_project_file",
+          ),
         }),
         expectJson: true,
         directTimeoutMs: DIRECT_TURN_TIMEOUT_MS,
@@ -2040,6 +2844,23 @@ const make = Effect.gen(function* () {
           spokenReply = latestMsg
             ? sanitizeSpeechText(`${first.title} is ${first.status}. ${latestMsg}`, 280)
             : `${first.title} is currently ${first.status}.`;
+          displayReply = spokenReply;
+        } else if (workspaceSearches[0]) {
+          const search = workspaceSearches[0];
+          const topFile = search.fileHits[0];
+          const topThread = search.threadHits[0];
+          spokenReply = topFile
+            ? sanitizeSpeechText(
+                `I found matching details in ${topFile.projectTitle}. ${topFile.snippet}`,
+                280,
+              )
+            : topThread
+              ? sanitizeSpeechText(`I found a matching thread called ${topThread.title}.`, 240)
+              : `I searched your workspace for ${search.query} but didn't find a strong match.`;
+          displayReply = spokenReply;
+        } else if (projectFileExcerpts[0]) {
+          const file = projectFileExcerpts[0];
+          spokenReply = sanitizeSpeechText(file.content, 280);
           displayReply = spokenReply;
         }
       }

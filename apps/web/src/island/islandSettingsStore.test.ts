@@ -35,21 +35,42 @@ describe("islandSettingsStore", () => {
     expect(getIslandSettings()).toEqual(next);
   });
 
-  it("accepts ElevenLabs provider, allowlisted models, and voice ids", () => {
+  it("accepts ElevenLabs provider, allowlisted models, voice ids, and clamped voice_settings", () => {
     const next = updateVoiceAssistantSettings({
       ttsProvider: "elevenlabs",
       elevenlabsModel: "eleven_flash_v2_5",
       elevenlabsVoice: " IKne3meq5aSn9XLyUdCD ",
+      elevenlabsCustomVoiceId: " CustomVoiceId1234567890 ",
+      elevenlabsStability: 0.35,
+      elevenlabsSimilarityBoost: 0.85,
+      elevenlabsStyle: 0.4,
+      elevenlabsSpeed: 1.1,
+      elevenlabsUseSpeakerBoost: false,
     });
     expect(next.voiceAssistant.ttsProvider).toBe("elevenlabs");
     expect(next.voiceAssistant.elevenlabsModel).toBe("eleven_flash_v2_5");
     expect(next.voiceAssistant.elevenlabsVoice).toBe("IKne3meq5aSn9XLyUdCD");
+    expect(next.voiceAssistant.elevenlabsCustomVoiceId).toBe("CustomVoiceId1234567890");
+    expect(next.voiceAssistant.elevenlabsStability).toBe(0.35);
+    expect(next.voiceAssistant.elevenlabsSimilarityBoost).toBe(0.85);
+    expect(next.voiceAssistant.elevenlabsStyle).toBe(0.4);
+    expect(next.voiceAssistant.elevenlabsSpeed).toBe(1.1);
+    expect(next.voiceAssistant.elevenlabsUseSpeakerBoost).toBe(false);
 
     const rejected = normalizeIslandSettings({
-      voiceAssistant: { elevenlabsModel: "eleven_bogus", elevenlabsVoice: "../etc" },
+      voiceAssistant: {
+        elevenlabsModel: "eleven_bogus",
+        elevenlabsVoice: "../etc",
+        elevenlabsCustomVoiceId: "../evil",
+        elevenlabsStability: 5,
+        elevenlabsSpeed: 0.1,
+      },
     });
     expect(rejected.voiceAssistant.elevenlabsModel).toBe("eleven_v4_turbo");
     expect(rejected.voiceAssistant.elevenlabsVoice).toBe("SAz9YHcvj6GT2YYXdXww");
+    expect(rejected.voiceAssistant.elevenlabsCustomVoiceId).toBe("");
+    expect(rejected.voiceAssistant.elevenlabsStability).toBe(1);
+    expect(rejected.voiceAssistant.elevenlabsSpeed).toBe(0.7);
   });
 
   it("merges partial voiceAssistant updates and clamps numeric bounds", () => {

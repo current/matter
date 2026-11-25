@@ -36,12 +36,43 @@ export const ELEVENLABS_PREMADE_VOICES = [
 
 export const DEFAULT_ELEVENLABS_VOICE = "SAz9YHcvj6GT2YYXdXww";
 
+/** ElevenLabs API `voice_settings` parameters (camelCase in mattr, snake_case on the wire). */
+export interface ElevenLabsVoiceSettings {
+  readonly stability: number;
+  readonly similarityBoost: number;
+  readonly style: number;
+  readonly speed: number;
+  readonly useSpeakerBoost: boolean;
+}
+
+export interface ElevenLabsVoiceSettingsPatch {
+  readonly stability?: number | undefined;
+  readonly similarityBoost?: number | undefined;
+  readonly style?: number | undefined;
+  readonly speed?: number | undefined;
+  readonly useSpeakerBoost?: boolean | undefined;
+}
+
+export const DEFAULT_ELEVENLABS_VOICE_SETTINGS: ElevenLabsVoiceSettings = {
+  stability: 0.5,
+  similarityBoost: 0.75,
+  style: 0.15,
+  speed: 1.0,
+  useSpeakerBoost: true,
+};
+
 /** Server-side TTS defaults, used when a client (e.g. the iPhone app) sends no provider. */
 export interface VoiceServerTtsPreferences {
   readonly ttsProvider: VoiceTtsProvider;
   readonly elevenlabsModel: ElevenLabsTtsModel;
   readonly elevenlabsVoice: string;
   readonly deepgramVoice: string;
+  readonly customVoiceId?: string | undefined;
+  readonly stability?: number | undefined;
+  readonly similarityBoost?: number | undefined;
+  readonly style?: number | undefined;
+  readonly speed?: number | undefined;
+  readonly useSpeakerBoost?: boolean | undefined;
 }
 
 export const DEFAULT_VOICE_SERVER_TTS_PREFERENCES: VoiceServerTtsPreferences = {
@@ -49,6 +80,12 @@ export const DEFAULT_VOICE_SERVER_TTS_PREFERENCES: VoiceServerTtsPreferences = {
   elevenlabsModel: DEFAULT_ELEVENLABS_MODEL,
   elevenlabsVoice: DEFAULT_ELEVENLABS_VOICE,
   deepgramVoice: "",
+  customVoiceId: "",
+  stability: DEFAULT_ELEVENLABS_VOICE_SETTINGS.stability,
+  similarityBoost: DEFAULT_ELEVENLABS_VOICE_SETTINGS.similarityBoost,
+  style: DEFAULT_ELEVENLABS_VOICE_SETTINGS.style,
+  speed: DEFAULT_ELEVENLABS_VOICE_SETTINGS.speed,
+  useSpeakerBoost: DEFAULT_ELEVENLABS_VOICE_SETTINGS.useSpeakerBoost,
 };
 
 export interface VoiceAssistantSettings {
@@ -64,6 +101,18 @@ export interface VoiceAssistantSettings {
   readonly elevenlabsModel: ElevenLabsTtsModel;
   /** ElevenLabs voice id (premade or custom). */
   readonly elevenlabsVoice: string;
+  /** Optional custom ElevenLabs voice ID overriding the preset voice when set. */
+  readonly elevenlabsCustomVoiceId: string;
+  /** ElevenLabs voice stability (0.0–1.0). */
+  readonly elevenlabsStability: number;
+  /** ElevenLabs similarity boost (0.0–1.0). */
+  readonly elevenlabsSimilarityBoost: number;
+  /** ElevenLabs style / expressiveness (0.0–1.0). */
+  readonly elevenlabsStyle: number;
+  /** ElevenLabs speech speed (0.7–1.2). */
+  readonly elevenlabsSpeed: number;
+  /** ElevenLabs speaker boost toggle. */
+  readonly elevenlabsUseSpeakerBoost: boolean;
   /** Speech playback rate (0.8 to 1.5). */
   readonly ttsSpeed: number;
   /** Automatically keep listening for follow-ups in Hands-Free Voice Mode. */
@@ -87,6 +136,12 @@ export const DEFAULT_VOICE_ASSISTANT_SETTINGS: VoiceAssistantSettings = {
   ttsVoice: "",
   elevenlabsModel: DEFAULT_ELEVENLABS_MODEL,
   elevenlabsVoice: DEFAULT_ELEVENLABS_VOICE,
+  elevenlabsCustomVoiceId: "",
+  elevenlabsStability: DEFAULT_ELEVENLABS_VOICE_SETTINGS.stability,
+  elevenlabsSimilarityBoost: DEFAULT_ELEVENLABS_VOICE_SETTINGS.similarityBoost,
+  elevenlabsStyle: DEFAULT_ELEVENLABS_VOICE_SETTINGS.style,
+  elevenlabsSpeed: DEFAULT_ELEVENLABS_VOICE_SETTINGS.speed,
+  elevenlabsUseSpeakerBoost: DEFAULT_ELEVENLABS_VOICE_SETTINGS.useSpeakerBoost,
   ttsSpeed: 1.08,
   handsFreeAutoListen: true,
   bargeInEnabled: true,
@@ -116,6 +171,14 @@ export interface VoiceWorkspaceThreadSummary {
   readonly latestUserMessage: string | null;
   readonly latestAssistantMessage: string | null;
   readonly isActive?: boolean;
+  readonly parentThreadId?: string | null;
+  readonly parentThreadTitle?: string | null;
+  readonly relationshipToParent?: "subagent" | null;
+  readonly activeChildCount?: number;
+  readonly childTitles?: ReadonlyArray<string>;
+  readonly providerInstanceId?: string | null;
+  readonly model?: string | null;
+  readonly branch?: string | null;
 }
 
 export interface VoiceWorkspaceApprovalSummary {
@@ -129,6 +192,11 @@ export interface VoiceWorkspaceApprovalSummary {
   readonly reason: string | null;
 }
 
+export interface VoiceWorkspaceQuestionOption {
+  readonly label: string;
+  readonly description?: string | undefined;
+}
+
 export interface VoiceWorkspaceQuestionSummary {
   readonly environmentId: string;
   readonly threadId: string;
@@ -138,7 +206,9 @@ export interface VoiceWorkspaceQuestionSummary {
     readonly id: string;
     readonly header: string;
     readonly question: string;
+    readonly isMultiSelect?: boolean | undefined;
     readonly options: ReadonlyArray<string>;
+    readonly optionDetails?: ReadonlyArray<VoiceWorkspaceQuestionOption> | undefined;
   }>;
 }
 
@@ -243,6 +313,8 @@ export interface VoiceSpeakRequest {
   /** ElevenLabs model override; ignored by other providers. */
   readonly model?: string | undefined;
   readonly speed?: number | undefined;
+  /** Optional ElevenLabs voice_settings overrides; ignored by other providers. */
+  readonly elevenlabsVoiceSettings?: ElevenLabsVoiceSettingsPatch | undefined;
 }
 
 export interface VoiceAvailableTtsInfo {
