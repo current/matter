@@ -9286,10 +9286,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· den som kör den får den här åtkomsten"
-      ]
+      "c": [" ", "· den som kör den får den här åtkomsten"]
     }
   ],
   "b2ece956b72c4a48": "Submoduler",
@@ -10897,10 +10894,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "på datorn som öppnade den här sidan"
-      ]
+      "c": [" ", "på datorn som öppnade den här sidan"]
     }
   ],
   "d1259290b8c63577": "Byt namn på tråd",
@@ -13280,5 +13274,8 @@
   "fff9316cf5e449b4": "Skapa ett ärende",
   "fff9a71717eec000": "Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for voice output.",
   "fff9b7f838279ee3": "Ingen återställningskredit kvar.",
-  "fffd51054a4240ab": "{status, select, inProgress {Läser en granskningsguide} completed {Läste en granskningsguide} failed {Kunde inte läsa en granskningsguide} declined {Avböjde att läsa en granskningsguide} stopped {Slutade läsa en granskningsguide} other {Läser en granskningsguide}}"
+  "fffd51054a4240ab": "{status, select, inProgress {Läser en granskningsguide} completed {Läste en granskningsguide} failed {Kunde inte läsa en granskningsguide} declined {Avböjde att läsa en granskningsguide} stopped {Slutade läsa en granskningsguide} other {Läser en granskningsguide}}",
+  "eb2e464bbdf1a809": "Agenter ser användningsgränser",
+  "a02932c0ecd7e30e": "Agenter kan läsa kvarvarande användning och varnas när de delegerar till ett konto som har nått sin gräns.",
+  "a65bbcd6001ffbf5": "användning kvot hastighetsbegränsning kvar delegera subagent mcp"
 }

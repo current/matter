@@ -9274,10 +9274,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· quien lo ejecute obtiene este acceso"
-      ]
+      "c": [" ", "· quien lo ejecute obtiene este acceso"]
     }
   ],
   "b2ece956b72c4a48": "Submódulos",
@@ -10884,10 +10881,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "en el ordenador que abrió esta página"
-      ]
+      "c": [" ", "en el ordenador que abrió esta página"]
     }
   ],
   "d1259290b8c63577": "Cambiar nombre del hilo",
@@ -13268,5 +13262,8 @@
   "fff9316cf5e449b4": "Abrir una issue",
   "fff9a71717eec000": "Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for voice output.",
   "fff9b7f838279ee3": "No quedan créditos de restablecimiento.",
-  "fffd51054a4240ab": "{status, select, inProgress {Leyendo una guía de revisión} completed {Leyó una guía de revisión} failed {No se pudo leer una guía de revisión} declined {Se rechazó leer una guía de revisión} stopped {Se dejó de leer una guía de revisión} other {Leyendo una guía de revisión}}"
+  "fffd51054a4240ab": "{status, select, inProgress {Leyendo una guía de revisión} completed {Leyó una guía de revisión} failed {No se pudo leer una guía de revisión} declined {Se rechazó leer una guía de revisión} stopped {Se dejó de leer una guía de revisión} other {Leyendo una guía de revisión}}",
+  "eb2e464bbdf1a809": "Los agentes ven los límites de uso",
+  "a02932c0ecd7e30e": "Los agentes pueden leer el uso restante y reciben un aviso cuando delegan en una cuenta agotada.",
+  "a65bbcd6001ffbf5": "uso cuota límite de uso restante delegar subagente mcp"
 }

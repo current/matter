@@ -9280,10 +9280,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· wer es ausführt, erhält diesen Zugriff"
-      ]
+      "c": [" ", "· wer es ausführt, erhält diesen Zugriff"]
     }
   ],
   "b2ece956b72c4a48": "Submodule",
@@ -10890,10 +10887,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "auf dem Computer, der diese Seite geöffnet hat"
-      ]
+      "c": [" ", "auf dem Computer, der diese Seite geöffnet hat"]
     }
   ],
   "d1259290b8c63577": "Thread umbenennen",
@@ -13273,5 +13267,8 @@
   "fff9316cf5e449b4": "Ein Issue erstellen",
   "fff9a71717eec000": "Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for voice output.",
   "fff9b7f838279ee3": "Kein Reset-Guthaben mehr.",
-  "fffd51054a4240ab": "{status, select, inProgress {Review-Leitfaden wird gelesen} completed {Review-Leitfaden gelesen} failed {Review-Leitfaden konnte nicht gelesen werden} declined {Lesen eines Review-Leitfadens abgelehnt} stopped {Lesen eines Review-Leitfadens abgebrochen} other {Review-Leitfaden wird gelesen}}"
+  "fffd51054a4240ab": "{status, select, inProgress {Review-Leitfaden wird gelesen} completed {Review-Leitfaden gelesen} failed {Review-Leitfaden konnte nicht gelesen werden} declined {Lesen eines Review-Leitfadens abgelehnt} stopped {Lesen eines Review-Leitfadens abgebrochen} other {Review-Leitfaden wird gelesen}}",
+  "eb2e464bbdf1a809": "Agents sehen Nutzungslimits",
+  "a02932c0ecd7e30e": "Agents können die verbleibende Nutzung lesen und werden gewarnt, wenn sie an ein aufgebrauchtes Konto delegieren.",
+  "a65bbcd6001ffbf5": "nutzung kontingent rate limit verbleibend delegieren subagent mcp"
 }

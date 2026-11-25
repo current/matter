@@ -5735,5 +5735,7 @@
   "fff9316cf5e449b4": "File an issue",
   "fff9b7f838279ee3": "No reset credit left.",
   "fffd51054a4240ab": "{status, select, inProgress {Reading a review guide} completed {Read a review guide} failed {Failed to read a review guide} declined {Declined to read a review guide} stopped {Stopped reading a review guide} other {Reading a review guide}}",
-  "fffe4b4a5ee40c3a": "All states"
+  "fffe4b4a5ee40c3a": "All states",
+  "eb2e464bbdf1a809": "Agents see usage limits",
+  "a02932c0ecd7e30e": "Agents can read usage left and are warned when they delegate to a used-up account."
 }

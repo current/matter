@@ -72,6 +72,7 @@ import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2Pe
 import { runRanAfter } from "@t3tools/shared/orchestrationV2ThreadError";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { formatThreadLink } from "@t3tools/shared/threadLinks";
+import { exhaustedUsageWindow, remainingPercent } from "@t3tools/shared/usageLimits";
 import { threadPullRequestUpdatedAtMs } from "@t3tools/shared/threadPullRequests";
 import {
   normalizeThreadPullRequestKey,
@@ -492,6 +493,13 @@ function knownOptions(
 ): ReadonlyArray<ProviderOptionSelection> | undefined {
   if (options === undefined || descriptors === undefined) return options;
   return options.filter((option) => descriptors.some((descriptor) => descriptor.id === option.id));
+}
+
+/** Readings can lag a reset, so a used-up window warns but never blocks delegation. */
+function usageWarning(provider: ServerProvider | undefined, now: number, model: string | null) {
+  const window = exhaustedUsageWindow(provider, now, model ?? undefined);
+  if (provider === undefined || window === undefined) return undefined;
+  return `${provider.instanceId} has used up its ${window.label} limit${window.resetsAt === undefined ? "" : ` until ${window.resetsAt}`}. Its tasks can stop until it resets.`;
 }
 
 /** Skip checks without descriptors; reject duplicate IDs because consumers disagree on precedence. */
@@ -1637,6 +1645,11 @@ const make = Effect.gen(function* () {
   });
 
   const loadProviders = providerRegistry.getProviders;
+
+  const agentUsageLimitsVisible = serverSettings.getSettings.pipe(
+    Effect.map((settings) => settings.agentUsageLimitsVisible),
+    Effect.orElseSucceed(() => false),
+  );
 
   /** The folder the composer's model picker scans for this thread. */
   const parentWorkspaceCwd = (parent: Pick<OrchestrationV2ThreadProjection, "thread">) =>
@@ -2896,6 +2909,20 @@ const make = Effect.gen(function* () {
             provider.supportedRuntimeModes.length === 0
               ? {}
               : { runtimeModes: [...provider.supportedRuntimeModes] }),
+            ...(!settings.agentUsageLimitsVisible ||
+            provider.usageLimits === undefined ||
+            provider.usageLimits.windows.length === 0
+              ? {}
+              : {
+                  usage: {
+                    checkedAt: provider.usageLimits.checkedAt,
+                    windows: provider.usageLimits.windows.map((window) => ({
+                      label: window.label,
+                      leftPercent: remainingPercent(window),
+                      ...(window.resetsAt === undefined ? {} : { resetsAt: window.resetsAt }),
+                    })),
+                  },
+                }),
             canRunChildTask: constraints.length === 0,
             canRunCrossProviderChildTask: constraints.length === 0,
             constraints: [...constraints],
@@ -3129,6 +3156,7 @@ const make = Effect.gen(function* () {
             );
           }
           const taskId = taskEvent.event.payload.id;
+          const { providerInstanceId: taskInstanceId, model: taskModel } = taskEvent.event.payload;
           const childThreadId = taskEvent.event.payload.childThreadId;
           const childRunEvent = result.storedEvents.find(
             (stored) =>
@@ -3145,9 +3173,18 @@ const make = Effect.gen(function* () {
               runId: childRunEvent.event.payload.id,
             });
           }
-          return yield* input.mode === "wait"
+          // A retry replays the accepted task, whose account can differ from `target`.
+          const warning = (yield* agentUsageLimitsVisible)
+            ? usageWarning(
+                (yield* loadProviders).find((provider) => provider.instanceId === taskInstanceId),
+                yield* Clock.currentTimeMillis,
+                taskModel,
+              )
+            : undefined;
+          const task = yield* input.mode === "wait"
             ? awaitTask(scope, taskId, key, input.timeoutMs, restore)
             : restore(readTask(scope, taskId, false, true));
+          return warning === undefined ? task : { ...task, usageWarning: warning };
         }),
       );
     }),

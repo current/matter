@@ -231,6 +231,12 @@ in **Settings → Providers**. The account’s quota windows then appear in the
 thread details usage card on web and desktop when that instance is selected. Accounts without
 a binding still appear in **Usage → Limits**.
 
+## Let agents see limits
+
+Agents cannot see your limits by default. Turn on **Agents see usage limits** in
+**Settings → Threads** to let them read how much usage each provider has left before they
+delegate work. A task delegated to an account that has run out then comes with a warning.
+
 ## Subscription usage widget
 
 Add **Subscription usage** from your iOS or Android widget gallery to see remaining Codex and

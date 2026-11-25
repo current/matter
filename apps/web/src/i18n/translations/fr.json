@@ -9277,10 +9277,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· quiconque l’exécute obtient cet accès"
-      ]
+      "c": [" ", "· quiconque l’exécute obtient cet accès"]
     }
   ],
   "b2ece956b72c4a48": "Sous-modules",
@@ -10889,10 +10886,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "sur l’ordinateur qui a ouvert cette page"
-      ]
+      "c": [" ", "sur l’ordinateur qui a ouvert cette page"]
     }
   ],
   "d1259290b8c63577": "Renommer le fil",
@@ -13273,5 +13267,8 @@
   "fff9316cf5e449b4": "Ouvrir un ticket",
   "fff9a71717eec000": "Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for voice output.",
   "fff9b7f838279ee3": "Plus aucun crédit de réinitialisation.",
-  "fffd51054a4240ab": "{status, select, inProgress {Lecture d’un guide de revue} completed {Guide de revue lu} failed {Impossible de lire un guide de revue} declined {Refus de lire un guide de revue} stopped {Arrêt de la lecture d’un guide de revue} other {Lecture d’un guide de revue}}"
+  "fffd51054a4240ab": "{status, select, inProgress {Lecture d’un guide de revue} completed {Guide de revue lu} failed {Impossible de lire un guide de revue} declined {Refus de lire un guide de revue} stopped {Arrêt de la lecture d’un guide de revue} other {Lecture d’un guide de revue}}",
+  "eb2e464bbdf1a809": "Les agents voient les limites d’utilisation",
+  "a02932c0ecd7e30e": "Les agents peuvent lire l’utilisation restante et sont avertis lorsqu’ils délèguent à un compte épuisé.",
+  "a65bbcd6001ffbf5": "utilisation quota limite de débit restant déléguer sous-agent mcp"
 }

@@ -9232,10 +9232,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· 실행하는 사람이 이 액세스 권한을 얻습니다"
-      ]
+      "c": [" ", "· 실행하는 사람이 이 액세스 권한을 얻습니다"]
     }
   ],
   "b2ece956b72c4a48": "하위 모듈",
@@ -10836,10 +10833,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "(이 페이지를 연 컴퓨터)"
-      ]
+      "c": [" ", "(이 페이지를 연 컴퓨터)"]
     }
   ],
   "d1259290b8c63577": "스레드 이름 바꾸기",
@@ -13206,5 +13200,8 @@
   "fff9316cf5e449b4": "이슈 작성",
   "fff9a71717eec000": "Speech-to-text stays on Deepgram Flux and Nova-3 to save your ElevenLabs credits for voice output.",
   "fff9b7f838279ee3": "남은 초기화 크레딧이 없습니다.",
-  "fffd51054a4240ab": "{status, select, inProgress {검토 가이드 읽기 중} completed {검토 가이드 읽기 완료} failed {검토 가이드 읽기 실패} declined {검토 가이드 읽기 거부됨} stopped {검토 가이드 읽기 중지됨} other {검토 가이드 읽기 중}}"
+  "fffd51054a4240ab": "{status, select, inProgress {검토 가이드 읽기 중} completed {검토 가이드 읽기 완료} failed {검토 가이드 읽기 실패} declined {검토 가이드 읽기 거부됨} stopped {검토 가이드 읽기 중지됨} other {검토 가이드 읽기 중}}",
+  "eb2e464bbdf1a809": "에이전트에게 사용량 한도 표시",
+  "a02932c0ecd7e30e": "에이전트가 남은 사용량을 확인할 수 있고, 한도를 모두 쓴 계정에 위임하면 경고를 받습니다.",
+  "a65bbcd6001ffbf5": "사용량 할당량 속도 제한 남은 위임 하위 에이전트 mcp"
 }

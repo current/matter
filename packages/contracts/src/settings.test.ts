@@ -135,6 +135,15 @@ describe("ClientSettings terminal close confirmation", () => {
   });
 });
 
+describe("ServerSettings agent usage limits", () => {
+  it("keeps usage hidden from agents for settings without a saved value", () => {
+    expect(decodeServerSettings({}).agentUsageLimitsVisible).toBe(false);
+    expect(decodeServerSettingsPatch({ agentUsageLimitsVisible: true })).toEqual({
+      agentUsageLimitsVisible: true,
+    });
+  });
+});
+
 describe("ServerSettings usage price overrides", () => {
   const prices = { inputCostPerMillionTokens: 2, outputCostPerMillionTokens: 8 };
 
