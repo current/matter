@@ -1,13 +1,15 @@
 name: Antimatter nightly
 
-# Builds Antimatter (this fork) whenever T3 Code ships a new nightly, or when
-# main changes. Each build merges the newest upstream nightly into main, builds
-# the macOS app, signs it with the fork's self-signed certificate, and publishes
-# a prerelease. The app's update button reads those releases.
+# Builds Antimatter (this fork) when T3 Code ships a new nightly. Pushes to main
+# do not build on their own: they ship with the next upstream nightly, or right
+# away when the commit message contains [build] or the workflow is run by hand.
+# Each build merges the newest upstream nightly into main, builds the macOS app,
+# signs it with the fork's self-signed certificate, and publishes a prerelease.
+# The app's update button reads those releases.
 
 on:
   schedule:
-    - cron: "17,47 * * * *"
+    - cron: "17 * * * *"
   push:
     branches: [main]
     paths-ignore: ["**/*.md"]
@@ -34,6 +36,7 @@ env:
 jobs:
   plan:
     name: Check for a new upstream nightly
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[build]')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -60,6 +63,7 @@ jobs:
         name: Decide whether to build
         env:
           FORCE: ${{ inputs.force }}
+          EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           upstream_tag=$(gh release list -R "$UPSTREAM" --limit 30 --json tagName,isDraft \
@@ -78,6 +82,15 @@ jobs:
             last_marker=$(gh release view "$last" --json body --jq '.body' | grep -o 'antimatter-build: [^ ]* [0-9a-f]*' || true)
           fi
 
+          # Scheduled runs only build for a new upstream nightly; main changes
+          # ride along with it. Pushes with [build] and manual runs also build
+          # for new main commits.
+          last_tag=$(printf '%s' "$last_marker" | awk '{print $2}')
+          if [[ "$EVENT" == "schedule" && "$upstream_tag" == "$last_tag" ]]; then
+            echo "No new upstream nightly since ${upstream_tag}."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ "$marker" == "$last_marker" && "${FORCE:-false}" != "true" ]]; then
             echo "Already built ${upstream_tag} with main ${main_sha}."
             echo "build=false" >> "$GITHUB_OUTPUT"
