@@ -80,6 +80,7 @@ function makeTestHarness(options: {
   readonly onLaunchThread?: (input: ThreadLaunchService.ThreadLaunchInput) => void;
   readonly threadProjections?: Readonly<Record<string, OrchestrationV2ThreadProjection>>;
   readonly projectsById?: Readonly<Record<string, Project>>;
+  readonly settings?: Parameters<typeof ServerSettings.layerTest>[0];
 }) {
   let replyIndex = 0;
   const llmPrompts: Array<string> = [];
@@ -106,6 +107,7 @@ function makeTestHarness(options: {
           instanceId: ProviderInstanceId.make("claudeAgent"),
           model: "claude-sonnet-4-6",
         },
+        ...options.settings,
       }),
     ),
     Layer.provide(
@@ -260,6 +262,9 @@ function makeTestHarness(options: {
 
   return { layer, llmPrompts, launchedInputs, createdNames };
 }
+
+// Read once outside Effect code: a developer key in the shell changes the expected error.
+const DEEPGRAM_ENV_KEY = process.env.DEEPGRAM_API_KEY?.trim();
 
 describe("VoiceAssistantService", () => {
   it.effect("chains create_project into multiple launch_thread actions in one turn", () =>
@@ -543,6 +548,124 @@ describe("VoiceAssistantService", () => {
         assert.notInclude(completion.spokenText, "**");
         assert.notInclude(completion.spokenText, "##");
       }),
+  );
+});
+
+function sseResponse(lines: ReadonlyArray<string>): Response {
+  const encoder = new TextEncoder();
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const line of lines) controller.enqueue(encoder.encode(line));
+        controller.close();
+      },
+    }),
+    { status: 200, headers: { "content-type": "text/event-stream" } },
+  );
+}
+
+const openAiDelta = (content: string) =>
+  `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
+
+describe("VoiceAssistantService.streamTurn", () => {
+  const directLlmSettings = {
+    textGenerators: {
+      [ProviderInstanceId.make("voice-llm")]: {
+        kind: "openaiCompatible" as const,
+        baseUrl: "https://llm.test/v1",
+        apiKey: "sk-test",
+        enabled: true,
+      },
+    },
+    textGenerationModelSelection: {
+      instanceId: ProviderInstanceId.make("voice-llm"),
+      model: "gpt-test",
+    },
+  };
+
+  it("parses OpenAI-compatible and Anthropic SSE deltas", () => {
+    assert.strictEqual(VoiceAssistantService.parseSseTextDelta(openAiDelta("Hi").trim()), "Hi");
+    assert.strictEqual(
+      VoiceAssistantService.parseSseTextDelta(
+        'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Yo"}}',
+      ),
+      "Yo",
+    );
+    assert.strictEqual(VoiceAssistantService.parseSseTextDelta("data: [DONE]"), "");
+    assert.strictEqual(VoiceAssistantService.parseSseTextDelta("event: ping"), "");
+  });
+
+  it.effect("speaks an action-free plan while the model is still streaming it", () =>
+    Effect.gen(function* () {
+      // The plan arrives in pieces that split the field name and the reply mid-sentence.
+      const upstream = vi.fn<typeof fetch>(async () =>
+        sseResponse([
+          openAiDelta('{"route":"assistant","actions":[],"spo'),
+          openAiDelta('kenReply":"Hey! Two threads'),
+          openAiDelta(' are running."'),
+          openAiDelta(',"displayReply":"2 running","expectFollowUp":true}'),
+          "data: [DONE]\n\n",
+        ]),
+      );
+      const harness = makeTestHarness({ settings: directLlmSettings });
+      const deltas: string[] = [];
+      const result = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+        Effect.flatMap((service) =>
+          service.streamTurn(
+            { utterance: "what's up", mode: "voice-mode", history: [], context: emptyContext() },
+            {
+              onSpokenDelta: (text) => Effect.sync(() => deltas.push(text)),
+              onToolResults: () => Effect.die("no tools in this plan"),
+            },
+          ),
+        ),
+        Effect.provideService(FetchHttpClient.Fetch, upstream),
+        Effect.provide(harness.layer),
+      );
+
+      assert.deepStrictEqual(deltas, ["Hey! Two threads", " are running."]);
+      assert.strictEqual(result.spokenReply, "Hey! Two threads are running.");
+      assert.strictEqual(result.expectFollowUp, true);
+      assert.strictEqual(harness.llmPrompts.length, 0);
+      const [url, init] = upstream.mock.calls[0]!;
+      assert.strictEqual(String(url), "https://llm.test/v1/chat/completions");
+      assert.strictEqual(JSON.parse(String(init?.body)).stream, true);
+    }),
+  );
+
+  it.effect("holds a plan with actions until its tools ran, then reports them", () =>
+    Effect.gen(function* () {
+      const harness = makeTestHarness({
+        llmReplies: [
+          JSON.stringify({
+            route: "assistant",
+            actions: [{ type: "launch_thread", prompt: "Run the audit", title: "Audit" }],
+            spokenReply: "Started the audit thread.",
+            displayReply: "Launched Audit",
+            expectFollowUp: false,
+          }),
+        ],
+      });
+      const deltas: string[] = [];
+      const toolBatches: Array<ReadonlyArray<{ readonly tool: string }>> = [];
+      const result = yield* VoiceAssistantService.VoiceAssistantService.pipe(
+        Effect.flatMap((service) =>
+          service.streamTurn(
+            { utterance: "run an audit", mode: "voice-mode", history: [], context: emptyContext() },
+            {
+              onSpokenDelta: (text) => Effect.sync(() => deltas.push(text)),
+              onToolResults: (results) => Effect.sync(() => toolBatches.push(results)),
+            },
+          ),
+        ),
+        Effect.provide(harness.layer),
+      );
+
+      assert.deepStrictEqual(deltas, []);
+      assert.strictEqual(toolBatches.length, 1);
+      assert.strictEqual(toolBatches[0]?.[0]?.tool, "launch_thread");
+      assert.strictEqual(result.spokenReply, "Started the audit thread.");
+    }),
   );
 });
 
@@ -985,30 +1108,28 @@ describe("VoiceTtsService ElevenLabs", () => {
 
   it.effect("merges ElevenLabs and Deepgram keys in one owner-only secrets file", () =>
     Effect.gen(function* () {
-      yield* Effect.gen(function* () {
-        const config = yield* ServerConfig.ServerConfig;
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const tts = yield* VoiceTtsService.VoiceTtsService;
-        const secretsPath = path.join(config.stateDir, "mattr-voice-secrets.json");
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const tts = yield* VoiceTtsService.VoiceTtsService;
+      const secretsPath = path.join(config.stateDir, "mattr-voice-secrets.json");
 
-        yield* tts.saveDeepgramApiKey("dg-key");
-        const status = yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
-        assert.strictEqual(status.deepgramConfigured, true);
-        assert.strictEqual(status.deepgramAvailable, true);
-        assert.strictEqual(status.elevenlabsConfigured, true);
-        assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
-          deepgramApiKey: "dg-key",
-          elevenlabsApiKey: "xi-key",
-        });
-        assert.strictEqual((yield* fs.stat(secretsPath)).mode & 0o777, 0o600);
+      yield* tts.saveDeepgramApiKey("dg-key");
+      const status = yield* tts.saveCredentials({ elevenlabsApiKey: "xi-key" });
+      assert.strictEqual(status.deepgramConfigured, true);
+      assert.strictEqual(status.deepgramAvailable, true);
+      assert.strictEqual(status.elevenlabsConfigured, true);
+      assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
+        deepgramApiKey: "dg-key",
+        elevenlabsApiKey: "xi-key",
+      });
+      assert.strictEqual((yield* fs.stat(secretsPath)).mode & 0o777, 0o600);
 
-        yield* tts.saveCredentials({ elevenlabsApiKey: "" });
-        assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
-          deepgramApiKey: "dg-key",
-        });
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-secrets-")));
-    }),
+      yield* tts.saveCredentials({ elevenlabsApiKey: "" });
+      assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
+        deepgramApiKey: "dg-key",
+      });
+    }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-secrets-"))),
   );
 
   it.effect("keeps speech-to-text on Deepgram even when only ElevenLabs is configured", () =>
@@ -1022,8 +1143,7 @@ describe("VoiceTtsService ElevenLabs", () => {
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream), Effect.flip);
       }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-stt-")));
 
-      const envKey = process.env.DEEPGRAM_API_KEY?.trim();
-      if (!envKey) {
+      if (!DEEPGRAM_ENV_KEY) {
         assert.strictEqual(error._tag, "VoiceTtsUnavailableError");
       }
       assert.isFalse(upstream.mock.calls.some(([url]) => String(url).includes("elevenlabs")));

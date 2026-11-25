@@ -13,6 +13,16 @@ import type {
 import type { ActiveListening, ActivePlayback, ListenResult } from "./nativeVoiceAudio";
 import type { VoiceAssistantApi } from "./voiceAssistantApi";
 import { VoiceModeSession, type VoiceModeAudio, type VoicePhase } from "./voiceModeSession";
+import type { VoiceTurnStreamEvent } from "./voiceTurnStream";
+
+type TurnStreamFn = (
+  request: VoiceAssistantTurnRequest,
+  onEvent: (event: VoiceTurnStreamEvent) => void,
+  signal?: AbortSignal,
+) => Promise<VoiceAssistantTurnResponse>;
+
+/** A server from before `/turn-stream`. */
+const routeMissing = Object.assign(new Error("Not found"), { status: 404, routeMissing: true });
 
 const EMPTY_CONTEXT: VoiceWorkspaceContext = {
   activeEnvironmentId: null,
@@ -39,14 +49,23 @@ const reply = (
 });
 
 function harness(
-  options: { readonly turn?: () => VoiceAssistantTurnResponse; readonly noTts?: boolean } = {},
+  options: {
+    readonly turn?: () => VoiceAssistantTurnResponse;
+    readonly noTts?: boolean;
+    readonly turnStream?: TurnStreamFn;
+  } = {},
 ) {
   const listens: Array<{
     resolve: (result: ListenResult) => void;
     finish: ReturnType<typeof vi.fn>;
     cancel: ReturnType<typeof vi.fn>;
   }> = [];
-  const playbacks: Array<{ finish: () => void; stop: ReturnType<typeof vi.fn> }> = [];
+  const playbacks: Array<{
+    finish: () => void;
+    stop: ReturnType<typeof vi.fn>;
+    pause: ReturnType<typeof vi.fn>;
+    resume: ReturnType<typeof vi.fn>;
+  }> = [];
   const turns: VoiceAssistantTurnRequest[] = [];
   const phases: VoicePhase[] = [];
   const transcripts: string[] = ["what's running", "approve it", "thanks"];
@@ -77,9 +96,19 @@ function harness(
         finish = () => resolve("finished");
         stopNow = () => resolve("stopped");
       });
-      const entry = { finish, stop: vi.fn(() => stopNow()) };
+      const entry = {
+        finish,
+        stop: vi.fn(() => stopNow()),
+        pause: vi.fn(),
+        resume: vi.fn(),
+      };
       playbacks.push(entry);
-      return { done, stop: entry.stop } satisfies ActivePlayback;
+      return {
+        done,
+        stop: entry.stop,
+        pause: entry.pause,
+        resume: entry.resume,
+      } satisfies ActivePlayback;
     }),
     transcribe: vi.fn(async () => transcripts.shift() ?? ""),
     discardRecording: vi.fn(),
@@ -92,6 +121,11 @@ function harness(
     speak: vi.fn(async () => {
       if (options.noTts) throw new Error("no tts");
       return { bytes: new Uint8Array([1]), contentType: "audio/mpeg" };
+    }),
+    turnStream: vi.fn<TurnStreamFn>(async (request, onEvent, signal) => {
+      if (!options.turnStream) throw routeMissing;
+      turns.push(request);
+      return options.turnStream(request, onEvent, signal);
     }),
   } as unknown as VoiceAssistantApi;
   const executeAction = vi.fn(async () => {});
@@ -106,6 +140,30 @@ function harness(
   session.subscribe(() => phases.push(session.getSnapshot().phase));
   return { session, audio, api, listens, playbacks, turns, phases, executeAction };
 }
+
+/** A `/turn-stream` reply the test drives event by event. */
+function controlledStream() {
+  const calls: Array<{
+    emit: (event: VoiceTurnStreamEvent) => void;
+    finish: (response?: VoiceAssistantTurnResponse) => void;
+    signal: AbortSignal | undefined;
+  }> = [];
+  const turnStream: TurnStreamFn = (_request, onEvent, signal) =>
+    new Promise((resolve, reject) => {
+      signal?.addEventListener("abort", () => reject(new Error("aborted")));
+      calls.push({ emit: onEvent, finish: (response = reply()) => resolve(response), signal });
+    });
+  return { calls, turnStream };
+}
+
+const chunk = (seq: number, text: string): VoiceTurnStreamEvent => ({
+  type: "audio_chunk",
+  seq,
+  text,
+  contentType: "audio/mpeg",
+  audioBase64: btoa(text),
+  provider: "elevenlabs",
+});
 
 const speech: ListenResult = {
   kind: "utterance",
@@ -315,7 +373,12 @@ describe("VoiceModeSession", () => {
       () =>
         new Promise((resolve) => {
           const playback = { done: Promise.resolve("stopped" as const), stop: vi.fn() };
-          playbacks.push({ finish: () => {}, stop: playback.stop });
+          playbacks.push({
+            finish: () => {},
+            stop: playback.stop,
+            pause: vi.fn(),
+            resume: vi.fn(),
+          });
           ready = () => resolve(playback);
         }),
     );
@@ -360,8 +423,11 @@ describe("VoiceModeSession", () => {
   });
 
   describe("with streaming recognition", () => {
-    function streamingHarness() {
-      const base = harness();
+    function streamingHarness(
+      options: Parameters<typeof harness>[0] & { readonly echoCancelled?: boolean } = {},
+    ) {
+      const base = harness(options);
+      Object.assign(base.audio, { echoCancelled: options.echoCancelled ?? false });
       const streams: Array<{
         options: StreamingListenOptions;
         resolve: (result: StreamingListenResult) => void;
@@ -429,6 +495,189 @@ describe("VoiceModeSession", () => {
       expect(streams[0]!.finish).toHaveBeenCalled();
       await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("paused"));
       expect(turns).toHaveLength(0);
+      await session.stop();
+    });
+
+    describe("speech-verified barge-in over an echo-cancelled reply", () => {
+      async function speakingReply() {
+        const stream = controlledStream();
+        const h = streamingHarness({ echoCancelled: true, turnStream: stream.turnStream });
+        h.session.start();
+        await vi.waitFor(() => expect(h.streams).toHaveLength(1));
+        h.streams[0]!.resolve({ kind: "utterance", text: "show me the build", heardSpeech: true });
+        await vi.waitFor(() => expect(stream.calls).toHaveLength(1));
+        stream.calls[0]!.emit(chunk(0, "The build is green."));
+        await vi.waitFor(() => expect(h.playbacks).toHaveLength(1));
+        // Flux stays connected during the reply.
+        await vi.waitFor(() => expect(h.streams).toHaveLength(2));
+        return { ...h, stream };
+      }
+
+      it("a StartOfTurn with no words pauses, then resumes the reply where it was", async () => {
+        vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+        try {
+          const { session, streams, playbacks, stream } = await speakingReply();
+          streams[1]!.options.onSpeechStart();
+          expect(playbacks[0]!.pause).toHaveBeenCalledTimes(1);
+          expect(playbacks[0]!.stop).not.toHaveBeenCalled();
+
+          vi.advanceTimersByTime(1_000);
+          expect(playbacks[0]!.resume).toHaveBeenCalledTimes(1);
+          expect(playbacks[0]!.stop).not.toHaveBeenCalled();
+          expect(stream.calls[0]!.signal?.aborted).toBe(false);
+          expect(session.getSnapshot().phase).toBe("speaking");
+          await session.stop();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("a single loud word that is not a command never interrupts", async () => {
+        const { session, streams, playbacks } = await speakingReply();
+        streams[1]!.options.onTranscript("uh");
+        expect(playbacks[0]!.pause).toHaveBeenCalled();
+        expect(playbacks[0]!.stop).not.toHaveBeenCalled();
+        await session.stop();
+      });
+
+      it("two real words interrupt at once and the same Flux turn becomes the next question", async () => {
+        const { session, audio, streams, playbacks, stream, turns } = await speakingReply();
+        streams[1]!.options.onSpeechStart();
+        streams[1]!.options.onTranscript("wait actually");
+
+        expect(playbacks[0]!.stop).toHaveBeenCalled();
+        // The in-flight turn stream is aborted, so no more TTS is paid for.
+        expect(stream.calls[0]!.signal?.aborted).toBe(true);
+        await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("hearing"));
+        expect(session.getSnapshot().liveTranscript).toBe("wait actually");
+
+        streams[1]!.resolve({
+          kind: "utterance",
+          text: "wait actually show me the logs",
+          heardSpeech: true,
+        });
+        await vi.waitFor(() => expect(turns).toHaveLength(2));
+        expect(turns[1]!.utterance).toBe("wait actually show me the logs");
+        // No new recognition was opened: the interrupting words were never lost.
+        expect(audio.listenStreaming).toHaveBeenCalledTimes(2);
+        await session.stop();
+      });
+
+      it("a command word like stop interrupts on its own", async () => {
+        const { session, streams, playbacks } = await speakingReply();
+        streams[1]!.options.onTranscript("stop");
+        expect(playbacks[0]!.stop).toHaveBeenCalled();
+        await session.stop();
+      });
+
+      it("keeps recognition open into the next turn when the reply ends naturally", async () => {
+        const { session, audio, streams, playbacks, stream } = await speakingReply();
+        stream.calls[0]!.finish();
+        await vi.waitFor(() =>
+          expect(session.getSnapshot().turns.at(-1)?.text).toBe("Sure thing."),
+        );
+        playbacks[0]!.finish();
+        await vi.waitFor(() => expect(session.getSnapshot().phase).toBe("listening"));
+        streams[1]!.options.onTranscript("next");
+        expect(session.getSnapshot()).toMatchObject({ phase: "hearing", liveTranscript: "next" });
+        expect(audio.listenStreaming).toHaveBeenCalledTimes(2);
+        await session.stop();
+      });
+    });
+  });
+
+  describe("with /turn-stream", () => {
+    it("plays sentence audio as it arrives, back to back, then listens again", async () => {
+      const stream = controlledStream();
+      const { session, api, listens, playbacks } = harness({ turnStream: stream.turnStream });
+      session.start();
+      await vi.waitFor(() => expect(listens).toHaveLength(1));
+      listens[0]!.resolve(speech);
+      await vi.waitFor(() => expect(stream.calls).toHaveLength(1));
+
+      stream.calls[0]!.emit({ type: "text_delta", text: "First. " });
+      stream.calls[0]!.emit(chunk(0, "First."));
+      // The first sentence plays before the reply finished streaming.
+      await vi.waitFor(() => expect(playbacks).toHaveLength(1));
+      expect(session.getSnapshot().phase).toBe("speaking");
+      stream.calls[0]!.emit(chunk(1, "Second."));
+      stream.calls[0]!.finish(reply({ spokenReply: "First. Second.", displayReply: "Two" }));
+      await vi.waitFor(() => expect(session.getSnapshot().turns.at(-1)?.text).toBe("Two"));
+      expect(playbacks).toHaveLength(1);
+
+      playbacks[0]!.finish();
+      await vi.waitFor(() => expect(playbacks).toHaveLength(2));
+      playbacks[1]!.finish();
+      await vi.waitFor(() => expect(listens).toHaveLength(2));
+      expect(api.speak).not.toHaveBeenCalled();
+      expect(api.turn).not.toHaveBeenCalled();
+      await session.stop();
+    });
+
+    it("applies client actions from tool_result once, before the reply audio", async () => {
+      const stream = controlledStream();
+      const action = { type: "focus-window" } as const;
+      const { session, listens, executeAction } = harness({ turnStream: stream.turnStream });
+      session.start();
+      await vi.waitFor(() => expect(listens).toHaveLength(1));
+      listens[0]!.resolve(speech);
+      await vi.waitFor(() => expect(stream.calls).toHaveLength(1));
+      stream.calls[0]!.emit({
+        type: "tool_result",
+        toolCalls: [{ tool: "focus", ok: true, summary: "Focused" }],
+        actions: [action],
+      });
+      await vi.waitFor(() => expect(executeAction).toHaveBeenCalledWith(action));
+      stream.calls[0]!.finish(
+        reply({
+          spokenReply: "",
+          toolResults: [{ tool: "focus", ok: true, summary: "Focused" }],
+          clientActions: [action],
+        }),
+      );
+      await vi.waitFor(() => expect(listens).toHaveLength(2));
+      expect(executeAction).toHaveBeenCalledTimes(1);
+      expect(session.getSnapshot().turns.at(-1)?.toolBadges).toMatchObject([
+        { label: "Focused", ok: true },
+      ]);
+      await session.stop();
+    });
+
+    it("tapping during a streamed reply stops playback and aborts the stream", async () => {
+      const stream = controlledStream();
+      const { session, listens, playbacks } = harness({ turnStream: stream.turnStream });
+      session.start();
+      await vi.waitFor(() => expect(listens).toHaveLength(1));
+      listens[0]!.resolve(speech);
+      await vi.waitFor(() => expect(stream.calls).toHaveLength(1));
+      stream.calls[0]!.emit({ type: "text_delta", text: "A long answer" });
+      stream.calls[0]!.emit(chunk(0, "A long answer."));
+      await vi.waitFor(() => expect(playbacks).toHaveLength(1));
+
+      session.tapOrb();
+      expect(playbacks[0]!.stop).toHaveBeenCalled();
+      expect(stream.calls[0]!.signal?.aborted).toBe(true);
+      await vi.waitFor(() => expect(listens).toHaveLength(2));
+      // The part that was heard stays in the history.
+      expect(session.getSnapshot().turns.at(-1)).toMatchObject({
+        role: "assistant",
+        text: "A long answer",
+      });
+      await session.stop();
+    });
+
+    it("falls back to /turn plus /speak on an older server and remembers it", async () => {
+      const { session, api, listens, playbacks, turns } = harness();
+      session.start();
+      await vi.waitFor(() => expect(listens).toHaveLength(1));
+      listens[0]!.resolve(speech);
+      await vi.waitFor(() => expect(playbacks).toHaveLength(1));
+      playbacks[0]!.finish();
+      await vi.waitFor(() => expect(listens).toHaveLength(2));
+      listens[1]!.resolve(speech);
+      await vi.waitFor(() => expect(turns).toHaveLength(2));
+      expect(api.turnStream).toHaveBeenCalledTimes(1);
+      expect(api.turn).toHaveBeenCalledTimes(2);
       await session.stop();
     });
   });

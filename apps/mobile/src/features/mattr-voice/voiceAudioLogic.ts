@@ -183,6 +183,34 @@ export function createVoiceActivityDetector(config: VoiceActivityConfig) {
 
 export type VoiceActivityDetector = ReturnType<typeof createVoiceActivityDetector>;
 
+/**
+ * Whether each reading is above the speech floor, with the detector's adaptive floor but no
+ * onset timing: the interruption guard decides how long a voiced run must last.
+ */
+export function createVoicedLevelGate(config: VoiceActivityConfig) {
+  let startedAt: number | null = null;
+  let noiseFloor: number | null = null;
+  return (decibels: number | undefined, now: number): boolean => {
+    const level = decibels === undefined || !Number.isFinite(decibels) ? -160 : decibels;
+    startedAt ??= now;
+    const warming = now - startedAt < config.warmupMs;
+    const onset = Math.min(
+      config.maxOnsetDb,
+      Math.max(config.onsetDb, (noiseFloor ?? level) + config.onsetMarginDb),
+    );
+    const voiced = !warming && noiseFloor !== null && level >= onset;
+    // Voiced readings never raise the floor, so a long sentence cannot talk itself silent.
+    if (!voiced) {
+      const rate = level < (noiseFloor ?? level) ? config.floorFall : 0.04;
+      noiseFloor = Math.min(
+        config.maxNoiseFloorDb,
+        noiseFloor === null ? level : noiseFloor + (warming ? 0.35 : rate) * (level - noiseFloor),
+      );
+    }
+    return voiced;
+  };
+}
+
 /** Maps an HTTP audio content type to the cache file extension the player recognizes. */
 export function audioExtensionForContentType(contentType: string | null | undefined): string {
   const type = (contentType ?? "").toLowerCase();

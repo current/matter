@@ -12,6 +12,11 @@ import type {
   VoiceTranscribeResponse,
 } from "../../../../../antimatter/voice-assistant/types";
 import { runSpeech } from "../voice-input/voiceDestination";
+import {
+  createNdjsonReader,
+  turnResponseFromDone,
+  type VoiceTurnStreamEvent,
+} from "./voiceTurnStream";
 
 const BASE_PATH = "/api/mattr/voice-assistant";
 const FLUX_WS_PATH = `${BASE_PATH}/flux`;
@@ -33,6 +38,11 @@ export class VoiceAssistantApiError extends Schema.TaggedError<VoiceAssistantApi
   /** The server has no provider for this feature (for example no Deepgram key). */
   get unavailable() {
     return this.status === 501;
+  }
+
+  /** A server from before `/turn-stream`; the caller falls back to `/turn` plus `/speak`. */
+  get routeMissing() {
+    return this.status === 404 || this.status === 405;
   }
 }
 
@@ -74,8 +84,9 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
     readonly timeoutMs: number;
     readonly signal?: AbortSignal | undefined;
     readonly contentType?: string;
+    readonly accept?: string;
     readonly body?: BodyInit | undefined;
-    readonly read: (response: Response, url: string) => Promise<T>;
+    readonly read: (response: Response, url: string, signal: AbortSignal) => Promise<T>;
   }): Promise<T> => {
     let requestUrl = "";
     // Typed HTTP failures travel as values so callers see the original error, not a fiber wrapper.
@@ -99,7 +110,7 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
                   ...(headers.authorization ? { authorization: headers.authorization } : {}),
                   ...(headers.dpop ? { dpop: headers.dpop } : {}),
                   ...(input.contentType ? { "content-type": input.contentType } : {}),
-                  accept: "application/json, audio/*",
+                  accept: input.accept ?? "application/json, audio/*",
                 },
                 signal: abort,
                 ...(input.body === undefined ? {} : { body: input.body }),
@@ -110,9 +121,9 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
       }).pipe(
         Effect.flatMap((response) =>
           Effect.tryPromise({
-            try: async () =>
+            try: async (abort) =>
               response.ok
-                ? { value: await input.read(response, requestUrl) }
+                ? { value: await input.read(response, requestUrl, abort) }
                 : { failure: await failureOf(response) },
             catch: (cause) => new VoiceRequestFailure({ cause }),
           }),
@@ -180,6 +191,59 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
         contentType: "application/json",
         body: JSON.stringify(request),
         read: json,
+      }),
+    /**
+     * The turn with its spoken reply streamed as sentence audio. Resolves with the same response
+     * `turn` returns once the server sends `done`; aborting cancels the body read, which ends
+     * the server's model and TTS calls.
+     */
+    turnStream: (
+      request: VoiceAssistantTurnRequest & {
+        readonly speak: Omit<VoiceSpeakRequest, "text"> | null;
+      },
+      onEvent: (event: VoiceTurnStreamEvent) => void,
+      signal?: AbortSignal,
+    ) =>
+      send<VoiceAssistantTurnResponse>({
+        method: "POST",
+        path: `${BASE_PATH}/turn-stream`,
+        timeoutMs: TURN_TIMEOUT_MS,
+        signal,
+        contentType: "application/json",
+        accept: "application/x-ndjson, application/json",
+        body: JSON.stringify(request),
+        read: async (response, _url, abort) => {
+          const outcome: {
+            done: VoiceAssistantTurnResponse | null;
+            failure: string | null;
+          } = { done: null, failure: null };
+          const ndjson = createNdjsonReader((event) => {
+            if (event.type === "done") outcome.done = turnResponseFromDone(event);
+            else if (event.type === "error") outcome.failure = event.message;
+            else onEvent(event);
+          });
+          const reader = response.body?.getReader();
+          if (!reader) {
+            ndjson.push(await response.text());
+          } else {
+            const cancel = () => void reader.cancel().catch(() => {});
+            abort.addEventListener("abort", cancel, { once: true });
+            const decoder = new TextDecoder();
+            try {
+              for (;;) {
+                const { done: finished, value } = await reader.read();
+                if (finished) break;
+                ndjson.push(decoder.decode(value, { stream: true }));
+              }
+            } finally {
+              abort.removeEventListener("abort", cancel);
+            }
+          }
+          ndjson.end();
+          if (outcome.failure !== null) throw new Error(outcome.failure);
+          if (outcome.done === null) throw new Error("The voice reply ended early.");
+          return outcome.done;
+        },
       }),
     speak: (request: VoiceSpeakRequest, signal?: AbortSignal) =>
       send<SpokenAudio>({

@@ -17,7 +17,9 @@ import {
   buildServerTtsPreferences,
   buildVoiceSpeakOptions,
   clearVoiceAssistantHistory as clearHistory,
+  confirmsSpokenInterruption,
   getVoiceAssistantState,
+  hasSustainedSpeech,
   registerHostBridge,
   resetVoiceAssistantStoreForTests,
   setVoiceAssistantModalOpen as setModalOpen,
@@ -27,6 +29,7 @@ import {
   syncVoiceTtsPreferencesToServer,
   toggleVoiceAssistantHandsFree,
   tryFastPathIntent,
+  type VoiceChunkPlayer,
 } from "./voiceAssistantStore";
 import {
   createDeepgramFluxCapture,
@@ -326,7 +329,7 @@ describe("voiceAssistantStore", () => {
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/turn")) {
+      if (url.endsWith("/turn") || url.endsWith("/turn-stream")) {
         await firstTurnGate.promise;
         return jsonResponse({
           route: "direct-reply",
@@ -855,5 +858,340 @@ describe("Deepgram Flux streaming STT", () => {
 
     expect(transcribePcmMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+function ndjsonResponse(events: ReadonlyArray<unknown>): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      // Split mid-line to prove lines are reassembled across reads.
+      const text = events.map((event) => `${JSON.stringify(event)}\n`).join("");
+      const middle = Math.floor(text.length / 2);
+      controller.enqueue(encoder.encode(text.slice(0, middle)));
+      controller.enqueue(encoder.encode(text.slice(middle)));
+      controller.close();
+    },
+  });
+  return new Response(body, { headers: { "Content-Type": "application/x-ndjson" } });
+}
+
+function audioChunk(seq: number, text: string) {
+  return {
+    type: "audio_chunk",
+    seq,
+    text,
+    contentType: "audio/mpeg",
+    audioBase64: btoa(text),
+    provider: "deepgram",
+  };
+}
+
+function doneEvent(reply: string, actions: ReadonlyArray<VoiceAssistantClientAction> = []) {
+  return {
+    type: "done",
+    reply,
+    displayReply: reply,
+    route: "assistant",
+    expectFollowUp: false,
+    actions,
+    toolCalls: [],
+  };
+}
+
+interface FakeChunkPlayer extends VoiceChunkPlayer {
+  readonly chunks: string[];
+  ended: boolean;
+  readonly pause: ReturnType<typeof vi.fn<() => void>>;
+  readonly resume: ReturnType<typeof vi.fn<() => void>>;
+  readonly stop: ReturnType<typeof vi.fn<() => void>>;
+  finish(): void;
+}
+
+function fakeChunkPlayers() {
+  const players: FakeChunkPlayer[] = [];
+  const create = (): VoiceChunkPlayer => {
+    const { promise, resolve } = Promise.withResolvers<"finished" | "stopped">();
+    const player: FakeChunkPlayer = {
+      done: promise,
+      chunks: [],
+      ended: false,
+      enqueue: (bytes) => {
+        player.chunks.push(new TextDecoder().decode(bytes));
+      },
+      end: () => {
+        player.ended = true;
+      },
+      pause: vi.fn<() => void>(),
+      resume: vi.fn<() => void>(),
+      stop: vi.fn<() => void>(() => resolve("stopped")),
+      finish: () => resolve("finished"),
+    };
+    players.push(player);
+    return player;
+  };
+  return { players, create };
+}
+
+function silentTts() {
+  const speak = vi.fn(async (_req: VoiceSpeakRequest) => undefined);
+  return { speak, player: { speak, stop: vi.fn(), isSpeaking: () => false } };
+}
+
+describe("streamed voice turns", () => {
+  beforeEach(() => {
+    updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
+    resetVoiceAssistantStoreForTests();
+  });
+
+  afterEach(() => {
+    resetVoiceAssistantStoreForTests();
+  });
+
+  it("plays streamed sentences in order and runs tool actions once, as soon as they arrive", async () => {
+    const { players, create } = fakeChunkPlayers();
+    const tts = silentTts();
+    const executed: VoiceAssistantClientAction[] = [];
+    const action: VoiceAssistantClientAction = { type: "focus-window" };
+    let body: Record<string, unknown> | null = null;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe("http://localhost:3773/api/mattr/voice-assistant/turn-stream");
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return ndjsonResponse([
+        { type: "tool_result", toolCalls: [], actions: [action] },
+        { type: "text_delta", text: "First one. " },
+        audioChunk(0, "First one."),
+        audioChunk(1, "Second one."),
+        doneEvent("First one. Second one.", [action]),
+      ]);
+    });
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: (next) => {
+        executed.push(next);
+      },
+      transcribePcm: async () => "",
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createTtsPlayer: () => tts.player,
+      createChunkPlayer: create,
+    });
+    setMode("assistant");
+
+    const turn = submitUtterance("focus the window");
+    await vi.waitFor(() => expect(players[0]?.ended).toBe(true));
+    expect(players[0]!.chunks).toEqual(["First one.", "Second one."]);
+    expect(getVoiceAssistantState().speaking).toBe(true);
+    expect(body).toMatchObject({ utterance: "focus the window", speak: { provider: "auto" } });
+
+    players[0]!.finish();
+    const response = await turn;
+    expect(response?.spokenReply).toBe("First one. Second one.");
+    expect(executed).toEqual([action]);
+    expect(tts.speak).not.toHaveBeenCalled();
+    expect(getVoiceAssistantState().speaking).toBe(false);
+    expect(getVoiceAssistantState().phase).toBe("idle");
+  });
+
+  it("falls back to /turn plus /speak on servers without the stream, and remembers it", async () => {
+    const tts = silentTts();
+    const urls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.endsWith("/turn-stream")) return new Response("Not Found", { status: 404 });
+      return jsonResponse({
+        route: "assistant",
+        spokenReply: "Done.",
+        displayReply: "Done.",
+        expectFollowUp: false,
+        toolResults: [],
+        clientActions: [],
+      } satisfies VoiceAssistantTurnResponse);
+    });
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: () => undefined,
+      transcribePcm: async () => "",
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createTtsPlayer: () => tts.player,
+      createChunkPlayer: () => {
+        throw new Error("no audio streams from an old server");
+      },
+    });
+    setMode("assistant");
+
+    await submitUtterance("status");
+    await submitUtterance("status again");
+    expect(
+      urls.map((url) => url.replace("http://localhost:3773/api/mattr/voice-assistant", "")),
+    ).toEqual(["/turn-stream", "/turn", "/turn"]);
+    expect(tts.speak.mock.calls.map(([req]) => req.text)).toEqual(["Done.", "Done."]);
+  });
+});
+
+describe("voice barge-in guard", () => {
+  beforeEach(() => {
+    updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
+    resetVoiceAssistantStoreForTests();
+  });
+
+  afterEach(() => {
+    resetVoiceAssistantStoreForTests();
+  });
+
+  it("needs two words or a command word to confirm an interruption", () => {
+    expect(confirmsSpokenInterruption("")).toBe(false);
+    expect(confirmsSpokenInterruption("um")).toBe(false);
+    expect(confirmsSpokenInterruption("Stop!")).toBe(true);
+    expect(confirmsSpokenInterruption("hold on")).toBe(true);
+    expect(confirmsSpokenInterruption("actually no")).toBe(true);
+  });
+
+  it("rejects short transients but accepts sustained speech in captured audio", () => {
+    const clip = (voicedMs: number) => {
+      const pcm = new Float32Array(16_000);
+      for (let index = 0; index < (voicedMs / 1000) * 16_000; index += 1) {
+        pcm[index] = Math.sin(index / 5) * 0.3;
+      }
+      return pcm;
+    };
+    expect(hasSustainedSpeech(clip(150))).toBe(false);
+    expect(hasSustainedSpeech(clip(240))).toBe(false);
+    expect(hasSustainedSpeech(clip(600))).toBe(true);
+  });
+
+  function startStreamedReply(options: { readonly flux: boolean }) {
+    const { players, create } = fakeChunkPlayers();
+    const utterances: string[] = [];
+    const transcribePcm = vi.fn(async () => "actually check the tests");
+    let fluxOptions: DeepgramFluxCaptureOptions | null = null;
+    let vadOptions: HandsFreeVadCaptureOptions | null = null;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as VoiceAssistantTurnRequest;
+      utterances.push(body.utterance);
+      return ndjsonResponse([
+        audioChunk(0, "Here is a long answer."),
+        doneEvent("Here is a long answer."),
+      ]);
+    });
+    const capture = () => ({
+      start: async () => undefined,
+      stop: () => undefined,
+      setMuted: () => undefined,
+      setSpeakingDuck: () => undefined,
+      isActive: () => true,
+    });
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: () => undefined,
+      transcribePcm,
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createTtsPlayer: () => silentTts().player,
+      createChunkPlayer: create,
+      ...(options.flux
+        ? {
+            createFluxCapture: (opts: DeepgramFluxCaptureOptions) => {
+              fluxOptions = opts;
+              return capture();
+            },
+          }
+        : {
+            createVadCapture: (opts: HandsFreeVadCaptureOptions) => {
+              vadOptions = opts;
+              return capture();
+            },
+          }),
+    });
+    toggleVoiceAssistantHandsFree();
+    return {
+      players,
+      utterances,
+      transcribePcm,
+      flux: () => fluxOptions!,
+      vad: () => vadOptions!,
+      speakFirstTurn: async (say: () => void) => {
+        say();
+        await vi.waitFor(() => expect(getVoiceAssistantState().speaking).toBe(true));
+        return players[0]!;
+      },
+    };
+  }
+
+  it("Flux StartOfTurn with no words pauses the reply, then resumes it in place", async () => {
+    const harness = startStreamedReply({ flux: true });
+    await vi.waitFor(() => expect(harness.flux()).not.toBeNull());
+    const reply = await harness.speakFirstTurn(() =>
+      harness.flux().onFinalTranscript("how is the build"),
+    );
+
+    harness.flux().onSpeechStart();
+    expect(reply.pause).toHaveBeenCalledTimes(1);
+    harness.flux().onLiveTranscript("um");
+    await vi.waitFor(() => expect(reply.resume).toHaveBeenCalledTimes(1), { timeout: 2_500 });
+    expect(reply.stop).not.toHaveBeenCalled();
+    expect(getVoiceAssistantState().speaking).toBe(true);
+    // A filler-only end of turn is not a new request.
+    harness.flux().onFinalTranscript("um");
+    expect(harness.utterances).toEqual(["how is the build"]);
+  });
+
+  it("two words cut the reply and the same Flux turn becomes the next request", async () => {
+    const harness = startStreamedReply({ flux: true });
+    await vi.waitFor(() => expect(harness.flux()).not.toBeNull());
+    const reply = await harness.speakFirstTurn(() =>
+      harness.flux().onFinalTranscript("how is the build"),
+    );
+
+    harness.flux().onSpeechStart();
+    harness.flux().onLiveTranscript("actually");
+    expect(reply.stop).not.toHaveBeenCalled();
+    harness.flux().onLiveTranscript("actually check");
+    expect(reply.stop).toHaveBeenCalledTimes(1);
+    expect(getVoiceAssistantState().speaking).toBe(false);
+    expect(getVoiceAssistantState().liveTranscript).toBe("actually check");
+
+    harness.flux().onFinalTranscript("actually check the tests");
+    await vi.waitFor(() =>
+      expect(harness.utterances).toEqual(["how is the build", "actually check the tests"]),
+    );
+  });
+
+  it('a single "stop" interrupts at once', async () => {
+    const harness = startStreamedReply({ flux: true });
+    await vi.waitFor(() => expect(harness.flux()).not.toBeNull());
+    const reply = await harness.speakFirstTurn(() =>
+      harness.flux().onFinalTranscript("how is the build"),
+    );
+    harness.flux().onLiveTranscript("stop");
+    expect(reply.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("local VAD: a car-door spike pauses, never interrupts; sustained speech does", async () => {
+    const harness = startStreamedReply({ flux: false });
+    await vi.waitFor(() => expect(harness.vad()).not.toBeNull());
+    const reply = await harness.speakFirstTurn(() => {
+      void submitUtterance("how is the build", { modeOverride: "voice-mode" });
+    });
+
+    const spike = new Float32Array(16_000);
+    for (let index = 0; index < 2_400; index += 1) spike[index] = index % 2 === 0 ? 0.8 : -0.8;
+    harness.vad().onSpeechStart();
+    expect(reply.pause).toHaveBeenCalledTimes(1);
+    harness.vad().onUtterance(spike, 16_000);
+    await vi.waitFor(() => expect(reply.resume).toHaveBeenCalledTimes(1));
+    expect(harness.transcribePcm).not.toHaveBeenCalled();
+    expect(reply.stop).not.toHaveBeenCalled();
+
+    const speech = new Float32Array(16_000);
+    for (let index = 0; index < 9_600; index += 1) speech[index] = Math.sin(index / 5) * 0.3;
+    harness.vad().onSpeechStart();
+    harness.vad().onUtterance(speech, 16_000);
+    await vi.waitFor(() =>
+      expect(harness.utterances).toEqual(["how is the build", "actually check the tests"]),
+    );
+    expect(reply.stop).toHaveBeenCalledTimes(1);
   });
 });

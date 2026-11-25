@@ -7,10 +7,12 @@ import {
   type VoiceAssistantClientAction,
   type VoiceAssistantSettings,
   type VoiceAssistantTurnRequest,
+  type VoiceAssistantTurnResponse,
   type VoiceWorkspaceApprovalSummary,
   type VoiceWorkspaceContext,
 } from "../../../../../antimatter/voice-assistant/types";
 import type { ActiveStreamingListening, StreamingListenOptions } from "./fluxListening";
+import { createInterruptionGuard, type InterruptionGuard } from "./interruptionGuard";
 import type {
   ActiveListening,
   ActivePlayback,
@@ -20,6 +22,12 @@ import type {
 import type { SpokenAudio, VoiceAssistantApi } from "./voiceAssistantApi";
 import { BARGE_IN_VAD, LISTENING_VAD, type VoiceActivityConfig } from "./voiceAudioLogic";
 import { historyFromTurns, type VoiceTurnEntry } from "./voiceContextLogic";
+import {
+  createPlaybackQueue,
+  decodeBase64Audio,
+  type PlaybackQueue,
+  type PreparedClip,
+} from "./voiceTurnStream";
 
 export type VoicePhase =
   | "starting"
@@ -56,6 +64,13 @@ export interface VoiceModeAudio {
   ): Promise<ActiveStreamingListening | null>;
   watchForBargeIn(config: VoiceActivityConfig, onBargeIn: () => void): Promise<() => Promise<void>>;
   play(audio: SpokenAudio): Promise<ActivePlayback>;
+  /** Loads a clip ahead of playing it, for gapless streamed replies. */
+  prepare?(audio: SpokenAudio): Promise<PreparedClip>;
+  /**
+   * Whether the microphone hears the reply cancelled out (Apple voice processing). Only then can
+   * streaming recognition keep listening while the assistant talks.
+   */
+  readonly echoCancelled?: boolean;
   transcribe(
     recording: VoiceRecording,
     api: VoiceAssistantApi,
@@ -81,11 +96,22 @@ const MAX_CONSECUTIVE_ERRORS = 3;
 const ERROR_RETRY_DELAY_MS = 2_000;
 // Streaming that keeps failing (no ticket, relay without proof, upstream down) stops being tried.
 const MAX_STREAMING_FAILURES = 2;
+// How often a paused reply checks whether its possible interruption timed out.
+const INTERRUPTION_TICK_MS = 100;
 
 type CycleOutcome = "continue" | "pause";
 
 class VoiceCancelled extends Schema.TaggedError<VoiceCancelled>()("VoiceCancelled", {}) {}
 const isVoiceCancelled = Schema.is(VoiceCancelled);
+
+/** A server from before `/turn-stream` (duck-typed so tests need not load the HTTP client). */
+function isRouteMissing(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { readonly routeMissing?: unknown }).routeMissing === true
+  );
+}
 
 function messageOf(error: unknown): string {
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -122,7 +148,13 @@ export class VoiceModeSession {
   private streamingFailures = 0;
   private streamingDisabled = false;
   private manualFinish = false;
-  private playback: ActivePlayback | null = null;
+  private reply: PlaybackQueue | null = null;
+  /** Set while a reply plays with streaming recognition open, so words can interrupt it. */
+  private replyGuard: InterruptionGuard | null = null;
+  /** Streaming recognition opened during a reply, adopted by the next listening cycle. */
+  private carriedListening: ActiveStreamingListening | null = null;
+  private turnStreamUnsupported = false;
+  private replyWatch: Promise<() => Promise<void>> | null = null;
   private turnAbort: AbortController | null = null;
   private stopWorkspaceWatch: (() => void) | null = null;
   private entrySequence = 0;
@@ -197,8 +229,16 @@ export class VoiceModeSession {
     const listening = this.listening;
     this.listening = null;
     listening?.cancel();
-    this.playback?.stop();
-    this.playback = null;
+    this.dropCarriedListening();
+    this.reply?.stop();
+    this.reply = null;
+    this.replyGuard = null;
+  }
+
+  private dropCarriedListening() {
+    const carried = this.carriedListening;
+    this.carriedListening = null;
+    carried?.cancel();
   }
 
   private requestLoop() {
@@ -236,6 +276,8 @@ export class VoiceModeSession {
         this.armed = false;
       }
     }
+    // Nobody will adopt recognition that a reply left open.
+    this.dropCarriedListening();
     if (this.current(generation) && !this.snapshot.muted && this.snapshot.phase !== "error") {
       this.setPhase("paused");
     }
@@ -284,6 +326,46 @@ export class VoiceModeSession {
     }
   }
 
+  /** Streaming recognition callbacks: over a reply they feed the guard, otherwise the screen. */
+  private onStreamSpeechStart(generation: number) {
+    if (!this.current(generation)) return;
+    const guard = this.replyGuard;
+    if (guard) {
+      this.applyInterruption(guard.speechStart(Date.now()));
+      return;
+    }
+    this.onSpeechStart(generation);
+  }
+
+  private onStreamTranscript(generation: number, text: string) {
+    if (!this.current(generation)) return;
+    const guard = this.replyGuard;
+    if (guard) {
+      this.applyInterruption(guard.transcript(text, Date.now()));
+      if (this.replyGuard !== null) return;
+    }
+    this.onSpeechStart(generation);
+    this.update({ liveTranscript: text });
+  }
+
+  private streamingOptions(generation: number): StreamingListenOptions {
+    return {
+      onLevel: (level) => {
+        if (this.replyGuard === null) this.deps.setLevel(level);
+      },
+      onSpeechStart: () => this.onStreamSpeechStart(generation),
+      onTranscript: (text) => this.onStreamTranscript(generation, text),
+    };
+  }
+
+  private applyInterruption(decision: ReturnType<InterruptionGuard["tick"]>) {
+    const reply = this.reply;
+    if (!reply) return;
+    if (decision === "pause") reply.pause();
+    else if (decision === "resume") reply.resume();
+    else if (decision === "interrupt") this.interruptSpeech();
+  }
+
   /**
    * Deepgram Flux streaming: the turn ends on meaning rather than a fixed silence and the words
    * show while the user talks. Undefined hands the cycle to local endpointing.
@@ -295,17 +377,12 @@ export class VoiceModeSession {
     if (!this.deps.audio.listenStreaming) return undefined;
     this.setPhase("listening");
     this.manualFinish = false;
-    let listening: ActiveStreamingListening | null;
+    // Recognition left open by the reply already holds the user's opening words.
+    let listening: ActiveStreamingListening | null = this.carriedListening;
+    this.carriedListening = null;
+    if (listening !== null && this.snapshot.liveTranscript !== null) this.setPhase("hearing");
     try {
-      listening = await this.deps.audio.listenStreaming(api, {
-        onLevel: (level) => this.deps.setLevel(level),
-        onSpeechStart: () => this.onSpeechStart(generation),
-        onTranscript: (text) => {
-          if (!this.current(generation)) return;
-          this.onSpeechStart(generation);
-          this.update({ liveTranscript: text });
-        },
-      });
+      listening ??= await this.deps.audio.listenStreaming(api, this.streamingOptions(generation));
     } catch {
       if (!this.current(generation)) throw new VoiceCancelled();
       this.noteStreamingFailure(false);
@@ -412,34 +489,124 @@ export class VoiceModeSession {
       history,
       context: this.deps.readContext(),
     };
-    const response = await api.turn(request, signal);
-    if (!this.current(generation) || signal.aborted) throw new VoiceCancelled();
-
-    const badge = (label: string, ok: boolean) => ({
-      id: `badge-${++this.entrySequence}`,
-      label,
-      ok,
-    });
-    const badges = response.toolResults.map((result) => badge(result.summary, result.ok));
-    for (const action of response.clientActions) {
+    if (!this.turnStreamUnsupported) {
       try {
-        await this.deps.executeAction(action);
+        await this.runStreamedTurn(generation, api, request, signal);
+        return;
       } catch (error) {
-        badges.push(badge(messageOf(error), false));
+        if (!isRouteMissing(error)) throw error;
+        this.turnStreamUnsupported = true;
       }
     }
-    this.appendTurn({
-      role: "assistant",
-      text: response.displayReply || response.spokenReply,
-      toolBadges: badges,
-    });
-    this.refreshPending();
+
+    const response = await api.turn(request, signal);
+    if (!this.current(generation) || signal.aborted) throw new VoiceCancelled();
+    const badges = await this.applyActions(response.clientActions, response.toolResults);
+    this.finishAssistantTurn(response.displayReply || response.spokenReply, badges);
 
     if (this.settings.speakReplies && response.spokenReply.trim().length > 0) {
       await this.speak(generation, api, response.spokenReply, signal);
     }
   }
 
+  private badge(label: string, ok: boolean) {
+    return { id: `badge-${++this.entrySequence}`, label, ok };
+  }
+
+  private async applyActions(
+    actions: ReadonlyArray<VoiceAssistantClientAction>,
+    toolResults: ReadonlyArray<{ readonly summary: string; readonly ok: boolean }>,
+  ) {
+    const badges = toolResults.map((result) => this.badge(result.summary, result.ok));
+    for (const action of actions) {
+      try {
+        await this.deps.executeAction(action);
+      } catch (error) {
+        badges.push(this.badge(messageOf(error), false));
+      }
+    }
+    return badges;
+  }
+
+  private finishAssistantTurn(text: string, toolBadges: VoiceTurnEntry["toolBadges"]) {
+    this.appendTurn({ role: "assistant", text, toolBadges });
+    this.refreshPending();
+  }
+
+  private speakOptions() {
+    return {
+      provider: this.settings.ttsProvider,
+      ...(this.settings.ttsVoice ? { voice: this.settings.ttsVoice } : {}),
+      speed: this.settings.ttsSpeed,
+    };
+  }
+
+  /**
+   * `/turn-stream`: sentence audio plays the moment it arrives while later sentences are still
+   * being written, and client actions apply as soon as the tool round reports them.
+   */
+  private async runStreamedTurn(
+    generation: number,
+    api: VoiceAssistantApi,
+    request: VoiceAssistantTurnRequest,
+    signal: AbortSignal,
+  ) {
+    const turn: {
+      reply: PlaybackQueue | null;
+      spoken: string;
+      badges: VoiceTurnEntry["toolBadges"] | null;
+      actionsApplied: Promise<void>;
+    } = { reply: null, spoken: "", badges: null, actionsApplied: Promise.resolve() };
+    const onEvent: Parameters<VoiceAssistantApi["turnStream"]>[1] = (event) => {
+      if (!this.current(generation) || signal.aborted) return;
+      switch (event.type) {
+        case "tool_result":
+          turn.actionsApplied = this.applyActions(event.actions, event.toolCalls).then((badges) => {
+            turn.badges = badges;
+          });
+          return;
+        case "text_delta":
+          turn.spoken += event.text;
+          return;
+        case "audio_chunk":
+          turn.reply ??= this.startReply(generation, api);
+          turn.reply.enqueue({
+            bytes: decodeBase64Audio(event.audioBase64),
+            contentType: event.contentType,
+          });
+          return;
+      }
+    };
+    let response: VoiceAssistantTurnResponse;
+    try {
+      response = await api.turnStream(
+        { ...request, speak: this.settings.speakReplies ? this.speakOptions() : null },
+        onEvent,
+        signal,
+      );
+    } catch (error) {
+      // An interrupted reply still belongs in the history, as far as it got.
+      if (signal.aborted && turn.spoken.trim().length > 0 && this.current(generation)) {
+        await turn.actionsApplied;
+        this.finishAssistantTurn(turn.spoken.trim(), turn.badges ?? []);
+      }
+      if (turn.reply !== null) {
+        turn.reply.stop();
+        await this.awaitReply(generation, turn.reply).catch(() => {});
+      }
+      throw error;
+    }
+    if (!this.current(generation) || signal.aborted) throw new VoiceCancelled();
+    await turn.actionsApplied;
+    const badges =
+      turn.badges ?? (await this.applyActions(response.clientActions, response.toolResults));
+    this.finishAssistantTurn(response.displayReply || response.spokenReply, badges);
+    if (turn.reply === null) return;
+    turn.reply.end();
+    await this.awaitReply(generation, turn.reply);
+  }
+
+  /** `/speak` for servers without `/turn-stream`. */
   private async speak(
     generation: number,
     api: VoiceAssistantApi,
@@ -449,49 +616,109 @@ export class VoiceModeSession {
     this.setPhase("speaking");
     let audio: SpokenAudio;
     try {
-      audio = await api.speak(
-        {
-          text,
-          provider: this.settings.ttsProvider,
-          ...(this.settings.ttsVoice ? { voice: this.settings.ttsVoice } : {}),
-          speed: this.settings.ttsSpeed,
-        },
-        signal,
-      );
+      audio = await api.speak({ text, ...this.speakOptions() }, signal);
     } catch {
       // Aborted turns propagate; a server with no TTS leaves the reply on screen.
       if (signal.aborted || !this.current(generation)) throw new VoiceCancelled();
       return;
     }
     if (!this.current(generation) || signal.aborted) throw new VoiceCancelled();
+    const queue = this.startReply(generation, api);
+    queue.enqueue(audio);
+    queue.end();
+    await this.awaitReply(generation, queue);
+  }
 
-    const playback = await this.deps.audio.play(audio);
-    if (!this.current(generation) || signal.aborted) {
-      playback.stop();
-      throw new VoiceCancelled();
-    }
-    this.playback = playback;
-    let stopWatching: (() => Promise<void>) | null = null;
+  /** Starts gapless playback and the interruption watch for one reply. */
+  private startReply(generation: number, api: VoiceAssistantApi): PlaybackQueue {
+    const audio = this.deps.audio;
+    const queue = createPlaybackQueue(
+      audio.prepare
+        ? (clip) => audio.prepare!(clip)
+        : async (clip) => ({ start: () => audio.play(clip), discard: () => {} }),
+    );
+    this.reply = queue;
+    this.setPhase("speaking");
     if (this.settings.bargeInEnabled) {
-      try {
-        stopWatching = await this.deps.audio.watchForBargeIn(BARGE_IN_VAD, () =>
-          this.interruptSpeech(),
-        );
-      } catch {
-        // Tap to interrupt still works without the microphone watcher.
-      }
+      this.replyWatch = this.watchReply(generation, api, queue);
     }
+    return queue;
+  }
+
+  private async awaitReply(generation: number, queue: PlaybackQueue) {
     try {
-      await playback.done;
+      await queue.done;
     } finally {
-      if (this.playback === playback) this.playback = null;
-      await stopWatching?.().catch(() => {});
+      if (this.reply === queue) this.reply = null;
+      this.replyGuard = null;
+      const watch = this.replyWatch;
+      this.replyWatch = null;
+      if (watch) await watch.then((stop) => stop()).catch(() => {});
     }
     if (!this.current(generation)) throw new VoiceCancelled();
   }
 
+  /**
+   * With echo-cancelled streaming recognition, the reply stays interruptible by words only, and
+   * the same recognition carries into the next turn so the user's first words are kept. Without
+   * it, local endpointing needs sustained speech.
+   */
+  private async watchReply(
+    generation: number,
+    api: VoiceAssistantApi,
+    queue: PlaybackQueue,
+  ): Promise<() => Promise<void>> {
+    const audio = this.deps.audio;
+    if (audio.listenStreaming && audio.echoCancelled && !this.streamingDisabled) {
+      let listening: ActiveStreamingListening | null = null;
+      const guard = createInterruptionGuard("transcript");
+      this.replyGuard = guard;
+      try {
+        listening = await audio.listenStreaming(api, this.streamingOptions(generation));
+      } catch {}
+      if (listening !== null && this.current(generation) && this.reply === queue) {
+        const active = listening;
+        let finishedTurn: boolean | null = null;
+        const ticker = setInterval(() => {
+          if (this.replyGuard === guard) this.applyInterruption(guard.tick(Date.now()));
+        }, INTERRUPTION_TICK_MS);
+        void active.result.then((result) => {
+          finishedTurn = result.kind === "utterance" && result.text.length > 0;
+          // A whole turn spoken over the reply is the user talking, not noise.
+          if (finishedTurn && this.reply === queue) {
+            this.update({ liveTranscript: result.kind === "utterance" ? result.text : null });
+            this.interruptSpeech();
+          }
+        });
+        return async () => {
+          clearInterval(ticker);
+          if (this.replyGuard === guard) this.replyGuard = null;
+          // Still listening, or holding the words that interrupted: the next turn takes it over.
+          if (this.current(generation) && finishedTurn !== false) {
+            this.dropCarriedListening();
+            this.carriedListening = active;
+          } else {
+            active.cancel();
+          }
+        };
+      }
+      if (this.replyGuard === guard) this.replyGuard = null;
+      listening?.cancel();
+      if (this.reply !== queue) return async () => {};
+    }
+    try {
+      return await audio.watchForBargeIn(BARGE_IN_VAD, () => this.interruptSpeech());
+    } catch {
+      // Tap to interrupt still works without the microphone watcher.
+      return async () => {};
+    }
+  }
+
+  /** Confirmed barge-in or a tap: drop the rest of the reply and stop paying for it. */
   private interruptSpeech() {
-    this.playback?.stop();
+    this.replyGuard = null;
+    this.reply?.stop();
+    this.turnAbort?.abort();
   }
 
   private appendTurn(turn: Omit<VoiceTurnEntry, "id">) {

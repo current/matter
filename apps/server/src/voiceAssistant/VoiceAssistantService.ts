@@ -24,6 +24,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import type {
@@ -46,6 +47,7 @@ import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import { createJsonStringFieldReader } from "./voiceSentenceChunker.ts";
 import { sanitizeSpeechText } from "./VoiceTtsService.ts";
 
 const DIRECT_TURN_TIMEOUT_MS = 15_000;
@@ -155,6 +157,23 @@ class VoiceAssistantLlmError extends Schema.TaggedError<VoiceAssistantLlmError>(
 
 const isVoiceAssistantLlmError = Schema.is(VoiceAssistantLlmError);
 
+/** Streaming callbacks for `streamTurn`; each runs in order on the turn's fiber. */
+export interface VoiceTurnStreamHooks {
+  /** Spoken reply text as the model writes it, only when no tool round can change it. */
+  readonly onSpokenDelta: (text: string) => Effect.Effect<void>;
+  /**
+   * Tool results and client actions, once every planned action has run and before the final
+   * answer streams, so a client that cuts the reply short still applies them.
+   */
+  readonly onToolResults: (
+    results: ReadonlyArray<VoiceAssistantToolResult>,
+    actions: ReadonlyArray<VoiceAssistantClientAction>,
+  ) => Effect.Effect<void>;
+}
+
+const PLAN_ACTIONS_EMPTY = /"actions"\s*:\s*\[\s*\]/;
+const PLAN_ROUTE_DICTATION = /"route"\s*:\s*"dictation"/;
+
 const readEnvOpenAiKey = Config.String("OPENAI_API_KEY").pipe(
   Config.withDefault(""),
   Effect.map((value) => value.trim()),
@@ -166,6 +185,14 @@ export class VoiceAssistantService extends Context.Service<
   {
     readonly handleTurn: (
       req: VoiceAssistantTurnRequest,
+    ) => Effect.Effect<VoiceAssistantTurnResponse>;
+    /**
+     * `handleTurn` with the spoken reply streamed through `hooks` as the model writes it. The
+     * resolved response is the same one `handleTurn` returns.
+     */
+    readonly streamTurn: (
+      req: VoiceAssistantTurnRequest,
+      hooks: VoiceTurnStreamHooks,
     ) => Effect.Effect<VoiceAssistantTurnResponse>;
     readonly generateBriefing: (req: VoiceBriefingRequest) => Effect.Effect<VoiceBriefingResponse>;
   }
@@ -742,6 +769,31 @@ const AnthropicMessageResponse = Schema.Struct({
 const decodeChatCompletion = Schema.decodeUnknownEffect(ChatCompletionResponse);
 const decodeAnthropicMessage = Schema.decodeUnknownEffect(AnthropicMessageResponse);
 
+/** The text delta in one server-sent-event line from an OpenAI-compatible or Anthropic stream. */
+export function parseSseTextDelta(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("data:")) return "";
+  const data = trimmed.slice(5).trim();
+  if (data.length === 0 || data === "[DONE]") return "";
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return "";
+  }
+  if (typeof parsed !== "object" || parsed === null) return "";
+  const event = parsed as {
+    readonly type?: unknown;
+    readonly delta?: { readonly text?: unknown };
+    readonly choices?: ReadonlyArray<{ readonly delta?: { readonly content?: unknown } }>;
+  };
+  if (event.type === "content_block_delta") {
+    return typeof event.delta?.text === "string" ? event.delta.text : "";
+  }
+  const content = event.choices?.[0]?.delta?.content;
+  return typeof content === "string" ? content : "";
+}
+
 interface DirectLlmTarget {
   readonly kind: "openaiCompatible" | "anthropic";
   readonly baseUrl: string;
@@ -937,6 +989,92 @@ const make = Effect.gen(function* () {
     return text;
   });
 
+  /** Server-sent-event streaming of the same request; `onText` sees each content delta. */
+  const streamDirectLlm = Effect.fn("VoiceAssistantService.streamDirectLlm")(function* (
+    target: DirectLlmTarget,
+    input: {
+      readonly systemPrompt: string;
+      readonly userPrompt: string;
+      readonly expectJson: boolean;
+      readonly timeoutMs: number;
+    },
+    onText: (text: string) => Effect.Effect<void>,
+  ) {
+    let request: HttpClientRequest.HttpClientRequest;
+    if (target.kind === "anthropic") {
+      request = HttpClientRequest.post(`${target.baseUrl}/messages`).pipe(
+        HttpClientRequest.setHeader("x-api-key", target.apiKey),
+        HttpClientRequest.setHeader("anthropic-version", ANTHROPIC_API_VERSION),
+        HttpClientRequest.bodyJsonUnsafe({
+          model: target.model,
+          max_tokens: 1024,
+          temperature: 0.2,
+          stream: true,
+          system: input.systemPrompt,
+          messages: [{ role: "user", content: input.userPrompt }],
+        }),
+      );
+    } else {
+      request = HttpClientRequest.post(`${target.baseUrl}/chat/completions`).pipe(
+        HttpClientRequest.bodyJsonUnsafe({
+          model: target.model,
+          temperature: 0.2,
+          max_tokens: 1024,
+          stream: true,
+          ...(input.expectJson ? { response_format: { type: "json_object" } } : {}),
+          messages: [
+            { role: "system", content: input.systemPrompt },
+            { role: "user", content: input.userPrompt },
+          ],
+        }),
+      );
+      if (target.apiKey) {
+        request = HttpClientRequest.bearerToken(request, Redacted.make(target.apiKey));
+      }
+    }
+    request = HttpClientRequest.setHeader(request, "accept", "text/event-stream");
+
+    let text = "";
+    const run = Effect.gen(function* () {
+      const response = yield* httpClient
+        .execute(request)
+        .pipe(
+          Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
+          Effect.provideService(HttpClient.TracerPropagationEnabled, false),
+        );
+      if (response.status < 200 || response.status >= 300) {
+        return yield* new VoiceAssistantLlmError({
+          stage: "direct-http",
+          cause: `HTTP ${response.status}`,
+        });
+      }
+      yield* response.stream.pipe(
+        Stream.decodeText,
+        Stream.splitLines,
+        Stream.runForEach((line) => {
+          const delta = parseSseTextDelta(line);
+          if (!delta) return Effect.void;
+          text += delta;
+          return onText(delta);
+        }),
+      );
+    });
+    yield* run.pipe(
+      Effect.timeoutOrElse({
+        duration: Duration.millis(input.timeoutMs),
+        orElse: () => Effect.fail(new VoiceAssistantLlmError({ stage: "direct-http" })),
+      }),
+      Effect.mapError((cause) =>
+        isVoiceAssistantLlmError(cause)
+          ? cause
+          : new VoiceAssistantLlmError({ stage: "direct-http", cause }),
+      ),
+    );
+    const trimmed = text.trim();
+    if (!trimmed) return yield* new VoiceAssistantLlmError({ stage: "direct-http" });
+    return trimmed;
+  });
+
   const callFallbackTextGeneration = Effect.fn("VoiceAssistantService.callFallbackTextGeneration")(
     function* (
       settings: ServerSettingsContract,
@@ -992,11 +1130,38 @@ const make = Effect.gen(function* () {
     readonly expectJson: boolean;
     readonly directTimeoutMs: number;
     readonly fallbackTimeoutMs: number;
+    /** Streams the direct model's output; the fallback path delivers its whole text once. */
+    readonly onText?: ((text: string) => Effect.Effect<void>) | undefined;
   }) {
     const settings = yield* settingsService.getSettings.pipe(
       Effect.mapError((cause) => new VoiceAssistantLlmError({ stage: "text-generation", cause })),
     );
     const directTarget = yield* resolveDirectLlmTarget(settings);
+    const onText = input.onText;
+    if (directTarget !== null && onText !== undefined) {
+      let emitted = false;
+      const streamed = yield* streamDirectLlm(
+        directTarget,
+        {
+          systemPrompt: input.systemPrompt,
+          userPrompt: input.userPrompt,
+          expectJson: input.expectJson,
+          timeoutMs: input.directTimeoutMs,
+        },
+        (text) => {
+          emitted = true;
+          return onText(text);
+        },
+      ).pipe(
+        Effect.tapError((cause) =>
+          Effect.logWarning("Streaming voice assistant LLM failed.", { cause }),
+        ),
+        Effect.option,
+      );
+      if (Option.isSome(streamed)) return streamed.value;
+      // Text already sent cannot be taken back, so a stream that broke midway ends the turn.
+      if (emitted) return yield* new VoiceAssistantLlmError({ stage: "direct-http" });
+    }
     if (directTarget !== null) {
       const directResult = yield* callDirectLlm(directTarget, {
         systemPrompt: input.systemPrompt,
@@ -1013,13 +1178,40 @@ const make = Effect.gen(function* () {
       );
       if (Option.isSome(directResult)) return directResult.value;
     }
-    return yield* callFallbackTextGeneration(settings, {
+    const fallback = yield* callFallbackTextGeneration(settings, {
       systemPrompt: input.systemPrompt,
       userPrompt: input.userPrompt,
       expectJson: input.expectJson,
       timeoutMs: input.fallbackTimeoutMs,
     });
+    if (onText !== undefined) yield* onText(fallback);
+    return fallback;
   });
+
+  /**
+   * Feeds a streaming plan's `spokenReply` to `hooks` as it arrives. `speculate` decides from the
+   * fields written before it whether the text can still change (a tool round would rewrite it).
+   */
+  const spokenStreamer = (
+    hooks: VoiceTurnStreamHooks | undefined,
+    speculate: (prefix: string) => boolean,
+  ) => {
+    if (hooks === undefined) return { onText: undefined, spoken: () => "" };
+    const reader = createJsonStringFieldReader("spokenReply");
+    let allowed: boolean | null = null;
+    let spoken = "";
+    return {
+      onText: Effect.fn("VoiceAssistantService.streamSpokenReply")(function* (delta: string) {
+        const text = reader.push(delta);
+        if (!reader.started) return;
+        allowed ??= speculate(reader.prefix);
+        if (!allowed || text.length === 0) return;
+        spoken += text;
+        yield* hooks.onSpokenDelta(text);
+      }),
+      spoken: () => spoken,
+    };
+  };
 
   const resolveLaunchModelAndMode = Effect.fn("VoiceAssistantService.resolveLaunchModelAndMode")(
     function* (projectId: ProjectId) {
@@ -1109,9 +1301,10 @@ const make = Effect.gen(function* () {
     },
   );
 
-  const handleTurn: VoiceAssistantService["Service"]["handleTurn"] = Effect.fn(
-    "VoiceAssistantService.handleTurn",
-  )(function* (req) {
+  const runTurn = Effect.fn("VoiceAssistantService.runTurn")(function* (
+    req: VoiceAssistantTurnRequest,
+    hooks: VoiceTurnStreamHooks | undefined,
+  ) {
     const utterance = req.utterance.trim();
     if (utterance.length === 0) {
       return {
@@ -1135,12 +1328,18 @@ const make = Effect.gen(function* () {
       } satisfies VoiceAssistantTurnResponse;
     }
 
+    // Only a plan with no actions can be spoken while it streams: tools may rewrite the reply.
+    const planSpoken = spokenStreamer(
+      hooks,
+      (prefix) => PLAN_ACTIONS_EMPTY.test(prefix) && !PLAN_ROUTE_DICTATION.test(prefix),
+    );
     const rawPlanText = yield* runLlm({
       systemPrompt: VOICE_ASSISTANT_SYSTEM_PROMPT,
       userPrompt: buildTurnUserPrompt(req),
       expectJson: true,
       directTimeoutMs: DIRECT_TURN_TIMEOUT_MS,
       fallbackTimeoutMs: FALLBACK_TURN_TIMEOUT_MS,
+      onText: planSpoken.onText,
     }).pipe(Effect.option);
 
     if (Option.isNone(rawPlanText)) {
@@ -1804,8 +2003,16 @@ const make = Effect.gen(function* () {
     let displayReply = plan.displayReply;
     let expectFollowUp = plan.expectFollowUp;
 
+    if (hooks !== undefined && (toolResults.length > 0 || clientActions.length > 0)) {
+      yield* hooks.onToolResults(toolResults, clientActions);
+    }
+
     // One follow-up pass when read_thread fetched detail the initial plan could not see.
     if (readThreadExcerpts.length > 0) {
+      const followUpSpoken = spokenStreamer(
+        planSpoken.spoken().length > 0 ? undefined : hooks,
+        () => true,
+      );
       const followUpRaw = yield* runLlm({
         systemPrompt: VOICE_ASSISTANT_SYSTEM_PROMPT,
         userPrompt: buildReadThreadSynthesisPrompt({
@@ -1816,6 +2023,7 @@ const make = Effect.gen(function* () {
         expectJson: true,
         directTimeoutMs: DIRECT_TURN_TIMEOUT_MS,
         fallbackTimeoutMs: FALLBACK_TURN_TIMEOUT_MS,
+        onText: followUpSpoken.onText,
       }).pipe(Effect.option);
 
       if (Option.isSome(followUpRaw)) {
@@ -1864,6 +2072,11 @@ const make = Effect.gen(function* () {
       clientActions,
     } satisfies VoiceAssistantTurnResponse;
   });
+
+  const handleTurn: VoiceAssistantService["Service"]["handleTurn"] = (req) =>
+    runTurn(req, undefined);
+  const streamTurn: VoiceAssistantService["Service"]["streamTurn"] = (req, hooks) =>
+    runTurn(req, hooks);
 
   const generateBriefing: VoiceAssistantService["Service"]["generateBriefing"] = Effect.fn(
     "VoiceAssistantService.generateBriefing",
@@ -1914,7 +2127,7 @@ const make = Effect.gen(function* () {
     } satisfies VoiceBriefingResponse;
   });
 
-  return VoiceAssistantService.of({ handleTurn, generateBriefing });
+  return VoiceAssistantService.of({ handleTurn, streamTurn, generateBriefing });
 });
 
 export const layer = Layer.effect(VoiceAssistantService, make);

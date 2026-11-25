@@ -50,6 +50,7 @@ export interface VoiceAssistantHostBridge {
   readonly createVadCapture?: typeof createHandsFreeVadCapture;
   readonly createFluxCapture?: typeof createDeepgramFluxCapture;
   readonly createTtsPlayer?: typeof createVoiceTtsPlayer;
+  readonly createChunkPlayer?: (options: VoiceChunkPlayerOptions) => VoiceChunkPlayer;
 }
 
 export type FastPathIntent =
@@ -374,6 +375,9 @@ let userSpeaking = false;
 let turnSequence = 0;
 let briefingSequence = 0;
 let briefingQueue: QueuedBriefing[] = [];
+let activeReply: VoiceChunkPlayer | null = null;
+let replyHoldTimer: ReturnType<typeof setTimeout> | null = null;
+let turnStreamUnsupported = false;
 
 function emit(patch: Partial<VoiceAssistantStoreState>): void {
   state = { ...state, ...patch };
@@ -525,6 +529,458 @@ async function speakText(text: string): Promise<void> {
     vadCapture?.setSpeakingDuck(false);
     if (state.speaking || state.outputLevel !== 0) {
       emit({ speaking: false, outputLevel: 0 });
+    }
+  }
+}
+
+/** One line of the server's `/turn-stream` NDJSON, mirrored from `apps/server/src/voiceAssistant`. */
+type VoiceTurnStreamEvent =
+  | {
+      readonly type: "tool_result";
+      readonly toolCalls: ReadonlyArray<VoiceAssistantToolResult>;
+      readonly actions: ReadonlyArray<VoiceAssistantClientAction>;
+    }
+  | { readonly type: "text_delta"; readonly text: string }
+  | {
+      readonly type: "audio_chunk";
+      readonly seq: number;
+      readonly text: string;
+      readonly contentType: string;
+      readonly audioBase64: string;
+    }
+  | {
+      readonly type: "done";
+      readonly reply: string;
+      readonly displayReply: string;
+      readonly route: VoiceAssistantTurnResponse["route"];
+      readonly expectFollowUp: boolean;
+      readonly actions: ReadonlyArray<VoiceAssistantClientAction>;
+      readonly toolCalls: ReadonlyArray<VoiceAssistantToolResult>;
+    }
+  | { readonly type: "error"; readonly message: string };
+
+const TURN_STREAM_EVENT_TYPES = new Set([
+  "tool_result",
+  "text_delta",
+  "audio_chunk",
+  "done",
+  "error",
+]);
+
+function parseTurnStreamLine(line: string): VoiceTurnStreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      TURN_STREAM_EVENT_TYPES.has((parsed as { readonly type?: unknown }).type as string)
+    ) {
+      return parsed as VoiceTurnStreamEvent;
+    }
+  } catch {}
+  return null;
+}
+
+function decodeBase64Bytes(data: string): Uint8Array {
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+/** Plays streamed reply sentences back to back; `done` settles once `end()`ed audio drains. */
+export interface VoiceChunkPlayer {
+  readonly done: Promise<"finished" | "stopped">;
+  enqueue(bytes: Uint8Array, contentType: string): void;
+  end(): void;
+  pause(): void;
+  resume(): void;
+  stop(): void;
+}
+
+export interface VoiceChunkPlayerOptions {
+  readonly onOutputLevel: (level: number) => void;
+}
+
+/** Decodes each sentence as it arrives and schedules it right after the previous one. */
+function createWebAudioChunkPlayer(options: VoiceChunkPlayerOptions): VoiceChunkPlayer {
+  const ctx = new AudioContext();
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.connect(ctx.destination);
+  const timeData = new Uint8Array(analyser.fftSize);
+  const sources = new Set<AudioBufferSourceNode>();
+  let chain: Promise<void> = Promise.resolve();
+  let nextStart = 0;
+  let drained = false;
+  let settled = false;
+  let meter: ReturnType<typeof setInterval> | null = null;
+  const { promise: done, resolve } = Promise.withResolvers<"finished" | "stopped">();
+
+  const settle = (outcome: "finished" | "stopped") => {
+    if (settled) return;
+    settled = true;
+    if (meter !== null) clearInterval(meter);
+    meter = null;
+    options.onOutputLevel(0);
+    void ctx.close().catch(() => undefined);
+    resolve(outcome);
+  };
+  const maybeFinish = () => {
+    if (drained && sources.size === 0) settle("finished");
+  };
+  const startMeter = () => {
+    if (meter !== null) return;
+    let smoothed = 0;
+    meter = setInterval(() => {
+      analyser.getByteTimeDomainData(timeData);
+      let energy = 0;
+      for (const sample of timeData) energy += ((sample - 128) / 128) ** 2;
+      smoothed = smoothed * 0.6 + Math.min(1, Math.sqrt(energy / timeData.length) * 3.8) * 0.4;
+      options.onOutputLevel(smoothed);
+    }, 50);
+  };
+
+  return {
+    done,
+    enqueue(bytes) {
+      if (settled || drained) return;
+      const decoding = ctx.decodeAudioData(bytes.slice().buffer).catch(() => null);
+      chain = chain.then(async () => {
+        const buffer = await decoding;
+        if (!buffer || settled) return;
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(analyser);
+        const when = Math.max(ctx.currentTime + 0.02, nextStart);
+        source.start(when);
+        nextStart = when + buffer.duration;
+        sources.add(source);
+        startMeter();
+        source.onended = () => {
+          sources.delete(source);
+          maybeFinish();
+        };
+      });
+    },
+    end() {
+      chain = chain.then(() => {
+        drained = true;
+        maybeFinish();
+      });
+    },
+    pause() {
+      if (!settled) void ctx.suspend().catch(() => undefined);
+    },
+    resume() {
+      if (!settled) void ctx.resume().catch(() => undefined);
+    },
+    stop() {
+      for (const source of sources) {
+        source.onended = null;
+        try {
+          source.stop(0);
+        } catch {}
+      }
+      sources.clear();
+      settle("stopped");
+    },
+  };
+}
+
+const COMMAND_WORDS = new Set([
+  "stop",
+  "wait",
+  "hold",
+  "cancel",
+  "pause",
+  "hey",
+  "quiet",
+  "enough",
+  "shush",
+]);
+
+/** Barge-in needs real speech: two words, or one command word like "stop" or "wait". */
+export function confirmsSpokenInterruption(text: string): boolean {
+  const words = text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}']+/u)
+    .filter((word) => word.length > 0);
+  return words.length >= 2 || words.some((word) => COMMAND_WORDS.has(word));
+}
+
+const SUSTAINED_SPEECH_MS = 420;
+const MAX_SPEECH_GAP_MS = 140;
+
+/**
+ * True when the clip holds at least 420 ms of voiced energy (gaps up to 140 ms allowed), so a
+ * car door, cough or keyboard clack picked up while the reply plays never counts as a turn.
+ */
+export function hasSustainedSpeech(pcm: Float32Array, sampleRate = 16_000): boolean {
+  const frameSize = Math.round(sampleRate * 0.02);
+  const levels: number[] = [];
+  for (let start = 0; start + frameSize <= pcm.length; start += frameSize) {
+    let energy = 0;
+    for (let index = start; index < start + frameSize; index += 1) {
+      energy += (pcm[index] ?? 0) ** 2;
+    }
+    levels.push(Math.sqrt(energy / frameSize));
+  }
+  if (levels.length === 0) return false;
+  const floor = [...levels].toSorted((a, b) => a - b)[Math.floor(levels.length * 0.1)] ?? 0;
+  const threshold = Math.max(0.025, floor * 2.6 + 0.008);
+  let runMs = 0;
+  let gapMs = 0;
+  for (const level of levels) {
+    if (level >= threshold) {
+      runMs += 20 + gapMs;
+      gapMs = 0;
+      if (runMs >= SUSTAINED_SPEECH_MS) return true;
+    } else if (runMs > 0) {
+      gapMs += 20;
+      if (gapMs > MAX_SPEECH_GAP_MS) {
+        runMs = 0;
+        gapMs = 0;
+      }
+    }
+  }
+  return false;
+}
+
+const FALSE_INTERRUPTION_MS = 900;
+const VAD_HOLD_SAFETY_MS = 6_000;
+
+function holdReply(timeoutMs: number): void {
+  if (replyHoldTimer !== null) clearTimeout(replyHoldTimer);
+  activeReply?.pause();
+  emit({ outputLevel: 0 });
+  replyHoldTimer = setTimeout(releaseReplyHold, timeoutMs);
+}
+
+/** A false interruption: the reply picks up where it paused. */
+function releaseReplyHold(): void {
+  if (replyHoldTimer === null) return;
+  clearTimeout(replyHoldTimer);
+  replyHoldTimer = null;
+  activeReply?.resume();
+}
+
+function stopActiveReply(): void {
+  if (replyHoldTimer !== null) clearTimeout(replyHoldTimer);
+  replyHoldTimer = null;
+  const reply = activeReply;
+  activeReply = null;
+  reply?.stop();
+}
+
+function replyGuardActive(): boolean {
+  return (
+    (state.speaking || replyHoldTimer !== null) && getIslandSettings().voiceAssistant.bargeInEnabled
+  );
+}
+
+function streamSpeakOptions(
+  mode: VoiceAssistantInteractionMode,
+  speakOverride: boolean | undefined,
+): Omit<VoiceSpeakRequest, "text"> | null {
+  const settings = getIslandSettings().voiceAssistant;
+  if (settings.ttsProvider === "off" || settings.ttsProvider === "browser") return null;
+  if (speakOverride === false) return null;
+  if (
+    speakOverride === undefined &&
+    mode !== "voice-mode" &&
+    mode !== "assistant" &&
+    !settings.speakReplies
+  ) {
+    return null;
+  }
+  return buildVoiceSpeakOptions(settings);
+}
+
+interface TurnRequestResult {
+  readonly response: VoiceAssistantTurnResponse;
+  /** Client actions already ran as they streamed in. */
+  readonly actionsApplied: boolean;
+  /** Set when the server streamed reply audio; resolves when it finished or was cut off. */
+  readonly reply: VoiceChunkPlayer | null;
+}
+
+async function postTurn(
+  url: string,
+  apiConfig: VoiceTtsApiConfig,
+  body: unknown,
+  signal: AbortSignal,
+): Promise<Response> {
+  return getFetchImpl()(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...apiConfig.headers },
+    credentials: apiConfig.credentials ?? "include",
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
+async function failedTurn(response: Response): Promise<never> {
+  const errorText = await response.text().catch(() => "");
+  throw new Error(errorText || `Voice assistant request failed (${response.status}).`);
+}
+
+/**
+ * Runs a turn over `/turn-stream`, playing sentences as they are synthesized. Older servers
+ * (404/405) are remembered and get the plain `/turn` request instead.
+ */
+async function requestTurn(input: {
+  readonly apiConfig: VoiceTtsApiConfig;
+  readonly payload: VoiceAssistantTurnRequest;
+  readonly speak: Omit<VoiceSpeakRequest, "text"> | null;
+  readonly signal: AbortSignal;
+  readonly isCurrent: () => boolean;
+}): Promise<TurnRequestResult> {
+  const base = input.apiConfig.baseUrl.replace(/\/+$/, "");
+  if (!turnStreamUnsupported) {
+    const response = await postTurn(
+      `${base}/api/mattr/voice-assistant/turn-stream`,
+      input.apiConfig,
+      { ...input.payload, speak: input.speak },
+      input.signal,
+    );
+    if (response.status === 404 || response.status === 405) {
+      turnStreamUnsupported = true;
+    } else {
+      if (!response.ok) return failedTurn(response);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("ndjson") || !response.body) {
+        return {
+          response: (await response.json()) as VoiceAssistantTurnResponse,
+          actionsApplied: false,
+          reply: null,
+        };
+      }
+      return readTurnStream(response.body, input);
+    }
+  }
+  const response = await postTurn(
+    `${base}/api/mattr/voice-assistant/turn`,
+    input.apiConfig,
+    input.payload,
+    input.signal,
+  );
+  if (!response.ok) return failedTurn(response);
+  return {
+    response: (await response.json()) as VoiceAssistantTurnResponse,
+    actionsApplied: false,
+    reply: null,
+  };
+}
+
+async function readTurnStream(
+  body: ReadableStream<Uint8Array>,
+  input: { readonly signal: AbortSignal; readonly isCurrent: () => boolean },
+): Promise<TurnRequestResult> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const cancel = () => void reader.cancel().catch(() => undefined);
+  input.signal.addEventListener("abort", cancel, { once: true });
+  let reply: VoiceChunkPlayer | null = null;
+  let actionsApplied = false;
+  let done: Extract<VoiceTurnStreamEvent, { readonly type: "done" }> | null = null;
+  const pendingEvents: VoiceTurnStreamEvent[] = [];
+
+  const handle = async (event: VoiceTurnStreamEvent) => {
+    if (!input.isCurrent()) return;
+    switch (event.type) {
+      case "tool_result":
+        // Actions run the moment they are known, so a barge-in never drops an approval.
+        if (event.actions.length > 0) {
+          actionsApplied = true;
+          emit({ phase: "acting", statusLabel: m(msg("Running actions...")) });
+          for (const action of event.actions) {
+            if (!input.isCurrent()) return;
+            await hostBridge?.executeClientAction(action);
+          }
+        }
+        return;
+      case "audio_chunk": {
+        if (!reply) {
+          const factory = hostBridge?.createChunkPlayer ?? createWebAudioChunkPlayer;
+          reply = factory({
+            onOutputLevel: (level) => {
+              if (state.outputLevel !== level && replyHoldTimer === null) {
+                emit({ outputLevel: level });
+              }
+            },
+          });
+          activeReply = reply;
+          vadCapture?.setSpeakingDuck(true);
+          emit({ phase: "speaking", speaking: true, statusLabel: null });
+        }
+        reply.enqueue(decodeBase64Bytes(event.audioBase64), event.contentType);
+        return;
+      }
+      case "done":
+        done = event;
+        return;
+      case "error":
+        throw new Error(event.message);
+      case "text_delta":
+        return;
+    }
+  };
+
+  try {
+    let buffer = "";
+    for (;;) {
+      const { value, done: finished } = await reader.read();
+      buffer += finished ? decoder.decode() : decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = finished ? "" : (lines.pop() ?? "");
+      for (const line of lines) {
+        const event = parseTurnStreamLine(line);
+        if (event) pendingEvents.push(event);
+      }
+      while (pendingEvents.length > 0) await handle(pendingEvents.shift()!);
+      if (finished) break;
+    }
+  } catch (error) {
+    (reply as VoiceChunkPlayer | null)?.stop();
+    throw error;
+  } finally {
+    input.signal.removeEventListener("abort", cancel);
+  }
+  const finalPlayer = reply as VoiceChunkPlayer | null;
+  finalPlayer?.end();
+  const finished = done as Extract<VoiceTurnStreamEvent, { readonly type: "done" }> | null;
+  if (!finished) {
+    finalPlayer?.stop();
+    if (!input.isCurrent()) throw new Error("Voice turn was interrupted.");
+    throw new Error("Voice assistant stream ended early.");
+  }
+  return {
+    response: {
+      route: finished.route,
+      spokenReply: finished.reply,
+      displayReply: finished.displayReply,
+      expectFollowUp: finished.expectFollowUp,
+      toolResults: finished.toolCalls,
+      clientActions: finished.actions,
+    },
+    actionsApplied,
+    reply: finalPlayer,
+  };
+}
+
+async function awaitReply(reply: VoiceChunkPlayer): Promise<void> {
+  try {
+    await reply.done;
+  } finally {
+    if (activeReply === reply) {
+      activeReply = null;
+      if (replyHoldTimer !== null) clearTimeout(replyHoldTimer);
+      replyHoldTimer = null;
+      vadCapture?.setSpeakingDuck(false);
+      if (state.speaking || state.outputLevel !== 0) emit({ speaking: false, outputLevel: 0 });
     }
   }
 }
@@ -697,6 +1153,7 @@ export function clearVoiceAssistantHistory(): void {
 
 export function bargeInVoiceAssistant(): void {
   ttsPlayer?.stop();
+  stopActiveReply();
   if (activeAbortController) {
     activeAbortController.abort();
     activeAbortController = null;
@@ -737,9 +1194,8 @@ async function startVadCapture(): Promise<void> {
     },
     onSpeechStart: () => {
       userSpeaking = true;
-      if (state.speaking && getIslandSettings().voiceAssistant.bargeInEnabled) {
-        bargeInVoiceAssistant();
-      }
+      // Energy alone only pauses the reply; the utterance decides whether it was a turn.
+      if (replyGuardActive()) holdReply(VAD_HOLD_SAFETY_MS);
       if (state.phase === "idle" || state.phase === "listening") {
         emit({ phase: "listening", statusLabel: m(msg("Listening...")) });
       }
@@ -747,6 +1203,10 @@ async function startVadCapture(): Promise<void> {
     onUtterance: (pcm16k, sampleRate) => {
       userSpeaking = false;
       if (!state.handsFreeActive || state.muted) return;
+      if (replyGuardActive()) {
+        void handleUtteranceDuringReply(pcm16k, sampleRate);
+        return;
+      }
       void handleCapturedUtterance(pcm16k, sampleRate);
     },
     onError: (message) => {
@@ -818,15 +1278,22 @@ async function startHandsFree(): Promise<void> {
     },
     onSpeechStart: () => {
       userSpeaking = true;
-      if (state.speaking && getIslandSettings().voiceAssistant.bargeInEnabled) {
-        bargeInVoiceAssistant();
-      }
+      // StartOfTurn pauses the reply; only real words (see onLiveTranscript) cancel it.
+      if (replyGuardActive()) holdReply(FALSE_INTERRUPTION_MS);
       if (state.phase === "idle" || state.phase === "listening") {
         emit({ phase: "listening", statusLabel: m(msg("Listening...")) });
       }
     },
     onLiveTranscript: (transcript) => {
       if (!state.handsFreeActive || state.muted) return;
+      if (replyGuardActive()) {
+        if (!confirmsSpokenInterruption(transcript)) {
+          if (transcript.trim()) holdReply(FALSE_INTERRUPTION_MS);
+          return;
+        }
+        // Confirmed: cut the reply but keep this Flux turn, so its first words still count.
+        bargeInVoiceAssistant();
+      }
       emit({
         liveTranscript: transcript,
         ...(state.phase === "idle" || state.phase === "listening"
@@ -838,6 +1305,13 @@ async function startHandsFree(): Promise<void> {
       userSpeaking = false;
       if (!state.handsFreeActive || state.muted) return;
       const trimmed = transcript.trim();
+      if (replyGuardActive()) {
+        if (!confirmsSpokenInterruption(trimmed)) {
+          releaseReplyHold();
+          return;
+        }
+        bargeInVoiceAssistant();
+      }
       if (!trimmed) {
         emit({ phase: "listening", statusLabel: null });
         void drainBriefingQueue();
@@ -896,6 +1370,7 @@ function stopHandsFree(): void {
     vadCapture = null;
   }
   ttsPlayer?.stop();
+  stopActiveReply();
   if (activeAbortController) {
     activeAbortController.abort();
     activeAbortController = null;
@@ -961,6 +1436,25 @@ async function handleCapturedUtterance(pcm16k: Float32Array, sampleRate: 16000):
   }
 }
 
+/** Local-VAD fallback: a clip heard over the reply is a turn only if it holds real speech. */
+async function handleUtteranceDuringReply(pcm16k: Float32Array, sampleRate: 16000): Promise<void> {
+  if (!hostBridge || !hasSustainedSpeech(pcm16k, sampleRate)) {
+    releaseReplyHold();
+    return;
+  }
+  let transcript = "";
+  try {
+    transcript = (await hostBridge.transcribePcm(pcm16k, sampleRate)).trim();
+  } catch {}
+  if (!state.handsFreeActive) return;
+  if (!/[\p{L}\p{N}]/u.test(transcript)) {
+    releaseReplyHold();
+    return;
+  }
+  bargeInVoiceAssistant();
+  await submitVoiceAssistantUtterance(transcript, { modeOverride: "voice-mode" });
+}
+
 export async function submitVoiceAssistantUtterance(
   text: string,
   options?: {
@@ -972,6 +1466,7 @@ export async function submitVoiceAssistantUtterance(
   if (!utterance) return null;
 
   ttsPlayer?.stop();
+  stopActiveReply();
   if (activeAbortController) {
     activeAbortController.abort();
     activeAbortController = null;
@@ -1095,35 +1590,30 @@ export async function submitVoiceAssistantUtterance(
 
   try {
     const apiConfig = await getApiConfig();
-    const base = apiConfig.baseUrl.replace(/\/+$/, "");
     const payload: VoiceAssistantTurnRequest = {
       utterance,
       mode: effectiveMode,
       history,
       context,
     };
-    const response = await getFetchImpl()(`${base}/api/mattr/voice-assistant/turn`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...apiConfig.headers,
-      },
-      credentials: apiConfig.credentials ?? "include",
-      body: JSON.stringify(payload),
+    const isCurrent = () => turnId === activeTurnCounter && !controller.signal.aborted;
+    const {
+      response: turnResult,
+      actionsApplied,
+      reply,
+    } = await requestTurn({
+      apiConfig,
+      payload,
+      speak: streamSpeakOptions(effectiveMode, options?.speakOverride),
       signal: controller.signal,
+      isCurrent,
     });
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      throw new Error(errorText || `Voice assistant request failed (${response.status}).`);
-    }
+    if (!isCurrent()) return null;
 
-    const turnResult = (await response.json()) as VoiceAssistantTurnResponse;
-    if (turnId !== activeTurnCounter || controller.signal.aborted) return null;
-
-    if (turnResult.clientActions.length > 0) {
+    if (!actionsApplied && turnResult.clientActions.length > 0) {
       emit({ phase: "acting", statusLabel: m(msg("Running actions...")) });
       for (const action of turnResult.clientActions) {
-        if (turnId !== activeTurnCounter || controller.signal.aborted) return null;
+        if (!isCurrent()) return null;
         await hostBridge?.executeClientAction(action);
       }
     }
@@ -1146,7 +1636,9 @@ export async function submitVoiceAssistantUtterance(
       error: null,
     });
 
-    if (
+    if (reply) {
+      await awaitReply(reply);
+    } else if (
       shouldSpeakReply(
         turnResult.spokenReply,
         turnResult.route,
@@ -1209,6 +1701,7 @@ export function resetVoiceAssistantStoreForTests(): void {
   activeTurnRunning = false;
   activeBriefingRunning = false;
   userSpeaking = false;
+  turnStreamUnsupported = false;
   hostBridge = null;
   if (ttsPlayer) {
     ttsPlayer.stop();

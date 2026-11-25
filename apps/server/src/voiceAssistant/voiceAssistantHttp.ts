@@ -30,6 +30,7 @@ import {
 } from "../auth/http.ts";
 import * as VoiceAssistantService from "./VoiceAssistantService.ts";
 import { makeVoiceAssistantFluxRoute } from "./voiceAssistantFluxWs.ts";
+import { encodeVoiceTurnStream, makeVoiceTurnStream } from "./voiceTurnStream.ts";
 import * as VoiceTtsService from "./VoiceTtsService.ts";
 
 const NO_STORE_HEADERS = {
@@ -106,6 +107,21 @@ const VoiceTurnRequestSchema = Schema.Struct({
   }),
 });
 
+const VoiceSpeakOptionsSchema = Schema.Struct({
+  provider: Schema.optional(
+    Schema.Literals(["auto", "elevenlabs", "deepgram", "openai", "macos", "browser", "off"]),
+  ),
+  voice: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  speed: Schema.optional(Schema.Number),
+});
+
+/** `/turn` plus how to speak it; `speak: null` streams text only. */
+const VoiceTurnStreamRequestSchema = Schema.Struct({
+  ...VoiceTurnRequestSchema.fields,
+  speak: Schema.optional(Schema.NullOr(VoiceSpeakOptionsSchema)),
+});
+
 const VoiceBriefingRequestSchema = Schema.Struct({
   kind: Schema.Literals(["approval", "question", "completed", "failed", "limited"]),
   threadTitle: Schema.String,
@@ -140,6 +156,7 @@ const VoiceConfigRequestSchema = Schema.Struct({
 });
 
 const decodeTurnRequest = Schema.decodeUnknownEffect(VoiceTurnRequestSchema);
+const decodeTurnStreamRequest = Schema.decodeUnknownEffect(VoiceTurnStreamRequestSchema);
 const decodeBriefingRequest = Schema.decodeUnknownEffect(VoiceBriefingRequestSchema);
 const decodeSpeakRequest = Schema.decodeUnknownEffect(VoiceSpeakRequestSchema);
 const decodeCredentialsRequest = Schema.decodeUnknownEffect(VoiceCredentialsRequestSchema);
@@ -208,6 +225,45 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
           decoded.value satisfies VoiceAssistantTurnRequest,
         );
         return HttpServerResponse.jsonUnsafe(result, { headers: NO_STORE_HEADERS });
+      }).pipe(catchAuthErrors),
+    );
+
+    const turnStreamRoute = HttpRouter.add(
+      "POST",
+      "/api/mattr/voice-assistant/turn-stream",
+      Effect.gen(function* () {
+        yield* authenticateOperate();
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const raw = yield* request.json.pipe(Effect.option);
+        if (raw._tag === "None") {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_json" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const decoded = yield* decodeTurnStreamRequest(raw.value).pipe(Effect.option);
+        if (decoded._tag === "None") {
+          return HttpServerResponse.jsonUnsafe(
+            { error: "invalid_request" },
+            { status: 400, headers: NO_STORE_HEADERS },
+          );
+        }
+        const { speak, ...turn } = decoded.value;
+        const speakOptions =
+          speak === null || speak?.provider === "off" || speak?.provider === "browser"
+            ? null
+            : (speak ?? {});
+        return HttpServerResponse.stream(
+          encodeVoiceTurnStream(
+            makeVoiceTurnStream({
+              request: turn satisfies VoiceAssistantTurnRequest,
+              assistant,
+              tts,
+              speak: speakOptions,
+            }),
+          ),
+          { contentType: "application/x-ndjson", headers: NO_STORE_HEADERS },
+        );
       }).pipe(catchAuthErrors),
     );
 
@@ -429,6 +485,7 @@ export const layerVoiceAssistantRoutes = Layer.unwrap(
 
     return Layer.mergeAll(
       turnRoute,
+      turnStreamRoute,
       briefingRoute,
       speakRoute,
       ttsInfoRoute,

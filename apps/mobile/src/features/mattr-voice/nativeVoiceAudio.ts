@@ -25,6 +25,8 @@ import {
   type SpokenAudio,
   type VoiceAssistantApi,
 } from "./voiceAssistantApi";
+import { createInterruptionGuard } from "./interruptionGuard";
+import { decodeBase64Audio, type PreparedClip } from "./voiceTurnStream";
 import {
   listenWithFlux,
   type ActiveStreamingListening,
@@ -37,6 +39,7 @@ import {
   BARGE_IN_ECHO_CANCELLED_VAD,
   buildWavFile,
   createVoiceActivityDetector,
+  createVoicedLevelGate,
   rmsToDecibels,
   type VoiceActivityConfig,
 } from "./voiceAudioLogic";
@@ -99,13 +102,6 @@ function playbackError(status: AudioStatus): boolean {
   return typeof error === "string" && error.length > 0;
 }
 
-function decodeBase64(data: string): Uint8Array {
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
-}
-
 /** The live microphone tap (iOS `AVAudioEngine` with voice processing), shared by every consumer. */
 class NativePcmFeed implements PcmFeed {
   private readonly subscribers = new Set<(chunk: PcmChunk) => void>();
@@ -124,7 +120,7 @@ class NativePcmFeed implements PcmFeed {
     // Keep `this` bound to the JSI NativeModule; detaching Expo EventEmitter.addListener SIGBUSes Hermes.
     this.subscription = native.addListener("onPcmChunk", (event) => {
       if (this.subscribers.size === 0) return;
-      const chunk = { bytes: decodeBase64(event.data), level: event.level };
+      const chunk = { bytes: decodeBase64Audio(event.data), level: event.level };
       for (const subscriber of this.subscribers) subscriber(chunk);
     });
     const starting = native.startPcmStream();
@@ -186,6 +182,9 @@ export interface ActivePlayback {
   readonly done: Promise<"finished" | "stopped">;
   /** Stops at once; the audio session stays active for the next recording. */
   stop(): void;
+  /** Holds the reply where it is (a possible interruption); `resume` continues from there. */
+  pause?(): void;
+  resume?(): void;
 }
 
 /**
@@ -200,6 +199,10 @@ export class NativeVoiceAudio {
   /** Set after the live stream failed to start, so later turns go straight to the recorder. */
   private pcmFailed = false;
   private voiceProcessing = false;
+
+  get echoCancelled() {
+    return this.voiceProcessing;
+  }
   private opened = false;
   private fileSequence = 0;
   // open() and close() run one at a time, so a screen that closes while the permission
@@ -442,29 +445,33 @@ export class NativeVoiceAudio {
    */
   async watchForBargeIn(config: VoiceActivityConfig, onBargeIn: () => void) {
     const feed = await this.livePcm();
+    // Only a sustained voiced run interrupts, so a car door or a cough never cuts the reply.
+    const guard = createInterruptionGuard("energy");
+    let fired = false;
+    const observe = (voiced: boolean) => {
+      if (fired) return;
+      if (guard.level(voiced, Date.now()) === "interrupt") {
+        fired = true;
+        onBargeIn();
+      }
+    };
     if (feed) {
       // With the reply cancelled out of the microphone, normal speech is enough to interrupt.
-      const detector = createVoiceActivityDetector(
+      const voiced = createVoicedLevelGate(
         this.voiceProcessing ? BARGE_IN_ECHO_CANCELLED_VAD : config,
       );
-      let fired = false;
-      const unsubscribe = feed.subscribe((chunk) => {
-        if (fired) return;
-        if (detector.push(rmsToDecibels(chunk.level), Date.now()) === "speech-start") {
-          fired = true;
-          onBargeIn();
-        }
-      });
+      const unsubscribe = feed.subscribe((chunk) =>
+        observe(voiced(rmsToDecibels(chunk.level), Date.now())),
+      );
       return async () => unsubscribe();
     }
     const recorder = await this.startRecorder();
-    const detector = createVoiceActivityDetector(config);
+    const voiced = createVoicedLevelGate(config);
     let stopped = false;
     const timer = setInterval(() => {
       if (stopped) return;
       try {
-        const event = detector.push(recorder.getStatus().metering, Date.now());
-        if (event === "speech-start") onBargeIn();
+        observe(voiced(recorder.getStatus().metering, Date.now()));
       } catch {}
     }, METERING_INTERVAL_MS);
     return async () => {
@@ -480,6 +487,14 @@ export class NativeVoiceAudio {
 
   /** Plays reply audio from the server; `stop()` interrupts it immediately. */
   async play(audio: SpokenAudio): Promise<ActivePlayback> {
+    return (await this.prepare(audio)).start();
+  }
+
+  /**
+   * Writes and loads a clip without playing it, so a streamed reply's next sentence is ready
+   * the moment the current one ends.
+   */
+  async prepare(audio: SpokenAudio): Promise<PreparedClip & { start(): Promise<ActivePlayback> }> {
     const file = new File(
       Paths.cache,
       `mattr-voice-${Date.now()}-${++this.fileSequence}.${audioExtensionForContentType(audio.contentType)}`,
@@ -499,25 +514,36 @@ export class NativeVoiceAudio {
       { updateInterval: 100, keepAudioSessionActive: true },
     );
     let ended = false;
+    let started = false;
+    let paused = false;
     let finishWith: (outcome: "finished" | "stopped") => void = () => {};
     const done = new Promise<"finished" | "stopped">((resolve) => {
       finishWith = resolve;
     });
-    let failsafe = setTimeout(() => end("stopped"), PLAYBACK_LOAD_TIMEOUT_MS);
-    let durationKnown = false;
+    let failsafe: ReturnType<typeof setTimeout> | undefined;
+    let durationMs: number | null = null;
+    // Measured from now, so a pause never lets the failsafe cut a resumed reply short.
+    const armFailsafe = () => {
+      clearTimeout(failsafe);
+      if (!started || paused) return;
+      let remainingMs = PLAYBACK_LOAD_TIMEOUT_MS;
+      if (durationMs !== null) {
+        const positionMs = Number.isFinite(player.currentTime) ? player.currentTime * 1000 : 0;
+        remainingMs = Math.max(0, durationMs - positionMs) + PLAYBACK_END_SLACK_MS;
+      }
+      failsafe = setTimeout(() => end("stopped"), Math.min(remainingMs, MAX_PLAYBACK_MS));
+    };
     const subscription = player.addListener("playbackStatusUpdate", (status) => {
       if (status.didJustFinish) {
         end("finished");
       } else if (playbackError(status)) {
         end("stopped");
-      } else if (!durationKnown && status.isLoaded) {
-        durationKnown = true;
-        clearTimeout(failsafe);
-        const expectedMs =
+      } else if (durationMs === null && status.isLoaded) {
+        durationMs =
           Number.isFinite(status.duration) && status.duration > 0
-            ? status.duration * 1000 + PLAYBACK_END_SLACK_MS
+            ? status.duration * 1000
             : MAX_PLAYBACK_MS;
-        failsafe = setTimeout(() => end("stopped"), Math.min(expectedMs, MAX_PLAYBACK_MS));
+        armFailsafe();
       }
     });
 
@@ -531,19 +557,45 @@ export class NativeVoiceAudio {
       finishWith(outcome);
     }
 
-    try {
-      player.play();
-    } catch (error) {
-      end("stopped");
-      throw error;
-    }
-    return {
+    const playback: ActivePlayback = {
       done,
       stop: () => {
         if (ended) return;
         pauseAudioPlayer(player);
         end("stopped");
       },
+      pause: () => {
+        if (ended || paused) return;
+        paused = true;
+        clearTimeout(failsafe);
+        pauseAudioPlayer(player);
+      },
+      resume: () => {
+        if (ended || !paused) return;
+        paused = false;
+        try {
+          player.play();
+        } catch {
+          end("stopped");
+          return;
+        }
+        armFailsafe();
+      },
+    };
+    return {
+      start: async () => {
+        if (ended) throw new Error("The reply audio was discarded.");
+        started = true;
+        try {
+          player.play();
+        } catch (error) {
+          end("stopped");
+          throw error;
+        }
+        armFailsafe();
+        return playback;
+      },
+      discard: () => end("stopped"),
     };
   }
 

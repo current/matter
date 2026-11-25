@@ -241,8 +241,26 @@ describe("NativeVoiceAudio", () => {
     const stopWatching = await audio.watchForBargeIn(LISTENING_VAD, onBargeIn);
     // The warmup learns the cleaned-up floor, then the user speaks at -30 dBFS.
     for (let index = 0; index < 5; index += 1) tap.emit([0, 0], 0.001);
-    for (let index = 0; index < 4; index += 1) tap.emit([1, 1], 0.03);
+    for (let index = 0; index < 5; index += 1) tap.emit([1, 1], 0.03);
+    // Speech must be sustained past 420 ms before it counts.
+    expect(onBargeIn).not.toHaveBeenCalled();
+    for (let index = 0; index < 2; index += 1) tap.emit([1, 1], 0.03);
     expect(onBargeIn).toHaveBeenCalledTimes(1);
+    await stopWatching();
+    await audio.close();
+  });
+
+  it("ignores a loud car-door thump while the reply plays", async () => {
+    const tap = installPcmTap(true);
+    const audio = new NativeVoiceAudio();
+    await audio.open();
+    const onBargeIn = vi.fn();
+    const stopWatching = await audio.watchForBargeIn(LISTENING_VAD, onBargeIn);
+    for (let index = 0; index < 5; index += 1) tap.emit([0, 0], 0.001);
+    // 160 ms of a very loud transient, then quiet road noise again.
+    for (let index = 0; index < 2; index += 1) tap.emit([9, 9], 0.6);
+    for (let index = 0; index < 20; index += 1) tap.emit([0, 0], 0.001);
+    expect(onBargeIn).not.toHaveBeenCalled();
     await stopWatching();
     await audio.close();
   });

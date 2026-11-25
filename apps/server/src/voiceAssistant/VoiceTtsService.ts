@@ -186,6 +186,8 @@ const VALID_PREFERENCE_PROVIDERS: ReadonlyArray<VoiceTtsProvider> = [
 export interface VoiceTtsSpeakResult {
   readonly bytes: Uint8Array;
   readonly contentType: string;
+  /** The provider that synthesized it, set by `speak`. */
+  readonly provider?: ServerTtsProvider;
 }
 
 export class VoiceTtsService extends Context.Service<
@@ -854,7 +856,7 @@ const make = Effect.gen(function* () {
       if (requested !== "auto") {
         const result = yield* speakWith(requested);
         if (!result) return yield* new VoiceTtsUnavailableError({ reason: "no-provider" });
-        return result;
+        return { ...result, provider: requested };
       }
 
       let lastError: VoiceTtsSynthesisError | null = null;
@@ -869,7 +871,7 @@ const make = Effect.gen(function* () {
               }).pipe(Effect.as({ result: null, error })),
           }),
         );
-        if (attempt.result) return attempt.result;
+        if (attempt.result) return { ...attempt.result, provider };
         if (attempt.error) lastError = attempt.error;
       }
       if (lastError) return yield* lastError;
