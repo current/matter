@@ -5,19 +5,21 @@
 
 /* Color. Custom seeds arrive pre-fitted per scheme (--mca-tint-light/-dark); Match shell reuses
    the Shell color, already fitted to a legible window by shellTint.ts, softened toward the card. */
-html[data-mattr-composer-tint="custom"] [data-mattr-composer] {
+html[data-mattr-composer-tint="custom"] :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
   --mca-tint: var(--mca-tint-light);
 }
 
-html.dark[data-mattr-composer-tint="custom"] [data-mattr-composer] {
+html.dark[data-mattr-composer-tint="custom"]
+  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
   --mca-tint: var(--mca-tint-dark);
 }
 
-html[data-mattr-composer-tint="shell"] [data-mattr-composer] {
+html[data-mattr-composer-tint="shell"] :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
   --mca-tint: color-mix(in oklab, var(--mattr-shell-tint-light, var(--sidebar)) 45%, #ffffff);
 }
 
-html.dark[data-mattr-composer-tint="shell"] [data-mattr-composer] {
+html.dark[data-mattr-composer-tint="shell"]
+  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
   --mca-tint: color-mix(
     in oklab,
     var(--mattr-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 55%,
@@ -26,12 +28,12 @@ html.dark[data-mattr-composer-tint="shell"] [data-mattr-composer] {
 }
 
 html[data-mattr-composer-material="tinted"][data-mattr-composer-tint="shell"]
-  [data-mattr-composer] {
+  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
   --mca-tint: color-mix(in oklab, var(--mattr-shell-tint-light, var(--sidebar)) 80%, #ffffff);
 }
 
 html.dark[data-mattr-composer-material="tinted"][data-mattr-composer-tint="shell"]
-  [data-mattr-composer] {
+  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
   --mca-tint: color-mix(
     in oklab,
     var(--mattr-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 90%,
@@ -326,8 +328,94 @@ html[data-mattr-composer-material="glass"][data-mattr-composer-shape="floating"]
   box-shadow: var(--mca-specular), var(--mca-depth);
 }
 
+/* Whisper Pill (thread-ribbon.css) follows the composer's color, style and material. It sits above
+   the composer rather than inside it, so it reads the same root attributes. :root outranks
+   thread-ribbon.css's theme surface, which loads later. */
+:root[data-mattr-composer-tint] [data-mattr-whisper-pill-row] {
+  --mw-bg: var(--mca-tint);
+  --mw-line: color-mix(in oklab, var(--mca-tint), #000000 11%);
+}
+
+:root.dark[data-mattr-composer-tint] [data-mattr-whisper-pill-row] {
+  --mw-line: color-mix(in oklab, var(--mca-tint), #ffffff 10%);
+}
+
+html[data-mattr-composer-shape="compact"] [data-mattr-whisper-pill-row] {
+  --mw-radius: 8px;
+}
+
+html[data-mattr-composer-shape="pill"] [data-mattr-whisper-pill-row] {
+  --mw-radius: 999px;
+}
+
+html[data-mattr-composer-shape="floating"]:not(
+    [data-mattr-composer-material="minimal"],
+    [data-mattr-composer-material="glass"]
+  )
+  [data-mattr-whisper-pill-row] {
+  --mw-shadow: 0 1px 2px rgb(20 22 30 / 6%), 0 8px 20px -12px rgb(20 22 30 / 26%);
+}
+
+html.dark[data-mattr-composer-shape="floating"]:not(
+    [data-mattr-composer-material="minimal"],
+    [data-mattr-composer-material="glass"]
+  )
+  [data-mattr-whisper-pill-row] {
+  --mw-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), 0 10px 22px -12px rgb(0 0 0 / 70%);
+}
+
+html[data-mattr-composer-material="minimal"] [data-mattr-whisper-pill-row] {
+  --mw-shadow: none;
+}
+
+html[data-mattr-composer-material="glass"] [data-mattr-whisper-pill-row] {
+  --mw-specular: inset 0 1px 0 rgb(255 255 255 / 70%), inset 0 0 0 0.5px rgb(255 255 255 / 30%);
+  --mw-shadow: var(--mw-specular);
+}
+
+html.dark[data-mattr-composer-material="glass"] [data-mattr-whisper-pill-row] {
+  --mw-specular: inset 0 1px 0 rgb(255 255 255 / 9%), inset 0 0 0 0.5px rgb(255 255 255 / 4%);
+}
+
+/* Avatar rings keep the solid --mw-bg, so they stay crisp over a translucent fill. */
+html:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  )
+  [data-mattr-whisper-pill-row] {
+  --mw-paint: color-mix(in srgb, var(--mw-bg) var(--mca-opacity, 100%), transparent);
+}
+
+/* Blur rides ::before, which covers the border, so it redraws the hairline (as the shelf does). */
+html[data-mattr-composer-blur="on"] [data-mattr-whisper-pill] {
+  position: relative;
+  isolation: isolate;
+  background-color: transparent;
+  border-color: transparent;
+}
+
+html[data-mattr-composer-blur="on"] [data-mattr-whisper-pill]::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background-color: var(--mw-fill);
+  box-shadow:
+    inset 0 0 0 1px var(--mw-edge),
+    var(--mw-specular, 0 0 #0000);
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--mca-blur)) saturate(var(--mca-saturate, 1.05));
+  backdrop-filter: blur(var(--mca-blur)) saturate(var(--mca-saturate, 1.05));
+}
+
+html[data-mattr-composer-material="glass"] [data-mattr-whisper-pill]::before {
+  --mca-saturate: 1.4;
+}
+
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  html[data-mattr-composer-blur="on"] [data-mattr-composer] {
+  html[data-mattr-composer-blur="on"] :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
     --mca-opacity: 100%;
   }
 }

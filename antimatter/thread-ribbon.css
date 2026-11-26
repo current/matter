@@ -19,11 +19,28 @@
   --mw-bg: #ffffff;
   --mw-line: rgb(0 0 0 / 8%);
   --mw-shadow: 0 1px 2px rgb(20 22 30 / 6%);
+  --mw-stop: #e5484d;
+  --mw-stop-hover: #d93d42;
 }
 
-.dark :is([data-mattr-ribbon], [data-mattr-whisper-pill-row], [data-mattr-frosted]) {
+.dark :is([data-mattr-ribbon], [data-mattr-frosted]) {
   --mw-bg: #1a1b1e;
   --mw-line: rgb(255 255 255 / 8%);
+  --mw-shadow: none;
+}
+
+/* The pill wears the composer's own surface (composer.css): the card's fill and shadow, and the
+   shelf's hairline in dark so it sits as one family with the composer below it. Settings →
+   Appearance → Composer restyles it too (composer-appearance.css). */
+[data-mattr-whisper-pill-row] {
+  --mw-line: rgb(0 0 0 / 7.5%);
+  --mw-shadow: 0 1px 2px rgb(20 22 30 / 5%);
+  --mw-radius: 10px;
+}
+
+.dark [data-mattr-whisper-pill-row] {
+  --mw-bg: #1c1c1c;
+  --mw-line: rgb(255 255 255 / 9%);
   --mw-shadow: none;
 }
 
@@ -228,14 +245,16 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
 }
 
 [data-mattr-whisper-pill] {
+  --mw-fill: var(--mw-paint, var(--mw-bg));
+  --mw-edge: var(--mw-line);
   display: inline-flex;
   align-items: center;
   gap: 7px;
   height: 28px;
-  padding-inline: 4px 9px;
-  border: 1px solid var(--mw-line);
-  border-radius: 999px;
-  background-color: var(--mw-bg);
+  padding-inline: 6px 10px;
+  border: 1px solid var(--mw-edge);
+  border-radius: var(--mw-radius);
+  background-color: var(--mw-fill);
   box-shadow: var(--mw-shadow);
   color: var(--mr-text);
   font-size: 12px;
@@ -249,8 +268,8 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
 
 [data-mattr-whisper-pill]:hover,
 [data-mattr-whisper-pill][data-popup-open] {
-  border-color: var(--mr-line-hover);
-  background-color: color-mix(in srgb, var(--mw-bg) 94%, var(--foreground));
+  --mw-fill: color-mix(in srgb, var(--mw-paint, var(--mw-bg)) 94%, var(--foreground));
+  --mw-edge: var(--mr-line-hover);
 }
 
 [data-mattr-whisper-pill]:focus-visible {
@@ -428,10 +447,35 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   opacity: 0.5;
 }
 
-[data-mattr-lineage-stop-all] svg {
-  width: 8px;
-  height: 8px;
-  fill: currentColor;
+[data-mattr-lineage-stop-all]:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--mw-stop) 14%, transparent);
+}
+
+/* Stop glyphs are DOM, not icons, so the icon pack can never swap them for an outline. Same
+   signal-red circle and solid white square as the composer's Stop (composer.css). */
+[data-mattr-lineage-stop-all] [data-mattr-stop-glyph] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-inline-start: -2px;
+  border-radius: 999px;
+  background-color: var(--mw-stop);
+  transition: background-color 120ms ease;
+}
+
+[data-mattr-lineage-stop-all] [data-mattr-stop-glyph]::after {
+  content: "";
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 1.5px;
+  background-color: #ffffff;
+}
+
+[data-mattr-lineage-stop-all]:hover:not(:disabled) [data-mattr-stop-glyph] {
+  background-color: var(--mw-stop-hover);
 }
 
 [data-mattr-lineage-back] {
@@ -529,11 +573,11 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   display: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background-color: var(--mr-chip-hover);
-  color: var(--mr-text);
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background-color: var(--mw-stop);
   cursor: pointer;
   opacity: 1;
   transition:
@@ -541,15 +585,20 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
     background-color 120ms ease;
 }
 
-[data-mattr-lineage-row-stop] svg {
-  width: 8px;
-  height: 8px;
-  fill: currentColor;
+[data-mattr-lineage-row-stop] [data-mattr-stop-glyph] {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  background-color: #ffffff;
 }
 
 [data-mattr-lineage-row-stop]:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--destructive) 18%, transparent);
-  color: var(--destructive);
+  background-color: var(--mw-stop-hover);
+}
+
+[data-mattr-lineage-row-stop]:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 [data-mattr-lineage-row]:is(:hover, :focus-within) [data-mattr-lineage-row-stop],

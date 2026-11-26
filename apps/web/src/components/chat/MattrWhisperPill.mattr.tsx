@@ -16,7 +16,6 @@ import {
   ChevronUpIcon,
   HistoryIcon,
   MessagesSquareIcon,
-  SquareIcon,
   TerminalIcon,
 } from "lucide-react";
 import { useLayoutEffect, useState, type ReactNode } from "react";
@@ -213,7 +212,7 @@ function LineageRow(props: {
               />
             }
           >
-            <SquareIcon aria-hidden />
+            <span aria-hidden data-mattr-stop-glyph />
           </TooltipTrigger>
           <TooltipPopup side="top">
             <T context="verb, stops one running subagent">Stop</T>
@@ -350,7 +349,7 @@ export function MattrLineagePopoverContent(
             disabled={!canStopAll || stoppingAll}
             onClick={stopAll}
           >
-            <SquareIcon aria-hidden />
+            <span aria-hidden data-mattr-stop-glyph />
             {stoppingAll ? (
               <T>Stopping...</T>
             ) : (
