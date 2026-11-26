@@ -1321,6 +1321,36 @@ importers:
       '@effect/vitest':
         specifier: 4.1.5
         version: 4.1.5(patch_hash=dd0bf2b1ae0f63aff0d620ebc67b82d19759b3fa69a608ef85e2a5b40b4d46c5)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.1.1)(@vitest/ui@5.1.1)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.5(patch_hash=14a7acd734809d8dddbf2c19c4ec01fdd2ffae60a612de42b5ed29860216052a))(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
+      '@iconify-json/fluent':
+        specifier: ^1.2.62
+        version: 1.2.62
+      '@iconify-json/heroicons':
+        specifier: ^1.2.3
+        version: 1.2.3
+      '@iconify-json/hugeicons':
+        specifier: ^1.2.36
+        version: 1.2.36
+      '@iconify-json/ion':
+        specifier: ^1.2.8
+        version: 1.2.8
+      '@iconify-json/material-symbols':
+        specifier: ^1.2.101
+        version: 1.2.101
+      '@iconify-json/mingcute':
+        specifier: ^1.2.10
+        version: 1.2.10
+      '@iconify-json/ph':
+        specifier: ^1.2.2
+        version: 1.2.2
+      '@iconify-json/ri':
+        specifier: ^1.2.10
+        version: 1.2.10
+      '@iconify-json/solar':
+        specifier: ^1.2.17
+        version: 1.2.17
+      '@iconify-json/tabler':
+        specifier: ^1.2.47
+        version: 1.2.47
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(@voidzero-dev/vite-plus-core@8.3.8001(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@6.0.3))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(yaml@2.9.0))
@@ -4747,6 +4777,39 @@ packages:
 
   '@iarna/toml@2.2.5':
     resolution: {integrity: sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==}
+
+  '@iconify-json/fluent@1.2.62':
+    resolution: {integrity: sha512-KCwk3D5pjLPjOWRkCKCndVNHqMVzgpBPQppumZu3vnrFKJ3eg1AVsWmNmF1w4zC7HzC1CMAByr/8Fzs5CYIoRA==}
+
+  '@iconify-json/heroicons@1.2.3':
+    resolution: {integrity: sha512-n+vmCEgTesRsOpp5AB5ILB6srsgsYK+bieoQBNlafvoEhjVXLq8nIGN4B0v/s4DUfa0dOrjwE/cKJgIKdJXOEg==}
+
+  '@iconify-json/hugeicons@1.2.36':
+    resolution: {integrity: sha512-AN5LVEmU7X/ynnA+HItRZq+YtFLtbjeFezRI3cPwpAuHerzi5WhwaH7ChoXakJqVLL/CvorDWl9rUFJBSG4nEA==}
+
+  '@iconify-json/ion@1.2.8':
+    resolution: {integrity: sha512-ycrWwp9Z85pXD8foFybi8t7kK6u1PUtl5SWs9sywcNWRVoyL9w5iUwq1QCJzp0oL/VaJOVMEjt00xjKptgwdEQ==}
+
+  '@iconify-json/material-symbols@1.2.101':
+    resolution: {integrity: sha512-k2cOWfrsLM9TpCr34UZ34toSotApzFDxh+DX7tVk4EkqO2XhoiuDPs1oAbiZSJQQ3JHjhkS9kBlMFa36yYda0Q==}
+
+  '@iconify-json/mingcute@1.2.10':
+    resolution: {integrity: sha512-TK1iGbnEpR8vcM3VMbKxWT2V3+PN1EYorh0HV4V5Fi4mF+2i/PRG4IJi84Sdu2jIMAqeYghN1wiAUOu8R7EPCg==}
+
+  '@iconify-json/ph@1.2.2':
+    resolution: {integrity: sha512-PgkEZNtqa8hBGjHXQa4pMwZa93hmfu8FUSjs/nv4oUU6yLsgv+gh9nu28Kqi8Fz9CCVu4hj1MZs9/60J57IzFw==}
+
+  '@iconify-json/ri@1.2.10':
+    resolution: {integrity: sha512-WWMhoncVVM+Xmu9T5fgu2lhYRrKTEWhKk3Com0KiM111EeEsRLiASjpsFKnC/SrB6covhUp95r2mH8tGxhgd5Q==}
+
+  '@iconify-json/solar@1.2.17':
+    resolution: {integrity: sha512-xCR6vOkEnSjNpCOfbMGZ9MVp56Qi700GAH6IK6g1SLtntPEk61rF213Ch314zi2T1cvOrhjxQLUGK/qG4O0AAw==}
+
+  '@iconify-json/tabler@1.2.47':
+    resolution: {integrity: sha512-WwdoigbGoDtA6BBSSprYMVOMZIBqAGfDAqc64d2Vzl6iln/F6Rvcto6gQJ8K5pjEiSDlRnwYIUcDSa9+c2SXNw==}
+
+  '@iconify/types@2.0.0':
+    resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -15581,6 +15644,48 @@ snapshots:
       hono: 4.13.17
 
   '@iarna/toml@2.2.5': {}
+
+  '@iconify-json/fluent@1.2.62':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/heroicons@1.2.3':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/hugeicons@1.2.36':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/ion@1.2.8':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/material-symbols@1.2.101':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/mingcute@1.2.10':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/ph@1.2.2':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/ri@1.2.10':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/solar@1.2.17':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify-json/tabler@1.2.47':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify/types@2.0.0': {}
 
   '@img/colour@1.1.0': {}
 

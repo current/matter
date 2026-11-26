@@ -117,6 +117,8 @@
         "src/components/ui/*.tsx": ["exports", "nsExports", "duplicates"],
         "src/components/AppRouteModal.tsx": ["exports"],
       },
+      // mattr's icon plugin reads these sets' icons.json from disk at build time.
+      "ignoreDependencies": ["^@iconify-json/"],
     },
     "apps/marketing": {
       // `astro check` runs from the typecheck task in vite.config.ts, which knip does not read.

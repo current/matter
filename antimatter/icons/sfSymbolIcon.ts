@@ -37,7 +37,7 @@ const grayFill = (level: number) => {
   return `rgb(${value},${value},${value})`;
 };
 
-const lucideClassName = (name: string) =>
+export const lucideClassName = (name: string) =>
   `lucide lucide-${name
     .replace(/Icon$/, "")
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")

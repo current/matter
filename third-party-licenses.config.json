@@ -175,7 +175,7 @@
       "generatedNotices": [
         {
           "licenseId": "Apache-2.0",
-          "copyrights": ["Copyright 2009, 2010, 2013 Andr\u00e9 Berg"]
+          "copyrights": ["Copyright 2009, 2010, 2013 André Berg"]
         }
       ]
     },
@@ -251,6 +251,116 @@
           "preamble": [
             "Unmodified KaTeX_* mathematical fonts. Reserved Font Names include KaTeX_Main, KaTeX_Math, KaTeX_AMS, and KaTeX_Caligraphic."
           ]
+        }
+      ]
+    },
+    {
+      "name": "Phosphor Icons (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/phosphor-icons/core",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2023 Phosphor Icons"]
+        }
+      ]
+    },
+    {
+      "name": "Heroicons (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/tailwindlabs/heroicons",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) Tailwind Labs, Inc."]
+        }
+      ]
+    },
+    {
+      "name": "Remix Icon (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "Remix Icon License 1.0",
+      "sourceUrl": "https://github.com/Remix-Design/RemixIcon",
+      "noticeFile": "antimatter/icons/LICENSE.remixicon"
+    },
+    {
+      "name": "Solar Icon Set (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "CC-BY-4.0",
+      "sourceUrl": "https://www.figma.com/community/file/1166831539721848736",
+      "noticeFile": "antimatter/icons/LICENSE.solar"
+    },
+    {
+      "name": "MingCute Icon (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "Apache-2.0",
+      "sourceUrl": "https://github.com/Richard9394/MingCute",
+      "generatedNotices": [
+        {
+          "licenseId": "Apache-2.0",
+          "copyrights": ["Copyright (c) MingCute Design"]
+        }
+      ]
+    },
+    {
+      "name": "Fluent UI System Icons (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/microsoft/fluentui-system-icons",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2020 Microsoft Corporation"]
+        }
+      ]
+    },
+    {
+      "name": "Ionicons (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/ionic-team/ionicons",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2015-present Ionic (http://ionic.io/)"]
+        }
+      ]
+    },
+    {
+      "name": "Material Symbols (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "Apache-2.0",
+      "sourceUrl": "https://github.com/google/material-design-icons",
+      "generatedNotices": [
+        {
+          "licenseId": "Apache-2.0",
+          "copyrights": ["Copyright Google LLC"]
+        }
+      ]
+    },
+    {
+      "name": "Tabler Icons (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/tabler/tabler-icons",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2020-2024 Paweł Kuna"]
+        }
+      ]
+    },
+    {
+      "name": "Hugeicons (mattr icon pack)",
+      "bundles": ["desktop", "web"],
+      "license": "MIT",
+      "sourceUrl": "https://github.com/hugeicons/hugeicons-react",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) Hugeicons"]
         }
       ]
     }
@@ -348,7 +458,9 @@
       "version": "0.4.0",
       "license": "Apache-2.0 AND OFL-1.1",
       "generatedNotices": [
-        { "licenseId": "Apache-2.0" },
+        {
+          "licenseId": "Apache-2.0"
+        },
         {
           "licenseId": "OFL-1.1",
           "copyrights": [
@@ -362,7 +474,9 @@
       "version": "0.4.0",
       "license": "Apache-2.0 AND OFL-1.1",
       "generatedNotices": [
-        { "licenseId": "Apache-2.0" },
+        {
+          "licenseId": "Apache-2.0"
+        },
         {
           "licenseId": "OFL-1.1",
           "copyrights": [
