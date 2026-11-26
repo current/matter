@@ -2,7 +2,6 @@ import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
 import { usesChatGptSharing } from "@t3tools/shared/usageLimits";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { useAtomValue } from "@effect/atom-react";
-import type { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Atom } from "effect/reactivity";
 import {
   USAGE_CONTRACT_VERSION,
@@ -67,7 +66,8 @@ import {
 } from "../ui/menu";
 import { ScrollArea } from "../ui/scroll-area";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { AppRouteModal, AppRouteModalClose } from "../AppRouteModal";
+import { MattrInsetPage } from "../MattrInsetPage";
+import { useCloseAppModal } from "../sidebar/mainAppLocation";
 import { Skeleton } from "../ui/skeleton";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -205,7 +205,7 @@ export function UsagePage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
-  const modalActionsRef = useRef<DialogPrimitive.Root.Actions | null>(null);
+  const closeAppModal = useCloseAppModal();
   const [priceDialog, setPriceDialog] = useState<{ readonly model?: string } | null>(null);
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
     useState<ReadonlySet<EnvironmentId> | null>(null);
@@ -287,7 +287,7 @@ export function UsagePage() {
     if (command === "usage.open") {
       event.preventDefault();
       event.stopPropagation();
-      modalActionsRef.current?.close();
+      void closeAppModal();
       return;
     }
     const metricOption = METRIC_OPTIONS.find((option) => option.command === command);
@@ -378,7 +378,7 @@ export function UsagePage() {
   const windowOptionLabel = WINDOW_OPTIONS.find((option) => option.days === windowDays)?.label;
   const metricOptionLabel = METRIC_OPTIONS.find((option) => option.value === metric)?.label;
   const topbarContent = (
-    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 @4xl/usage-header:flex">
+    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 @4xl/usage-header:flex">
       <WorkspaceBreadcrumb ariaLabel={gt("Usage breadcrumb")} className="min-w-0">
         <WorkspaceBreadcrumbItem>
           <h1>
@@ -520,13 +520,13 @@ export function UsagePage() {
   );
 
   return (
-    <AppRouteModal label={gt("Usage")} actionsRef={modalActionsRef}>
+    <MattrInsetPage
+      label={gt("Usage")}
+      breadcrumb={
+        <div className="@container/usage-header flex min-w-0 flex-1">{topbarContent}</div>
+      }
+    >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="@container/usage-header flex min-h-12 shrink-0 items-center gap-1 border-b ps-5 pe-2">
-          {topbarContent}
-          <AppRouteModalClose />
-        </header>
-
         <ScrollArea className="min-h-0 flex-1" observeContent>
           <WorkspacePageContainer width="wide">
             {selectedEnvironments.length === 0 ? (
@@ -605,7 +605,7 @@ export function UsagePage() {
           }}
         />
       ) : null}
-    </AppRouteModal>
+    </MattrInsetPage>
   );
 }
 

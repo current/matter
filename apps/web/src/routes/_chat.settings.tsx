@@ -6,7 +6,7 @@ import { RotateCcwIcon } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { useSettingsRestore } from "../components/settings/SettingsPanels";
 
-import { MattrSettingsPage } from "../components/settings/MattrSettingsPage";
+import { MattrInsetPage } from "../components/MattrInsetPage";
 import { SettingsBreadcrumb } from "../components/settings/SettingsBreadcrumb";
 import { SettingsSidebarNav } from "../components/settings/SettingsSidebarNav";
 import {
@@ -152,7 +152,7 @@ function SettingsContentLayout() {
   const [restoreSignal, setRestoreSignal] = useState(0);
 
   return (
-    <MattrSettingsPage
+    <MattrInsetPage
       label={gt("Settings")}
       breadcrumb={<SettingsBreadcrumb pathname={location.pathname} />}
       actions={
@@ -171,7 +171,7 @@ function SettingsContentLayout() {
           </div>
         </div>
       </div>
-    </MattrSettingsPage>
+    </MattrInsetPage>
   );
 }
 

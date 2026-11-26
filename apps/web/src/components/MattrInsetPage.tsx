@@ -3,25 +3,25 @@ import { T, useGT } from "gt-react";
 import { XIcon } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
-import { isElectron } from "../../env";
-import { requestWorkspaceFocus } from "../../lib/workspaceFocus";
-import { GlobalVoiceInputIndicator } from "../chat/GlobalVoiceInputIndicator";
-import { useCloseAppModal } from "../sidebar/mainAppLocation";
-import { Button } from "../ui/button";
-import { SidebarInset } from "../ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { isElectron } from "../env";
+import { requestWorkspaceFocus } from "../lib/workspaceFocus";
+import { GlobalVoiceInputIndicator } from "./chat/GlobalVoiceInputIndicator";
+import { useCloseAppModal } from "./sidebar/mainAppLocation";
+import { Button } from "./ui/button";
+import { SidebarInset } from "./ui/sidebar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
-// Layers that own Escape while open. Settings' own surface keeps `data-app-modal` so the
+// Layers that own Escape while open. The page surface keeps `data-app-modal` so the
 // shortcut guards that skip dialogs still treat it as a page that owns its keys.
 const ESCAPE_LAYER_SELECTOR =
   '[role="dialog"]:not([data-app-modal]), [aria-modal="true"]:not([data-app-modal]), [data-slot$="popup"]:not([data-app-modal])';
 
 /**
- * mattr: Settings as a page in the shell's inset card instead of a floating modal. The sidebar
- * stays usable; Esc and the close button return to the page that opened Settings.
+ * mattr: Settings and Usage as pages in the shell's inset card instead of upstream's floating
+ * `AppRouteModal`. The sidebar stays usable; Esc and the close button return to the opener.
  */
-export function MattrSettingsPage({
+export function MattrInsetPage({
   label,
   breadcrumb,
   actions,
@@ -45,7 +45,7 @@ export function MattrSettingsPage({
 
   const close = (viaKeyboard = false) => {
     // Closing unmounts a focused field without a blur, so commit-on-blur rows would drop input.
-    blurFocusedWithin(document.querySelector("[data-mattr-settings-page]"));
+    blurFocusedWithin(document.querySelector("[data-mattr-inset-page]"));
     void closeAppModal();
     if (viaKeyboard && openerArea) requestWorkspaceFocus({ area: openerArea });
   };
@@ -105,14 +105,14 @@ export function MattrSettingsPage({
   return (
     <SidebarInset
       ref={pageRef}
-      data-mattr-settings-page=""
+      data-mattr-inset-page=""
       className="h-svh min-h-0 overflow-hidden overscroll-y-none md:h-dvh"
     >
       <WorkspacePageHeader electron={isElectron} className="border-b">
         {breadcrumb}
         <div className="ms-auto flex shrink-0 items-center gap-1">
           {actions}
-          <MattrSettingsClose onClose={() => close()} />
+          <MattrInsetPageClose onClose={() => close()} />
         </div>
       </WorkspacePageHeader>
       <div
@@ -135,7 +135,7 @@ function blurFocusedWithin(container: HTMLElement | null) {
   if (focused instanceof HTMLElement && container?.contains(focused)) focused.blur();
 }
 
-function MattrSettingsClose({ onClose }: { onClose: () => void }) {
+function MattrInsetPageClose({ onClose }: { onClose: () => void }) {
   const gt = useGT();
   return (
     <Tooltip>

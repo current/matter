@@ -3,13 +3,13 @@ import { useLocation } from "@tanstack/react-router";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
-import { render } from "../../../test/render";
-import { useCommitOnBlur } from "../../hooks/useCommitOnBlur";
-import { startMainAppLocationTracking } from "../sidebar/mainAppLocation";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
-import { MattrSettingsPage } from "./MattrSettingsPage";
+import { render } from "../../test/render";
+import { useCommitOnBlur } from "../hooks/useCommitOnBlur";
+import { startMainAppLocationTracking } from "./sidebar/mainAppLocation";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./ui/menu";
+import { MattrInsetPage } from "./MattrInsetPage";
 
-vi.mock("../chat/GlobalVoiceInputIndicator", () => ({ GlobalVoiceInputIndicator: () => null }));
+vi.mock("./chat/GlobalVoiceInputIndicator", () => ({ GlobalVoiceInputIndicator: () => null }));
 
 const THREAD_PATH = "/environment-one/thread-one";
 
@@ -20,9 +20,9 @@ function CommitOnBlurField({ onCommit }: { onCommit: (next: string) => void }) {
 function SettingsRoute({ children }: { children?: React.ReactNode }) {
   const pathname = useLocation({ select: (location) => location.pathname });
   return pathname.startsWith("/settings") ? (
-    <MattrSettingsPage label="Settings" breadcrumb={<span>General</span>}>
+    <MattrInsetPage label="Settings" breadcrumb={<span>General</span>}>
       {children}
-    </MattrSettingsPage>
+    </MattrInsetPage>
   ) : (
     <p>Thread view</p>
   );
@@ -50,7 +50,7 @@ async function openFromThread(children?: React.ReactNode) {
   };
 }
 
-describe("MattrSettingsPage", () => {
+describe("MattrInsetPage", () => {
   it("renders inline in the shell card, not in a dialog", async () => {
     await using _settings = await openFromThread();
 

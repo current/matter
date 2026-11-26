@@ -1,11 +1,10 @@
-import { Outlet, createFileRoute, redirect, useMatches } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { ThreadRouteView } from "../components/ThreadRouteView";
 import { GlobalVoiceInputIndicator } from "../components/chat/GlobalVoiceInputIndicator";
 import { MattrIslandHost } from "../island/MattrIslandHost";
 import { ClaudeCloudModalHost } from "../components/cloud/ClaudeCloudModal";
 import { isAppModalPage } from "../components/sidebar/mainAppLocation";
-import { SidebarInset } from "../components/ui/sidebar";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { retainThreadFindForRoute } from "../components/chat/threadFindStore";
 import { ThreadLinkPrompt } from "../components/promptLinks/ThreadLinkPrompt";
@@ -14,22 +13,16 @@ import { useShownThreadRouteTarget } from "../hooks/useShownThreadRouteTarget";
 function ChatRouteLayout() {
   // Render both routes here so draft promotion keeps the same ChatView mounted.
   const { shownTarget, modalOpen } = useShownThreadRouteTarget();
-  // mattr: Settings is a page in the shell card, so the thread under it stays mounted but hidden.
-  const settingsOpen = useMatches({
-    select: (matches) => matches.some((match) => match.pathname.startsWith("/settings")),
-  });
+  // mattr: Settings and Usage are pages in the shell card, so the thread under them stays
+  // mounted but hidden.
   return (
     <>
       {shownTarget?.kind === "server" && !modalOpen ? (
         <ThreadLinkPrompt threadRef={shownTarget.threadRef} />
       ) : null}
       {shownTarget ? (
-        <ThreadRouteView target={shownTarget} background={modalOpen} hidden={settingsOpen} />
-      ) : modalOpen ? (
-        settingsOpen ? null : (
-          <SidebarInset className="h-dvh" />
-        )
-      ) : (
+        <ThreadRouteView target={shownTarget} background={modalOpen} hidden={modalOpen} />
+      ) : modalOpen ? null : (
         <Outlet />
       )}
       {modalOpen ? <Outlet /> : null}
