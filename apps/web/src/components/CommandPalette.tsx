@@ -83,6 +83,7 @@ import {
   MonitorIcon,
   PinIcon,
   PinOffIcon,
+  ListChecksIcon,
   PlugIcon,
   RadioIcon,
   SquarePenIcon,
@@ -1813,6 +1814,17 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "usage.open",
     run: async () => {
       await navigate({ to: "/usage" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:tasks",
+    searchTerms: ["tasks", "todo", "to do", "kanban", "board", "checklist"],
+    title: gt("Open tasks"),
+    icon: <ListChecksIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/tasks" });
     },
   });
 

@@ -60,7 +60,7 @@ export async function mattrApiRequest<A>(
   config: MattrApiConfig,
   path: string,
   init: {
-    readonly method?: "GET" | "POST" | "DELETE";
+    readonly method?: "GET" | "POST" | "PATCH" | "DELETE";
     readonly body?: unknown;
     readonly signal?: AbortSignal;
   } = {},

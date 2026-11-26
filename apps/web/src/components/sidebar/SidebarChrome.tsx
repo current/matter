@@ -2,6 +2,7 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   ChartNoAxesColumnIcon,
+  ListChecksIcon,
   RadioIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -323,6 +324,15 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
               compact={hasUndoNotice}
             />
           ) : null}
+          <SidebarUtilityItem
+            icon={<ListChecksIcon />}
+            label={gt("Tasks")}
+            onClick={() => {
+              closeMobileSidebar();
+              void navigate({ to: "/tasks" });
+            }}
+            compact={hasUndoNotice}
+          />
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label={gt("Usage")}

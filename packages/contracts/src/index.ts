@@ -81,3 +81,4 @@ export * from "./clientRpcPermissions.ts";
 export * from "./mattrAddons.ts";
 export * from "./mattrBots.ts";
 export * from "./mattrClaudeCloud.ts";
+export * from "./mattrTasks.ts";

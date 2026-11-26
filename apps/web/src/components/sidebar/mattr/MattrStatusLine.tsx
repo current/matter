@@ -4,6 +4,7 @@ import {
   ArrowLeftIcon,
   ChartNoAxesColumnIcon,
   ChevronsUpDownIcon,
+  ListChecksIcon,
   RadioIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -58,6 +59,7 @@ export function MattrStatusLine() {
   const openSettings = () =>
     go(() => (onSettings ? void navigateToMainApp() : void navigate({ to: "/settings" })));
   const openUsage = () => go(() => void navigate({ to: "/usage" }));
+  const openTasks = () => go(() => void navigate({ to: "/tasks" }));
   const openPullRequests = () =>
     go(() => void navigate({ to: "/pull-requests", search: readPullRequestListPreferences() }));
   const openIssues = () =>
@@ -143,6 +145,10 @@ export function MattrStatusLine() {
                   {gt("Issues", { $context: "sidebar link to the list of issues" })}
                 </MenuItem>
               ) : null}
+              <MenuItem onClick={openTasks}>
+                <ListChecksIcon />
+                {gt("Tasks")}
+              </MenuItem>
               <MenuItem onClick={openUsage}>
                 <ChartNoAxesColumnIcon />
                 {gt("Usage")}

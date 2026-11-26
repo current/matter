@@ -52,6 +52,7 @@ import {
 import {
   BoardGlyph,
   BranchGlyph,
+  ChecklistGlyph,
   ChevronDownGlyph,
   ChevronGlyph,
   ClockGlyph,
@@ -632,6 +633,15 @@ export function MattrTimelineSidebar({
           <ComposeGlyph />
           <span>{gt("New thread")}</span>
           {newThreadHint ? <kbd className="mts-kbd">{newThreadHint}</kbd> : null}
+        </button>
+        <button
+          type="button"
+          className="mts-ni"
+          aria-current={pathname === "/tasks" ? "page" : undefined}
+          onClick={() => go(() => void navigate({ to: "/tasks" }))}
+        >
+          <ChecklistGlyph />
+          <span>{gt("Tasks")}</span>
         </button>
         <button
           type="button"

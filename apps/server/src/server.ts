@@ -63,6 +63,7 @@ import * as MattrComposerPredictions from "./mattr/composerPredictions/MattrComp
 import * as MattrDelegationInstructions from "./mattr/delegation/MattrDelegationInstructions.ts";
 import * as VoiceTtsService from "./voiceAssistant/VoiceTtsService.ts";
 import { layerMattrAddonsAndBots } from "./bots/botsHttp.ts";
+import { layerMattrTasks } from "./mattr/tasks/mattrTasksHttp.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as IssueService from "./issue/IssueService.ts";
@@ -936,6 +937,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(VoiceTtsService.layer),
     ),
     layerMattrAddonsAndBots,
+    layerMattrTasks,
     MattrDelegationInstructions.layer,
   ),
   McpHttpServer.layer.pipe(

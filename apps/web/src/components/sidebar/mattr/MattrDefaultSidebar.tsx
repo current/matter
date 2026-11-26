@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
   ClockIcon,
   InboxIcon,
+  ListChecksIcon,
   SearchIcon,
   SquarePenIcon,
   XIcon,
@@ -447,6 +448,15 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
       </div>
 
       <nav className="mfs-qn" aria-label={gt("Sidebar navigation")}>
+        <button
+          type="button"
+          className="mfs-ni"
+          aria-current={pathname === "/tasks" ? "page" : undefined}
+          onClick={() => go(() => void navigate({ to: "/tasks" }))}
+        >
+          <ListChecksIcon aria-hidden />
+          <span>{gt("Tasks")}</span>
+        </button>
         <button
           type="button"
           className="mfs-ni"

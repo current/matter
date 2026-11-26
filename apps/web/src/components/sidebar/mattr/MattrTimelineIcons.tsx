@@ -39,6 +39,13 @@ export const BoardGlyph = (props: IconProps) => (
   </Glyph>
 );
 
+export const ChecklistGlyph = (props: IconProps) => (
+  <Glyph {...props}>
+    <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="2" />
+    <path d="m4.6 5.6 1 1 1.65-1.85M8.9 5.9h2.5M4.6 9.85l1 1 1.65-1.85M8.9 10.15h2.5" />
+  </Glyph>
+);
+
 export const PullRequestOpenGlyph = (props: IconProps) => (
   <Glyph {...props}>
     <circle cx="4.5" cy="3.75" r="1.6" />

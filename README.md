@@ -36,6 +36,7 @@ mattr tracks [`pingdotgg/t3code`](https://github.com/pingdotgg/t3code) nightly a
 - **streaming text animation** — pick how assistant replies arrive in settings → appearance: instant, blur reveal with a riding caret, soft fade, rise & settle, smooth pace, or rareui's burst reveal; each word animates once, and finished messages render exactly as upstream.
 - **ai status** — settings → appearance → ai status swaps the working timer for an animated status that names what the agent is doing (thinking, searching, editing, running a command, writing, needs your input), adapted from rareui; it stops the moment the turn ends.
 - **mattr sidebar** — project-grouped threads with nested subagent trees, a needs-you filter, crew, and live usage meters; spaces, timeline (threads by day with branch, pr and running subagents) and classic layouts stay one click away, and settings render in-card instead of a modal.
+- **tasks** — a to-do list and kanban board (sidebar, command palette, `/tasks`) where tab hands a task to a real agent thread: pick provider, model, effort, project and local or worktree, press start, and the task follows the thread live.
 
 ### zero outbound telemetry
 
