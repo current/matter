@@ -19,6 +19,12 @@
   --mc-send-hover: #d93d42;
   --mc-send-idle: #c9cacf;
   --mc-send-idle-ink: #ffffff;
+  --mc-gooey-satellite: #e4e5e9;
+  --mc-gooey-satellite-ink: #2c2d32;
+  --mc-gooey-satellite-hover: rgb(0 0 0 / 6%);
+  --mc-gooey-shadow: drop-shadow(0 2px 8px rgb(20 22 30 / 16%));
+  --mc-gooey-label-bg: #24252a;
+  --mc-gooey-label-ink: #f5f5f7;
   /* Upstream's composer tokens, so popovers and icon rings that read them match the card. */
   --chat-composer-glass-surface: var(--mc-card);
   --chat-composer-outline: var(--mc-card-line);
@@ -39,6 +45,12 @@
   --mc-amber: #d39a52;
   --mc-send-idle: #2a2a2a;
   --mc-send-idle-ink: #8a8a8a;
+  --mc-gooey-satellite: #2c2c2e;
+  --mc-gooey-satellite-ink: #ececee;
+  --mc-gooey-satellite-hover: rgb(255 255 255 / 8%);
+  --mc-gooey-shadow: drop-shadow(0 3px 10px rgb(0 0 0 / 38%));
+  --mc-gooey-label-bg: #28282b;
+  --mc-gooey-label-ink: #f1f1f3;
 }
 
 /* Custom themes keep their own surfaces; only the shape and controls follow the frame. */
@@ -49,7 +61,8 @@ html[data-theme-id] [data-mattr-composer] {
   --mc-card-line: var(--app-theme-toolbar-border);
 }
 
-/* The shelf: one rounded tray holding the card and the under-tray. */
+/* The shelf: one rounded tray holding the card and the under-tray. Without an under-tray
+   (no project / embedded / subagent bar), collapse the outer cradle so there is no empty rim. */
 [data-mattr-composer] {
   background-color: var(--mc-shelf);
   border: 1px solid var(--mc-shelf-line);
@@ -59,6 +72,13 @@ html[data-theme-id] [data-mattr-composer] {
 
 [data-mattr-composer][data-context-row] {
   padding-bottom: 0;
+}
+
+[data-mattr-composer]:not([data-context-row]) {
+  background-color: transparent;
+  border: 0;
+  border-radius: 13px;
+  padding: 0;
 }
 
 [data-mattr-composer]::before {
@@ -177,7 +197,8 @@ html[data-theme-id] [data-mattr-composer] {
   background-color: var(--mc-rest);
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Start voice input"] svg {
+[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Start voice input"] svg,
+[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Start voice mode"] svg {
   width: 15px !important;
   height: 15px !important;
 }
@@ -305,6 +326,10 @@ html[data-theme-id] [data-mattr-composer] {
 }
 
 [data-mattr-composer] [data-slot="composer-context-strip"] span[data-composer-context-control] {
+  height: 26px;
+  padding-inline: 6px;
+  gap: 6px;
+  font-size: 12px;
   color: var(--mc-tray);
 }
 
@@ -319,19 +344,24 @@ html[data-theme-id] [data-mattr-composer] {
   height: 13px;
 }
 
-/* A new thread's permissions sit in the tray beside Local, amber and label-only like the footer
-   chip; the branch keeps the right edge. */
+/* Under-tray order is identical in new-chat drafts and active threads: project, workspace
+   (picker button or locked label), amber permissions, and branch pinned to the right edge. */
 [data-mattr-composer] [data-slot="composer-context-strip"] > [data-mattr-composer-project] {
   order: -3;
 }
 
 [data-mattr-composer]
   [data-slot="composer-context-strip"]
-  > :has([data-composer-shortcut~="composer.workspace"]),
+  > :is(
+    :has([data-composer-shortcut~="composer.workspace"]),
+    div:not(.contents):has([data-composer-context-control]):not(
+        :has(button[data-slot="combobox-trigger"])
+      )
+  ),
 [data-mattr-composer]
   [data-slot="composer-context-strip"]
   > .contents
-  > [data-composer-shortcut~="composer.workspace"] {
+  > :is([data-composer-shortcut~="composer.workspace"], span[data-composer-context-control]) {
   order: -2;
   flex: 0 1 auto;
 }
@@ -391,5 +421,236 @@ html[data-theme-id] [data-mattr-composer] {
     > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut])
     > svg {
     display: revert-layer;
+  }
+}
+
+/* Gooey right-click Send pop-out (libraries.dev/gooey two-layer SVG silhouette + crisp DOM).
+   The SVG filter mounts only while opening/open/closing; closed state carries zero GPU cost. */
+[data-mattr-gooey-anchor] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] [data-mattr-gooey-anchor] {
+  margin-inline-start: 4px;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] [data-mattr-gooey-anchor] button[type="submit"],
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-gooey-anchor]
+  button[aria-label="Stop generation"],
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-gooey-anchor]
+  button[aria-label="Stopping"] {
+  margin-inline-start: 0;
+}
+
+[data-mattr-gooey-primary] {
+  position: relative;
+  z-index: 31;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-mattr-gooey-stage] {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+[data-mattr-gooey-svg] {
+  position: absolute;
+  right: -30px;
+  bottom: -24px;
+  width: 88px;
+  height: 168px;
+  overflow: visible;
+  pointer-events: none;
+  filter: var(--mc-gooey-shadow);
+}
+
+[data-mattr-gooey-blob="anchor"] {
+  fill: var(--mc-send-idle);
+}
+
+[data-mattr-gooey-blob="anchor"][data-active="true"] {
+  fill: var(--mc-send);
+}
+
+[data-mattr-gooey-blob="satellite"] {
+  fill: var(--mc-gooey-satellite);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+[data-mattr-gooey-actions] {
+  position: absolute;
+  inset: 0;
+  z-index: 32;
+  pointer-events: none;
+}
+
+[data-mattr-gooey-action] {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background-color: transparent;
+  color: var(--mc-gooey-satellite-ink);
+  cursor: pointer;
+  pointer-events: auto;
+  outline: none;
+  transform-origin: center;
+  transition: background-color 140ms ease;
+}
+
+[data-mattr-gooey-action]:hover,
+[data-mattr-gooey-action]:focus-visible {
+  background-color: var(--mc-gooey-satellite-hover);
+}
+
+[data-mattr-gooey-action]:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+[data-mattr-gooey-action]:disabled {
+  cursor: default;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+[data-mattr-gooey-action] svg {
+  width: 15px !important;
+  height: 15px !important;
+  flex: none;
+  pointer-events: none;
+}
+
+[data-mattr-gooey-label] {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translate3d(4px, -50%, 0);
+  padding: 3px 8px;
+  border-radius: 7px;
+  background-color: var(--mc-gooey-label-bg);
+  color: var(--mc-gooey-label-ink);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
+  transition:
+    opacity 130ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-mattr-gooey-action]:hover [data-mattr-gooey-label],
+[data-mattr-gooey-action]:focus-visible [data-mattr-gooey-label] {
+  opacity: 1;
+  transform: translate3d(0, -50%, 0);
+}
+
+[data-mattr-gooey-stage][data-state="opening"] [data-mattr-gooey-blob="satellite"],
+[data-mattr-gooey-stage][data-state="open"] [data-mattr-gooey-blob="satellite"] {
+  animation: mattr-gooey-blob-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--mc-gooey-delay, 0ms)
+    both;
+}
+
+[data-mattr-gooey-stage][data-state="closing"] [data-mattr-gooey-blob="satellite"] {
+  animation: mattr-gooey-blob-out 230ms cubic-bezier(0.4, 0, 0.2, 1) var(--mc-gooey-delay, 0ms) both;
+}
+
+[data-mattr-gooey-stage][data-state="opening"] [data-mattr-gooey-action],
+[data-mattr-gooey-stage][data-state="open"] [data-mattr-gooey-action] {
+  animation: mattr-gooey-action-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1)
+    var(--mc-gooey-delay, 0ms) both;
+}
+
+[data-mattr-gooey-stage][data-state="closing"] [data-mattr-gooey-action] {
+  pointer-events: none;
+  animation: mattr-gooey-action-out 230ms cubic-bezier(0.4, 0, 0.2, 1) var(--mc-gooey-delay, 0ms)
+    both;
+}
+
+[data-mattr-gooey-stage][data-reduced-motion="true"] [data-mattr-gooey-action] {
+  animation: none;
+  background-color: var(--mc-gooey-satellite);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
+  transform: translate3d(0, var(--mc-gooey-y), 0);
+}
+
+@keyframes mattr-gooey-blob-in {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.82);
+  }
+  to {
+    transform: translate3d(0, var(--mc-gooey-y), 0) scale(1);
+  }
+}
+
+@keyframes mattr-gooey-blob-out {
+  from {
+    transform: translate3d(0, var(--mc-gooey-y), 0) scale(1);
+  }
+  to {
+    transform: translate3d(0, 0, 0) scale(0.82);
+  }
+}
+
+@keyframes mattr-gooey-action-in {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.82);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, var(--mc-gooey-y), 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes mattr-gooey-action-out {
+  0% {
+    transform: translate3d(0, var(--mc-gooey-y), 0) scale(1);
+    opacity: 1;
+  }
+  65% {
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.82);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mattr-gooey-stage] [data-mattr-gooey-action],
+  [data-mattr-gooey-stage] [data-mattr-gooey-blob="satellite"] {
+    animation: none;
+    transform: translate3d(0, var(--mc-gooey-y), 0);
+  }
+
+  [data-mattr-gooey-label] {
+    transition: none;
   }
 }

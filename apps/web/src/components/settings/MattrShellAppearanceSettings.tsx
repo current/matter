@@ -21,7 +21,9 @@ import { isElectron } from "../../env";
 import { cn, isMacPlatform } from "../../lib/utils";
 import { MattrSidebarLayoutSetting } from "../sidebar/mattr/MattrSidebarLayoutSetting";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { Switch } from "../ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { DEFAULT_MATTR_GOOEY_SEND, useMattrGooeySendSetting } from "../../mattrGooeySend";
 import { MattrAiStatusSetting } from "./MattrAiStatusSetting";
 import { MattrIconPackSetting } from "./MattrIconPackSetting";
 import { MattrStreamAnimationSetting } from "./MattrStreamAnimationSetting";
@@ -172,6 +174,7 @@ export function MattrShellAppearanceSettings() {
   const m = useMessages();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
+  const [gooeySend, setGooeySend] = useMattrGooeySendSetting();
   const material = settings.shellMaterial;
   // Blur amount and glass style drive macOS-only native calls; Windows maps materials to
   // acrylic and mica, which have no such knobs.
@@ -422,6 +425,29 @@ export function MattrShellAppearanceSettings() {
       <MattrIconPackSetting />
       <MattrAiStatusSetting />
       <MattrStreamAnimationSetting />
+      <SettingsRow
+        id="mattr-gooey-send"
+        title={gt("Gooey send button")}
+        description={gt(
+          "Right-click the send button to pop out Dictate and Voice Mode. Turn off to show both buttons inline.",
+        )}
+        devicePreference
+        resetAction={
+          gooeySend !== DEFAULT_MATTR_GOOEY_SEND ? (
+            <SettingResetButton
+              ariaLabel={gt("Reset gooey send button to default")}
+              onClick={() => setGooeySend(DEFAULT_MATTR_GOOEY_SEND)}
+            />
+          ) : null
+        }
+        control={
+          <Switch
+            checked={gooeySend}
+            onCheckedChange={(checked) => setGooeySend(Boolean(checked))}
+            aria-label={gt("Gooey send button")}
+          />
+        }
+      />
     </>
   );
 }

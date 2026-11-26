@@ -1,7 +1,7 @@
 import { useGT } from "gt-react";
-import { AudioLinesIcon } from "lucide-react";
 import type { PointerEvent } from "react";
 
+import { MattrVoiceModeIcon } from "./MattrComposerParts.mattr";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -33,7 +33,7 @@ export function ComposerVoiceModeButton(props: {
             }}
             className="shrink-0"
           >
-            <AudioLinesIcon />
+            <MattrVoiceModeIcon />
           </Button>
         }
       />

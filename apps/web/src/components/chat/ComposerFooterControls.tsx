@@ -226,6 +226,10 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   hideCompactToggle: boolean;
   keepFullHistory: boolean;
   onToggleKeepFullHistory: () => void;
+  wrapPrimaryCircle?: (
+    button: React.ReactNode,
+    state: { readonly active: boolean },
+  ) => React.ReactNode;
 }) {
   return (
     <>
@@ -257,6 +261,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         hideCompactToggle={props.hideCompactToggle}
         keepFullHistory={props.keepFullHistory}
         onToggleKeepFullHistory={props.onToggleKeepFullHistory}
+        {...(props.wrapPrimaryCircle ? { wrapPrimaryCircle: props.wrapPrimaryCircle } : {})}
       >
         {props.children}
       </ComposerPrimaryActions>

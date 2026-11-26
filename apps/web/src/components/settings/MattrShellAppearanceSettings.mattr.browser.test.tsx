@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import "../../index.css";
+import {
+  MATTR_GOOEY_SEND_STORAGE_KEY,
+  readMattrGooeySend,
+  writeMattrGooeySend,
+} from "../../mattrGooeySend";
 import type { ScopedSettingsPatch } from "./scopedSettings";
 
 const state = vi.hoisted(() => ({
@@ -115,5 +120,23 @@ describe("MattrShellAppearanceSettings", () => {
     await expect
       .element(page.getByRole("button", { name: "Default" }))
       .toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("toggles and resets the Gooey send button setting", async () => {
+    writeMattrGooeySend(true);
+    using _cleanup = {
+      [Symbol.dispose]: () => localStorage.removeItem(MATTR_GOOEY_SEND_STORAGE_KEY),
+    };
+    await using _screen = await renderSettings();
+    const toggle = page.getByRole("switch", { name: "Gooey send button" });
+    await expect.element(toggle).toBeChecked();
+
+    await userEvent.click(toggle);
+    await expect.element(toggle).not.toBeChecked();
+    expect(readMattrGooeySend()).toBe(false);
+
+    await userEvent.click(page.getByRole("button", { name: "Reset gooey send button to default" }));
+    await expect.element(toggle).toBeChecked();
+    expect(readMattrGooeySend()).toBe(true);
   });
 });

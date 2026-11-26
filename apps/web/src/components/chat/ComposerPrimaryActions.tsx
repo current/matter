@@ -69,6 +69,7 @@ interface ComposerPrimaryActionsProps {
   hideCompactToggle?: boolean;
   keepFullHistory?: boolean;
   onToggleKeepFullHistory?: () => void;
+  wrapPrimaryCircle?: (button: ReactNode, state: { readonly active: boolean }) => ReactNode;
 }
 
 const formatPendingPrimaryActionLabel = (
@@ -262,6 +263,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   hideCompactToggle = false,
   keepFullHistory = false,
   onToggleKeepFullHistory,
+  wrapPrimaryCircle,
 }: ComposerPrimaryActionsProps) {
   const gt = useGT();
   const m = useMessages();
@@ -374,10 +376,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     !isEditingQueuedMessage &&
     !isSendHeld
   ) {
+    const stopButton = renderStopGenerationButton(false);
     return (
       <>
         {children}
-        {renderStopGenerationButton(false)}
+        {wrapPrimaryCircle ? wrapPrimaryCircle(stopButton, { active: true }) : stopButton}
       </>
     );
   }
@@ -437,6 +440,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         : submitLabel);
 
   const isBusyOrHeld = isSendBusy || isSendHeld;
+  const isSendButtonDisabled =
+    isBusyOrHeld ||
+    isSendDisabled ||
+    isEnvironmentUnavailable ||
+    (!hasSendableContent && !showResume);
   const sendButton = (
     <button
       type={showResume ? "button" : "submit"}
@@ -455,12 +463,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         if (showResume) onResume?.();
         else onSubmitMessage?.(event);
       }}
-      disabled={
-        isBusyOrHeld ||
-        isSendDisabled ||
-        isEnvironmentUnavailable ||
-        (!hasSendableContent && !showResume)
-      }
+      disabled={isSendButtonDisabled}
       aria-label={submitStatus ?? submitLabel}
       aria-busy={isBusyOrHeld || undefined}
     >
@@ -493,12 +496,15 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     </button>
   );
 
-  const submit = (
+  const submitTooltipTrigger = (
     <Tooltip key="submit">
       <TooltipTrigger render={<span className="inline-flex" />}>{sendButton}</TooltipTrigger>
       <TooltipPopup>{submitTooltip}</TooltipPopup>
     </Tooltip>
   );
+  const submit = wrapPrimaryCircle
+    ? wrapPrimaryCircle(submitTooltipTrigger, { active: !isSendButtonDisabled })
+    : submitTooltipTrigger;
   if (compactTokens === null || hideCompactToggle) {
     return withStopButton(
       <>

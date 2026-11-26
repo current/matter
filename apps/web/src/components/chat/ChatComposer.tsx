@@ -128,7 +128,14 @@ import {
 } from "./composerContextUndo";
 import { ComposerBanner } from "./ComposerBanner";
 import { ComposerSurface } from "./ComposerSurface";
-import { MattrComposerAttachButton } from "./MattrComposerParts.mattr";
+import {
+  MattrComposerAttachButton,
+  MattrDictateIcon,
+  MattrGooeySendAnchor,
+  type MattrGooeySendAction,
+  MattrVoiceModeIcon,
+} from "./MattrComposerParts.mattr";
+import { useMattrGooeySendSetting } from "../../mattrGooeySend";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";
 import {
@@ -2042,6 +2049,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       ? voiceModeThreadKey(environmentId, activeThreadId)
       : null;
   const voiceModeHere = useIsVoiceModeHost(voiceModeHostKey, !backgroundThread);
+  const [gooeySendEnabled] = useMattrGooeySendSetting();
+  const handleStartDictationStable = useStableCallback(() => {
+    void speechInput.start();
+  });
   const handleOpenThreadVoiceModeStable = useStableCallback(() => {
     if (routeKind !== "server" || activeThreadId === null) return;
     openThreadVoiceMode({
@@ -3646,6 +3657,47 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerAttachButton = showComposerAttachAction ? (
     <MattrComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
   ) : null;
+  const showVoiceModeTrigger =
+    routeKind === "server" &&
+    activeThreadId !== null &&
+    speechInput.state.phase === "idle" &&
+    pendingPrimaryAction === null &&
+    !isEditingQueuedMessage;
+  const useGooeySendMenu = gooeySendEnabled && pendingPrimaryAction === null;
+  const gooeySendActions: MattrGooeySendAction[] = useGooeySendMenu
+    ? [
+        ...(speechInput.available && speechInput.state.phase === "idle"
+          ? [
+              {
+                id: "dictate" as const,
+                label: gt("Dictate"),
+                shortcut: dictationShortcutLabel,
+                disabled: dictationDisabled,
+                icon: <MattrDictateIcon />,
+                onSelect: handleStartDictationStable,
+              },
+            ]
+          : []),
+        ...(showVoiceModeTrigger
+          ? [
+              {
+                id: "voice-mode" as const,
+                label: gt("Voice mode"),
+                disabled: environmentUnavailable !== null || !canOperateThread,
+                icon: <MattrVoiceModeIcon />,
+                onSelect: handleOpenThreadVoiceModeStable,
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const wrapGooeyPrimaryCircle = useGooeySendMenu
+    ? (button: React.ReactNode, state: { readonly active: boolean }) => (
+        <MattrGooeySendAnchor actions={gooeySendActions} anchorActive={state.active}>
+          {button}
+        </MattrGooeySendAnchor>
+      )
+    : undefined;
   return (
     <form
       ref={composerFormRef}
@@ -4147,6 +4199,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     hideCompactToggle={dictationTakesFooter}
                     keepFullHistory={props.keepFullHistory}
                     onToggleKeepFullHistory={props.onToggleKeepFullHistory}
+                    {...(wrapGooeyPrimaryCircle
+                      ? { wrapPrimaryCircle: wrapGooeyPrimaryCircle }
+                      : {})}
                   >
                     {speechInput.available ? (
                       <>
@@ -4163,20 +4218,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           onCancel={() => speechInput.cancel()}
                           onSkipPostProcessing={() => speechInput.skipPostProcessing()}
                         />
-                        <ComposerSpeechButton
-                          state={speechInput.state}
-                          shortcutLabel={dictationShortcutLabel}
-                          disabled={dictationDisabled}
-                          onStart={() => speechInput.start()}
-                          onStop={() => void speechInput.stop()}
-                        />
+                        {!useGooeySendMenu ? (
+                          <ComposerSpeechButton
+                            state={speechInput.state}
+                            shortcutLabel={dictationShortcutLabel}
+                            disabled={dictationDisabled}
+                            onStart={() => speechInput.start()}
+                            onStop={() => void speechInput.stop()}
+                          />
+                        ) : null}
                       </>
                     ) : null}
-                    {routeKind === "server" &&
-                    activeThreadId !== null &&
-                    speechInput.state.phase === "idle" &&
-                    pendingPrimaryAction === null &&
-                    !isEditingQueuedMessage ? (
+                    {!useGooeySendMenu && showVoiceModeTrigger ? (
                       <ComposerVoiceModeButton
                         disabled={environmentUnavailable !== null || !canOperateThread}
                         onOpen={handleOpenThreadVoiceModeStable}

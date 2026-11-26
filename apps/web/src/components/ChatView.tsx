@@ -339,9 +339,9 @@ import {
   offersWorkspaceModes,
   resolveEffectiveEnvMode,
   resolveLocalCheckoutBranchMismatch,
-  shouldShowComposerContextStrip,
   shouldShowEnvironmentIndicator,
 } from "./BranchToolbar.logic";
+import { shouldShowMattrComposerContextStrip } from "./chat/MattrComposerParts.mattr";
 import {
   getProviderStatusDismissalKey,
   shouldShowProviderStatusBanner,
@@ -1915,15 +1915,16 @@ export default function ChatView(props: ChatViewProps) {
           providerSubagentModels,
           reportedModelSelection,
         );
-  const showComposerContextStrip =
-    !embedded &&
-    shouldShowComposerContextStrip({
-      isDraftHeroState,
-      persistInActiveThreads: settings.persistComposerContextStrip,
-      hasActiveProject: activeProject !== null && !showProviderSubagentBar,
-      isGitRepo,
-      showEnvironmentIndicator: showComposerEnvironmentIndicator,
-    });
+  const showComposerContextStrip = shouldShowMattrComposerContextStrip({
+    embedded,
+    hasActiveProject: activeProject !== null,
+    isScratchProject: activeProjectIsScratch,
+    isDraftHeroState,
+    showProviderSubagentBar,
+    persistInActiveThreads: settings.persistComposerContextStrip,
+    isGitRepo,
+    showEnvironmentIndicator: showComposerEnvironmentIndicator,
+  });
   const terminalShortcutLabelOptions = {
     context: {
       terminalFocus: true,
@@ -3991,9 +3992,7 @@ export default function ChatView(props: ChatViewProps) {
                                   (activeThreadShell ?? activeThread)?.pullRequests
                                 }
                                 onComposerOverlayHeightChange={publishComposerOverlayHeightStable}
-                                permissionsShownInStrip={
-                                  showComposerContextStrip && !isServerThread
-                                }
+                                permissionsShownInStrip={showComposerContextStrip}
                                 promptRef={promptRef}
                                 composerImagesRef={composerImagesRef}
                                 composerFilesRef={composerFilesRef}
@@ -4089,22 +4088,18 @@ export default function ChatView(props: ChatViewProps) {
                                       : undefined
                                   }
                                   availableEnvironments={logicalProjectEnvironments}
-                                  {...(isServerThread
-                                    ? {}
-                                    : {
-                                        trailing: (
-                                          <ComposerContextPermissions
-                                            environmentId={environmentId}
-                                            runtimeMode={runtimeMode}
-                                            supportedRuntimeModes={draftSupportedRuntimeModes(
-                                              activeProviderStatus?.supportedRuntimeModes,
-                                              multipleModelSelections,
-                                              providerStatuses,
-                                            )}
-                                            onRuntimeModeChange={handleRuntimeModeChangeStable}
-                                          />
-                                        ),
-                                      })}
+                                  trailing={
+                                    <ComposerContextPermissions
+                                      environmentId={environmentId}
+                                      runtimeMode={runtimeMode}
+                                      supportedRuntimeModes={draftSupportedRuntimeModes(
+                                        activeProviderStatus?.supportedRuntimeModes,
+                                        multipleModelSelections,
+                                        providerStatuses,
+                                      )}
+                                      onRuntimeModeChange={handleRuntimeModeChangeStable}
+                                    />
+                                  }
                                 />
                               </div>
                             )}

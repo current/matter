@@ -1,7 +1,9 @@
 import type { VoiceInputState } from "@t3tools/client-runtime/voice-input";
 import { msg, useGT, useMessages } from "gt-react";
-import { CheckIcon, MicIcon, XIcon } from "lucide-react";
+import { CheckIcon, XIcon } from "lucide-react";
 import { useEffect, useState, type PointerEvent, type ReactElement } from "react";
+
+import { MattrDictateIcon } from "./MattrComposerParts.mattr";
 
 import { VoiceInputErrorPill } from "./VoiceInputErrorPill";
 import { VoiceInputPill, VoiceWaveform } from "./VoiceInputPill";
@@ -167,7 +169,7 @@ export function ComposerSpeechButton(props: {
         }}
         className="shrink-0"
       >
-        <MicIcon />
+        <MattrDictateIcon />
       </Button>
     </ShortcutTooltip>
   );
