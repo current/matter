@@ -160,6 +160,26 @@ describe("predictionReadiness", () => {
     });
   });
 
+  it("is ready while the turn is over but background subagents still run", () => {
+    const waiting = { ...base, runs: [run("run:1", 1, "completed"), run("run:2", 2, "waiting")] };
+    assert.isTrue(predictionReadiness(waiting, latest).ready);
+    // A pending question or approval still blocks it, and so does the parent waking up.
+    assert.deepStrictEqual(
+      predictionReadiness(
+        { ...waiting, runtimeRequests: [{ status: "pending" } as OrchestrationV2RuntimeRequest] },
+        latest,
+      ),
+      { ready: false, reason: "pending-request" },
+    );
+    assert.deepStrictEqual(
+      predictionReadiness(
+        { ...waiting, runs: [...waiting.runs, run("run:3", 3, "running")] },
+        latest,
+      ),
+      { ready: false, reason: "busy" },
+    );
+  });
+
   it("waits out delegated, closed, busy, superseded, and blocked threads", () => {
     const reason = (projection: Parameters<typeof predictionReadiness>[0], runId = latest) => {
       const readiness = predictionReadiness(projection, runId);

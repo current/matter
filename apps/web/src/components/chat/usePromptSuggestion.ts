@@ -19,10 +19,9 @@ const readDismissed = () => dismissedKeys;
 const dismissKey = (environmentId: EnvironmentId, runId: RunId) => `${environmentId}\u0000${runId}`;
 
 /**
- * The suggestion while the run that produced it is the thread's latest completed run. A message
- * promoted to Steer leaves its queued run cancelled before it started, still the latest run, so
- * the comparison skips to the last run that ran. Detail can lag the shell, so it skips only once
- * the runs include that cancelled run.
+ * The suggestion while its run is the latest finished turn (`waiting` only holds for subagents).
+ * A message promoted to Steer leaves a never-started cancelled run as latest, so this skips to the
+ * last run that ran, but only once the runs include that cancelled run: detail can lag the shell.
  */
 export function offeredPromptSuggestion<Suggestion extends { readonly runId: RunId }>(
   suggestion: Suggestion | null | undefined,
@@ -42,7 +41,7 @@ export function offeredPromptSuggestion<Suggestion extends { readonly runId: Run
   return suggestion &&
     !skippedUnseenRun &&
     run?.runId === suggestion.runId &&
-    run.status === "completed"
+    (run.status === "completed" || run.status === "waiting")
     ? suggestion
     : null;
 }

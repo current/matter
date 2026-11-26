@@ -28,6 +28,7 @@ import {
   PredictionLru,
   predictionReadiness,
   type PredictionRoute,
+  TURN_ENDED_RUN_STATUSES,
 } from "./predictionPolicy.ts";
 import { sanitizePrediction } from "./predictionText.ts";
 
@@ -47,9 +48,9 @@ interface PendingPrediction {
 }
 
 /**
- * mattr's next-message predictor. After a top-level run completes it asks a small stateless model
- * call for the user's likely next message and serves it through upstream's prompt suggestion
- * subscription, so every client shows it without changes.
+ * mattr's next-message predictor. After a top-level run's turn ends (even while its background
+ * subagents keep working) it asks a small stateless model call for the user's likely next message
+ * and serves it through upstream's prompt suggestion subscription, so every client shows it.
  */
 export class MattrComposerPredictions extends Context.Service<
   MattrComposerPredictions,
@@ -68,6 +69,20 @@ const make = Effect.gen(function* () {
   const cache = new PredictionLru<string | null>(CACHE_ENTRIES);
   const latency = new PredictionLatency();
   const pending = new Map<ThreadId, PendingPrediction>();
+  // Each thread's latest ended turn, so a request settling on an idle thread can predict again.
+  const endedRuns = new Map<ThreadId, OrchestrationV2Run>();
+  // False for an older run's late update, such as a delegated cohort write: it has nothing to predict.
+  const rememberEnded = (run: OrchestrationV2Run): boolean => {
+    const known = endedRuns.get(run.threadId);
+    if (known !== undefined && known.ordinal > run.ordinal) return false;
+    endedRuns.delete(run.threadId);
+    endedRuns.set(run.threadId, run);
+    for (const key of endedRuns.keys()) {
+      if (endedRuns.size <= MAX_STORED_SUGGESTIONS) break;
+      endedRuns.delete(key);
+    }
+    return true;
+  };
 
   const enabled = settingsService.getSettings.pipe(
     Effect.map((settings) => settings.promptSuggestionsEnabled),
@@ -198,9 +213,13 @@ const make = Effect.gen(function* () {
       case "run.created":
       case "run.updated": {
         const run = event.payload;
-        if (run.status === "completed") return yield* schedule(run);
-        // New work on the thread: the prediction no longer answers its latest turn.
+        if (TURN_ENDED_RUN_STATUSES.has(run.status)) {
+          return rememberEnded(run) ? yield* schedule(run) : undefined;
+        }
+        // New work on the thread, such as a subagent's result waking it: the prediction no longer
+        // answers its latest turn. The wake run's own end schedules a fresh one.
         if (ACTIVE_RUN_STATUSES.has(run.status)) {
+          endedRuns.delete(run.threadId);
           yield* cancel(run.threadId);
           return yield* publish(run.threadId, null);
         }
@@ -209,10 +228,21 @@ const make = Effect.gen(function* () {
         }
         return;
       }
-      case "runtime-request.updated":
-        return yield* cancel(event.threadId);
+      // A question or approval hides the prediction. Once it settles on a thread whose turn is
+      // over (a background subagent's approval, say), predict again; the cache makes a repeat free.
+      case "runtime-request.updated": {
+        if (event.payload.status === "pending") {
+          yield* cancel(event.threadId);
+          return yield* publish(event.threadId, null);
+        }
+        const ended = endedRuns.get(event.threadId);
+        return ended === undefined || pending.has(event.threadId)
+          ? undefined
+          : yield* schedule(ended);
+      }
       case "thread.archived":
       case "thread.deleted":
+        endedRuns.delete(event.threadId);
         yield* cancel(event.threadId);
         return yield* publish(event.threadId, null);
       default:

@@ -125,19 +125,27 @@ const current = Effect.gen(function* () {
   return Option.getOrNull(head);
 });
 
-const completeRun = (harness: Harness, ordinal: number) =>
+const completeRun = (
+  harness: Harness,
+  ordinal: number,
+  status: OrchestrationV2Run["status"] = "completed",
+) =>
   Effect.gen(function* () {
     const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
     harness.projection = {
       ...harness.projection,
-      runs: [
-        ...harness.projection.runs.filter((r) => r.ordinal !== ordinal),
-        run(ordinal, "completed"),
-      ],
+      runs: [...harness.projection.runs.filter((r) => r.ordinal !== ordinal), run(ordinal, status)],
     };
-    yield* predictions.observe(runEvent(run(ordinal, "completed")));
+    yield* predictions.observe(runEvent(run(ordinal, status)));
     yield* settle;
   });
+
+const requestEvent = (status: OrchestrationV2RuntimeRequest["status"]) =>
+  ({
+    type: "runtime-request.updated",
+    threadId,
+    payload: { status },
+  }) as OrchestrationV2DomainEvent;
 
 describe("MattrComposerPredictions", () => {
   it.effect("publishes a prediction one second after a run completes", () => {
@@ -187,6 +195,98 @@ describe("MattrComposerPredictions", () => {
       yield* settle;
       assert.strictEqual(harness.calls, 1);
       assert.strictEqual((yield* current)?.text, "yes, follow the system theme");
+    }).pipe(Effect.provide(layerFor(harness)));
+  });
+
+  it.effect(
+    "predicts while subagents run, clears when one wakes the parent, then predicts again",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+        // The parent's turn is over; its background work holds the run as waiting.
+        yield* completeRun(harness, 1, "waiting");
+        yield* TestClock.adjust("1 second");
+        yield* settle;
+        assert.strictEqual((yield* current)?.runId, RunId.make("run:1"));
+
+        // A delegated cohort write on the finished run neither restarts nor clears it.
+        yield* predictions.observe(runEvent(run(1, "completed")));
+        yield* TestClock.adjust("1 second");
+        yield* settle;
+        assert.strictEqual(harness.calls, 1);
+        assert.strictEqual((yield* current)?.runId, RunId.make("run:1"));
+
+        // A finished subagent wakes the parent: the old prediction goes at once.
+        harness.projection = {
+          ...harness.projection,
+          runs: [...harness.projection.runs, run(2, "queued")],
+        };
+        yield* predictions.observe({
+          type: "run.created",
+          threadId,
+          payload: run(2, "queued"),
+        } as OrchestrationV2DomainEvent);
+        yield* settle;
+        assert.isNull(yield* current);
+
+        // An older run's late update while the wake runs schedules nothing.
+        yield* predictions.observe(runEvent(run(1, "completed")));
+        yield* TestClock.adjust("1 second");
+        yield* settle;
+        assert.strictEqual(harness.calls, 1);
+        assert.isNull(yield* current);
+
+        // The wake turn ends and the parent gets a fresh prediction for it.
+        yield* completeRun(harness, 2);
+        yield* TestClock.adjust("1 second");
+        yield* settle;
+        assert.strictEqual(harness.calls, 2);
+        assert.strictEqual((yield* current)?.runId, RunId.make("run:2"));
+      }).pipe(Effect.provide(layerFor(harness)));
+    },
+  );
+
+  it.effect(
+    "hides the prediction during a pending request and brings it back once it settles",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+        yield* completeRun(harness, 1);
+        yield* TestClock.adjust("1 second");
+        yield* settle;
+        assert.isNotNull(yield* current);
+
+        // A background subagent asks for approval on the idle parent.
+        harness.projection = {
+          ...harness.projection,
+          runtimeRequests: [{ status: "pending" } as OrchestrationV2RuntimeRequest],
+        };
+        yield* predictions.observe(requestEvent("pending"));
+        yield* settle;
+        assert.isNull(yield* current);
+
+        harness.projection = { ...harness.projection, runtimeRequests: [] };
+        yield* predictions.observe(requestEvent("resolved"));
+        yield* TestClock.adjust("1 second");
+        yield* settle;
+        assert.strictEqual(harness.calls, 1, "served from the cache");
+        assert.strictEqual((yield* current)?.runId, RunId.make("run:1"));
+      }).pipe(Effect.provide(layerFor(harness)));
+    },
+  );
+
+  it.effect("keeps a scheduled prediction when a finished turn's request settles", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+      yield* completeRun(harness, 1);
+      yield* predictions.observe(requestEvent("cancelled"));
+      yield* TestClock.adjust("1 second");
+      yield* settle;
+      assert.strictEqual(harness.calls, 1);
+      assert.isNotNull(yield* current);
     }).pipe(Effect.provide(layerFor(harness)));
   });
 

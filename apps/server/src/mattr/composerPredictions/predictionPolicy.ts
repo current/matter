@@ -71,13 +71,19 @@ export function predictionRoutes(input: {
   return [...claude, ...codex];
 }
 
+/** The thread itself is working; a prediction would answer a stale turn. */
 export const ACTIVE_RUN_STATUSES: ReadonlySet<string> = new Set([
   "preparing",
   "queued",
   "starting",
   "running",
-  "waiting",
 ]);
+
+/**
+ * The agent's turn is over. A `waiting` run ended its turn but still holds for background work
+ * (subagents, checkpoint capture); the user can answer it now, so it predicts like `completed`.
+ */
+export const TURN_ENDED_RUN_STATUSES: ReadonlySet<string> = new Set(["completed", "waiting"]);
 
 export type PredictionReadiness =
   | { readonly ready: true; readonly transcript: string }
@@ -94,8 +100,9 @@ export type PredictionReadiness =
     };
 
 /**
- * Whether a completed run should get a prediction now: a top-level open thread whose latest run is
- * this completed one, with nothing queued, running, or waiting on the user.
+ * Whether a finished run should get a prediction now: a top-level open thread whose latest run is
+ * this one, with nothing queued or running and no question or approval waiting on the user.
+ * Background subagents still running don't block it: the user can answer the parent meanwhile.
  */
 export function predictionReadiness(
   projection: Pick<
@@ -117,7 +124,7 @@ export function predictionReadiness(
   const latest = projection.runs.reduce((newest, candidate) =>
     candidate.ordinal > newest.ordinal ? candidate : newest,
   );
-  if (run.status !== "completed" || latest.id !== run.id) {
+  if (!TURN_ENDED_RUN_STATUSES.has(run.status) || latest.id !== run.id) {
     return { ready: false, reason: "not-latest" };
   }
   if (projection.runtimeRequests.some((request) => request.status === "pending")) {
