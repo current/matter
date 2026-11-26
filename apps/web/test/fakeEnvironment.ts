@@ -247,6 +247,8 @@ export interface FakeThread {
   readonly runs: ReadonlyArray<OrchestrationV2Run>;
   readonly items: ReadonlyArray<OrchestrationV2TurnItem>;
   readonly runtimeRequests?: OrchestrationV2ThreadProjection["runtimeRequests"];
+  /** Defaults to Default. */
+  readonly interactionMode?: OrchestrationV2ThreadShell["interactionMode"];
 }
 
 /** A thread of `turns` user prompts, each answered in markdown with a list and inline code. */
@@ -329,7 +331,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     providerInstanceId: modelSelection.instanceId,
     modelSelection,
     runtimeMode: "full-access",
-    interactionMode: "default",
+    interactionMode: thread.interactionMode ?? "default",
     branch: "main",
     worktreePath: null,
     activeProviderThreadId: thread.providerThreads?.[0]?.id ?? null,
@@ -459,6 +461,12 @@ const handlers: Record<string, (input: never) => unknown> = {
     Effect.suspend(() => {
       dispatched.push(command);
       if (acceptCommands && !holdCommand(command)) {
+        // A saved interaction mode shows in the shell, as the server's thread.updated would.
+        if (command.type === "thread.interaction-mode.set") {
+          return Effect.promise(() =>
+            setFakeThreadInteractionMode(command.threadId, command.interactionMode),
+          ).pipe(Effect.as({ sequence }));
+        }
         if (command.type !== "thread.fork" || !command.sideChat || shellSubscriber === null)
           return Effect.succeed({ sequence: sequence + 1 });
         const fork: FakeThread = {
@@ -696,6 +704,27 @@ export async function answerAssetUrls(): Promise<void> {
       Deferred.succeed(reply, { relativeUrl: "/api/assets/fake", expiresAt: 4_102_444_800_000 }),
     );
   }
+}
+
+/** Changes a thread's saved interaction mode and pushes the shell update, as the server would. */
+export async function setFakeThreadInteractionMode(
+  threadId: string,
+  interactionMode: NonNullable<FakeThread["interactionMode"]>,
+): Promise<void> {
+  threads = threads.map((thread) =>
+    thread.id === threadId ? { ...thread, interactionMode } : thread,
+  );
+  const updated = threads.find((thread) => thread.id === threadId);
+  if (updated === undefined || shellSubscriber === null) return;
+  sequence += 1;
+  await Effect.runPromise(
+    Queue.offer(shellSubscriber, {
+      kind: "thread.updated",
+      sequence,
+      location: "active",
+      thread: shellOf(updated),
+    }),
+  );
 }
 
 /** Commands the app dispatched to the environment, oldest first. */

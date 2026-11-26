@@ -161,7 +161,7 @@ describe("CodexAdapterV2 runtime policy", () => {
     "selects native collaboration modes without prompt overrides with hasT3Mcp=%s",
     (hasT3Mcp) =>
       Effect.gen(function* () {
-        for (const interactionMode of ["plan", "default"] as const) {
+        for (const interactionMode of ["plan", "default", "goal"] as const) {
           for (const reasoningEffort of [undefined, "high"] as const) {
             const params = yield* CodexAdapterV2.buildCodexTurnStartParams({
               nativeThreadId: "native-mode-switch",
@@ -178,7 +178,8 @@ describe("CodexAdapterV2 runtime policy", () => {
             });
 
             assert.deepEqual(params.collaborationMode, {
-              mode: interactionMode,
+              // Goal edits like Default; the goal itself goes through native `/goal`.
+              mode: interactionMode === "plan" ? "plan" : "default",
               settings: {
                 model: "gpt-5.4",
                 ...(reasoningEffort === undefined ? {} : { reasoning_effort: reasoningEffort }),

@@ -5,6 +5,7 @@ import type {
 import {
   CommandId,
   type EnvironmentId,
+  isInteractionModeAbove,
   isRuntimeModeAbove,
   OrchestratorMcpFailure,
   type ProjectId,
@@ -217,7 +218,8 @@ export function assertLiveCaller({ caller, scope }: Caller) {
 }
 
 export const assertFullAccess = (context: Caller, message: string) =>
-  context.limits.runtimeMode === "full-access" && context.limits.interactionMode === "default"
+  context.limits.runtimeMode === "full-access" &&
+  !isInteractionModeAbove("default", context.limits.interactionMode)
     ? Effect.void
     : Effect.fail(new OrchestratorMcpFailure({ code: "capability_denied", message }));
 
@@ -228,7 +230,7 @@ export const assertFullAccess = (context: Caller, message: string) =>
 export const assertBroadestAccess = (context: Caller, what: string) => {
   const broadest = context.scope.runtimeModeCeiling ?? "full-access";
   return !isRuntimeModeAbove(broadest, context.limits.runtimeMode) &&
-    context.limits.interactionMode === "default"
+    !isInteractionModeAbove("default", context.limits.interactionMode)
     ? Effect.void
     : Effect.fail(
         new OrchestratorMcpFailure({

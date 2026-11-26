@@ -53,6 +53,7 @@ import {
   useMattrInboxProjectFilter,
   useMattrSortMode,
 } from "./mattrSidebarStore";
+import { MattrGoalModeGlyph } from "../../chat/MattrComposerModeControl.mattr";
 import type { MattrSidebarModel } from "./useMattrSidebarModel";
 
 const SUBAGENT_PREVIEW_LIMIT = 5;
@@ -201,6 +202,7 @@ function ThreadRow({
           ) : null}
         </span>
         <span className="mfs-t">{item.title}</span>
+        <MattrGoalModeGlyph mode={item.interactionMode} />
         <ThreadTrailing item={item} nowMs={model.nowMs} />
       </div>
       {hasSubagents && expanded ? (

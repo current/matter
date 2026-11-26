@@ -62,7 +62,15 @@ import {
   type ComposerSubmissionIntent,
   collapseExpandedComposerCursor,
 } from "../../composer-logic";
-import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
+import { type ChatMessage } from "../../types";
+import {
+  clearPersistedComposerInteractionMode,
+  isGoalClearCommand,
+  nativeGoalCommand,
+  prependKeepingGoalCommand,
+  resolveMattrModeSend,
+  setComposerInteractionMode,
+} from "./mattrInteractionMode.mattr";
 import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
@@ -184,7 +192,10 @@ function liveAttachmentCapabilities(
 // already points at that response, from a pasted card, keeps its one reference.
 function withReplyReference(prompt: string, replyTo: ResponseContextRecord | null) {
   return replyTo && !collectInlineContextIds(prompt).includes(replyTo.contextId)
-    ? `${formatInlineContextReference(responseContextReference(replyTo))} ${prompt}`
+    ? prependKeepingGoalCommand(
+        prompt,
+        formatInlineContextReference(responseContextReference(replyTo)),
+      )
     : prompt;
 }
 
@@ -809,6 +820,11 @@ export function useComposerSend(input: ComposerSendInput) {
       selectedProviderModels: ctxSelectedProviderModels,
       selectedPromptEffort: ctxSelectedPromptEffort,
       selectedModelSelection: ctxSelectedModelSelection,
+      interactionMode: ctxInteractionMode,
+      nativeGoals: ctxNativeGoals,
+      nativeGoalStarted: ctxNativeGoalStarted,
+      planImplementation: ctxPlanImplementation,
+      setInteractionMode: ctxSetInteractionMode,
     } = sendCtx;
     const { images: composerImages, previewAnnotations: composerPreviewAnnotations } =
       mergeDirectPreviewAnnotation({
@@ -817,13 +833,49 @@ export function useComposerSend(input: ComposerSendInput) {
         previewAnnotations: sendContextPreviewAnnotations,
         direct: directAnnotation,
       });
+    const modeSend = resolveMattrModeSend({
+      prompt: promptAtSend,
+      bypass: directAnnotation !== undefined,
+      editingQueuedMessage: queuedRunEdit.isEditing,
+      interactionMode: ctxInteractionMode,
+      nativeGoals: ctxNativeGoals,
+      nativeGoalStarted: ctxNativeGoalStarted,
+      planImplementation: ctxPlanImplementation,
+      attachmentCount: sendContextImages.length + composerFiles.length,
+      contextCount:
+        composerTerminalContexts.length +
+        sendContextPreviewAnnotations.length +
+        composerReviewComments.length +
+        composerThreadContexts.length +
+        composerEnvironmentContexts.length,
+    });
+    if (modeSend.switchTo !== null) {
+      // A typed `/goal clear` clears the goal itself; other ways out of a running goal clear it.
+      if (modeSend.prompt !== null && isGoalClearCommand(modeSend.prompt)) {
+        setComposerInteractionMode(composerDraftTarget, modeSend.switchTo);
+      } else {
+        ctxSetInteractionMode(modeSend.switchTo);
+      }
+    }
+    if (modeSend.prompt === null) {
+      setComposerDraftPrompt(composerDraftTarget, "");
+      if (currentRouteThreadKeyRef.current === routeThreadKey) {
+        promptRef.current = "";
+        composerRef.current?.resetCursorState();
+      }
+      return;
+    }
+    const sendInteractionMode = modeSend.interactionMode;
     // A direct "send annotation" writes the draft and sends in the same tick; the reference
     // must be in the text now, not after the next render.
     const draftPrompt = directAnnotation
-      ? ensureInlineContextReferences(promptAtSend, [
+      ? ensureInlineContextReferences(modeSend.prompt, [
           previewAnnotationContextReference(directAnnotation.annotation),
         ])
-      : promptAtSend;
+      : // Several models each add `/goal` only where their own provider runs it.
+        modeSend.startsNativeGoal && ctxNativeGoals && multipleModelSelections === null
+        ? nativeGoalCommand(modeSend.prompt)
+        : modeSend.prompt;
     const replyTo =
       useComposerDraftStore.getState().getComposerDraft(composerDraftTarget)?.replyTo ?? null;
     const promptForSend = withReplyReference(draftPrompt, replyTo);
@@ -1114,6 +1166,7 @@ export function useComposerSend(input: ComposerSendInput) {
       selections: multipleModelSelections ?? [],
       providerInstanceEntries,
       messageText: messageTextForSend,
+      startsNativeGoal: modeSend.startsNativeGoal,
     })) {
       if ("error" in resolved) {
         setThreadError(threadIdForSend, resolved.error);
@@ -1396,6 +1449,7 @@ export function useComposerSend(input: ComposerSendInput) {
         branch: activeThreadBranch!,
         selections: multipleModelSelections,
         targets: multipleTargets,
+        interactionMode: sendInteractionMode,
         sendSnapshot,
         createdAt: messageCreatedAt,
         attachmentsPromise: turnAttachmentsPromise,
@@ -1488,7 +1542,7 @@ export function useComposerSend(input: ComposerSendInput) {
           ? { branch: localCheckoutBranchMismatch.currentBranch }
           : {}),
         runtimeMode,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode: sendInteractionMode,
       });
       if (settingsResult._tag === "Failure") {
         failure = settingsResult;
@@ -1521,7 +1575,7 @@ export function useComposerSend(input: ComposerSendInput) {
           },
           modelSelection: ctxSelectedModelSelection,
           runtimeMode,
-          interactionMode: DEFAULT_INTERACTION_MODE,
+          interactionMode: sendInteractionMode,
         },
       });
       if (compactResult._tag === "Failure") {
@@ -1542,7 +1596,7 @@ export function useComposerSend(input: ComposerSendInput) {
                       title,
                       modelSelection: threadCreateModelSelection,
                       runtimeMode,
-                      interactionMode: DEFAULT_INTERACTION_MODE,
+                      interactionMode: sendInteractionMode,
                       branch: activeThreadBranch,
                       worktreePath: activeThread.worktreePath,
                       createdAt: activeThread.createdAt,
@@ -1592,7 +1646,15 @@ export function useComposerSend(input: ComposerSendInput) {
           modelSelection: ctxSelectedModelSelection,
           titleSeed: title,
           runtimeMode,
-          interactionMode: DEFAULT_INTERACTION_MODE,
+          interactionMode: sendInteractionMode,
+          ...(modeSend.sourceProposedPlanId !== null && isServerThread
+            ? {
+                sourceProposedPlan: {
+                  threadId: threadIdForSend,
+                  planId: modeSend.sourceProposedPlanId,
+                },
+              }
+            : {}),
           dispatchMode: turnDispatchMode,
           ...(freshArm === undefined ? {} : { freshContext: true }),
           ...(bootstrap ? { bootstrap } : {}),
@@ -1627,6 +1689,9 @@ export function useComposerSend(input: ComposerSendInput) {
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        if (isServerThread) {
+          clearPersistedComposerInteractionMode(composerDraftTarget, sendInteractionMode);
+        }
         if (checkoutPullRequestUrl) {
           linkCheckoutPullRequest(
             scopeThreadRef(environmentId, threadIdForSend),

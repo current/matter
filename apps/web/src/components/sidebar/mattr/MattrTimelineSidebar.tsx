@@ -70,6 +70,7 @@ import {
   SearchGlyph,
   SortGlyph,
   SpinnerGlyph,
+  TargetGlyph,
   WorktreeGlyph,
 } from "./MattrTimelineIcons";
 import {
@@ -218,6 +219,9 @@ function TimelineRow({
           <MattrProviderMark driver={item.driver} />
         </span>
         <span className="mts-t">{item.title}</span>
+        {item.interactionMode === "goal" ? (
+          <TargetGlyph className="mts-goal" role="img" aria-label={gt("Goal mode")} />
+        ) : null}
         {item.pinned ? <PinGlyph className="mts-pin" role="img" aria-label={gt("Pinned")} /> : null}
         {needs ? (
           <span className="mts-need" role="img" aria-label={gt("Needs you")} />

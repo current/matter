@@ -6,6 +6,7 @@ import {
   OrchestratorMcpFailure,
   PreviewAutomationUnavailableError,
   type ProviderInstanceId,
+  interactionModeRank,
   type ProviderInteractionMode,
   type OrchestrationV2LinkedSender,
   type RuntimeMode,
@@ -90,7 +91,6 @@ const runtimeModeRank: Record<RuntimeMode, number> = {
   auto: 2,
   "full-access": 3,
 };
-const interactionModeRank: Record<ProviderInteractionMode, number> = { plan: 0, default: 1 };
 
 /**
  * The modes a client caller's writes are capped at: what it was approved
@@ -112,7 +112,7 @@ export const clientModeCeiling = (client: McpClientCaller | undefined): ClientMo
         ? asked.runtimeMode
         : approved.runtimeMode,
     interactionMode:
-      interactionModeRank[asked.interactionMode] < interactionModeRank[approved.interactionMode]
+      interactionModeRank(asked.interactionMode) < interactionModeRank(approved.interactionMode)
         ? asked.interactionMode
         : approved.interactionMode,
   };

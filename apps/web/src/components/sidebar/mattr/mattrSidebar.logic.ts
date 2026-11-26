@@ -2,7 +2,11 @@ import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environ
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/client-runtime/thread-pull-requests";
-import type { ProviderDriverKind, ScopedThreadRef } from "@t3tools/contracts";
+import type {
+  ProviderDriverKind,
+  ProviderInteractionMode,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 
 import { hasUnseenCompletion, resolveSidebarRowStatus } from "../../Sidebar.logic";
 
@@ -38,6 +42,8 @@ export interface MattrThreadItem {
   readonly branch: string | null;
   /** Set when the thread runs in its own worktree rather than the project's checkout. */
   readonly worktreePath: string | null;
+  /** Goal threads carry a small target glyph. */
+  readonly interactionMode?: ProviderInteractionMode;
 }
 
 export type MattrPullRequestState = "open" | "merged" | "closed" | "draft";
@@ -114,6 +120,7 @@ export function toMattrThreadItem(
     createdAt: thread.createdAt,
     branch: thread.branch,
     worktreePath: thread.worktreePath,
+    interactionMode: thread.interactionMode,
   };
 }
 

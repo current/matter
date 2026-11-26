@@ -75,12 +75,17 @@ export interface T3AcpInstructionState {
   readonly includeMcpFallback?: boolean;
 }
 
+/** ACP agents only know Plan and Default; mattr's Goal runs in the agent's Default mode. */
+export const acpEffectiveInteractionMode = (mode: ProviderInteractionMode): "plan" | "default" =>
+  mode === "plan" ? "plan" : "default";
+
 const acpInstructionStatesEqual = (
   left: T3AcpInstructionState | undefined,
   right: T3AcpInstructionState,
 ): boolean =>
   left !== undefined &&
-  left.interactionMode === right.interactionMode &&
+  acpEffectiveInteractionMode(left.interactionMode) ===
+    acpEffectiveInteractionMode(right.interactionMode) &&
   left.hasT3Mcp === right.hasT3Mcp &&
   left.hasDeviceTools === right.hasDeviceTools &&
   (left.includeMcpFallback ?? true) === (right.includeMcpFallback ?? true);
@@ -118,7 +123,10 @@ export function t3AcpPromptWithInstructions(input: {
   if (input.systemPromptState !== undefined) {
     const baseline = input.previousState ?? input.systemPromptState;
     const delta: Array<string> = [];
-    if (baseline.interactionMode !== input.state.interactionMode) {
+    if (
+      acpEffectiveInteractionMode(baseline.interactionMode) !==
+      acpEffectiveInteractionMode(input.state.interactionMode)
+    ) {
       delta.push(
         input.state.interactionMode === "plan"
           ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
@@ -187,4 +195,23 @@ export function t3OrchestrationSystemPrompt(
   hasDeviceTools: boolean,
 ): string | undefined {
   return hasT3Mcp ? orchestrationInstructions(hasDeviceTools) : undefined;
+}
+
+// mattr: providers without a native `/goal` get Goal mode as a block after the user's words, so
+// compaction cannot drop it. Plan, and Goal on native-goal providers, add nothing to the prompt.
+const MATTR_GOAL_MODE_INSTRUCTIONS = `Treat this request as a goal to finish end to end, not a single step.
+- Break it into milestones and keep a \`- [ ]\` checklist current as you work.
+- Keep going through implementation, edge cases, tests, verification and a self-review. Don't stop for check-ins you can resolve yourself.
+- Run independent pieces in parallel with subagents when that is faster.
+- Stop only when the goal is verified complete or you are blocked on a user decision, secret or credential. Then say what is done and what is left.`;
+
+/** Appends mattr's fallback Goal block for a provider without native `/goal`; anything else passes through. */
+export function withMattrGoalModeInstructions(
+  text: string,
+  mode: ProviderInteractionMode,
+  nativeGoals: boolean,
+): string {
+  return mode !== "goal" || nativeGoals || text.trim() === ""
+    ? text
+    : `${text}\n\n<mattr_goal_mode>\n${MATTR_GOAL_MODE_INSTRUCTIONS}\n</mattr_goal_mode>`;
 }

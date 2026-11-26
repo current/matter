@@ -3055,6 +3055,104 @@ describe("AntigravityAdapterV2 runtime mode ceiling", () => {
   );
 });
 
+describe("AntigravityAdapterV2 mattr Goal mode", () => {
+  it.effect("runs Goal in the session's Default mode, with no reconfigure or mode note", () =>
+    Effect.gen(function* () {
+      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const crypto = yield* SecureRandom.SecureRandom;
+      const mockAgentPath = yield* path.fromFileUrl(
+        new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
+      );
+      const logs = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-antigravity-goal-" });
+      const requestLog = path.join(logs, "requests.ndjson");
+      const instanceId = ProviderInstanceId.make("antigravity-goal-mode-test");
+      const adapter = yield* makeAntigravityAdapterV2({
+        instanceId,
+        selfInvocation: yield* resolveSelfInvocation(),
+        makeRuntime: (input) =>
+          makeAntigravityAcpRuntime({
+            ...input,
+            childProcessSpawner,
+            spawn: {
+              command: process.execPath,
+              args: [mockAgentPath],
+              cwd: input.cwd,
+              env: { T3_ACP_ANTIGRAVITY: "1", T3_ACP_REQUEST_LOG_PATH: requestLog },
+            },
+          }).pipe(Effect.provideService(SecureRandom.SecureRandom, crypto)),
+        withProcess: (_stop, task) => task,
+        defaultModel: Effect.undefined,
+      });
+      const threadId = ThreadId.make("thread-antigravity-goal-mode");
+      const modelSelection = { instanceId, model: "gemini-test-low" } as const;
+      const policy = (interactionMode: "default" | "goal") =>
+        ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+          runtimeMode: "full-access",
+          interactionMode,
+          cwd: process.cwd(),
+        });
+      const session = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("provider-session-antigravity-goal-mode"),
+        modelSelection,
+        runtimePolicy: policy("default"),
+      });
+      const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
+      yield* session.events.pipe(
+        Stream.runForEach((event) => Queue.offer(events, event)),
+        Effect.forkScoped,
+      );
+      const providerThread = yield* session.ensureThread({
+        threadId,
+        modelSelection,
+        runtimePolicy: policy("default"),
+      });
+      const readRequests = fileSystem.readFileString(requestLog).pipe(
+        Effect.map((log) =>
+          log
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as { method?: string; params?: unknown }),
+        ),
+      );
+      const runTurn = (ordinal: number, interactionMode: "default" | "goal") =>
+        Effect.gen(function* () {
+          yield* session.startTurn(
+            makeTurnInput({
+              threadId,
+              providerThread,
+              instanceId,
+              runtimePolicy: policy(interactionMode),
+              modelSelection,
+              ordinal,
+              now: yield* DateTime.now,
+            }),
+          );
+          yield* Stream.fromQueue(events).pipe(
+            Stream.filter((event) => event.type === "turn.terminal"),
+            Stream.runHead,
+          );
+        });
+      yield* runTurn(1, "default");
+      const before = (yield* readRequests).length;
+      yield* runTurn(2, "goal");
+      const goalRequests = (yield* readRequests).slice(before);
+      assert.deepEqual(
+        goalRequests
+          .map((request) => request.method)
+          .filter((method) => method !== undefined && method.startsWith("session/set_")),
+        [],
+      );
+      const goalPrompt = JSON.stringify(
+        goalRequests.find((request) => request.method === "session/prompt")?.params ?? null,
+      );
+      assert.notInclude(goalPrompt, "T3 Code interaction mode");
+    }).pipe(Effect.provide(layerSession), Effect.scoped),
+  );
+});
+
 describe("AntigravityAdapterV2 session system prompt", () => {
   it.effect.each(["1.5.0"])(
     "carries PR linking once per turn on %s, which does not advertise a system prompt append",

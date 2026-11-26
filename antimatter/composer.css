@@ -227,6 +227,80 @@ html[data-theme-id] [data-mattr-composer] {
   display: none;
 }
 
+/* Interaction mode beside +: a quiet icon in Default; Plan (the theme's success green) and Goal
+   (its warning amber) read as one tinted pill, its label then a clear button. No motion. */
+[data-mattr-composer] {
+  --mc-plan: var(--success-foreground);
+  --mc-plan-tint: color-mix(in srgb, var(--success) 11%, transparent);
+  --mc-goal: var(--warning-foreground);
+  --mc-goal-tint: color-mix(in srgb, var(--warning) 13%, transparent);
+}
+
+[data-mattr-composer] [data-chat-composer-footer] [data-mattr-mode-control] {
+  height: 28px;
+  margin-inline-end: 2px;
+  border-radius: 8px;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] [data-mattr-mode-control][data-mode="plan"] {
+  --mc-mode: var(--mc-plan);
+  background-color: var(--mc-plan-tint);
+}
+
+[data-mattr-composer] [data-chat-composer-footer] [data-mattr-mode-control][data-mode="goal"] {
+  --mc-mode: var(--mc-goal);
+  background-color: var(--mc-goal-tint);
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-mode-control]:not([data-mode="default"])
+  button[data-mattr-mode-trigger],
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-mode-control]:not([data-mode="default"])
+  button[data-mattr-mode-clear] {
+  color: var(--mc-mode);
+  background-color: transparent;
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-mode-control]:not([data-mode="default"])
+  button[data-mattr-mode-trigger] {
+  gap: 5px;
+  padding-inline: 7px 3px;
+  font-weight: 500;
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-mode-control]:not([data-mode="default"])
+  button[data-mattr-mode-clear] {
+  width: 22px;
+  min-width: 22px;
+  padding: 0;
+  opacity: 0.72;
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-mode-control]:not([data-mode="default"])
+  button:is([data-mattr-mode-trigger], [data-mattr-mode-clear]):is(:hover, [data-popup-open]) {
+  color: var(--mc-mode);
+  background-color: color-mix(in srgb, var(--mc-mode) 12%, transparent);
+  opacity: 1;
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  [data-mattr-mode-control]
+  button[data-mattr-mode-clear]
+  svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* Model picker: provider glyph, name in the label gray, effort muted, then a chevron. */
 [data-mattr-composer] [data-chat-composer-footer] [data-chat-provider-model-picker] {
   padding-inline: 7px;

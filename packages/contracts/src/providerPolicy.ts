@@ -42,9 +42,26 @@ const RUNTIME_MODE_RANK: Record<RuntimeMode, number> = {
 export const isRuntimeModeAbove = (mode: RuntimeMode, ceiling: RuntimeMode | undefined): boolean =>
   ceiling !== undefined && RUNTIME_MODE_RANK[mode] > RUNTIME_MODE_RANK[ceiling];
 
-export const ProviderInteractionMode = Schema.Literals(["default", "plan"]);
+/** `goal` runs with `default`'s authority plus autonomous end-to-end instructions (mattr). */
+export const ProviderInteractionMode = Schema.Literals(["default", "plan", "goal"]);
 export type ProviderInteractionMode = typeof ProviderInteractionMode.Type;
 export const DEFAULT_PROVIDER_INTERACTION_MODE: ProviderInteractionMode = "default";
+
+const INTERACTION_MODE_RANK: Record<ProviderInteractionMode, number> = {
+  plan: 0,
+  default: 1,
+  goal: 1,
+};
+
+/** How much an interaction mode lets the agent do: plan is read-only, default and goal may edit. */
+export const interactionModeRank = (mode: ProviderInteractionMode): number =>
+  INTERACTION_MODE_RANK[mode];
+
+/** Whether `mode` grants the agent more than `ceiling`; no ceiling allows every mode. */
+export const isInteractionModeAbove = (
+  mode: ProviderInteractionMode,
+  ceiling: ProviderInteractionMode | undefined,
+): boolean => ceiling !== undefined && interactionModeRank(mode) > interactionModeRank(ceiling);
 
 export const ProviderRequestKind = Schema.Literals([
   "command",

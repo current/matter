@@ -38,6 +38,7 @@ import { ATTACHMENT_ONLY_BOOTSTRAP_PROMPT } from "@t3tools/shared/composerContex
 import { createModelSelection } from "@t3tools/shared/model";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { getComposerPromptInjectionState, getComposerProviderState } from "./composerProviderState";
+import { nativeGoalCommand, providerHasNativeGoals } from "./mattrInteractionMode.mattr";
 import {
   formatOutgoingPrompt,
   getAntigravitySendBlockReason,
@@ -357,6 +358,8 @@ export function resolveMultipleModelTargets(input: {
   readonly selections: ReadonlyArray<ModelSelection>;
   readonly providerInstanceEntries: ReadonlyArray<ProviderInstanceEntry>;
   readonly messageText: string;
+  /** mattr: a Goal send that starts a native goal, as `/goal …` where the target runs one. */
+  readonly startsNativeGoal?: boolean;
 }): Array<MultipleModelTarget | { readonly error: string }> {
   const { messageText } = input;
   return input.selections.map((selection) => {
@@ -386,7 +389,15 @@ export function resolveMultipleModelTargets(input: {
         model: selection.model,
         models: provider.models,
         effort: providerState.promptEffort,
-        text: messageText || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
+        text:
+          input.startsNativeGoal === true &&
+          providerHasNativeGoals(
+            provider.driverKind,
+            provider.snapshot.slashCommands,
+            provider.snapshot.version,
+          )
+            ? nativeGoalCommand(messageText)
+            : messageText || ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
       }),
     };
   });

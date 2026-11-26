@@ -1016,8 +1016,9 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
       // Codex keeps no per-thread choice for this, so every turn must carry it.
       ...(cyberAccessProgram === undefined ? {} : { cyberAccessProgram }),
       // Codex supplies its own mode instructions; send both modes to clear Plan on exit.
+      // Goal runs as Default; the goal itself goes through native `/goal`.
       collaborationMode: {
-        mode: input.runtimePolicy.interactionMode,
+        mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "default",
         settings: {
           model: input.modelSelection.model,
           ...(effort === undefined ? {} : { reasoning_effort: effort }),

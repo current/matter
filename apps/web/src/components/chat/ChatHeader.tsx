@@ -1,6 +1,7 @@
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
+  type ProviderInteractionMode,
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -45,11 +46,13 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
+import { MattrGoalModeGlyph } from "./MattrComposerModeControl.mattr";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
   activeThreadId: ThreadId;
   activeThreadTitle: string;
+  activeThreadInteractionMode?: ProviderInteractionMode | undefined;
   activeThreadLinkOrigin?: string | null | undefined;
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
@@ -75,6 +78,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadEnvironmentId,
   activeThreadId,
   activeThreadTitle,
+  activeThreadInteractionMode,
   activeThreadLinkOrigin,
   isServerThread,
   activeProject,
@@ -372,6 +376,7 @@ export const ChatHeader = memo(function ChatHeader({
                 <h2 className="min-w-0" dir={textDirection(activeThreadTitle)}>
                   <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
                 </h2>
+                <MattrGoalModeGlyph mode={activeThreadInteractionMode} />
                 <ChevronDownIcon
                   aria-hidden
                   data-thread-title-chevron

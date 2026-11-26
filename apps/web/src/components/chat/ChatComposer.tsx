@@ -31,7 +31,9 @@ import type {
   EnvironmentId,
   ModelSelection,
   ProjectId,
+  PlanId,
   PreviewAnnotationPayload,
+  ProviderInteractionMode,
   ThreadContextRecord,
   EnvironmentContextRecord,
   ResolvedKeybindingsConfig,
@@ -136,6 +138,11 @@ import {
   MattrVoiceModeIcon,
 } from "./MattrComposerParts.mattr";
 import { MattrComposerReplyBar } from "./MattrComposerReplyBar.mattr";
+import { MattrComposerModeControl } from "./MattrComposerModeControl.mattr";
+import {
+  deriveMattrComposerInteractionMode,
+  type MattrPlanImplementation,
+} from "./mattrInteractionMode.mattr";
 import { useMattrGooeySendSetting } from "../../mattrGooeySend";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";
@@ -377,6 +384,12 @@ export interface ChatComposerHandle {
     selectedModel: string;
     selectedProviderModels: ReadonlyArray<ServerProvider["models"][number]>;
     shownPendingApprovalIds: ReadonlyArray<RuntimeRequestId>;
+    interactionMode: ProviderInteractionMode;
+    nativeGoals: boolean;
+    nativeGoalStarted: boolean;
+    planImplementation: MattrPlanImplementation | null;
+    /** Switches the composer's mode; leaving a running native goal also clears it. */
+    setInteractionMode: (mode: ProviderInteractionMode) => void;
   };
   validateProviderInput: (providerInput: string) => boolean;
   setMultipleModelSelections: (selections: ReadonlyArray<ModelSelection>) => void;
@@ -420,6 +433,13 @@ export interface ChatComposerProps {
   onToggleKeepFullHistory: () => void;
   onUsageLimitsCommand?: (() => void) | undefined;
   sideChatAvailable?: boolean;
+  /** False for an unsent local draft, which has no provider goal yet. */
+  isServerThread?: boolean;
+  /** The thread's newest proposed plan, sent as "implement this plan" from an empty Plan composer. */
+  latestProposedPlanId?: PlanId | null;
+  latestProposedPlanMarkdown?: string | null;
+  /** Sends `/goal clear` when the user leaves a running native goal for `next`. */
+  onClearNativeGoal?: ((next: ProviderInteractionMode) => void) | undefined;
   sideChatDisabledReason?: string | null;
   /** Arms a fresh session for the next message; absent where `/clear` is unavailable. */
   onFreshSession?: (() => void) | undefined;
@@ -1228,6 +1248,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerPreviewAnnotations.length === 0 &&
     composerReviewComments.length === 0;
   const linkedEnvironments = useLinkedEnvironments(environmentId);
+  const mattrMode = deriveMattrComposerInteractionMode({
+    composerDraftTarget,
+    composerMode: composerDraft.interactionMode,
+    thread: activeThread,
+    isServerThread: props.isServerThread === true,
+    selectedProvider,
+    providerSlashCommands: selectedProviderSlashCommands,
+    providerVersion: selectedProviderStatus?.version,
+    pendingUserInputCount: pendingUserInputs.length,
+    latestProposedPlanId: props.latestProposedPlanId,
+    latestProposedPlanMarkdown: props.latestProposedPlanMarkdown,
+    canChangeMode: canOperateThread && environmentUnavailable === null,
+    canClearNativeGoal:
+      canOperateThread && environmentUnavailable === null && sendDisabledReason === null,
+    onClearNativeGoal: props.onClearNativeGoal,
+  });
+  const setMattrModeStable = useStableCallback(mattrMode.setMode);
+  const planImplementationId = mattrMode.planImplementation?.planId ?? null;
+  const planImplementationPrompt = mattrMode.planImplementation?.prompt ?? null;
   const {
     items: composerMenuItems,
     isLoading: isComposerMenuLoading,
@@ -1252,6 +1291,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     workspaceSkillsScanning,
     questionAttachmentTarget,
     modelMentions: { instanceEntries: providerInstanceEntries, modelOptionsByInstance },
+    nativeGoalProvider: mattrMode.nativeGoals,
   });
 
   const composerMenuOpen = Boolean(composerTrigger);
@@ -1340,7 +1380,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         isComplete: Boolean(activePendingResolvedAnswers),
       }
     : null;
-  const hasMessageToSend = composerSendState.hasSendableContent || messageHasPreparingImages;
+  const hasMessageToSend =
+    composerSendState.hasSendableContent ||
+    messageHasPreparingImages ||
+    planImplementationPrompt !== null;
   const showResumeAction =
     canResume &&
     !composerDraftHasUserContent(composerDraft) &&
@@ -2145,6 +2188,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
         return;
       }
+      if (item.command === "plan" || item.command === "goal" || item.command === "default") {
+        // A native goal provider takes the objective as `/goal <objective>`.
+        const keepsGoalCommand = item.command === "goal" && mattrMode.nativeGoals;
+        const applied = applyPromptReplacement(
+          trigger.rangeStart,
+          trigger.rangeEnd,
+          keepsGoalCommand ? "/goal " : "",
+          { expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd) },
+        );
+        if (applied) {
+          setComposerHighlightedItemId(null);
+          mattrMode.setMode(item.command);
+        }
+        return;
+      }
       if (item.command === "side" || item.command === "btw") {
         if (props.sideChatDisabledReason) return;
         const applied = applyPromptReplacement(
@@ -2652,6 +2710,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       dismissPromptSuggestion,
       hasActiveReply: replyTo !== null,
       dismissReply: dismissComposerReply,
+      cycleInteractionMode: mattrMode.cycleMode,
     })(key, event, isTaskItem);
   };
 
@@ -3523,6 +3582,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         selectedProvider,
         selectedModel,
         selectedProviderModels,
+        interactionMode: mattrMode.mode,
+        nativeGoals: mattrMode.nativeGoals,
+        nativeGoalStarted: mattrMode.nativeGoalStarted,
+        setInteractionMode: setMattrModeStable,
+        planImplementation:
+          planImplementationId !== null && planImplementationPrompt !== null
+            ? { planId: planImplementationId, prompt: planImplementationPrompt }
+            : null,
       }),
       setMultipleModelSelections,
       validateProviderInput: (providerInput: string) => {
@@ -3587,6 +3654,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       selectedProvider,
       selectedProviderModels,
       compactThreadContextStable,
+      mattrMode.mode,
+      mattrMode.nativeGoals,
+      mattrMode.nativeGoalStarted,
+      setMattrModeStable,
+      planImplementationId,
+      planImplementationPrompt,
     ],
   );
 
@@ -4042,11 +4115,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               : gt(
                                   "Type your own answer, or leave this blank to use the selected option",
                                 )
-                          : projectSelectionRequired
-                            ? gt("Choose a project above to start a thread")
-                            : showProviderUnavailable
-                              ? gt("Enable a provider in Settings to send a message")
-                              : (offeredPromptSuggestion ?? m(DEFAULT_COMPOSER_PLACEHOLDER))
+                          : planImplementationPrompt !== null
+                            ? gt(
+                                "Add feedback to refine the plan, or leave this blank to implement it",
+                              )
+                            : projectSelectionRequired
+                              ? gt("Choose a project above to start a thread")
+                              : showProviderUnavailable
+                                ? gt("Enable a provider in Settings to send a message")
+                                : (offeredPromptSuggestion ?? m(DEFAULT_COMPOSER_PLACEHOLDER))
                     }
                     placeholderContent={
                       offeredPromptSuggestion !== null ? (
@@ -4125,6 +4202,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               >
                 {composerAttachButton && !dictationTakesFooter ? (
                   <div className="me-2">{composerAttachButton}</div>
+                ) : null}
+                {!dictationTakesFooter && !isLiteralPendingAnswer ? (
+                  <MattrComposerModeControl
+                    mode={mattrMode.mode}
+                    onModeChange={mattrMode.setMode}
+                    disabled={!canOperateThread || environmentUnavailable !== null}
+                    onClear={() => mattrMode.setMode("default")}
+                  />
                 ) : null}
                 <div
                   data-chat-composer-actions="right"

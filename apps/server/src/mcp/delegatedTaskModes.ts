@@ -1,4 +1,5 @@
 import {
+  interactionModeRank,
   type ModelSelection,
   OrchestratorMcpFailure,
   type OrchestratorMcpDelegateTaskInput,
@@ -21,11 +22,6 @@ export function runtimeModeRank(mode: RuntimeMode): number {
     case "full-access":
       return 3;
   }
-}
-
-/** How much an interaction mode allows: plan, then default. */
-export function interactionModeRank(mode: ProviderInteractionMode): number {
-  return mode === "plan" ? 0 : 1;
 }
 
 /**

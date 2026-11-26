@@ -1,4 +1,5 @@
 import {
+  isInteractionModeAbove,
   isRuntimeModeAbove,
   type OrchestrationV2DomainEvent,
   type ProviderInteractionMode,
@@ -28,15 +29,13 @@ export const DispatchModeLimit = Context.Reference<DispatchModeLimitValue | unde
   { defaultValue: () => undefined },
 );
 
-const interactionModeRank: Record<ProviderInteractionMode, number> = { plan: 0, default: 1 };
-
 export const exceededDispatchModeLimit = (
   limit: DispatchModes,
   modes: DispatchModes,
 ): "runtime" | "interaction" | undefined =>
   isRuntimeModeAbove(modes.runtimeMode, limit.runtimeMode)
     ? "runtime"
-    : interactionModeRank[modes.interactionMode] > interactionModeRank[limit.interactionMode]
+    : isInteractionModeAbove(modes.interactionMode, limit.interactionMode)
       ? "interaction"
       : undefined;
 

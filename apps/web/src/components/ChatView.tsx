@@ -399,6 +399,7 @@ import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useComposerHandleContext } from "../composerHandleContext";
 import { clampFileAttachmentUploadBytes } from "@t3tools/client-runtime/state/attachments";
 import { appAtomRegistry } from "../rpc/atomRegistry";
+import { environmentSummaries } from "../state/presentation";
 import { assetEnvironment } from "../state/assets";
 import { readEnvironmentScope, readPreparedConnection } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
@@ -421,6 +422,10 @@ import {
 import { useDraftHeroLayoutTransition } from "./chat/useDraftHeroLayoutTransition";
 import { useLocalDispatchState } from "./chat/useLocalDispatchState";
 import { draftFanoutSelectionsAtom, draftSendState } from "./chat/chatViewSend";
+import {
+  clearPersistedComposerInteractionMode,
+  latestProposedPlan,
+} from "./chat/mattrInteractionMode.mattr";
 import {
   isCompactCommandMessage,
   type LocalThreadErrorEntry,
@@ -2044,7 +2049,7 @@ export default function ChatView(props: ChatViewProps) {
         threadId: activeThreadId,
         message: { messageId: newMessageId(), role: "user", text, attachments: [] },
         runtimeMode,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode: serverThread?.interactionMode ?? DEFAULT_INTERACTION_MODE,
         dispatchMode: "queue",
       },
     });
@@ -2054,6 +2059,44 @@ export default function ChatView(props: ChatViewProps) {
     }
   };
   const sendAppMessageStable = useStableCallback(sendAppMessage);
+  // mattr: leaving a running native goal clears it at the provider; read-only or offline only switches.
+  const clearNativeGoal = async (nextMode: ProviderInteractionMode) => {
+    if (!serverThread || !canOperateThread) return;
+    const connected = appAtomRegistry.get(environmentSummaries.connectedEnvironmentIdsAtom);
+    if (!connected.includes(environmentId)) return;
+    const threadId = serverThread.id;
+    const createdAt = new Date().toISOString();
+    const modeResult = await setThreadInteractionMode({
+      environmentId,
+      input: { threadId, interactionMode: nextMode, createdAt },
+    });
+    const result =
+      modeResult._tag === "Failure"
+        ? modeResult
+        : await startThreadTurn({
+            environmentId,
+            input: {
+              threadId,
+              message: {
+                messageId: newMessageId(),
+                role: "user",
+                text: "/goal clear",
+                attachments: [],
+              },
+              runtimeMode,
+              interactionMode: nextMode,
+              createdAt,
+              dispatchMode: "queue",
+            },
+          });
+    if (result._tag === "Failure") {
+      toastManager.add({ type: "error", title: gt("Could not clear the goal") });
+      return;
+    }
+    clearPersistedComposerInteractionMode(composerDraftTarget, nextMode);
+  };
+  const clearNativeGoalStable = useStableCallback(clearNativeGoal);
+  const mattrLatestProposedPlan = latestProposedPlan(serverProjection);
   const queuedRunsControlRef = useRef<QueuedRunsControlHandle>(null);
 
   const {
@@ -3652,6 +3695,7 @@ export default function ChatView(props: ChatViewProps) {
               activeThreadId={activeThread.id}
               isServerThread={isServerThread}
               activeThreadTitle={activeThread.title}
+              activeThreadInteractionMode={serverThread?.interactionMode}
               activeThreadLinkOrigin={activeThreadShell?.linkOrigin?.label ?? null}
               activeProject={activeProject ?? null}
               parentThreadLink={headerParentThreadLink}
@@ -4024,6 +4068,12 @@ export default function ChatView(props: ChatViewProps) {
                                 onToggleKeepFullHistory={toggleKeepFullHistoryStable}
                                 sideChatAvailable={sideChat.available}
                                 sideChatDisabledReason={sideChatDisabledReason}
+                                isServerThread={isServerThread}
+                                latestProposedPlanId={mattrLatestProposedPlan?.planId ?? null}
+                                latestProposedPlanMarkdown={
+                                  mattrLatestProposedPlan?.markdown ?? null
+                                }
+                                onClearNativeGoal={clearNativeGoalStable}
                                 onFreshSession={
                                   freshSessionCommandAvailable ? armFreshSessionStable : undefined
                                 }

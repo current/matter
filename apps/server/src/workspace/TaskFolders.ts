@@ -1,5 +1,6 @@
 import {
   GitCommandError,
+  isInteractionModeAbove,
   isRuntimeModeAbove,
   linkOriginIsFenced,
   managedPolicyDeniedMessage,
@@ -252,7 +253,7 @@ export const projectCommandsForAgent = (
   if (link !== "permitted") return link;
   return modes.runtimeMode === "full-access" &&
     !isRuntimeModeAbove(modes.runtimeMode, maxRuntimeMode) &&
-    modes.interactionMode === "default"
+    !isInteractionModeAbove("default", modes.interactionMode)
     ? "permitted"
     : "agent-below-full-access";
 };
@@ -419,14 +420,16 @@ const make = Effect.gen(function* () {
         return refuse(
           `and ${managedPolicyDeniedMessage(layoutCommandsOffBy, "project worktree layout commands")}`,
         );
-      const approved = yield* approvals
-        .isApproved({ projectId: project.projectId, kind, command: text })
-        // An approval that cannot be read is not one.
-        .pipe(
-          Effect.catch((cause) =>
-            Effect.logWarning(cause.detail, { cause }).pipe(Effect.as(false)),
-          ),
-        );
+      const approved = yield* (
+        approvals
+          .isApproved({ projectId: project.projectId, kind, command: text })
+          // An approval that cannot be read is not one.
+          .pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning(cause.detail, { cause }).pipe(Effect.as(false)),
+            ),
+          )
+      );
       if (!approved)
         return refuse(
           "which nobody has approved as it is written now. Review and approve it in the web or desktop app, under Worktree layout in the project's settings or when starting a worktree thread there.",

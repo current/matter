@@ -1,9 +1,16 @@
-import type { AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
-import type { OrchestrationV2PlanArtifact, PlanId, ScopedThreadRef } from "@t3tools/contracts";
+import type { AtomCommand, AtomCommandResult } from "@t3tools/client-runtime/state/runtime";
+import type {
+  OrchestrationV2PlanArtifact,
+  PlanId,
+  ProviderInteractionMode,
+  RuntimeMode,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 import { use, useState } from "react";
 
 import { newMessageId } from "~/lib/utils";
 import { useQuietThreadProjection, useQuietThreadShell } from "~/state/entities";
+import { useComposerDraftStore } from "../../composerDraftStore";
 import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "../../proposedPlan";
 import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
@@ -45,11 +52,62 @@ export function isRecentProposedPlan(
   return nowMs - latestMs <= MATTR_PLAN_AUTO_APPROVE_FRESHNESS_MS;
 }
 
+type CommandValue<C> = C extends AtomCommand<infer W, infer _A, infer _E> ? W : never;
+
 /**
  * mattr: approving a proposed plan leaves plan mode and queues a turn that implements it.
  * `sourceProposedPlan` lets the server mark the plan completed, so its card stops offering
- * Approve. Returns null where the thread cannot take a turn.
+ * Approve.
  */
+export async function approveMattrPlan(input: {
+  readonly threadRef: ScopedThreadRef;
+  readonly planId: PlanId;
+  readonly planMarkdown: string;
+  readonly thread: {
+    readonly interactionMode: ProviderInteractionMode;
+    readonly runtimeMode: RuntimeMode;
+  };
+  readonly setInteractionMode: (
+    value: CommandValue<typeof threadEnvironment.setInteractionMode>,
+  ) => Promise<MattrPlanApproveCommandResult>;
+  readonly startTurn: (
+    value: CommandValue<typeof threadEnvironment.startTurn>,
+  ) => Promise<MattrPlanApproveCommandResult>;
+}): Promise<MattrPlanApproveCommandResult> {
+  const { threadRef, planId, thread } = input;
+  const { environmentId, threadId } = threadRef;
+  if (thread.interactionMode !== DEFAULT_INTERACTION_MODE) {
+    const modeResult = await input.setInteractionMode({
+      environmentId,
+      input: {
+        threadId,
+        interactionMode: DEFAULT_INTERACTION_MODE,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    if (modeResult._tag === "Failure") return modeResult;
+  }
+  // A Plan pick still pending in the composer would otherwise pull the next turn back to Plan.
+  useComposerDraftStore.getState().setInteractionMode(threadRef, null);
+  return input.startTurn({
+    environmentId,
+    input: {
+      threadId,
+      message: {
+        messageId: newMessageId(),
+        role: "user",
+        text: `${PLAN_IMPLEMENTATION_PROMPT_PREFIX}${input.planMarkdown}`,
+        attachments: [],
+      },
+      runtimeMode: thread.runtimeMode,
+      interactionMode: DEFAULT_INTERACTION_MODE,
+      sourceProposedPlan: { threadId, planId },
+      dispatchMode: "queue",
+    },
+  });
+}
+
+/** Returns null where the thread cannot take a turn. */
 function useMattrPlanApproval(threadRef: ScopedThreadRef | null, planId: PlanId) {
   const thread = useQuietThreadShell(threadRef);
   const setInteractionMode = useOrchestrationCommand(threadEnvironment.setInteractionMode, {
@@ -59,36 +117,8 @@ function useMattrPlanApproval(threadRef: ScopedThreadRef | null, planId: PlanId)
     reportFailure: false,
   });
   if (!threadRef || !thread) return null;
-  return async (planMarkdown: string): Promise<MattrPlanApproveCommandResult> => {
-    const { environmentId, threadId } = threadRef;
-    if (thread.interactionMode !== DEFAULT_INTERACTION_MODE) {
-      const modeResult = await setInteractionMode({
-        environmentId,
-        input: {
-          threadId,
-          interactionMode: DEFAULT_INTERACTION_MODE,
-          createdAt: new Date().toISOString(),
-        },
-      });
-      if (modeResult._tag === "Failure") return modeResult;
-    }
-    return startTurn({
-      environmentId,
-      input: {
-        threadId,
-        message: {
-          messageId: newMessageId(),
-          role: "user",
-          text: `${PLAN_IMPLEMENTATION_PROMPT_PREFIX}${planMarkdown}`,
-          attachments: [],
-        },
-        runtimeMode: thread.runtimeMode,
-        interactionMode: DEFAULT_INTERACTION_MODE,
-        sourceProposedPlan: { threadId, planId },
-        dispatchMode: "queue",
-      },
-    });
-  };
+  return (planMarkdown: string): Promise<MattrPlanApproveCommandResult> =>
+    approveMattrPlan({ threadRef, planId, planMarkdown, thread, setInteractionMode, startTurn });
 }
 
 /** The timeline row's Approve: offered only while the plan is active and the thread idle. */

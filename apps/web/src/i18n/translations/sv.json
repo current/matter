@@ -388,6 +388,7 @@
   "0875cf506f4c6810": "Överhoppad",
   "087d8cedc3ea219d": "Sluta bevaka #{number}",
   "0886cdaa4f5357cf": "Användningsfördelning",
+  "088a7afa42adcd8d": "Arbeta självständigt tills uppgiften är verifierat klar",
   "088bf6e16e4b2021": "Squasha och merga",
   "089043f7a037d2df": "{label}: Begränsad. {message}",
   "0890f74435af5a97": "Versionsinformation för uppdateringen",
@@ -712,6 +713,7 @@
   "0e4b49c8203aae81": "Tidsgränsen överskreds i väntan på en autentiserad session efter uppstart.",
   "0e4cd25642a2df00": "Ingen tillgänglig dator, eller en annan åtgärdsändring håller på att sparas.",
   "0e4f42dd41b74e9a": "Klicka på ”Lägg till miljö” för att parkoppla en annan miljö.",
+  "0e542c982911a601": "Kunde inte rensa målet",
   "0e54f664e6fdc156": "Högerpanel: växla",
   "0e56ea6a22e303ca": "Behöver åtgärdas",
   "0e600459b655584a": "Kontrollerar Expo-kontot…",
@@ -1522,6 +1524,7 @@
   "1e0eb5e0c7c7f4f2": "ACP-åtgärden misslyckades.",
   "1e25265f2758fce3": "Öppna som en hel tråd",
   "1e25e91acb23adbc": "Sortera pull requests",
+  "1e2664b52d580a91": "Sätt ett mål och arbeta självständigt tills det är verifierat uppnått",
   "1e3375e17e0b0704": "Krävs",
   "1e358a7392662403": "Ogiltig indata för terminalstart",
   "1e3857bfd41528f6": "Import från den här webbläsaren går inte på den här plattformen.",
@@ -2219,6 +2222,7 @@
     }
   ],
   "2ae5b30f6da90116": "Kanban",
+  "2aecddccc9357bbc": "Målläge",
   "2af1495b1177c00f": "Cleared saved key (using environment variable).",
   "2b067fba95e3312b": "T3:s systemavtryck",
   "2b06a4b6f5369ae2": "Förhandsvisningsåtkomst är inte tillgänglig för den här klienten.",
@@ -2311,6 +2315,14 @@
   "2d1f6668f713dca9": "Lägg till åtgärd",
   "2d22ff842ebd95f5": "Rutter till {environment}, föredragen först",
   "2d2eb19fbba4d272": "Visa diagnostik och användning",
+  "2d399b57adb61182": [
+    {
+      "t": "kbd",
+      "i": 1,
+      "c": "⇧Tab"
+    },
+    " byter läge"
+  ],
   "2d3ad1215c5d8a52": "Den här anslutningen kan inte ändra trådar.",
   "2d3b55018a54287e": "Kontrollerar stacken med värden…",
   "2d3d4fb05ed5ea44": [
@@ -2345,6 +2357,7 @@
   "2d6107cb78382d08": "Arbetsflöden",
   "2d6175996ce14556": "Leverantörsuppdateringen misslyckades.",
   "2d67b3fae24b20b2": "Hittar enheter…",
+  "2d68cb39ed6b45ca": "Planera först: undersök och föreslå en plan innan något ändras",
   "2d6da78ecabfd210": "Det gick inte att komma åt arbetsytans mapp.",
   "2d6e0f570051b337": "Kunde inte kopiera terminalmarkeringen till urklipp.",
   "2d707aa220f213ec": "{attempt, plural, one {Användningsgränsen nåddes efter {progress} försök} other {Användningsgränsen nåddes efter {progress} försök}}",
@@ -2366,6 +2379,7 @@
   "2db10394281f4dc9": "Miljön är inte ansluten.",
   "2db595fcf95d3ff6": "Ange API-nyckel",
   "2db5ed04153121b3": "Kunde inte skicka {signal} till process {pid}.",
+  "2dbbaa767bbf24a1": "Interaktionsläge: {label}",
   "2dbf5720a46cb44e": "{names} reagerade med tummen ner-emoji",
   "2dc05fc592c6ea45": "Zooma {name}",
   "2dc0997e37a2287f": "Uppdatera den här miljöns T3 Code-server för att använda sidochattar.",
@@ -3473,6 +3487,7 @@
   "40e3528651297351": "{merged, plural, one {Mergade {merged} pull request, köade {queued}} other {Mergade {merged} pull requests, köade {queued}}}",
   "40ef11933aa35e8e": "⌘/Ctrl Enter för att skicka",
   "40f58619ace8deec": "Sökväg i inställningar",
+  "40fed90b1e2c6e6f": "Mål",
   "4103b6b8e0ff3f46": "Det finns fler personer än som listas här.",
   "4105164e21ea3baf": "Strömövervakning av värd",
   "410aa5225a830c8c": "Det tog för lång tid att läsa in PDF:en. Försök igen.",
@@ -3608,6 +3623,7 @@
   "42ade0e14ff6af94": "Uppdatera T3 Code-servern i den här miljön för att bläddra bland ärenden.",
   "42b96626eb49fc73": "{count, plural, one {Försökte lista trådar {count} gång} other {Försökte lista trådar {count} gånger}}",
   "42b973e30201939b": "Kortkommandot sparades.",
+  "42c4a91e4a91f914": "Undersök, ställ frågor och föreslå en steg-för-steg-plan innan något ändras",
   "42d294de5860fbea": "Din session har inte behörighet att hantera åtkomst till T3 Connect.",
   "42d843f45e1de53b": "Läggs till i prompten för nya och omgenererade trådtitlar.",
   "42df29db7df79d71": "Hamnar i {root} på {environment}",
@@ -4375,6 +4391,7 @@
   "51b2ac4a176e9ca0": "Inaktivera radbrytning",
   "51b31345c7bed6f0": "Parkopplingskod",
   "51b46e7723ed52d4": "Leverantörsinstansen lades till",
+  "51cc9f52e73c8f47": "Självständigt genomförande från början till slut tills det är verifierat klart",
   "51e961b37f0ca780": "Läste fil +{count} till",
   "51f1736666da2de9": "Installera fångsthjälpen för att fortsätta",
   "51faae5b2aa811a9": "{count, plural, one {Begärde {count} körning av schemalagd uppgift} other {Begärde {count} körningar av schemalagda uppgifter}}",
@@ -4753,6 +4770,7 @@
   "59e45b02b09e183d": "{environment} är inte ansluten.",
   "59e6cdf357f52c19": "Linjen visar var jämn förbrukning skulle ligga.",
   "59ec78632dc17220": "Det här dokumentet innehåller XML-deklarationer som inte stöds.",
+  "59ee8cd68fb1cc58": "Vanlig interaktiv kodning",
   "59f6812b91146b3b": "{count, plural, one {Försökte lista arbetsytans grenar {count} gång} other {Försökte lista arbetsytans grenar {count} gånger}}",
   "59faa48c7cc48009": "Needs a claude.ai login",
   "59fe9fe34b55019b": "Värden nekade. Kontrollera att du har skrivåtkomst till det här repot och att de fortfarande har åtkomst till det.",
@@ -7276,6 +7294,7 @@
   "897c43fea0cdd373": "Byt till Tailscale eller avregistrera en miljö som du inte längre använder (förlåt!)",
   "8982283666c8c3d5": "{count, plural, one {Körde om CI {count} gång} other {Körde om CI {count} gånger}}",
   "898770cae17df8d2": "{count, plural, one {Skickade {count} meddelande} other {Skickade {count} meddelanden}}",
+  "89a52e8bfb1e817b": "Planera",
   "89a68ae66d9266dc": "Den här appen har ingen adress som en annan dator kan nå. Ange dess https- eller Tailscale-adress.",
   "89b5010ac2665a5b": "Konversationer som inte finns i den aktuella diffen",
   "89b5e8f3887812da": "Gästbegäran",
@@ -8478,6 +8497,7 @@
   "a0e93cca71d0417e": "Auktoriserade klienter",
   "a0eb0e4f76608833": "Öppna länkade pull requests först. Annars öppnas Ändringar för redigeringar av minst 3 filer eller 50 rader.",
   "a0fd24f965eb070b": "Kunde inte importera trådhistorik.",
+  "a10b30890e450f41": "Läge",
   "a10cfdb27152c757": "{count, plural, one {{count} enhet} other {{count} enheter}} anslöt via {product}. Inte du? Granska dem.",
   "a10ff8b39e16d7f8": "Fäst",
   "a1190e56375f2032": "{action} ({shortcut})",
@@ -9485,10 +9505,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· den som kör den får den här åtkomsten"
-      ]
+      "c": [" ", "· den som kör den får den här åtkomsten"]
     }
   ],
   "b2ece956b72c4a48": "Submoduler",
@@ -9598,11 +9615,13 @@
   "b54cf7575b169cc2": "Profilen togs bort",
   "b54ddec9084fa955": "Stängd utan att skickas",
   "b550d04490078bda": "Agenter här kan sedan starta, skicka meddelanden till och vänta på trådar på varje dator du väljer. Varje länk visas under Auktoriserade klienter i den datorns Delning och åtkomst, där den kan återkallas.",
+  "b557a9b90dd7b99d": "Lämna läget {label}",
   "b55aba60a91dc142": "{count, plural, =1 {{label} uppdaterades} other {{count} teman uppdaterades}}",
   "b560c47847c88b2e": "Gränser",
   "b56e706e61e09d5d": "Använd ljus variant, för närvarande {label}",
   "b56f19657e03188c": "Det gick inte att stänga av backenden.",
   "b5702d0b64866b08": "Anpassat",
+  "b5724101371222fc": "Tillbaka till vanlig interaktiv kodning",
   "b5753c2786c8c699": "Committa och pusha till standardgrenen?",
   "b584f8e39d1179c7": "Anpassat alternativ",
   "b587aeb10f238d17": "Ladda ned modell",
@@ -9901,6 +9920,7 @@
     }
   ],
   "babea77bd5527a74": "Återställningstiden har passerat. Försök med tråden igen manuellt.",
+  "babf7a87a1438434": "Målläge: arbetar självständigt tills uppgiften är verifierat klar",
   "bac07cd397c7d1a8": "Nästa träff",
   "bac2928938c80e78": "{provider} uppdaterad: {version}",
   "bac5ef48aafb20b1": "Det här tar bort {count} grupperade projektposter.",
@@ -11127,10 +11147,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "på datorn som öppnade den här sidan"
-      ]
+      "c": [" ", "på datorn som öppnade den här sidan"]
     }
   ],
   "d1259290b8c63577": "Byt namn på tråd",
@@ -11987,6 +12004,7 @@
   "e1fcc4b74faaae02": "Ta bort kortkommando…",
   "e2130fe5df35d0fc": "{count, plural, one {Försökte uppdatera miljöinställningar {count} gång} other {Försökte uppdatera miljöinställningar {count} gånger}}",
   "e2131cbec8accfe3": "Alla typer",
+  "e21b1d0dfeb9cff2": "Planläge: ändringar väntar tills du godkänner planen",
   "e2257344a317b840": "Hand it to an agent",
   "e22a698e175dc991": "Ingen internetanslutning",
   "e22de81630cea8c8": "Begränsad förhandsvisning: det här Word-dokumentet har överdrivet djup XML-nästling.",
@@ -12824,6 +12842,7 @@
   "f1e633aa8e6549b3": "Väntar på sampel",
   "f1e8eadbdfccf059": "iPhone Duo i 3D kräver Device Hub {version} eller senare",
   "f1ea4c6b6cded59b": "Det här lägger pull requestens kod i en ny worktree och kör projektets konfigurationsskript på den.",
+  "f1f3c589d0c0fd77": "Standard",
   "f1f3d81d2a97f0ed": "Initierar...",
   "f2043e87a10cb831": "Redigera tema",
   "f206891e124c77b0": [
@@ -13288,6 +13307,7 @@
   "fb8a1e48976d91c6": "Alla repon",
   "fb8b1585e3724cda": "Manuell uppdatering krävs",
   "fb9434aad2b5c0bb": "Bilden kunde inte läsas in.",
+  "fb9dfbbca2eaf15a": "Lägg till feedback för att förfina planen, eller lämna tomt för att genomföra den",
   "fba00de8e861f8c1": "T3 Connect-inställningar",
   "fba4061567111460": "T3 Code startar om den lokala backenden med Tailscale Serve aktiverat och ber Tailscale att vidarebefordra HTTPS-trafik till den här backenden.",
   "fbaa47ab5f038cfc": "Förhandsvisning finns bara i skrivbordsappen T3 Code.",
@@ -13544,6 +13564,7 @@
   "ffa0687412a3eb80": "Pusha och skapa {term, select, mr {MR} cr {ändringsbegäran} other {PR}} från standardref?",
   "ffaa75d2db1e7cc1": "Uppdateringen tillämpades inte",
   "ffb001f07764c19e": "Inte",
+  "ffb03f7e9c3d11ad": "Interaktionsläge",
   "ffb2653eb2d9fc1a": "{model} identifierar språket automatiskt.",
   "ffbc33f6b6ddc689": "Var ett klick öppnar en subagent, en sidochatt eller en tråd i en länkad miljö. {modifier}-klick eller mittenklick öppnar den i huvudvyn i stället.",
   "ffc1ec33d2de84a3": "Inloggad med ChatGPT.",

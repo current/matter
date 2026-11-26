@@ -388,6 +388,7 @@
   "0875cf506f4c6810": "Ignorée",
   "087d8cedc3ea219d": "Arrêter de surveiller #{number}",
   "0886cdaa4f5357cf": "Répartition de l’utilisation",
+  "088a7afa42adcd8d": "Travailler en autonomie jusqu’à ce que la tâche soit vérifiée comme terminée",
   "088bf6e16e4b2021": "Squash and merge",
   "089043f7a037d2df": "{label} : limité. {message}",
   "0890f74435af5a97": "Notes de version de la mise à jour",
@@ -712,6 +713,7 @@
   "0e4b49c8203aae81": "Délai dépassé en attendant la session authentifiée après l’amorçage.",
   "0e4cd25642a2df00": "Aucune machine disponible, ou une autre modification d’action est en cours d’enregistrement.",
   "0e4f42dd41b74e9a": "Cliquez sur « Ajouter un environnement » pour appairer un autre environnement.",
+  "0e542c982911a601": "Impossible d’effacer l’objectif",
   "0e54f664e6fdc156": "Panneau de droite : afficher/masquer",
   "0e56ea6a22e303ca": "Requiert votre attention",
   "0e600459b655584a": "Vérification du compte Expo…",
@@ -1522,6 +1524,7 @@
   "1e0eb5e0c7c7f4f2": "L’opération ACP a échoué.",
   "1e25265f2758fce3": "Ouvrir comme fil complet",
   "1e25e91acb23adbc": "Trier les pull requests",
+  "1e2664b52d580a91": "Définir un objectif et travailler en autonomie jusqu’à vérification de son atteinte",
   "1e3375e17e0b0704": "Requise",
   "1e358a7392662403": "Paramètres de lancement du terminal non valides",
   "1e3857bfd41528f6": "L’import depuis ce navigateur n’est pas possible sur cette plateforme.",
@@ -2217,6 +2220,7 @@
     }
   ],
   "2ae5b30f6da90116": "Kanban",
+  "2aecddccc9357bbc": "Mode objectif",
   "2af1495b1177c00f": "Cleared saved key (using environment variable).",
   "2b067fba95e3312b": "Empreinte système de T3",
   "2b06a4b6f5369ae2": "L’accès à l’aperçu n’est pas disponible pour ce client.",
@@ -2309,6 +2313,14 @@
   "2d1f6668f713dca9": "Ajouter une action",
   "2d22ff842ebd95f5": "Routes vers {environment}, par ordre de préférence",
   "2d2eb19fbba4d272": "Voir les diagnostics et l’utilisation",
+  "2d399b57adb61182": [
+    {
+      "t": "kbd",
+      "i": 1,
+      "c": "⇧Tab"
+    },
+    " change de mode"
+  ],
   "2d3ad1215c5d8a52": "Cette connexion ne peut pas modifier les fils.",
   "2d3b55018a54287e": "Vérification de la pile auprès de l’hôte…",
   "2d3d4fb05ed5ea44": [
@@ -2343,6 +2355,7 @@
   "2d6107cb78382d08": "Workflows",
   "2d6175996ce14556": "Échec de la mise à jour du fournisseur.",
   "2d67b3fae24b20b2": "Recherche des appareils…",
+  "2d68cb39ed6b45ca": "Planifier d’abord : rechercher et proposer un plan avant de modifier",
   "2d6da78ecabfd210": "Impossible d’accéder au dossier de l’espace de travail.",
   "2d6e0f570051b337": "Impossible de copier la sélection du terminal dans le presse-papiers.",
   "2d707aa220f213ec": "{attempt, plural, one {Limite d’utilisation atteinte après {progress} tentative} other {Limite d’utilisation atteinte après {progress} tentatives}}",
@@ -2364,6 +2377,7 @@
   "2db10394281f4dc9": "L’environnement n’est pas connecté.",
   "2db595fcf95d3ff6": "Saisissez la clé API",
   "2db5ed04153121b3": "Échec de l’envoi de {signal} au processus {pid}.",
+  "2dbbaa767bbf24a1": "Mode d’interaction : {label}",
   "2dbf5720a46cb44e": "{names} a réagi avec l’emoji pouce baissé",
   "2dc05fc592c6ea45": "Zoomer sur {name}",
   "2dc0997e37a2287f": "Mettez à jour le serveur T3 Code de cet environnement pour utiliser les discussions annexes.",
@@ -3471,6 +3485,7 @@
   "40e3528651297351": "{merged, plural, one {{merged} pull request fusionnée, {queued} en file} other {{merged} pull requests fusionnées, {queued} en file}}",
   "40ef11933aa35e8e": "⌘/Ctrl Enter pour envoyer",
   "40f58619ace8deec": "Fil d’Ariane des paramètres",
+  "40fed90b1e2c6e6f": "Objectif",
   "4103b6b8e0ff3f46": "Il existe plus de personnes que celles listées ici.",
   "4105164e21ea3baf": "Moniteur d’alimentation de l’hôte",
   "410aa5225a830c8c": "Le chargement de ce PDF a pris trop de temps. Réessayez.",
@@ -3606,6 +3621,7 @@
   "42ade0e14ff6af94": "Mettez à jour le serveur T3 Code de cet environnement pour parcourir les tickets.",
   "42b96626eb49fc73": "{count, plural, one {Tentative de lister les fils {count} fois} other {Tentative de lister les fils {count} fois}}",
   "42b973e30201939b": "Raccourci enregistré.",
+  "42c4a91e4a91f914": "Rechercher, poser des questions et proposer un plan étape par étape avant de modifier",
   "42d294de5860fbea": "Votre session n’est pas autorisée à gérer l’accès T3 Connect.",
   "42d843f45e1de53b": "Ajouté au prompt pour les titres de fil nouveaux ou régénérés.",
   "42df29db7df79d71": "Dans {root} sur {environment}",
@@ -4372,6 +4388,7 @@
   "51b2ac4a176e9ca0": "Désactiver le retour à la ligne",
   "51b31345c7bed6f0": "Code d’appairage",
   "51b46e7723ed52d4": "Instance du fournisseur ajoutée",
+  "51cc9f52e73c8f47": "Exécution autonome de bout en bout jusqu’à vérification de l’achèvement",
   "51e961b37f0ca780": "Lecture d’un fichier +{count} autres",
   "51f1736666da2de9": "Installez l’assistant de capture pour continuer",
   "51faae5b2aa811a9": "{count, plural, one {{count} exécution de tâche planifiée demandée} other {{count} exécutions de tâches planifiées demandées}}",
@@ -4750,6 +4767,7 @@
   "59e45b02b09e183d": "{environment} n’est pas connecté.",
   "59e6cdf357f52c19": "La ligne indique où en serait une consommation régulière.",
   "59ec78632dc17220": "Ce document contient des déclarations XML non prises en charge.",
+  "59ee8cd68fb1cc58": "Codage interactif normal",
   "59f6812b91146b3b": "{count, plural, one {Tentative de lister les branches de l’espace de travail {count} fois} other {Tentative de lister les branches de l’espace de travail {count} fois}}",
   "59faa48c7cc48009": "Needs a claude.ai login",
   "59fe9fe34b55019b": "L’hôte a refusé. Vérifiez que vous avez l’accès en écriture sur ce dépôt et que ces personnes y ont toujours accès.",
@@ -7271,6 +7289,7 @@
   "897c43fea0cdd373": "Passez à Tailscale ou désinscrivez un environnement que vous n’utilisez plus (désolé !)",
   "8982283666c8c3d5": "{count, plural, one {CI relancée {count} fois} other {CI relancée {count} fois}}",
   "898770cae17df8d2": "{count, plural, one {{count} message envoyé} other {{count} messages envoyés}}",
+  "89a52e8bfb1e817b": "Plan",
   "89a68ae66d9266dc": "Cette app n’a pas d’adresse de machine joignable par une autre machine. Saisissez son adresse https ou Tailscale.",
   "89b5010ac2665a5b": "Conversations absentes du diff actuel",
   "89b5e8f3887812da": "Demande d’invité",
@@ -8471,6 +8490,7 @@
   "a0e93cca71d0417e": "Clients autorisés",
   "a0eb0e4f76608833": "Ouvre d’abord les pull requests associées. Sinon, ouvre Modifications pour des changements touchant au moins 3 fichiers ou 50 lignes.",
   "a0fd24f965eb070b": "Impossible d’importer l’historique des fils.",
+  "a10b30890e450f41": "Mode",
   "a10cfdb27152c757": "{count, plural, one {{count} appareil s’est connecté} other {{count} appareils se sont connectés}} via {product}. Ce n’était pas vous ? Vérifiez-les.",
   "a10ff8b39e16d7f8": "Épingler",
   "a1190e56375f2032": "{action} ({shortcut})",
@@ -9476,10 +9496,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· quiconque l’exécute obtient cet accès"
-      ]
+      "c": [" ", "· quiconque l’exécute obtient cet accès"]
     }
   ],
   "b2ece956b72c4a48": "Sous-modules",
@@ -9589,11 +9606,13 @@
   "b54cf7575b169cc2": "Profil supprimé",
   "b54ddec9084fa955": "Fermé sans envoi",
   "b550d04490078bda": "Les agents d’ici pourront alors lancer des fils sur chaque machine choisie, leur envoyer des messages et les attendre. Chaque association apparaît sous Clients autorisés dans Partage et accès de la machine concernée, où elle peut être révoquée.",
+  "b557a9b90dd7b99d": "Quitter le mode {label}",
   "b55aba60a91dc142": "{count, plural, =1 {{label} mis à jour} other {{count} thèmes mis à jour}}",
   "b560c47847c88b2e": "Limites",
   "b56e706e61e09d5d": "Utiliser la variante claire, actuellement {label}",
   "b56f19657e03188c": "Échec de la désactivation du backend.",
   "b5702d0b64866b08": "Personnalisé",
+  "b5724101371222fc": "Revenir au codage interactif normal",
   "b5753c2786c8c699": "Commiter et pousser sur la branche par défaut ?",
   "b584f8e39d1179c7": "Option personnalisée",
   "b587aeb10f238d17": "Télécharger le modèle",
@@ -9892,6 +9911,7 @@
     }
   ],
   "babea77bd5527a74": "L’heure de réinitialisation est passée. Relancez le fil manuellement.",
+  "babf7a87a1438434": "Mode objectif : travaille seul jusqu’à ce que la tâche soit vérifiée comme terminée",
   "bac07cd397c7d1a8": "Résultat suivant",
   "bac2928938c80e78": "{provider} mis à jour : {version}",
   "bac5ef48aafb20b1": "Cela retire {count} entrées de projet regroupées.",
@@ -11119,10 +11139,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "sur l’ordinateur qui a ouvert cette page"
-      ]
+      "c": [" ", "sur l’ordinateur qui a ouvert cette page"]
     }
   ],
   "d1259290b8c63577": "Renommer le fil",
@@ -11979,6 +11996,7 @@
   "e1fcc4b74faaae02": "Supprimer le raccourci…",
   "e2130fe5df35d0fc": "{count, plural, one {Tentative de mettre à jour les préférences de l’environnement {count} fois} other {Tentative de mettre à jour les préférences de l’environnement {count} fois}}",
   "e2131cbec8accfe3": "Tous les types",
+  "e21b1d0dfeb9cff2": "Mode plan : les modifications attendent votre validation du plan",
   "e2257344a317b840": "Hand it to an agent",
   "e22a698e175dc991": "Aucune connexion Internet",
   "e22de81630cea8c8": "Aperçu limité : ce document Word a une imbrication XML excessive.",
@@ -12817,6 +12835,7 @@
   "f1e633aa8e6549b3": "En attente d’un échantillon",
   "f1e8eadbdfccf059": "L’iPhone Duo 3D nécessite Device Hub {version} ou ultérieur",
   "f1ea4c6b6cded59b": "Cela place le code de la pull request dans un nouveau worktree et y exécute le script de configuration de votre projet.",
+  "f1f3c589d0c0fd77": "Par défaut",
   "f1f3d81d2a97f0ed": "Initialisation...",
   "f2043e87a10cb831": "Modifier le thème",
   "f206891e124c77b0": [
@@ -13281,6 +13300,7 @@
   "fb8a1e48976d91c6": "Tous les dépôts",
   "fb8b1585e3724cda": "Mise à jour manuelle requise",
   "fb9434aad2b5c0bb": "Impossible de charger cette image.",
+  "fb9dfbbca2eaf15a": "Ajoutez un retour pour affiner le plan, ou laissez vide pour l’appliquer",
   "fba00de8e861f8c1": "Paramètres T3 Connect",
   "fba4061567111460": "T3 Code va redémarrer le backend local avec Tailscale Serve activé et demander à Tailscale de relayer le trafic HTTPS vers ce backend.",
   "fbaa47ab5f038cfc": "L’aperçu n’est disponible que dans l’app desktop T3 Code.",
@@ -13537,6 +13557,7 @@
   "ffa0687412a3eb80": "Pousser et créer une {term, select, mr {MR} cr {demande de modification} other {PR}} depuis la ref par défaut ?",
   "ffaa75d2db1e7cc1": "La mise à jour ne s’est pas appliquée",
   "ffb001f07764c19e": "Non",
+  "ffb03f7e9c3d11ad": "Mode d’interaction",
   "ffb2653eb2d9fc1a": "{model} détecte automatiquement la langue.",
   "ffbc33f6b6ddc689": "Où un clic ouvre un sous-agent, une discussion annexe ou un fil d’un environnement associé. {modifier}-clic ou un clic du milieu l’ouvre plutôt dans la vue principale.",
   "ffc1ec33d2de84a3": "Connecté avec ChatGPT.",

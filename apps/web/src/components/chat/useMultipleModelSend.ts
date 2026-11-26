@@ -4,6 +4,7 @@ import { m } from "~/i18n/messages";
 import {
   type EnvironmentId,
   type ModelSelection,
+  type ProviderInteractionMode,
   type RuntimeMode,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -27,7 +28,6 @@ import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { threadEnvironment } from "../../state/threads";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
-import { DEFAULT_INTERACTION_MODE } from "../../types";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   boundAttachmentIds,
@@ -95,6 +95,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     branch,
     selections,
     targets,
+    interactionMode,
     sendSnapshot,
     createdAt,
     attachmentsPromise,
@@ -109,6 +110,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     readonly branch: string;
     readonly selections: ReadonlyArray<ModelSelection>;
     readonly targets: ReadonlyArray<MultipleModelTarget>;
+    readonly interactionMode: ProviderInteractionMode;
     readonly sendSnapshot: ComposerSendSnapshot;
     readonly createdAt: string;
     readonly attachmentsPromise: ReturnType<typeof prepareTurnAttachments>;
@@ -188,14 +190,14 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   modelSelection: target.selection,
                   titleSeed: title,
                   runtimeMode,
-                  interactionMode: DEFAULT_INTERACTION_MODE,
+                  interactionMode,
                   bootstrap: {
                     createThread: {
                       projectId: project.id,
                       title,
                       modelSelection: target.selection,
                       runtimeMode,
-                      interactionMode: DEFAULT_INTERACTION_MODE,
+                      interactionMode,
                       branch,
                       worktreePath: null,
                       createdAt: createdAt,

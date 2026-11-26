@@ -37,7 +37,8 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 
 /**
  * The composer's key handling inside the editor: send shortcuts, the slash/mention menu,
- * prompt history on ArrowUp/ArrowDown, plan-mode toggle, prompt suggestions on Tab, and list continuation.
+ * prompt history on ArrowUp/ArrowDown, interaction-mode cycling on Shift+Tab, prompt suggestions on Tab,
+ * and list continuation.
  * Returns the editor's key handler; it reads the inputs captured by the render that built it.
  */
 export function composerCommandKeyHandler(input: {
@@ -103,6 +104,8 @@ export function composerCommandKeyHandler(input: {
   /** Active in-chat reply target; Escape dismisses it when the prompt is empty. */
   readonly hasActiveReply?: boolean;
   readonly dismissReply?: () => void;
+  /** Shift+Tab outside a list item: Default → Plan → Goal. */
+  readonly cycleInteractionMode?: (() => void) | undefined;
 }) {
   const {
     keybindings,
@@ -238,7 +241,10 @@ export function composerCommandKeyHandler(input: {
       prompt: promptRef.current,
     });
     if (key === "Tab" && event.shiftKey && submissionIntent === null) {
-      return applyListEdit(event, listOutdentForTab);
+      if (applyListEdit(event, listOutdentForTab)) return true;
+      if (!input.cycleInteractionMode || isLiteralPendingAnswer || event.isComposing) return false;
+      input.cycleInteractionMode();
+      return true;
     }
     const { trigger } = resolveActiveComposerTrigger();
     const menuIsActive = !isLiteralPendingAnswer && trigger !== null;

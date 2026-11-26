@@ -1,7 +1,16 @@
-import { NodeId, PlanId, ThreadId, type OrchestrationV2PlanArtifact } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  NodeId,
+  PlanId,
+  ThreadId,
+  type OrchestrationV2PlanArtifact,
+} from "@t3tools/contracts";
+import { AsyncResult } from "effect/reactivity";
 import { describe, expect, it } from "vite-plus/test";
 
+import { useComposerDraftStore } from "../../composerDraftStore";
 import {
+  approveMattrPlan,
   isLatestActiveProposedPlan,
   isRecentProposedPlan,
   MATTR_PLAN_AUTO_APPROVE_FRESHNESS_MS,
@@ -62,5 +71,41 @@ describe("isRecentProposedPlan", () => {
     expect(isRecentProposedPlan({ createdAt: stale, updatedAt: stale }, now)).toBe(false);
     expect(isRecentProposedPlan({ createdAt: fresh, updatedAt: "invalid" }, now)).toBe(true);
     expect(isRecentProposedPlan({ createdAt: "invalid", updatedAt: "invalid" }, now)).toBe(false);
+  });
+});
+
+describe("approveMattrPlan", () => {
+  it("leaves Plan, drops a stale composer Plan pick and cites the plan", async () => {
+    const threadRef = {
+      environmentId: EnvironmentId.make("env-approve"),
+      threadId: ThreadId.make("thread-approve"),
+    };
+    useComposerDraftStore.getState().setInteractionMode(threadRef, "plan");
+    const commands: Array<{ readonly kind: string; readonly value: unknown }> = [];
+    const ok = AsyncResult.success(undefined);
+    await approveMattrPlan({
+      threadRef,
+      planId: PlanId.make("plan-approve"),
+      planMarkdown: "# Plan",
+      thread: { interactionMode: "plan", runtimeMode: "full-access" },
+      setInteractionMode: async (value) => {
+        commands.push({ kind: "mode", value });
+        return ok;
+      },
+      startTurn: async (value) => {
+        commands.push({ kind: "turn", value });
+        return ok;
+      },
+    });
+    expect(
+      useComposerDraftStore.getState().getComposerDraft(threadRef)?.interactionMode ?? null,
+    ).toBeNull();
+    expect(commands.map((command) => command.kind)).toEqual(["mode", "turn"]);
+    expect(commands[1]?.value).toMatchObject({
+      input: {
+        interactionMode: "default",
+        sourceProposedPlan: { threadId: threadRef.threadId, planId: "plan-approve" },
+      },
+    });
   });
 });

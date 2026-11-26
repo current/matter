@@ -72,6 +72,7 @@ import {
 } from "./ContextHandoffDelivery.ts";
 import { isProviderCommand, outputInstructions } from "./runOutput.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import { withMattrGoalModeInstructions } from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import { unsentManualContinuationSource } from "@t3tools/shared/orchestrationV2ManualContinuation";
@@ -1198,10 +1199,20 @@ export const layer: Layer.Layer<
         session.providerSession.capabilities.turns.supportsNativeGoals === true;
       const goalCommand = goalDriver && parseGoalCommand(providerMessage) !== null;
       // Part of the user text, so every way a turn starts carries it, after the user's own words.
-      const userText =
-        run.outputSchema === undefined || goalCommand || isProviderCommand(providerMessage)
+      // Commands reach the provider bare; native-goal providers run Goal through `/goal` instead.
+      const commandText = goalCommand || isProviderCommand(providerMessage);
+      const modeText =
+        commandText || messageText.trimStart().startsWith("/")
           ? messageText
-          : `${messageText}\n\n${outputInstructions(run.outputSchema)}`;
+          : withMattrGoalModeInstructions(
+              messageText,
+              resolvedRuntimePolicy.interactionMode,
+              goalDriver,
+            );
+      const userText =
+        run.outputSchema === undefined || commandText
+          ? modeText
+          : `${modeText}\n\n${outputInstructions(run.outputSchema)}`;
       // The provider turn marks cancellation work delivered; restart continuations use their own text or resume natively.
       const noteContinuation = isRestartNoteContinuation(
         run,

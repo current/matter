@@ -142,6 +142,14 @@ export const PinGlyph = (props: IconProps) => (
   </Glyph>
 );
 
+export const TargetGlyph = (props: IconProps) => (
+  <Glyph {...props}>
+    <circle cx="8" cy="8" r="5.75" />
+    <circle cx="8" cy="8" r="3" />
+    <circle cx="8" cy="8" r=".6" fill="currentColor" />
+  </Glyph>
+);
+
 export const CloseGlyph = (props: IconProps) => (
   <Glyph {...props}>
     <path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />

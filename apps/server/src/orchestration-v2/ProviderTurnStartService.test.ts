@@ -3592,3 +3592,46 @@ effectIt.effect("rejects citation expansion before opening a provider session", 
     expect(harness.projection().messages[0]?.text).toBe(text);
   }),
 );
+
+effectIt.effect.each([
+  // Codex, and OpenCode/Antigravity when they report native goals, run Goal through `/goal`.
+  { mode: "goal", text: "Ship the importer", nativeGoals: undefined, fallback: false },
+  { mode: "goal", text: "Ship the importer", nativeGoals: true, fallback: false },
+  { mode: "goal", text: "/goal Ship the importer", nativeGoals: undefined, fallback: false },
+  // A provider without native goals gets mattr's fallback block, but never after a command.
+  { mode: "goal", text: "Ship the importer", nativeGoals: false, fallback: true },
+  { mode: "goal", text: "/review the diff", nativeGoals: false, fallback: false },
+  // Plan and Default add nothing on any provider.
+  { mode: "plan", text: "Ship the importer", nativeGoals: false, fallback: false },
+  { mode: "plan", text: "Ship the importer", nativeGoals: undefined, fallback: false },
+  { mode: "default", text: "Ship the importer", nativeGoals: false, fallback: false },
+] as const)(
+  "mattr: a $mode turn for $text (native goals: $nativeGoals) adds the Goal fallback: $fallback",
+  ({ mode, text, nativeGoals, fallback }) =>
+    Effect.gen(function* () {
+      const harness = makeLocalCommandHarness({
+        text,
+        ...(nativeGoals === undefined ? {} : { nativeGoals }),
+        sideChat: { contextRun: "failed", switchedProvider: true },
+      });
+      harness.resolveRuntimePolicy.mockReturnValue(
+        Effect.succeed({
+          cwd: "/tmp/native-account-command",
+          runtimeMode: "full-access",
+          interactionMode: mode,
+        } as never),
+      );
+      harness.tryHandlePromptCommand.mockReturnValue(Effect.succeed(false));
+      yield* harness.start;
+      // The side chat's context rides in front; the Goal block follows the user's words.
+      const sent = harness.startTurn.mock.calls[0]?.[0].message.text ?? "";
+      expect(sent).not.toContain("mattr Plan mode");
+      if (fallback) {
+        expect(sent).toContain(`${text}\n\n<mattr_goal_mode>\n`);
+        expect(sent.endsWith("</mattr_goal_mode>")).toBe(true);
+      } else {
+        expect(sent.endsWith(text)).toBe(true);
+        expect(sent).not.toContain("<mattr_goal_mode>");
+      }
+    }),
+);

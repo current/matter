@@ -574,7 +574,8 @@ html:not([data-mattr-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data-
   font-weight: 560;
 }
 
-.mts .mts-pin {
+.mts .mts-pin,
+.mts .mts-goal {
   width: 11px;
   height: 11px;
   flex: none;
@@ -775,7 +776,8 @@ html:not([data-mattr-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data-
 .mts .mts-row[data-active] .mts-br,
 .mts .mts-row[data-active] .mts-mi,
 .mts .mts-row[data-active] .mts-age,
-.mts .mts-row[data-active] .mts-pin {
+.mts .mts-row[data-active] .mts-pin,
+.mts .mts-row[data-active] .mts-goal {
   color: var(--mts-secondary);
 }
 
