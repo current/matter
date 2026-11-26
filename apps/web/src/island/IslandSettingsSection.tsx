@@ -52,13 +52,13 @@ const SHORTCUT_OPTIONS: ReadonlyArray<{
 }> = [
   {
     value: "control",
-    label: msg("Control tap (⌃)"),
-    hint: msg("Tap Control alone from any app"),
+    label: msg("Control (⌃⌃)"),
+    hint: msg("Double-tap Control to open; hold it to dictate"),
   },
   {
     value: "option",
-    label: msg("Option tap (⌥)"),
-    hint: msg("Tap Option alone from any app"),
+    label: msg("Option (⌥⌥)"),
+    hint: msg("Double-tap Option to open; hold it to dictate"),
   },
   {
     value: "command-shift-space",
@@ -68,7 +68,7 @@ const SHORTCUT_OPTIONS: ReadonlyArray<{
   {
     value: "off",
     label: msg("Off"),
-    hint: msg("Open only from notifications or Settings"),
+    hint: msg("Open by clicking the notch"),
   },
 ];
 
@@ -482,17 +482,17 @@ export function IslandSettingsSection() {
   return (
     <>
       {islandBridge ? (
-        <SettingsSection id="mattr-island" title={gt("mattr Island")}>
+        <SettingsSection id="mattr-island" title={gt("Matter Island")}>
           <SettingsRow
-            title={gt("Floating Island")}
+            title={gt("Notch island")}
             description={gt(
-              "Show a pill at the notch when a thread finishes or needs you, and talk to mattr from any app.",
+              "Answer agents, capture a prompt or task, and drop files at the notch without leaving the app you are in.",
             )}
             control={
               <Switch
                 checked={settings.enabled}
                 onCheckedChange={(checked) => updateIslandSettings({ enabled: checked })}
-                aria-label={gt("Enable mattr Island")}
+                aria-label={gt("Enable Matter Island")}
               />
             }
           />
@@ -502,7 +502,7 @@ export function IslandSettingsSection() {
               <SettingsRow
                 title={gt("Global shortcut")}
                 description={gt(
-                  "Opens the floating session panel over any app. Tap again while open to speak.",
+                  "Opens the island over any app without switching Spaces. Hold the key while it is open to dictate.",
                 )}
                 control={
                   <Select
@@ -531,9 +531,9 @@ export function IslandSettingsSection() {
               />
 
               <SettingsRow
-                title={gt("Notch notifications")}
+                title={gt("Agent status at the notch")}
                 description={gt(
-                  "Hang a pill from the notch when a thread finishes, asks a question, or needs approval while mattr is in the background.",
+                  "Show who is working beside the notch, and peek for a moment when an agent needs you.",
                 )}
                 control={
                   <Switch
@@ -547,23 +547,9 @@ export function IslandSettingsSection() {
               />
 
               <SettingsRow
-                title={gt("Show recent messages")}
-                description={gt(
-                  "Display the thread's latest prompt, tool calls, and reply above the Siri Wave.",
-                )}
-                control={
-                  <Switch
-                    checked={settings.showMessages}
-                    onCheckedChange={(checked) => updateIslandSettings({ showMessages: checked })}
-                    aria-label={gt("Show recent messages in Island")}
-                  />
-                }
-              />
-
-              <SettingsRow
                 title={gt("Voice visual")}
                 description={gt(
-                  "Lilt Siri Wave (GLSL): animates live with your voice and mattr's spoken replies, and morphs into fluid dots while thinking.",
+                  "The wave in the notch while you dictate or Voice Mode is listening or speaking.",
                 )}
                 control={
                   <div className="flex items-center gap-2">

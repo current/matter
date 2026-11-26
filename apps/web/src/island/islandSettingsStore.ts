@@ -141,6 +141,7 @@ function normalizeVoiceAssistantSettings(
   };
 }
 
+/** Fields of older island designs (e.g. `showMessages`) are read past and dropped on the next write. */
 export function normalizeIslandSettings(
   raw: unknown,
   base: IslandSettings = DEFAULT_ISLAND_SETTINGS,
@@ -157,8 +158,6 @@ export function normalizeIslandSettings(
       typeof parsed.showNotifications === "boolean"
         ? parsed.showNotifications
         : base.showNotifications,
-    showMessages:
-      typeof parsed.showMessages === "boolean" ? parsed.showMessages : base.showMessages,
     voiceAssistant: normalizeVoiceAssistantSettings(parsed.voiceAssistant, base.voiceAssistant),
   };
 }

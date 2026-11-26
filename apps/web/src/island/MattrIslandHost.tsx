@@ -6,6 +6,7 @@ import { transcribeCloudPcm, transcribeEnvironmentPcm } from "@t3tools/client-ru
 import {
   DEFAULT_RUNTIME_MODE,
   EnvironmentId,
+  PlanId,
   RuntimeRequestId,
   ThreadId,
   type OrchestrationV2ThreadShell,
@@ -24,7 +25,7 @@ import { useClientSettings } from "../hooks/useSettings";
 import { useStableCallback } from "../hooks/useStableCallback";
 import { useTheme } from "../hooks/useTheme";
 import { m } from "../i18n/messages";
-import { cn, newMessageId } from "../lib/utils";
+import { cn, newMessageId, newThreadId } from "../lib/utils";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readAppleSpeechLocales, resolveAppleSpeechLocale } from "../speech/appleSpeech";
 import { runEnvironmentSpeech } from "../speech/runEnvironmentSpeech";
@@ -37,6 +38,15 @@ import {
   useEnvironmentSpeechInput,
   useVoiceTranscriptionDestination,
 } from "../speech/useEnvironmentSpeechInput";
+import { useMattrApiConfig } from "../addons/mattrApi";
+import { parseMattrPlanOverview } from "../components/chat/mattrPlanParser.mattr";
+import {
+  providerHasNativeGoals,
+  withNativeGoalCommand,
+} from "../components/chat/mattrInteractionMode.mattr";
+import { approveMattrPlan } from "../components/chat/useMattrPlanApproval.mattr";
+import { createMattrTasksActions } from "../components/tasks/mattrTasksStore";
+import { primaryServerProvidersAtom } from "../state/server";
 import { usePreparedConnection } from "../state/session";
 import { useProjects } from "../state/entities";
 import { usePrimaryEnvironmentId } from "../state/environments";
@@ -53,18 +63,14 @@ import { resolveThreadRouteTarget } from "../threadRoutes";
 import { MattrVoiceModeBar } from "./MattrVoiceModeBar";
 import { useHasVoiceModeHost } from "./voiceModeHost";
 import { VoiceBriefingCoordinator } from "./VoiceBriefingCoordinator";
+import { captureTaskTitle, composeCaptureText } from "./islandCapture";
 import { EMPTY_ISLAND_THREAD_PREVIEW, summarizeThreadProjection } from "./islandThreadActivity";
 import { useIslandSettings } from "./islandSettingsStore";
 import {
-  bargeInVoiceAssistant,
-  clearVoiceAssistantHistory,
   registerHostBridge,
   setVoiceModeOpen,
-  setVoiceAssistantMode,
-  submitVoiceAssistantUtterance,
   toIslandVoiceAssistantState,
   toggleVoiceAssistantHandsFree,
-  toggleVoiceAssistantMute,
   useVoiceAssistantState,
   type VoiceAssistantThreadScope,
 } from "./voiceAssistantStore";
@@ -74,7 +80,9 @@ import type {
   IslandAction,
   IslandApprovalOption,
   IslandDoneNotification,
+  IslandDroppedFile,
   IslandPendingApproval,
+  IslandPendingPlan,
   IslandPendingUserInput,
   IslandSnapshot,
   IslandThreadSummary,
@@ -158,8 +166,9 @@ export function MattrIslandHost() {
   const environmentIds = useAtomValue(environmentSummaries.environmentIdsAtom);
   const voiceMicrophone = useClientSettings((s) => s.voiceMicrophone);
   const speechLanguage = useClientSettings((s) => s.speechLanguage);
+  const serverProviders = useAtomValue(primaryServerProvidersAtom);
+  const tasksApiConfig = useMattrApiConfig();
 
-  const startTurn = useOrchestrationCommand(threadEnvironment.startTurn, { reportFailure: false });
   const respondToApproval = useOrchestrationCommand(threadEnvironment.respondToApproval, {
     reportFailure: false,
   });
@@ -169,15 +178,15 @@ export function MattrIslandHost() {
   const dismissUserInput = useAtomCommand(threadEnvironment.dismissUserInput, {
     reportFailure: false,
   });
+  // Captures from the island report failures in the app: the island itself has no toasts.
+  const startCaptureTurn = useOrchestrationCommand(threadEnvironment.startTurn);
+  const setInteractionMode = useOrchestrationCommand(threadEnvironment.setInteractionMode);
 
   const [mainWindowFocused, setMainWindowFocused] = useState(() =>
     typeof document !== "undefined" ? document.hasFocus() : true,
   );
-  const [selectionOverride, setSelectionOverride] = useState<{
-    readonly routeKey: string | null;
-    readonly pickedKey: string;
-  } | null>(null);
   const [draftText, setDraftText] = useState("");
+  const [draftRevision, setDraftRevision] = useState(0);
   const [doneNotifications, setDoneNotifications] = useState<ReadonlyArray<IslandDoneNotification>>(
     [],
   );
@@ -204,10 +213,7 @@ export function MattrIslandHost() {
 
   const routeTarget = resolveThreadRouteTarget(routeParams);
   const routeThreadKey = routeTarget?.kind === "server" ? threadKey(routeTarget.threadRef) : null;
-  const selectedThreadKey =
-    selectionOverride && selectionOverride.routeKey === routeThreadKey
-      ? selectionOverride.pickedKey
-      : routeThreadKey;
+  const selectedThreadKey = routeThreadKey;
 
   const activeHostEnvironmentId =
     (routeTarget?.kind === "server" ? routeTarget.threadRef.environmentId : null) ??
@@ -285,18 +291,25 @@ export function MattrIslandHost() {
                 raw,
                 subagentRequests.get(raw.id) ?? null,
               );
-              const status = resolveSidebarThreadStatus(presented);
-              const completedRunId =
-                status === "ready" && presented.latestRun?.status === "completed"
-                  ? presented.latestRun.runId
-                  : null;
+              const status = mapThreadStatus(
+                resolveSidebarThreadStatus(presented),
+                presented.latestRun?.status,
+              );
+              const outcome =
+                status === "done"
+                  ? ("completed" as const)
+                  : status === "failed" || status === "limited"
+                    ? status
+                    : null;
+              const finishedRunId = outcome ? (presented.latestRun?.runId ?? null) : null;
               const prevRunId = previousCompletedRunRef.current.get(key) ?? null;
-              previousCompletedRunRef.current.set(key, completedRunId);
+              previousCompletedRunRef.current.set(key, finishedRunId);
 
               if (
                 initialized &&
-                completedRunId !== null &&
-                completedRunId !== prevRunId &&
+                outcome !== null &&
+                finishedRunId !== null &&
+                finishedRunId !== prevRunId &&
                 raw.archivedAt === null &&
                 !(mainFocusedRef.current && key === routeThreadKeyRef.current)
               ) {
@@ -309,6 +322,7 @@ export function MattrIslandHost() {
                       threadId: raw.id,
                       threadTitle: presented.title || m(msg("Untitled thread")),
                       completedAt: Date.now(),
+                      outcome,
                     },
                     ...filtered,
                   ].slice(0, MAX_DONE_NOTIFICATIONS);
@@ -406,7 +420,11 @@ export function MattrIslandHost() {
   if (scopedVoiceThreadKey) watchedDetailKeys.add(scopedVoiceThreadKey);
   let watchedRunning = 0;
   for (const [key, entry] of shellsByKey) {
-    if (entry.status === "approval" || entry.status === "input") {
+    if (
+      entry.status === "approval" ||
+      entry.status === "input" ||
+      (entry.raw.interactionMode === "plan" && entry.status !== "running")
+    ) {
       watchedDetailKeys.add(key);
     } else if (entry.status === "running" && watchedRunning < MAX_WATCHED_RUNNING_THREADS) {
       watchedDetailKeys.add(key);
@@ -449,12 +467,6 @@ export function MattrIslandHost() {
     ? (projectByKey.get(`${selectedShell.environmentId}:${selectedShell.raw.projectId}`) ?? null)
     : null;
 
-  const assistantModeRef = useRef(assistantState.mode);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps active voice panel mode visible to speech commit callback
-  useEffect(() => {
-    assistantModeRef.current = assistantState.mode;
-  }, [assistantState.mode]);
-
   const speech = useEnvironmentSpeechInput({
     environmentId: speechEnvironmentId,
     projectId: selectedShell?.raw.projectId ?? null,
@@ -467,27 +479,50 @@ export function MattrIslandHost() {
       text: draftRef.current,
       selection: { start: draftRef.current.length, end: draftRef.current.length },
     }),
+    // Island dictation always lands in the notch composer; Voice Mode handles spoken commands.
     commitDraft: (text) => {
-      const cleaned = text.trim();
-      if (cleaned && assistantModeRef.current !== "dictation") {
-        draftRef.current = "";
-        setDraftText("");
-        void submitVoiceAssistantUtterance(cleaned, {
-          modeOverride: assistantModeRef.current,
-        });
-        return;
-      }
       draftRef.current = text;
       setDraftText(text);
+      setDraftRevision((n) => n + 1);
     },
   });
 
   // Build pending approvals, user inputs, and recent thread summaries once per render
-  const { pendingApprovals, pendingUserInputs, recentThreads } = (() => {
+  const providerByInstanceId = new Map(
+    serverProviders.map((provider) => [provider.instanceId as string, provider] as const),
+  );
+  const planMarkdownById = new Map<string, string>();
+
+  const { pendingApprovals, pendingUserInputs, pendingPlans, recentThreads } = (() => {
     void stateRevision;
     const approvals: IslandPendingApproval[] = [];
     const userInputs: IslandPendingUserInput[] = [];
+    const plans: IslandPendingPlan[] = [];
     const threads: IslandThreadSummary[] = [];
+
+    for (const [key, entry] of shellsByKey) {
+      if (entry.raw.interactionMode !== "plan" || entry.status === "running") continue;
+      if (!watchedDetailKeys.has(key)) continue;
+      const projection = Option.getOrNull(
+        appAtomRegistry.get(environmentThreadDetails.stateAtom(parseThreadKey(key))).data,
+      );
+      const plan = projection?.plans.findLast(
+        (candidate) => candidate.kind === "proposed_plan" && candidate.status === "active",
+      );
+      if (!plan || plan.kind !== "proposed_plan") continue;
+      const overview = parseMattrPlanOverview(plan.markdown);
+      planMarkdownById.set(plan.id, plan.markdown);
+      plans.push({
+        environmentId: entry.environmentId,
+        threadId: entry.raw.id,
+        threadTitle: entry.title,
+        planId: plan.id,
+        title: overview.title,
+        steps: overview.steps.slice(0, 5).map((step) => step.text),
+        stepCount: overview.steps.length,
+        canApprove: entry.status !== "approval" && entry.status !== "input",
+      });
+    }
 
     for (const [key, entry] of shellsByKey) {
       if (entry.status !== "approval" && entry.status !== "input") continue;
@@ -570,6 +605,8 @@ export function MattrIslandHost() {
         toolCallCount: preview.toolCallCount,
         isStreaming: preview.isStreaming,
         providerInstanceId: entry.raw.providerInstanceId,
+        providerKind: providerByInstanceId.get(entry.raw.providerInstanceId)?.driver ?? null,
+        providerName: providerByInstanceId.get(entry.raw.providerInstanceId)?.displayName ?? null,
         model: entry.raw.modelSelection.model,
         branch: entry.raw.branch,
         runStartedAt: entry.runStartedAt,
@@ -580,36 +617,161 @@ export function MattrIslandHost() {
       });
     }
 
-    return { pendingApprovals: approvals, pendingUserInputs: userInputs, recentThreads: threads };
+    return {
+      pendingApprovals: approvals,
+      pendingUserInputs: userInputs,
+      pendingPlans: plans,
+      recentThreads: threads,
+    };
   })();
 
   const sendReplyToThread = useStableCallback(
-    (environmentId: string, threadId: string, text: string) => {
+    (
+      environmentId: string,
+      threadId: string,
+      text: string,
+      requestedMode: "default" | "plan" | "goal" = "default",
+    ) => {
       const envId = EnvironmentId.make(environmentId);
       const tId = ThreadId.make(threadId);
       const key = threadKey({ environmentId: envId, threadId: tId });
       const shellEntry = shellsByKey.get(key);
       const trimmed = text.trim();
       if (!trimmed) return;
-      draftRef.current = "";
-      setDraftText("");
-      void startTurn({
+      // No prefix keeps the thread's own mode; /plan or /goal switches it.
+      const interactionMode =
+        requestedMode === "default"
+          ? (shellEntry?.raw.interactionMode ?? "default")
+          : requestedMode;
+      const provider = shellEntry
+        ? providerByInstanceId.get(shellEntry.raw.providerInstanceId)
+        : undefined;
+      const outgoing = withNativeGoalCommand({
+        prompt: trimmed,
+        interactionMode,
+        nativeGoalStarted: shellEntry?.raw.interactionMode === "goal",
+        attachmentCount: 0,
+        nativeGoals: providerHasNativeGoals(
+          provider?.driver ?? null,
+          provider?.slashCommands,
+          provider?.version,
+        ),
+      });
+      void startCaptureTurn({
         environmentId: envId,
         input: {
           threadId: tId,
           message: {
             messageId: newMessageId(),
             role: "user",
-            text: trimmed,
+            text: outgoing,
             attachments: [],
           },
           ...(shellEntry?.raw.modelSelection
             ? { modelSelection: shellEntry.raw.modelSelection }
             : {}),
           runtimeMode: shellEntry?.raw.runtimeMode ?? DEFAULT_RUNTIME_MODE,
-          interactionMode: shellEntry?.raw.interactionMode ?? "default",
+          interactionMode,
           createdAt: currentTimestampIso(),
         },
+      });
+    },
+  );
+
+  // "New thread" starts in the project (and with the model) of the thread the island targets.
+  const referenceShell = effectiveSelectedKey
+    ? (shellsByKey.get(effectiveSelectedKey) ?? null)
+    : null;
+  const referenceProject = referenceShell
+    ? (projects.find(
+        (project) =>
+          project.environmentId === referenceShell.environmentId &&
+          project.id === referenceShell.raw.projectId,
+      ) ?? null)
+    : null;
+
+  const startCaptureThread = useStableCallback(
+    (text: string, requestedMode: "default" | "plan" | "goal") => {
+      if (!referenceShell || !referenceProject) return;
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const threadId = newThreadId();
+      const createdAt = currentTimestampIso();
+      const { modelSelection, runtimeMode } = referenceShell.raw;
+      const provider = providerByInstanceId.get(referenceShell.raw.providerInstanceId);
+      const outgoing = withNativeGoalCommand({
+        prompt: trimmed,
+        interactionMode: requestedMode,
+        nativeGoalStarted: false,
+        attachmentCount: 0,
+        nativeGoals: providerHasNativeGoals(
+          provider?.driver ?? null,
+          provider?.slashCommands,
+          provider?.version,
+        ),
+      });
+      const title = captureTaskTitle(trimmed, [], []);
+      void startCaptureTurn({
+        environmentId: referenceProject.environmentId,
+        input: {
+          threadId,
+          message: { messageId: newMessageId(), role: "user", text: outgoing, attachments: [] },
+          modelSelection,
+          titleSeed: title,
+          runtimeMode,
+          interactionMode: requestedMode,
+          bootstrap: {
+            createThread: {
+              projectId: referenceProject.id,
+              title,
+              modelSelection,
+              runtimeMode,
+              interactionMode: requestedMode,
+              branch: null,
+              worktreePath: null,
+              createdAt,
+            },
+          },
+          createdAt,
+        },
+      });
+    },
+  );
+
+  const createCaptureTask = useStableCallback(
+    (text: string, files: ReadonlyArray<IslandDroppedFile>, urls: ReadonlyArray<string>) => {
+      if (!tasksApiConfig) return;
+      const title = captureTaskTitle(text, files, urls);
+      if (!title) return;
+      const firstLine = text.trim().split("\n")[0]?.trim() ?? "";
+      const note = composeCaptureText(text.trim().slice(firstLine.length), files, urls);
+      void createMattrTasksActions(tasksApiConfig)
+        .create({
+          title,
+          ...(note ? { note } : {}),
+          ...(referenceShell ? { projectId: referenceShell.raw.projectId } : {}),
+        })
+        .catch((error: unknown) => console.warn("Island could not create a task", error));
+    },
+  );
+
+  const approveIslandPlan = useStableCallback(
+    (environmentId: string, threadId: string, planId: string) => {
+      const envId = EnvironmentId.make(environmentId);
+      const tId = ThreadId.make(threadId);
+      const shellEntry = shellsByKey.get(threadKey({ environmentId: envId, threadId: tId }));
+      const markdown = planMarkdownById.get(planId);
+      if (!shellEntry || markdown === undefined) return;
+      void approveMattrPlan({
+        threadRef: { environmentId: envId, threadId: tId },
+        planId: PlanId.make(planId),
+        planMarkdown: markdown,
+        thread: {
+          interactionMode: shellEntry.raw.interactionMode,
+          runtimeMode: shellEntry.raw.runtimeMode,
+        },
+        setInteractionMode,
+        startTurn: startCaptureTurn,
       });
     },
   );
@@ -722,6 +884,7 @@ export function MattrIslandHost() {
           } else {
             draftRef.current = action.text;
             setDraftText(action.text);
+            setDraftRevision((n) => n + 1);
           }
           return;
         }
@@ -918,10 +1081,6 @@ export function MattrIslandHost() {
         });
         return;
       }
-      case "select-thread": {
-        setSelectionOverride({ routeKey: routeThreadKey, pickedKey: action.threadKey });
-        return;
-      }
       case "dismiss-done": {
         if (action.key) {
           setDoneNotifications((existing) => existing.filter((item) => item.key !== action.key));
@@ -959,48 +1118,9 @@ export function MattrIslandHost() {
         speechRef.current.cancel();
         return;
       }
-      case "voice-toggle": {
-        if (!speechRef.current.available && deepgramAvailableRef.current) {
-          toggleVoiceAssistantHandsFree();
-          return;
-        }
-        const phase = speechRef.current.state.phase;
-        if (phase === "recording") {
-          void speechRef.current.stop();
-        } else if (phase === "idle" || phase === "error") {
-          void speechRef.current.start();
-        } else {
-          speechRef.current.cancel();
-        }
-        return;
-      }
-      case "assistant-set-mode": {
-        setVoiceAssistantMode(action.mode);
-        return;
-      }
-      case "assistant-submit-text": {
-        void submitVoiceAssistantUtterance(action.text);
-        return;
-      }
-      case "assistant-toggle-hands-free": {
-        toggleVoiceAssistantHandsFree();
-        return;
-      }
-      case "assistant-toggle-mute": {
-        toggleVoiceAssistantMute();
-        return;
-      }
-      case "assistant-barge-in": {
-        bargeInVoiceAssistant();
-        return;
-      }
       case "assistant-open-voice-mode-modal": {
         window.focus();
         setVoiceModeOpen(true);
-        return;
-      }
-      case "assistant-clear-history": {
-        clearVoiceAssistantHistory();
         return;
       }
       case "open-voice-settings": {
@@ -1011,8 +1131,26 @@ export function MattrIslandHost() {
         void navigate({ to: "/settings/general", hash: "mattr-island" });
         return;
       }
-      case "send-reply": {
-        sendReplyToThread(action.environmentId, action.threadId, action.text);
+      case "submit-capture": {
+        const text = composeCaptureText(action.text, action.files, action.urls);
+        draftRef.current = "";
+        setDraftText("");
+        if (action.target.kind === "thread") {
+          sendReplyToThread(
+            action.target.environmentId,
+            action.target.threadId,
+            text,
+            action.interactionMode,
+          );
+        } else if (action.target.kind === "new-thread") {
+          startCaptureThread(text, action.interactionMode);
+        } else {
+          createCaptureTask(action.text, action.files, action.urls);
+        }
+        return;
+      }
+      case "approve-plan": {
+        approveIslandPlan(action.environmentId, action.threadId, action.planId);
         return;
       }
       case "respond-approval": {
@@ -1074,14 +1212,18 @@ export function MattrIslandHost() {
         doneNotifications,
         pendingApprovals,
         pendingUserInputs,
+        pendingPlans,
         recentThreads,
         selectedThreadKey: effectiveSelectedKey,
+        canStartThread: referenceProject !== null,
+        canCreateTask: tasksApiConfig !== null,
         voice: {
           phase: speech.state.phase,
           level: speech.level,
           previewCommitted: speech.preview?.committed ?? "",
           previewTentative: speech.preview?.tentative ?? "",
           draftText,
+          draftRevision,
           error: speech.state.phase === "error" ? speech.state.error : null,
           available: speech.available || deepgramAvailable,
         },

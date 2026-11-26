@@ -14,20 +14,32 @@ const MODIFIER_FLAG_MASK: Record<MacSingleTapModifier, number> = {
 const ALL_MODIFIERS_MASK = 0x20000 | 0x40000 | 0x80000 | 0x100000;
 
 const MODIFIER_EVENTS = ["tap", "hold-start", "hold-end", "hold-cancel"] as const;
+const DRAG_EVENTS = ["drag-start", "drag-end"] as const;
 
 export type MacModifierEvent = (typeof MODIFIER_EVENTS)[number];
 
-export function parseModifierMonitorLine(line: string): MacModifierEvent | null {
+export type MacDragEvent = (typeof DRAG_EVENTS)[number];
+export type MacMonitorEvent = MacModifierEvent | MacDragEvent;
+
+export function parseModifierMonitorLine(line: string): MacMonitorEvent | null {
   const message = line.trim();
-  return MODIFIER_EVENTS.find((event) => event === message) ?? null;
+  return (
+    MODIFIER_EVENTS.find((event) => event === message) ??
+    DRAG_EVENTS.find((event) => event === message) ??
+    null
+  );
+}
+
+export function isMacDragEvent(event: MacMonitorEvent): event is MacDragEvent {
+  return event === "drag-start" || event === "drag-end";
 }
 
 export const MODIFIER_TAP_MAX_SECONDS = 0.22;
 export const MODIFIER_TAP_MIN_SECONDS = 0.015;
 
-// Polls CGEventSourceFlagsState without Accessibility permissions. Clean keydown prints
-// "hold-start" at 0ms; another key, modifier, or click prints "hold-cancel". Clean release prints
-// "hold-cancel" + "tap" when <= 220ms, or "hold-end" when held longer.
+// Polls without Accessibility permissions. Clean keydown: "hold-start"; a chord: "hold-cancel";
+// release within 220ms: "hold-cancel" + "tap", later: "hold-end". Mask 0 skips the modifier.
+// A drag is the drag pasteboard changing while the left button is down ("drag-start"/"drag-end").
 export const MODIFIER_POLLER_SCRIPT = `
 ObjC.import("AppKit");
 $.NSApplication.sharedApplication.setActivationPolicy($.NSApplicationActivationPolicyProhibited);
@@ -43,8 +55,33 @@ function run(argv) {
   let dirty = false;
   let holding = false;
   let downAt = 0;
+  const dragName = $.NSPasteboardNameDrag || $("Apple CFPasteboard drag");
+  const dragBoard = $.NSPasteboard.pasteboardWithName(dragName);
+  let buttonDown = false;
+  let dragCount = 0;
+  let dragging = false;
   console.log("ready");
   while ($.getppid() !== 1) {
+    const leftDown = ($.NSEvent.pressedMouseButtons & 1) !== 0;
+    if (leftDown) {
+      if (!buttonDown) {
+        buttonDown = true;
+        dragCount = dragBoard.changeCount;
+      } else if (!dragging && dragBoard.changeCount !== dragCount) {
+        dragging = true;
+        console.log("drag-start");
+      }
+    } else if (buttonDown) {
+      buttonDown = false;
+      if (dragging) {
+        dragging = false;
+        console.log("drag-end");
+      }
+    }
+    if (targetMask === 0) {
+      delay(0.02);
+      continue;
+    }
     const flags = $.CGEventSourceFlagsState(1);
     const targetDown = (flags & targetMask) !== 0;
     const otherDown = (flags & otherMask) !== 0;
@@ -94,12 +131,13 @@ function run(argv) {
   return "orphaned";
 }`;
 
+/** `modifier: null` watches drags only. */
 export function startMacSingleTapModifierMonitor(
-  modifier: MacSingleTapModifier,
-  onEvent: (event: MacModifierEvent) => void,
+  modifier: MacSingleTapModifier | null,
+  onEvent: (event: MacMonitorEvent) => void,
   onFailure?: (error: Error) => void,
 ): Promise<() => void> {
-  const targetMask = MODIFIER_FLAG_MASK[modifier];
+  const targetMask = modifier === null ? 0 : MODIFIER_FLAG_MASK[modifier];
   const poller = NodeChildProcess.spawn(
     "/usr/bin/osascript",
     [

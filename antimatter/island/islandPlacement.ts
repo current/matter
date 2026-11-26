@@ -1,7 +1,10 @@
 import type { IslandDisplayMetrics } from "./types.ts";
 
-export const ISLAND_WINDOW_WIDTH = 560;
-export const ISLAND_WINDOW_HEIGHT = 600;
+// Fits the 420pt Open card plus its 18pt ears and the hover bloom, with room for the drop zones.
+export const ISLAND_WINDOW_WIDTH = 520;
+export const ISLAND_WINDOW_HEIGHT = 560;
+/** How far below the screen top a drag counts as "near the notch". */
+export const ISLAND_DROP_CATCH_HEIGHT = 140;
 // Wider than both 14"/16" MacBook Pro (~185pt) and 13"/15" MacBook Air (~192pt) camera housings
 // so left/right pill wings never clip beneath the physical notch.
 export const NOTCHED_DISPLAY_NOTCH_WIDTH = 200;

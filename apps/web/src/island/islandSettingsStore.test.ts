@@ -13,21 +13,20 @@ describe("islandSettingsStore", () => {
     updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
   });
 
-  it("defaults to enabled with single-tap Control shortcut, notifications, and voiceAssistant defaults", () => {
+  it("defaults to enabled with the Control shortcut, notch status, and voiceAssistant defaults", () => {
     expect(getIslandSettings()).toEqual({
       enabled: true,
       shortcut: "control",
       showNotifications: true,
-      showMessages: true,
       voiceAssistant: DEFAULT_VOICE_ASSISTANT_SETTINGS,
     });
   });
 
   it("updates partial top-level settings cleanly without clobbering voiceAssistant", () => {
     updateVoiceAssistantSettings({ ttsProvider: "openai", ttsVoice: "coral", ttsSpeed: 1.2 });
-    const next = updateIslandSettings({ shortcut: "option", showMessages: false });
+    const next = updateIslandSettings({ shortcut: "option", showNotifications: false });
     expect(next.shortcut).toBe("option");
-    expect(next.showMessages).toBe(false);
+    expect(next.showNotifications).toBe(false);
     expect(next.enabled).toBe(true);
     expect(next.voiceAssistant.ttsProvider).toBe("openai");
     expect(next.voiceAssistant.ttsVoice).toBe("coral");
@@ -97,7 +96,7 @@ describe("islandSettingsStore", () => {
     expect(muted.voiceAssistant.thinkingCueEnabled).toBe(false);
   });
 
-  it("preserves backwards compatibility with legacy stored settings lacking voiceAssistant", () => {
+  it("keeps legacy stored settings, dropping the old showMessages field and filling voiceAssistant", () => {
     const legacy = {
       enabled: false,
       shortcut: "command-shift-space",
@@ -109,7 +108,6 @@ describe("islandSettingsStore", () => {
       enabled: false,
       shortcut: "command-shift-space",
       showNotifications: false,
-      showMessages: true,
       voiceAssistant: DEFAULT_VOICE_ASSISTANT_SETTINGS,
     });
   });

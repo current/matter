@@ -8,6 +8,7 @@ export const ISLAND_SNAPSHOT_CHANNEL = "desktop:island-snapshot";
 export const ISLAND_ACTION_CHANNEL = "desktop:island-action";
 export const ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL = "desktop:island-set-mouse-passthrough";
 export const ISLAND_FOCUS_WINDOW_CHANNEL = "desktop:island-focus-window";
+export const ISLAND_RELEASE_FOCUS_CHANNEL = "desktop:island-release-focus";
 export const ISLAND_EXPAND_REQUEST_CHANNEL = "desktop:island-expand-request";
 export const ISLAND_CONTEXT_MENU_CHANNEL = "desktop:island-context-menu";
 export const ISLAND_DISPLAY_METRICS_CHANNEL = "desktop:island-display-metrics";
@@ -20,10 +21,13 @@ export interface IslandDisplayMetrics {
   readonly windowWidth: number;
 }
 
-export interface IslandWindowCommand {
-  readonly type: "toggle-voice-panel" | "open-voice-panel" | "close-panel";
-  readonly startVoice?: boolean;
-}
+/** Main process → island renderer. */
+export type IslandWindowCommand =
+  | { readonly type: "open"; readonly reason: "click" | "shortcut" | "settings" }
+  | { readonly type: "close-panel" }
+  | { readonly type: "dictation-hold"; readonly phase: ComposerDictationHoldPhase }
+  /** A drag from any app is near (or left) the notch; the window accepts drops meanwhile. */
+  | { readonly type: "drag"; readonly phase: "near" | "away" | "end" };
 
 export type IslandShortcutMode = "control" | "option" | "command-shift-space" | "off";
 
@@ -32,8 +36,8 @@ export type IslandVoicePanelMode = "smart" | "assistant" | "dictation" | "voice-
 export interface IslandSettings {
   readonly enabled: boolean;
   readonly shortcut: IslandShortcutMode;
+  /** Status wings and the needs-you auto-peek; off leaves only the shortcut and click. */
   readonly showNotifications: boolean;
-  readonly showMessages: boolean;
   readonly voiceAssistant: VoiceAssistantSettings;
 }
 
@@ -41,12 +45,11 @@ export const DEFAULT_ISLAND_SETTINGS: IslandSettings = {
   enabled: true,
   shortcut: "control",
   showNotifications: true,
-  showMessages: true,
   voiceAssistant: DEFAULT_VOICE_ASSISTANT_SETTINGS,
 };
 
 export interface IslandApprovalOption {
-  readonly decision: "accept" | "acceptAlways" | "acceptForSession" | "decline" | "cancel";
+  readonly decision: IslandApprovalDecision;
   readonly label: string;
   readonly warning?: string | undefined;
 }
@@ -94,7 +97,9 @@ export interface IslandDoneNotification {
   readonly environmentId: string;
   readonly threadId: string;
   readonly threadTitle: string;
+  /** Local clock (Date.now) when the run ended. */
   readonly completedAt: number;
+  readonly outcome: "completed" | "failed" | "limited";
 }
 
 export type IslandActivityKind = "command" | "edit" | "read" | "search" | "web" | "tool" | "agent";
@@ -124,6 +129,9 @@ export interface IslandThreadSummary {
   readonly toolCallCount: number;
   readonly isStreaming: boolean;
   readonly providerInstanceId: string;
+  /** Driver kind (`claudeAgent`, `codex`, …) picks the wing glyph; null when unknown. */
+  readonly providerKind: string | null;
+  readonly providerName: string | null;
   readonly model: string | null;
   readonly branch: string | null;
   /** ISO start of the active run, or of the latest run once it has finished. */
@@ -141,6 +149,8 @@ export interface IslandVoiceState {
   readonly previewCommitted: string;
   readonly previewTentative: string;
   readonly draftText: string;
+  /** Bumps when dictation (not typing) rewrites `draftText`. */
+  readonly draftRevision: number;
   readonly error: string | null;
   readonly available: boolean;
 }
@@ -177,6 +187,18 @@ export interface IslandVoiceAssistantState {
   readonly error: string | null;
 }
 
+export interface IslandPendingPlan {
+  readonly environmentId: string;
+  readonly threadId: string;
+  readonly threadTitle: string;
+  readonly planId: string;
+  readonly title: string | null;
+  /** First to-dos, already stripped of markdown. */
+  readonly steps: ReadonlyArray<string>;
+  readonly stepCount: number;
+  readonly canApprove: boolean;
+}
+
 export interface IslandSnapshot {
   readonly theme: "dark" | "light";
   readonly mainWindowFocused: boolean;
@@ -184,27 +206,51 @@ export interface IslandSnapshot {
   readonly doneNotifications: ReadonlyArray<IslandDoneNotification>;
   readonly pendingApprovals: ReadonlyArray<IslandPendingApproval>;
   readonly pendingUserInputs: ReadonlyArray<IslandPendingUserInput>;
+  readonly pendingPlans: ReadonlyArray<IslandPendingPlan>;
   readonly recentThreads: ReadonlyArray<IslandThreadSummary>;
+  /** The thread the composer sends to by default (routed thread, else the newest). */
   readonly selectedThreadKey: string | null;
+  /** Whether "New thread" has a project to start in. */
+  readonly canStartThread: boolean;
+  readonly canCreateTask: boolean;
   readonly voice: IslandVoiceState;
   readonly assistant: IslandVoiceAssistantState;
 }
 
+export type IslandCaptureTarget =
+  | { readonly kind: "thread"; readonly environmentId: string; readonly threadId: string }
+  | { readonly kind: "new-thread" }
+  | { readonly kind: "task" };
+
+export interface IslandDroppedFile {
+  readonly name: string;
+  /** Absolute path on this Mac, from the preload's `webUtils.getPathForFile`. */
+  readonly path: string;
+}
+
+export type IslandApprovalDecision =
+  | "accept"
+  | "acceptAlways"
+  | "acceptForSession"
+  | "decline"
+  | "cancel";
+
 export type IslandAction =
   | { readonly type: "open-thread"; readonly environmentId: string; readonly threadId: string }
-  | { readonly type: "select-thread"; readonly threadKey: string }
   | {
-      readonly type: "send-reply";
-      readonly environmentId: string;
-      readonly threadId: string;
+      readonly type: "submit-capture";
+      readonly target: IslandCaptureTarget;
       readonly text: string;
+      readonly interactionMode: "default" | "plan" | "goal";
+      readonly files: ReadonlyArray<IslandDroppedFile>;
+      readonly urls: ReadonlyArray<string>;
     }
   | {
       readonly type: "respond-approval";
       readonly environmentId: string;
       readonly threadId: string;
       readonly requestId: string;
-      readonly decision: "accept" | "acceptAlways" | "acceptForSession" | "decline" | "cancel";
+      readonly decision: IslandApprovalDecision;
     }
   | {
       readonly type: "respond-user-input";
@@ -219,19 +265,18 @@ export type IslandAction =
       readonly threadId: string;
       readonly requestId: string;
     }
+  | {
+      readonly type: "approve-plan";
+      readonly environmentId: string;
+      readonly threadId: string;
+      readonly planId: string;
+    }
   | { readonly type: "dismiss-done"; readonly key?: string }
-  | { readonly type: "voice-toggle" }
   | { readonly type: "voice-start" }
   | { readonly type: "voice-stop" }
   | { readonly type: "voice-cancel" }
   | { readonly type: "update-draft"; readonly text: string }
-  | { readonly type: "assistant-set-mode"; readonly mode: IslandVoicePanelMode }
-  | { readonly type: "assistant-submit-text"; readonly text: string }
-  | { readonly type: "assistant-toggle-hands-free" }
-  | { readonly type: "assistant-toggle-mute" }
-  | { readonly type: "assistant-barge-in" }
   | { readonly type: "assistant-open-voice-mode-modal" }
-  | { readonly type: "assistant-clear-history" }
   | { readonly type: "open-voice-settings" }
   | { readonly type: "open-island-settings" }
   | { readonly type: "close-panel" }
