@@ -10,6 +10,7 @@ import { isElectron } from "../../env";
 import { MattrSidebarLayoutSetting } from "../sidebar/mattr/MattrSidebarLayoutSetting";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { MattrIconPackSetting } from "./MattrIconPackSetting";
+import { MattrStreamAnimationSetting } from "./MattrStreamAnimationSetting";
 import { MattrUiFontSetting } from "./MattrUiFontSetting";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
@@ -138,6 +139,7 @@ export function MattrShellAppearanceSettings() {
       <MattrSidebarLayoutSetting />
       <MattrUiFontSetting />
       <MattrIconPackSetting />
+      <MattrStreamAnimationSetting />
     </>
   );
 }

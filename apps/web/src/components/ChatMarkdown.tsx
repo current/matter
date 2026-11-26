@@ -207,6 +207,8 @@ import type { Element as HastElement } from "hast";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
 import { collectComposerModelMentions } from "@t3tools/client-runtime/composer-model-mentions";
 import { splitMarkdownBlocks } from "./chat/markdownStreamBlocks";
+import { mattrStreamHast } from "./chat/mattrStreamHast";
+import { type MattrAnimatedStream, useMattrStreamingText } from "../mattrStreamAnimation";
 import { MarkdownMermaidCodeBlock } from "./chat/MarkdownMermaidCodeBlock";
 import { MarkdownTable } from "./chat/MarkdownTable";
 import { MarkdownDetails } from "./chat/MarkdownDetails";
@@ -2049,11 +2051,13 @@ const MarkdownSource = memo(function MarkdownSource({
   text,
   markdown,
   cache,
+  animation,
 }: {
   text: string;
   markdown: WordsHastOptions;
   /** The text will not change again; streamed text would only fill the cache with prefixes. */
   cache: boolean;
+  animation: MattrAnimatedStream | null;
 }) {
   const render = markdownRenderer(markdown);
   const entry = render.parse(text);
@@ -2065,14 +2069,16 @@ const MarkdownSource = memo(function MarkdownSource({
   return (
     <ChatMarkdownTextContext value={text}>
       {islandState
-        ? renderHastWithIslands(entry.tree, markdownIslandOptions(islandState))
+        ? renderHastWithIslands(
+            ...mattrStreamHast(entry.tree, markdownIslandOptions(islandState), animation, !cache),
+          )
         : render.element(entry)}
     </ChatMarkdownTextContext>
   );
 });
 
 function ChatMarkdown({
-  text,
+  text: arrivedText,
   className,
   inline = false,
   lineBreaks = false,
@@ -2081,6 +2087,8 @@ function ChatMarkdown({
   renderInsights = false,
   ...props
 }: ChatMarkdownProps) {
+  const stream = useMattrStreamingText(arrivedText, props.isStreaming === true && !inline);
+  const text = stream.text;
   // Streaming re-renders only the last block; offsets for task edits, and extensions that read
   // the whole message, need the whole text.
   const streamingBlocks =
@@ -2111,6 +2119,7 @@ function ChatMarkdown({
         className,
       )}
       data-streaming={componentState.isStreaming ? "" : undefined}
+      data-mattr-stream={stream.animation ?? undefined}
       onCopy={handleCopy}
     >
       <ChatMarkdownRendererContext value={componentState}>
@@ -2123,6 +2132,7 @@ function ChatMarkdown({
               markdown={markdown}
               // Every block before the last is finished, so its parse can be reused.
               cache={!props.isStreaming || index < blocks.length - 1}
+              animation={stream.animation}
             />
           ))}
         </SharedTooltipProvider>

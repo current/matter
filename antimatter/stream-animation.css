@@ -1,0 +1,81 @@
+/* Streaming text animation (Settings → Appearance). While a message streams, ChatMarkdown wraps
+   each word of its prose in `.mattr-sw` (apps/web/src/components/chat/mattrStreamHast.ts) and
+   sets `data-mattr-stream` to the mode. React keeps the spans already on screen, so each word
+   animates once, when it mounts. Fill is `backwards`: a finished word keeps no filter or
+   transform, and nothing runs once the words have settled. Finished messages render without
+   any of this. */
+
+[data-mattr-stream="blur"] .mattr-sw {
+  animation: mattr-stream-blur 220ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+[data-mattr-stream="fade"] .mattr-sw {
+  animation: mattr-stream-fade 180ms cubic-bezier(0, 0, 0.2, 1) backwards;
+}
+
+/* Transforms skip inline boxes. Words carry no spaces (they stay text between spans), so an
+   inline-block word wraps like the text around it. */
+[data-mattr-stream="rise"] span.mattr-sw {
+  display: inline-block;
+}
+[data-mattr-stream="rise"] .mattr-sw {
+  animation: mattr-stream-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+[data-mattr-stream="typewriter"] .mattr-sw {
+  animation: mattr-stream-fade 120ms cubic-bezier(0, 0, 0.2, 1) backwards;
+}
+
+/* Rides the end of the live text, only while it streams: it leaves with the stream. It remounts
+   as words arrive, so it holds steady while text flows and breathes a few times in a pause,
+   then rests (an even count ends where it began), so a long tool call runs no animation. */
+.mattr-stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-inline-start: 2px;
+  vertical-align: -0.16em;
+  border-radius: 1px;
+  background-color: currentColor;
+  opacity: 0.5;
+  animation: mattr-stream-caret 900ms ease-in-out 400ms 6 alternate;
+}
+
+@keyframes mattr-stream-blur {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes mattr-stream-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes mattr-stream-rise {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+@keyframes mattr-stream-caret {
+  to {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mattr-sw {
+    animation: none !important;
+  }
+  .mattr-stream-caret {
+    display: none;
+  }
+}

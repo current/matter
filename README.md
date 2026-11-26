@@ -33,6 +33,7 @@ mattr tracks [`pingdotgg/t3code`](https://github.com/pingdotgg/t3code) nightly a
 - **38pt frameless window** — browser-style outer frame with optically aligned macOS traffic lights, an inset dark page card directly below the topbar, and a transparent sidebar with zero seam.
 - **shell materials & film grain** — native `NSGlassEffectView` `liquid-glass`, `blur`, `transparent`, and `solid` materials, paired with monochrome Arc-style SVG film grain (`0–100%`) across the outer frame and sidebar.
 - **solid icon packs** — filled SF Symbols by default (extracted on the build Mac via Swift, zero Apple glyphs committed), or switch live in settings → appearance to solar, phosphor, heroicons, remix, mingcute, fluent, ionicons, material, tabler, hugeicons or lucide.
+- **streaming text animation** — pick how assistant replies arrive in settings → appearance: instant, blur reveal with a riding caret, soft fade, rise & settle, or smooth pace; each word animates once, and finished messages render exactly as upstream.
 - **mattr sidebar** — project-grouped threads with nested subagent trees, a needs-you filter, crew, and live usage meters; spaces and classic layouts stay one click away, and settings render in-card instead of a modal.
 
 ### zero outbound telemetry
