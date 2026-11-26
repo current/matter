@@ -252,7 +252,7 @@ describe("island mode and Open card", () => {
       width: 360,
       height: 152,
       ear: 18,
-      bottomRadius: 28,
+      bottomRadius: 24,
     });
     expect(M.shellGeometry("open", running, NOTCH, 200).width).toBe(420);
     const external = { ...NOTCH, hasNotch: false, notchWidth: 168, notchHeight: 34 };

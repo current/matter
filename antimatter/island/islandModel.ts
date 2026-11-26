@@ -601,7 +601,7 @@ export function islandModelRuntime() {
       width: Math.max(width, notchW + current.wingWidth * 2),
       height: notchH + Math.max(0, contentHeight),
       ear: pill ? 0 : 18,
-      bottomRadius: 28,
+      bottomRadius: 24,
       pill,
     };
   }

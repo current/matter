@@ -40,12 +40,14 @@ export function buildIslandHtml(): string {
     ${islandMotionCssVariables()}
     --fg: #f5f5f7;
     --muted: rgba(245, 245, 247, 0.6);
-    --subtle: rgba(245, 245, 247, 0.38);
+    --subtle: rgba(245, 245, 247, 0.5);
     --line: rgba(255, 255, 255, 0.08);
     --surface: rgba(255, 255, 255, 0.07);
     --surface-hover: rgba(255, 255, 255, 0.12);
     --amber: #ff9f0a;
     --red: #ff453a;
+    --green: #34d399;
+    --send: #e5484d;
     --notch-w: 200px;
     --notch-h: 32px;
     --wing-w: 36px;
@@ -98,13 +100,13 @@ export function buildIslandHtml(): string {
   .wing > * { flex: none; }
   .glyph { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg); }
   .glyph svg { width: 16px; height: 16px; fill: currentColor; }
-  .glyph.mono { font-weight: 650; font-size: 12px; width: 18px; height: 18px; border-radius: 5px; background: rgba(255,255,255,0.14); }
+  .glyph.monogram { flex: none; font-weight: 600; font-size: 10px; line-height: 1; border-radius: 4px; background: rgba(255,255,255,0.16); }
   .ring { width: 16px; height: 16px; }
   .ring circle { fill: none; stroke-width: 2.25; }
   .dots { display: flex; gap: 3px; }
   .dots i { width: 4px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.3); }
   .dots i.on { background: var(--fg); }
-  .count { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; }
+  .count { font-variant-numeric: tabular-nums; font-weight: 560; font-size: 13px; }
   .amber { display: flex; align-items: center; gap: 4px; }
   .amber i { width: 8px; height: 8px; border-radius: 4px; background: var(--amber); }
   .amber .count { color: var(--amber); font-size: 12px; }
@@ -117,7 +119,7 @@ export function buildIslandHtml(): string {
     to { opacity: 1; transform: none; filter: none; }
   }
   #panel { position: absolute; top: var(--notch-h); left: 50%; transform: translateX(-50%); width: var(--content-w); }
-  #panel-inner { position: relative; padding: 6px 14px 14px; }
+  #panel-inner { position: relative; padding: 6px 14px 16px; max-height: calc(100vh - var(--notch-h) - 8px); overflow-y: auto; scrollbar-width: none; }
   .content-in { animation: island-in ${t.insert.durationMs}ms cubic-bezier(0.22, 1, 0.36, 1) ${t.insert.delayMs}ms both; }
   .content-out { position: absolute; top: 0; left: 0; right: 0; pointer-events: none;
     animation: island-out ${t.remove.durationMs}ms cubic-bezier(0.4, 0, 1, 1) both; }
@@ -133,39 +135,47 @@ export function buildIslandHtml(): string {
   .row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 12px; min-height: 40px; }
   .row.is-selected, .row[data-action]:hover { background: var(--surface); }
   .row .text { flex: 1; min-width: 0; }
-  .row .title { font-weight: 590; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 500, not ~520: weights above 500 snap to Semibold when the system font is not variable. */
+  .row .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .detail { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .meta { color: var(--subtle); font-size: 11.5px; font-variant-numeric: tabular-nums; flex: none; }
-  .row .state-dot { width: 7px; height: 7px; border-radius: 4px; flex: none; }
-  .state-dot.running { background: var(--fg); opacity: 0.7; }
+  .row .state-dot { width: 6px; height: 6px; border-radius: 3px; flex: none; }
+  .row .meta.running { color: var(--green); }
+  .row .status { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .state-dot.running { background: var(--green); }
   .state-dot.needs { background: var(--amber); }
   .state-dot.failed { background: var(--red); }
-  .state-dot.done { background: rgba(255,255,255,0.28); }
-  .btn { height: 28px; padding: 0 12px; border-radius: 9px; background: var(--surface); font-weight: 560; font-size: 12.5px; white-space: nowrap; }
+  .state-dot.done { background: rgba(255,255,255,0.24); }
+  .btn { height: 28px; padding: 0 12px; border-radius: 9px; background: var(--surface); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
   .btn:hover { background: var(--surface-hover); }
   .btn.primary { background: #fff; color: #000; }
   .btn.primary:hover { background: rgba(255,255,255,0.86); }
   .btn.small { height: 24px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
-  .btn kbd { font: inherit; opacity: 0.5; margin-left: 4px; }
+  .btn kbd { font: inherit; font-weight: 450; opacity: 0.5; margin-left: 5px; }
+  .btn kbd.sym { font-family: "SF Pro Text", -apple-system, "Apple Symbols", sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 1px; opacity: 0.45; }
+  .btn.primary[disabled] { background: var(--surface); color: var(--subtle); }
+  .btn.primary[disabled]:hover { background: var(--surface); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
   .actions .spacer { flex: 1; }
   .empty { color: var(--muted); padding: 10px 8px 4px; }
-  .empty b { color: var(--fg); font-weight: 590; }
+  .empty b { color: var(--fg); font-weight: 500; }
   .head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 8px; color: var(--muted); font-size: 12px; }
-  .head .title { color: var(--fg); font-weight: 590; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head .title { color: var(--muted); font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .head .pager { font-variant-numeric: tabular-nums; }
-  .card-title { font-weight: 650; font-size: 14px; margin: 2px 2px 6px; }
+  .card-title { font-weight: 600; font-size: 14px; margin: 2px 2px 6px; }
+  .question-text { margin: 0 2px 6px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-wrap: pretty; }
   .mono { font: 12px/1.45 ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface); border-radius: 10px;
     padding: 8px 10px; color: var(--fg); white-space: pre-wrap; word-break: break-word; display: -webkit-box;
     -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .muted { color: var(--muted); }
-  .reason { color: var(--muted); font-size: 12px; margin: 6px 2px 0; }
-  .options { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .reason { color: var(--muted); font-size: 12px; margin: 6px 2px 0; text-wrap: pretty; }
+  .options { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: 248px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
+  .options.has-more { mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), rgba(0,0,0,0.3)); }
   .option { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; text-align: left; }
   .option:hover { background: var(--surface); }
   .option.is-picked { background: var(--surface-hover); }
   .option .letter { width: 20px; height: 20px; border-radius: 6px; flex: none; display: inline-flex; align-items: center;
-    justify-content: center; font-size: 11px; font-weight: 650; background: var(--surface); color: var(--muted); }
+    justify-content: center; font-size: 11px; font-weight: 560; background: var(--surface); color: var(--muted); }
   .option.is-picked .letter { background: #fff; color: #000; }
   .option .desc { color: var(--muted); font-size: 12px; }
   .steps { margin: 2px 2px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
@@ -179,11 +189,16 @@ export function buildIslandHtml(): string {
   }
   textarea#draft { background: transparent; padding: 6px 2px; min-height: 30px; max-height: 120px; font-size: 14px; }
   textarea#draft::placeholder, input.custom::placeholder { color: var(--subtle); }
+  .draft-wrap { position: relative; }
+  #voice-preview { position: absolute; inset: 0; padding: 6px 2px; font-size: 14px; white-space: pre-wrap; overflow-wrap: break-word; pointer-events: none; overflow: hidden; }
+  #voice-preview .tentative { color: var(--subtle); }
   .composer-top { display: flex; align-items: center; gap: 6px; }
-  .target { height: 24px; padding: 0 9px; border-radius: 8px; background: var(--surface); font-size: 12px; font-weight: 560;
-    max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .target { height: 24px; padding: 0 7px 0 9px; border-radius: 8px; background: var(--surface); font-size: 12px; font-weight: 500;
+    max-width: 260px; display: inline-flex; align-items: center; gap: 4px; }
+  .target span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .target svg { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   .target:hover { background: var(--surface-hover); }
-  .badge { height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 650; display: inline-flex; align-items: center;
+  .badge { height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center;
     background: rgba(255,255,255,0.14); }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 9px; border-radius: 8px;
@@ -196,14 +211,15 @@ export function buildIslandHtml(): string {
   .icon-btn { width: 28px; height: 28px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface); }
   .icon-btn:hover { background: var(--surface-hover); }
   .icon-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .icon-btn.send { background: #fff; color: #000; }
+  .icon-btn.send { background: var(--send); color: #fff; }
+  .icon-btn.send:hover { background: #d93f44; }
   .icon-btn.send[disabled] { background: var(--surface); color: var(--subtle); }
-  .icon-btn.is-on { background: #fff; color: #000; }
-  .zones { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 6px; }
+  .icon-btn.is-on, .icon-btn.is-on:hover { background: rgba(229,72,77,0.22); color: #ff6b6f; }
+  .zones { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr); gap: 6px; }
   .zone { height: 74px; border-radius: 14px; border: 1.5px dashed rgba(255,255,255,0.22); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 3px; padding: 0 10px; text-align: center; color: var(--muted);
+    align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 0 10px; text-align: center; color: var(--muted);
     transition: background-color 120ms, border-color 120ms, color 120ms; }
-  .zone b { color: var(--fg); font-weight: 590; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zone b { color: var(--fg); font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .zone.is-over { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.7); color: var(--fg); }
   .zone.is-disabled { opacity: 0.35; }
   .zone-hint { color: var(--subtle); font-size: 11.5px; text-align: center; margin-top: 8px; }
@@ -285,11 +301,12 @@ export function buildIslandHtml(): string {
   function providerGlyph(kind, name) {
     if (kind && GLYPHS.marks[kind]) return '<span class="glyph">' + GLYPHS.marks[kind] + "</span>";
     const letter = (kind && GLYPHS.monograms[kind]) || String(name || kind || "M").charAt(0).toUpperCase();
-    return '<span class="glyph mono">' + esc(letter) + "</span>";
+    return '<span class="glyph monogram">' + esc(letter) + "</span>";
   }
 
   const MIC_SVG = '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
   const SEND_SVG = '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+  const CHEVRON_SVG = '<svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg>';
   const CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
   function threadByKey(key) {
@@ -459,6 +476,11 @@ export function buildIslandHtml(): string {
       (total > 1 ? '<span class="pager">' + (entry.index + 1) + " of " + total + " · ⌘↑↓</span>" : "") + "</div>";
   }
 
+  // Deny-style choices first, the primary last; shortcuts number them left to right.
+  function orderedApprovalOptions(approval) {
+    return approval.options.filter((o) => o.decision !== "accept").concat(approval.options.filter((o) => o.decision === "accept"));
+  }
+
   function approvalCard(approval) {
     let html = '<div class="card-title">' + esc(approval.title) + "</div>";
     if (approval.detail) html += '<div class="mono">' + esc(approval.detail) + "</div>";
@@ -468,9 +490,9 @@ export function buildIslandHtml(): string {
         esc(approval.environmentId) + '" data-thread="' + esc(approval.threadId) + '">Open ↗</button></div>';
     }
     html += '<div class="actions"><button class="btn" data-action="later">Later</button><span class="spacer"></span>';
-    const ordered = approval.options.filter((o) => o.decision !== "accept").concat(approval.options.filter((o) => o.decision === "accept"));
-    for (const option of ordered) {
-      const index = approval.options.indexOf(option) + 1;
+    const ordered = orderedApprovalOptions(approval);
+    for (const [i, option] of ordered.entries()) {
+      const index = i + 1;
       html += '<button class="btn' + (option.decision === "accept" ? " primary" : "") + '" data-action="approve" data-request="' + esc(approval.requestId) +
         '" data-decision="' + option.decision + '" title="' + esc(option.warning || "") + '">' + esc(option.label) + "<kbd>" + index + "</kbd></button>";
     }
@@ -482,6 +504,11 @@ export function buildIslandHtml(): string {
     return question;
   }
 
+  function hasAnswer(state, q) {
+    const picked = state.answers[q.id];
+    return (Array.isArray(picked) ? picked.length > 0 : picked !== undefined) || state.custom.trim().length > 0;
+  }
+
   function questionCard(input) {
     const state = questionState(input);
     const q = input.questions[state.index] || input.questions[0];
@@ -489,7 +516,7 @@ export function buildIslandHtml(): string {
     const picked = state.answers[q.id];
     const pickedSet = new Set(Array.isArray(picked) ? picked : picked ? [picked] : []);
     let html = '<div class="card-title">' + esc(q.header || "Question") + (input.questions.length > 1 ? ' <span class="muted">' + (state.index + 1) + "/" + input.questions.length + "</span>" : "") + "</div>";
-    html += '<div style="margin:0 2px 6px">' + esc(q.question) + "</div>";
+    html += '<div class="question-text" title="' + esc(q.question) + '">' + esc(q.question) + "</div>";
     html += '<div class="options">' + q.options.map((option, i) =>
       '<button class="option' + (pickedSet.has(option.value) ? " is-picked" : "") + '" data-action="pick-option" data-value="' + esc(option.value) + '">' +
       '<span class="letter">' + String.fromCharCode(65 + i) + "</span><span><div>" + esc(option.label) + "</div>" +
@@ -497,7 +524,7 @@ export function buildIslandHtml(): string {
     if (q.allowCustomAnswer) html += '<input class="custom" id="custom-answer" placeholder="Something else…" style="margin-top:6px" value="' + esc(state.custom) + '" />';
     const last = state.index >= input.questions.length - 1;
     html += '<div class="actions">' + (input.dismissible ? '<button class="btn" data-action="skip-question">Skip</button>' : '<button class="btn" data-action="later">Later</button>') +
-      '<span class="spacer"></span><button class="btn primary" data-action="submit-question">' + (last ? "Submit" : "Next") + "<kbd>↵</kbd></button></div>";
+      '<span class="spacer"></span><button class="btn primary" data-action="submit-question"' + (hasAnswer(state, q) ? "" : " disabled") + ">" + (last ? "Submit" : "Next") + "<kbd>↵</kbd></button></div>";
     return html;
   }
 
@@ -551,16 +578,23 @@ export function buildIslandHtml(): string {
       .concat(urls.map((u, i) => '<span class="chip"><span>' + esc(u) + '</span><button data-action="remove-url" data-index="' + i + '">×</button></span>')).join("");
     const canSend = Boolean(target) && (parsed.text.length > 0 || files.length > 0 || urls.length > 0);
     const html =
-      '<div class="composer-top"><button class="target" data-action="cycle-target" title="Tab">' + esc(targetLabel(target)) + "</button>" +
+      '<div class="composer-top"><button class="target" data-action="cycle-target" title="Tab to change"><span>' + esc(targetLabel(target)) + "</span>" + CHEVRON_SVG + "</button>" +
       (parsed.interactionMode !== "default" ? '<span class="badge">' + (parsed.interactionMode === "plan" ? "Plan" : "Goal") + "</span>" : "") + "</div>" +
-      '<textarea id="draft" rows="1" placeholder="' + (listening ? "Listening…" : "Ask, steer or add a task…") + '"></textarea>' +
-      (listening ? '<div id="voice-preview" class="muted" style="margin:0 2px;font-size:12px"></div>' : "") +
+      '<div class="draft-wrap"><textarea id="draft" rows="1" placeholder="' + (listening ? "Listening…" : "Ask, steer or add a task…") + '"></textarea>' +
+      (listening ? '<div id="voice-preview" aria-live="polite"></div>' : "") + "</div>" +
       (chips ? '<div class="chips">' + chips + "</div>" : "") +
       (notice ? '<div class="reason">' + esc(notice) + "</div>" : "") +
       '<div class="composer-foot"><span class="hint">Tab target · ⌃ hold to dictate · ↵ send</span>' +
       '<button class="icon-btn' + (listening ? " is-on" : "") + '" data-action="mic" title="Dictate">' + MIC_SVG + "</button>" +
       '<button class="icon-btn send" data-action="send" title="Send"' + (canSend ? "" : " disabled") + ">" + SEND_SVG + "</button></div>";
     return { key: "prompt:" + targetLabel(target) + ":" + parsed.interactionMode + ":" + chips + ":" + listening + ":" + canSend + ":" + notice, html, prompt: true };
+  }
+
+  function glanceStatus(thread) {
+    const tone = thread.status === "running" ? "running" : thread.status === "approval" || thread.status === "input" ? "needs"
+      : thread.status === "failed" ? "failed" : thread.status === "done" ? "done" : null;
+    const age = '<span class="meta' + (tone === "running" ? " running" : "") + '">' + relTime(thread.updatedAt) + "</span>";
+    return '<span class="status">' + (tone ? '<span class="state-dot ' + tone + '"></span>' : "") + age + "</span>";
   }
 
   function glanceCard() {
@@ -573,10 +607,10 @@ export function buildIslandHtml(): string {
         : thread.status === "done" ? "Done" : thread.projectTitle || "Idle";
       return rowHtml({ providerKind: thread.providerKind, providerName: thread.providerName, title: thread.title, detail, selected: i === glanceIndex,
         action: "open-thread", data: ' data-env="' + esc(thread.environmentId) + '" data-thread="' + esc(thread.threadId) + '"',
-        trailing: '<span class="meta">' + relTime(thread.updatedAt) + "</span>" });
+        trailing: glanceStatus(thread) });
     }).join("");
     const html = rows + '<div class="actions"><button class="btn" data-action="voice-mode">Voice Mode</button><span class="spacer"></span>' +
-      '<button class="btn primary" data-action="ask">Ask…<kbd>⌃⌃</kbd></button></div>';
+      '<button class="btn primary" data-action="ask">Ask…<kbd class="sym">⌃⌃</kbd></button></div>';
     return { key: "glance:" + threads.map((t) => t.key + t.status + relTime(t.updatedAt) + (t.currentActivity ? t.currentActivity.label : "")).join("|") + ":" + glanceIndex, html };
   }
 
@@ -653,11 +687,38 @@ export function buildIslandHtml(): string {
         else textarea.setSelectionRange(draft.length, draft.length);
       }
     }
+    const options = card.querySelector(".options");
+    if (options) fitOptions(options);
     const custom = card.querySelector("#custom-answer");
     if (custom && open && focusedId === "custom-answer") {
       custom.focus();
       custom.setSelectionRange(selection[0], selection[1]);
     }
+  }
+
+  // The live words sit after the draft inside the field: the draft prefix is invisible and only lays them out.
+  function paintVoicePreview(preview) {
+    const committed = snapshot.voice.previewCommitted.trim();
+    const tentative = snapshot.voice.previewTentative.trim();
+    const textarea = document.getElementById("draft");
+    if (textarea) textarea.placeholder = committed || tentative ? "" : "Listening…";
+    const prefix = draft ? '<span style="color:transparent">' + esc(draft) + (/\\s$/.test(draft) ? "" : " ") + "</span>" : "";
+    preview.innerHTML = prefix + esc(committed) + (committed && tentative ? " " : "") + '<span class="tentative">' + esc(tentative) + "</span>";
+  }
+
+  // A long list stops halfway through a row, so the cut itself shows there is more to scroll.
+  function fitOptions(options) {
+    const limit = 248;
+    if (options.scrollHeight > limit) {
+      const cut = [...options.children].find((o) => o.offsetTop - options.offsetTop + o.offsetHeight > limit);
+      if (cut) options.style.maxHeight = Math.round(cut.offsetTop - options.offsetTop + Math.min(26, cut.offsetHeight / 2)) + "px";
+    }
+    markOptionsOverflow(options);
+  }
+
+  // Fades the list's bottom edge while more options sit below it.
+  function markOptionsOverflow(options) {
+    options.classList.toggle("has-more", options.scrollTop + options.clientHeight < options.scrollHeight - 2);
   }
 
   function autosize(textarea) {
@@ -746,7 +807,7 @@ export function buildIslandHtml(): string {
     if (wing.kind === "listening" && mode !== "hidden") mountWave(); else destroyWave();
     paintPanel();
     const preview = document.getElementById("voice-preview");
-    if (preview) preview.textContent = (snapshot.voice.previewCommitted + " " + snapshot.voice.previewTentative).trim();
+    if (preview) paintVoicePreview(preview);
     applyGeometry(wing);
     applyBloom();
     scheduleDeadline(wing);
@@ -769,6 +830,7 @@ export function buildIslandHtml(): string {
   }
 
   function closeIsland() {
+    flushDraft();
     const wasOpen = open;
     open = false;
     openReason = null;
@@ -785,12 +847,22 @@ export function buildIslandHtml(): string {
     render();
   }
 
-  function syncDraft(text) {
+  let draftTimer = 0;
+  function flushDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = 0;
+    if (draft === lastSyncedDraft) return;
+    lastSyncedDraft = draft;
+    bridge.sendAction({ type: "update-draft", text: draft });
+  }
+
+  // Keystrokes reach main at most every 150 ms; submit, close, target and dictation changes flush first.
+  function syncDraft(text, immediate) {
     draft = text;
-    if (text !== lastSyncedDraft) {
-      lastSyncedDraft = text;
-      bridge.sendAction({ type: "update-draft", text });
-    }
+    clearTimeout(draftTimer);
+    draftTimer = 0;
+    if (immediate) flushDraft();
+    else if (text !== lastSyncedDraft) draftTimer = setTimeout(flushDraft, 150);
   }
 
   function submitCapture() {
@@ -802,7 +874,7 @@ export function buildIslandHtml(): string {
     bridge.sendAction({ type: "submit-capture", target, text: parsed.text, interactionMode: parsed.interactionMode, files, urls });
     files = [];
     urls = [];
-    syncDraft("");
+    syncDraft("", true);
     closeIsland();
   }
 
@@ -848,7 +920,7 @@ export function buildIslandHtml(): string {
     const state = questionState(input);
     const q = input.questions[state.index];
     if (q && state.custom.trim()) state.answers[q.id] = q.multiSelect ? [state.custom.trim()] : state.custom.trim();
-    if (q && state.answers[q.id] === undefined) return;
+    if (q && !hasAnswer(state, q)) return;
     if (state.index < input.questions.length - 1) {
       state.index += 1;
       state.custom = "";
@@ -907,7 +979,7 @@ export function buildIslandHtml(): string {
         render();
         return;
       }
-      case "cycle-target": target = M.nextTarget(ensureTarget(), target); render(); return;
+      case "cycle-target": flushDraft(); target = M.nextTarget(ensureTarget(), target); render(); return;
       case "remove-file": files = files.filter((_, i) => i !== Number(d.index)); render(); return;
       case "remove-url": urls = urls.filter((_, i) => i !== Number(d.index)); render(); return;
       case "mic": toggleDictation(); return;
@@ -923,7 +995,7 @@ export function buildIslandHtml(): string {
   function toggleDictation() {
     if (!snapshot) return;
     if (!snapshot.voice.available) { bridge.sendAction({ type: "open-voice-settings" }); closeIsland(); return; }
-    syncDraft(draft);
+    syncDraft(draft, true);
     bridge.sendAction({ type: snapshot.voice.phase === "recording" ? "voice-stop" : "voice-start" });
   }
 
@@ -935,6 +1007,10 @@ export function buildIslandHtml(): string {
       render();
     } else if (event.target.id === "custom-answer") {
       question.custom = event.target.value;
+      const input = currentQuestionInput();
+      const q = input ? input.questions[questionState(input).index] : null;
+      const submit = panelInner.querySelector('.card:not(.content-out) [data-action="submit-question"]');
+      if (submit && q) submit.disabled = !hasAnswer(question, q);
     }
   });
 
@@ -944,7 +1020,7 @@ export function buildIslandHtml(): string {
     if (event.key === "Escape") { event.preventDefault(); closeIsland(); return; }
     const kind = lastPanelKey.split(":")[0];
     if (kind === "prompt") {
-      if (event.key === "Tab") { event.preventDefault(); target = M.nextTarget(ensureTarget(), target); render(); return; }
+      if (event.key === "Tab") { event.preventDefault(); flushDraft(); target = M.nextTarget(ensureTarget(), target); render(); return; }
       if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!event.repeat) submitCapture(); }
       return;
     }
@@ -957,7 +1033,8 @@ export function buildIslandHtml(): string {
       if (entry.item.kind === "approval") {
         const approval = entry.item.item;
         const digit = Number.parseInt(event.key, 10);
-        if (approval.canRespond && digit >= 1 && digit <= approval.options.length) { event.preventDefault(); respondApproval(approval.requestId, approval.options[digit - 1].decision); return; }
+        const ordered = orderedApprovalOptions(approval);
+        if (approval.canRespond && digit >= 1 && digit <= ordered.length) { event.preventDefault(); respondApproval(approval.requestId, ordered[digit - 1].decision); return; }
         if (approval.canRespond && event.key === "Enter") {
           const accept = approval.options.find((o) => o.decision === "accept");
           if (accept) { event.preventDefault(); respondApproval(approval.requestId, accept.decision); }
@@ -1004,6 +1081,10 @@ export function buildIslandHtml(): string {
       }
     }
   });
+
+  document.addEventListener("scroll", (event) => {
+    if (event.target.classList && event.target.classList.contains("options")) markOptionsOverflow(event.target);
+  }, true);
 
   // ---- Hover, press, passthrough ----
   function shellContains(x, y) {
@@ -1129,6 +1210,8 @@ export function buildIslandHtml(): string {
     // Adopt the host's draft only when dictation wrote it; keystrokes stay the island's own.
     if (next.voice.draftRevision !== draftRevision) {
       draftRevision = next.voice.draftRevision;
+      clearTimeout(draftTimer);
+      draftTimer = 0;
       draft = next.voice.draftText;
       lastSyncedDraft = draft;
       const textarea = document.getElementById("draft");
@@ -1150,7 +1233,7 @@ export function buildIslandHtml(): string {
     if (command.type === "dictation-hold") {
       if (!open) return;
       wantsPrompt = true;
-      if (command.phase === "start") { syncDraft(draft); bridge.sendAction({ type: "voice-start" }); }
+      if (command.phase === "start") { syncDraft(draft, true); bridge.sendAction({ type: "voice-start" }); }
       else bridge.sendAction({ type: command.phase === "end" ? "voice-stop" : "voice-cancel" });
       render();
       return;
