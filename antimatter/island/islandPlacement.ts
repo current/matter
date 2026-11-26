@@ -38,9 +38,9 @@ export function computeIslandPlacement(
 ): ComputedIslandPlacement {
   const { x, y, width } = display.bounds;
   const topInset = Math.max(0, display.workArea.y - display.bounds.y);
-  // Notched MacBooks reserve 32-38pt at the top edge vs 24-25pt for standard macOS menu bars.
+  // Notched MacBooks have a 37-38pt menu bar while the physical camera notch sits at 32pt.
   const hasNotch = isMac && topInset >= 30;
-  const notchHeight = hasNotch ? Math.min(40, Math.max(32, topInset)) : 34;
+  const notchHeight = hasNotch ? Math.min(32, Math.max(30, topInset - 5)) : 34;
   const notchWidth = hasNotch ? NOTCHED_DISPLAY_NOTCH_WIDTH : STANDARD_DISPLAY_NOTCH_WIDTH;
   return {
     bounds: {

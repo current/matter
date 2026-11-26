@@ -60,18 +60,28 @@ describe("mattr Island HTML & Lilt Siri Wave shaders", () => {
     expect(() => new Function(scriptMatch![1]!)).not.toThrow();
   });
 
-  it("uses WWDC-style asymmetric springs, blur-scale morphs and attention rims", () => {
+  it("uses WWDC-style asymmetric springs, blur-scale morphs, and Alcove-flush notch geometry", () => {
     const html = buildIslandHtml();
     expect(html).toContain("w: [0.34, 0.78, 0]");
     expect(html).toContain("h: [0.4, 0.74, 25]");
     expect(html).toContain("w: [0.28, 0.88, 18]");
-    expect(html).toContain("w: nW + 10, h: nH + 5");
+    expect(html).toContain("w: nW + 10, h: nH, earR: 6, botR: 10");
     expect(html).toContain("@keyframes island-morph-in");
     expect(html).toContain("filter: blur(10px); transform: scale(0.94) translateY(-6px)");
     expect(html).toContain("filter: blur(8px); transform: scale(0.93) translateY(-4px)");
     expect(html).toContain("transform: scale(0.95)");
-    expect(html).toContain("rgba(251, 146, 60, 0.42)");
-    expect(html).toContain("rgba(52, 211, 153, 0.34)");
+    // Pure black flush notch silhouette: zero colored rim strokes or +2px menu-bar overhang.
+    expect(html).not.toContain("rgba(251, 146, 60");
+    expect(html).not.toContain("rgba(52, 211, 153, 0.34)");
+    expect(html).not.toContain("metrics.notchHeight + 2");
+    expect(html).not.toContain("nH + 2");
+    expect(html).toContain('geomState === "card"');
+    expect(html).toContain("rgba(255, 255, 255, 0.08)");
+    expect(html).toContain("notchHeight: 32");
+    expect(html).toContain("const NOTCH_PILL_WIDTH = 344;");
+    expect(html).toContain(
+      'const PILL_WING = { running: 62, done: 68, attention: 72, "voice-mode": 72 };',
+    );
     // No looping animations: everything that moves at rest is one-shot.
     expect(html).not.toMatch(/animation:[^;]*infinite/);
   });
@@ -185,7 +195,7 @@ describe("computeIslandPlacement & buildIslandWindowOptions", () => {
   it("anchors the window flush to display.bounds.y (never workArea.y) and clears the hardware notch", () => {
     const macBookPro14 = {
       bounds: { x: 0, y: 0, width: 1512, height: 982 },
-      workArea: { x: 0, y: 34, width: 1512, height: 881 },
+      workArea: { x: 0, y: 37, width: 1512, height: 878 },
     };
     const placement = computeIslandPlacement(macBookPro14, true);
     expect(placement.bounds).toEqual({
@@ -198,7 +208,19 @@ describe("computeIslandPlacement & buildIslandWindowOptions", () => {
     expect(placement.metrics.hasNotch).toBe(true);
     // Must exceed physical 185-192pt MacBook Pro/Air camera notch width so wings never overlap it.
     expect(placement.metrics.notchWidth).toBeGreaterThanOrEqual(200);
-    expect(placement.metrics.notchHeight).toBe(34);
+    // Physical MacBook Pro notch sits at 32pt inside a 37-38pt menu bar — never overhangs onto windows.
+    expect(placement.metrics.notchHeight).toBe(32);
+
+    const compactMenuBarNotch = computeIslandPlacement(
+      {
+        bounds: { x: 0, y: 0, width: 1512, height: 982 },
+        workArea: { x: 0, y: 34, width: 1512, height: 881 },
+      },
+      true,
+    );
+    expect(compactMenuBarNotch.metrics.hasNotch).toBe(true);
+    expect(compactMenuBarNotch.metrics.notchHeight).toBe(30);
+    expect(compactMenuBarNotch.metrics.notchHeight).toBeLessThan(34);
   });
 
   it("anchors external and secondary displays to display.bounds.y without notch ears", () => {

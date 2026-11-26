@@ -78,7 +78,7 @@ export function buildIslandHtml(): string {
     top: 0;
     left: 0;
     width: 200px;
-    height: 37px;
+    height: 32px;
     overflow: hidden;
     pointer-events: auto;
     transform-origin: top center;
@@ -95,7 +95,7 @@ export function buildIslandHtml(): string {
     left: 50%;
     transform: translateX(-50%);
     width: 200px;
-    min-height: 37px;
+    min-height: 32px;
     color: var(--island-fg);
   }
 
@@ -173,7 +173,7 @@ export function buildIslandHtml(): string {
   }
 
   #island-rim-path {
-    transition: stroke 260ms ease;
+    transition: stroke-opacity 180ms ease;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -260,18 +260,49 @@ export function buildIslandHtml(): string {
   .pill-wing {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4.5px;
     min-width: 0;
     height: 100%;
     overflow: hidden;
   }
   .pill-wing.left {
-    padding: 0 6px 0 14px;
+    padding: 0 4px 0 8px;
     justify-content: flex-start;
   }
   .pill-wing.right {
-    padding: 0 14px 0 6px;
+    padding: 0 8px 0 4px;
     justify-content: flex-end;
+  }
+  .pill-notched .status-dot {
+    width: 6.5px;
+    height: 6.5px;
+  }
+  .pill-notched .done-tick svg {
+    width: 11px;
+    height: 11px;
+  }
+  .pill-notched .pill-label {
+    font-size: 11.5px;
+    font-weight: 580;
+    line-height: 1;
+  }
+  .pill-notched .pill-timer {
+    font-size: 11.5px;
+    line-height: 1;
+  }
+  .pill-notched .pill-btn {
+    font-size: 10.5px;
+    font-weight: 580;
+    line-height: 1.1;
+    padding: 3px 7.5px;
+  }
+  .pill-notched .eq-bars {
+    gap: 2px;
+    height: 12px;
+    padding: 0;
+  }
+  .pill-notched .eq-bar {
+    width: 2px;
   }
   .notch-cutout {
     height: 100%;
@@ -1279,7 +1310,7 @@ export function buildIslandHtml(): string {
 
   const STAGE_HEIGHT = 600;
   const CARD_WIDTH = 472;
-  const NOTCH_PILL_WIDTH = 468;
+  const NOTCH_PILL_WIDTH = 344;
   const CAPSULE_PILL_WIDTH = 320;
   const CAPSULE_FLASH_WIDTH = 228;
   const CAPSULE_RUNNING_WIDTH = 236;
@@ -1290,7 +1321,7 @@ export function buildIslandHtml(): string {
   let metrics = {
     hasNotch: true,
     notchWidth: 200,
-    notchHeight: 37,
+    notchHeight: 32,
     windowWidth: 560,
   };
 
@@ -1331,7 +1362,6 @@ export function buildIslandHtml(): string {
   let lastMorphKey = "";
   let morphStartedAt = -Infinity;
   let morphDirection = "fade";
-  let currentRimTone = "";
   let elapsedTimer = null;
   let lastPingSignature = "";
   let lastPlanSignature = "";
@@ -1339,7 +1369,7 @@ export function buildIslandHtml(): string {
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const PEEK_WING = 44;
-  const PILL_WING = { running: 112, done: 134, attention: 134, "voice-mode": 134 };
+  const PILL_WING = { running: 62, done: 68, attention: 72, "voice-mode": 72 };
   const GEOM_RANK = { hidden: 0, docked: 0, nudge: 1, peek: 2, pill: 3, card: 4 };
   // WWDC23-style springs per animated value: [response (s), dampingRatio, start delay (ms)].
   // Opening: width leads and height follows ~25ms later with a little jelly overshoot.
@@ -1373,17 +1403,6 @@ export function buildIslandHtml(): string {
   const MORPH_ENTER_DELAY_MS = 65;
   const SLIDE_ENTER_DELAY_MS = 30;
   const MORPH_ENTER_DURATION_MS = 260;
-  const RIM_TONES = {
-    normal: { stroke: "rgba(255, 255, 255, 0.08)", glow: "" },
-    attention: {
-      stroke: "rgba(251, 146, 60, 0.42)",
-      glow: "drop-shadow(0 0 3px rgba(251, 146, 60, 0.35))",
-    },
-    done: {
-      stroke: "rgba(52, 211, 153, 0.34)",
-      glow: "drop-shadow(0 0 3px rgba(52, 211, 153, 0.28))",
-    },
-  };
 
   function configureSpring(s, response, dampingRatio) {
     const omega = (2 * Math.PI) / response;
@@ -1401,9 +1420,9 @@ export function buildIslandHtml(): string {
   // change (hover, click, new request, voice) interrupts mid-flight with zero jump.
   const springs = {
     w: makeSpring(200, 0.05),
-    h: makeSpring(37, 0.05),
+    h: makeSpring(32, 0.05),
     earR: makeSpring(6, 0.02),
-    botR: makeSpring(11, 0.02),
+    botR: makeSpring(10, 0.02),
     expand: makeSpring(0, 0.002),
     presence: makeSpring(1, 0.002),
   };
@@ -1548,7 +1567,7 @@ export function buildIslandHtml(): string {
 
   function getEffectiveNotchPillWidth() {
     const { stageW } = syncStageSize();
-    return Math.min(NOTCH_PILL_WIDTH, Math.max(metrics.notchWidth + 120, stageW - 28));
+    return Math.min(NOTCH_PILL_WIDTH, Math.max(metrics.notchWidth + 112, stageW - 28));
   }
 
   function shadowFilter(amount, y1, b1, a1, y2, b2, a2) {
@@ -1573,14 +1592,15 @@ export function buildIslandHtml(): string {
       shapePathEl.setAttribute("d", d);
       clipPathEl.setAttribute("d", d);
       rimPathEl.setAttribute("d", buildNotchShapePath(cx, w, h, earR, botR, 0.5));
-      rimPathEl.setAttribute("stroke-opacity", clamp(e / 0.3, 0, 1).toFixed(3));
+      const cardElevation = geomState === "card" ? clamp((e - 0.6) / 0.4, 0, 1) : 0;
+      rimPathEl.setAttribute("stroke-opacity", cardElevation.toFixed(3));
 
       // Invisible while docked inside the hardware notch so it never protrudes on any MacBook.
       const silhouetteAlpha = geomState === "hidden" ? 0 : clamp(e / 0.06, 0, 1);
       svgEl.style.opacity = silhouetteAlpha.toFixed(3);
       svgEl.style.transform = "";
       shapeGroupEl.style.filter =
-        e > 0.01 && geomState !== "hidden" ? shadowFilter(e, 14, 32, 0.56, 3, 10, 0.34) : "none";
+        cardElevation > 0.01 ? shadowFilter(cardElevation, 14, 32, 0.56, 3, 10, 0.34) : "none";
 
       const rB = Math.max(0, Math.min(botR, h / 2, w / 2));
       contentClipEl.style.left = fmt(cx - w / 2) + "px";
@@ -1835,24 +1855,6 @@ export function buildIslandHtml(): string {
       threadSwitcherOpen = false;
       cancelAutoCollapse();
     }
-  }
-
-  function rimToneFor(view) {
-    if (view.kind === "attention" || (view.kind === "pill" && view.pillKind === "attention")) {
-      return "attention";
-    }
-    if (view.kind === "done-list" || (view.kind === "pill" && view.pillKind === "done")) {
-      return "done";
-    }
-    return "normal";
-  }
-
-  function applyRimTone(tone) {
-    if (tone === currentRimTone) return;
-    currentRimTone = tone;
-    const next = RIM_TONES[tone] || RIM_TONES.normal;
-    rimPathEl.style.stroke = next.stroke;
-    rimPathEl.style.filter = next.glow;
   }
 
   function cancelAutoCollapse() {
@@ -2231,7 +2233,7 @@ export function buildIslandHtml(): string {
 
   function renderPeek() {
     const notchW = metrics.notchWidth;
-    const h = metrics.notchHeight + 2;
+    const h = metrics.notchHeight;
     const agents = activeAgents();
     const pending = attentionItems().length;
     const left =
@@ -2255,12 +2257,16 @@ export function buildIslandHtml(): string {
   function renderFlash() {
     if (metrics.hasNotch) {
       const notchW = metrics.notchWidth;
-      const h = metrics.notchHeight + 2;
+      const h = metrics.notchHeight;
+      const shortFlash =
+        flashMessage && (flashMessage.startsWith("Allowed") || flashMessage === "Always allowed")
+          ? "Allowed"
+          : flashMessage;
       return \`
         <div class="pill-notched" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px">
           <div class="pill-wing left">
             <span class="done-tick">\${ICON_CHECK}</span>
-            <span class="pill-label flash-ok">\${escapeHtml(flashMessage)}</span>
+            <span class="pill-label flash-ok">\${escapeHtml(shortFlash)}</span>
           </div>
           <div class="notch-cutout"></div>
           <div class="pill-wing right"></div>
@@ -2280,11 +2286,12 @@ export function buildIslandHtml(): string {
       if (view.kind === "flash") return CAPSULE_FLASH_WIDTH;
       return view.pillKind === "running" ? CAPSULE_RUNNING_WIDTH : CAPSULE_PILL_WIDTH;
     }
-    const wing = view.kind === "flash" ? 134 : (PILL_WING[view.pillKind] ?? 134);
+    const wing = view.kind === "flash" ? 68 : (PILL_WING[view.pillKind] ?? 68);
     return Math.min(getEffectiveNotchPillWidth(), metrics.notchWidth + wing * 2);
   }
 
   function renderPill(view) {
+    const compact = metrics.hasNotch;
     let leftHtml = "";
     let rightHtml = "";
     let rowAction = "expand-voice";
@@ -2296,15 +2303,25 @@ export function buildIslandHtml(): string {
       const thinking = a.phase === "thinking" || a.phase === "acting" || a.phase === "transcribing";
       const listening = a.phase === "listening" || snapshot?.voice?.phase === "recording";
       const dotClass = a.muted ? "approval" : thinking ? "input" : "done";
-      const label = a.muted
-        ? "Muted"
-        : speaking
-          ? a.activeBriefingLabel || "Speaking"
-          : thinking
-            ? a.statusLabel || "Working"
-            : listening
-              ? "Listening"
-              : "Voice Mode";
+      const label = compact
+        ? a.muted
+          ? "Muted"
+          : speaking
+            ? "Speak"
+            : thinking
+              ? "Think"
+              : listening
+                ? "Listen"
+                : "Voice"
+        : a.muted
+          ? "Muted"
+          : speaking
+            ? a.activeBriefingLabel || "Speaking"
+            : thinking
+              ? a.statusLabel || "Working"
+              : listening
+                ? "Listening"
+                : "Voice Mode";
       const eqClass = a.muted ? "muted" : thinking ? "thinking" : "";
       leftHtml = \`<span class="status-dot \${dotClass}"></span><span class="pill-label">\${escapeHtml(label)}</span>\`;
       rightHtml =
@@ -2317,33 +2334,54 @@ export function buildIslandHtml(): string {
       const lead = agents[0];
       rowAction = "expand-agents";
       rowAttrs = \`data-key="\${escapeHtml(lead.key)}"\`;
-      leftHtml =
-        providerStack(agents) +
-        \`<span class="pill-label">\${agents.length === 1 ? "Running" : agents.length + " running"}</span>\`;
+      const runLabel = compact
+        ? agents.length === 1
+          ? "Live"
+          : String(agents.length)
+        : agents.length === 1
+          ? "Running"
+          : agents.length + " running";
+      leftHtml = providerStack(agents) + \`<span class="pill-label">\${escapeHtml(runLabel)}</span>\`;
       rightHtml = elapsedSpan(lead, "pill-timer");
     } else if (view.pillKind === "done") {
       const items = view.done;
       rowAction = "expand-done";
-      leftHtml = \`<span class="done-tick">\${ICON_CHECK}</span><span class="pill-label done-label">Done</span>\`;
+      const doneLabel = compact && items.length > 1 ? items.length + " done" : "Done";
+      leftHtml = \`<span class="done-tick">\${ICON_CHECK}</span><span class="pill-label done-label">\${escapeHtml(doneLabel)}</span>\`;
       if (items.length === 1) {
         const item = items[0];
-        rightHtml = \`<span class="pill-title">\${escapeHtml(item.threadTitle)}</span><button class="pill-btn emerald" data-action="open-thread" data-env="\${escapeHtml(item.environmentId)}" data-thread="\${escapeHtml(item.threadId)}">Review</button>\`;
+        rightHtml =
+          (compact ? "" : \`<span class="pill-title">\${escapeHtml(item.threadTitle)}</span>\`) +
+          \`<button class="pill-btn emerald" data-action="open-thread" data-env="\${escapeHtml(item.environmentId)}" data-thread="\${escapeHtml(item.threadId)}">Review</button>\`;
       } else {
-        rightHtml = \`<span class="pill-title">\${items.length} agents</span><button class="pill-btn emerald" data-action="expand-done">Review</button>\`;
+        rightHtml =
+          (compact ? "" : \`<span class="pill-title">\${items.length} agents</span>\`) +
+          \`<button class="pill-btn emerald" data-action="expand-done">Review</button>\`;
       }
     } else {
       const items = view.items;
       const first = items[0];
       rowAction = "expand-attention";
-      const label =
-        items.length > 1 ? items.length + " pending" : first.kind === "approval" ? "Approve" : "Question";
+      const label = compact
+        ? items.length > 1
+          ? items.length + " open"
+          : first.kind === "approval"
+            ? "Approve"
+            : "Ask"
+        : items.length > 1
+          ? items.length + " pending"
+          : first.kind === "approval"
+            ? "Approve"
+            : "Question";
       leftHtml = \`<span class="status-dot \${first.kind === "approval" ? "approval" : "input"}"></span><span class="pill-label">\${escapeHtml(label)}</span>\`;
-      rightHtml = \`<span class="pill-title">\${escapeHtml(first.item.threadTitle)}</span><button class="pill-btn" data-action="expand-attention">Review</button>\`;
+      rightHtml =
+        (compact ? "" : \`<span class="pill-title">\${escapeHtml(first.item.threadTitle)}</span>\`) +
+        \`<button class="pill-btn" data-action="expand-attention">Review</button>\`;
     }
 
-    if (metrics.hasNotch) {
+    if (compact) {
       const notchW = metrics.notchWidth;
-      const h = metrics.notchHeight + 2;
+      const h = metrics.notchHeight;
       return \`
         <div class="pill-notched" style="grid-template-columns:1fr \${notchW}px 1fr;height:\${h}px" data-action="\${rowAction}" \${rowAttrs}>
           <div class="pill-wing left">\${leftHtml}</div>
@@ -2944,22 +2982,22 @@ export function buildIslandHtml(): string {
     if (view.kind === "hidden") {
       if (metrics.hasNotch && snapshot?.settings?.enabled !== false) {
         next = "docked";
-        targets = { w: nW, h: nH, earR: 6, botR: 11, expand: 0, presence: 1 };
+        targets = { w: nW, h: nH, earR: 6, botR: 10, expand: 0, presence: 1 };
       } else {
         next = "hidden";
         targets = { w: 220, h: 34, earR: 0, botR: 17, expand: 0, presence: 0 };
       }
     } else if (view.kind === "nudge") {
-      // 0ms hover response: the silhouette stretches out of the hardware notch immediately.
+      // 0ms hover response: the silhouette stretches horizontally out of the hardware notch.
       next = "nudge";
-      targets = { w: nW + 10, h: nH + 5, earR: 7, botR: 13, expand: 0.16, presence: 1 };
+      targets = { w: nW + 10, h: nH, earR: 6, botR: 10, expand: 0.16, presence: 1 };
     } else if (view.kind === "peek") {
       next = "peek";
       targets = {
-        w: nW + PEEK_WING * 2 + hover * 10,
-        h: nH + 2 + hover * 5,
-        earR: 8,
-        botR: 14,
+        w: nW + PEEK_WING * 2 + hover * 6,
+        h: nH,
+        earR: 6,
+        botR: 11,
         expand: 0.3,
         presence: 1,
       };
@@ -2967,7 +3005,7 @@ export function buildIslandHtml(): string {
       next = "pill";
       const pillW = pillWidthFor(view);
       targets = metrics.hasNotch
-        ? { w: pillW + hover * 10, h: nH + 2 + hover * 5, earR: 8, botR: 14, expand: 0.52, presence: 1 }
+        ? { w: pillW + hover * 6, h: nH, earR: 6, botR: 11, expand: 0.52, presence: 1 }
         : { w: pillW + hover * 10, h: 38 + hover * 4, earR: 0, botR: 19 + hover * 2, expand: 0.52, presence: 1 };
     } else {
       geomState = "card";
@@ -3133,7 +3171,6 @@ export function buildIslandHtml(): string {
   function render() {
     const view = resolveEffectiveView();
     normalizeUiMode(view);
-    applyRimTone(rimToneFor(view));
 
     if (view.kind === "hidden" || view.kind === "nudge") {
       stopWaveLoop();
@@ -3754,7 +3791,7 @@ export function buildIslandHtml(): string {
     metrics = {
       hasNotch: Boolean(next.hasNotch),
       notchWidth: Number(next.notchWidth) || 200,
-      notchHeight: Number(next.notchHeight) || 37,
+      notchHeight: Number(next.notchHeight) || 32,
       windowWidth: Number(next.windowWidth) || 560,
     };
     syncStageSize();
@@ -3765,7 +3802,7 @@ export function buildIslandHtml(): string {
     if (changedNotch && geomState !== "card") {
       setSpringTargets(
         metrics.hasNotch
-          ? { w: metrics.notchWidth, h: metrics.notchHeight, earR: 6, botR: 11, expand: 0, presence: 1 }
+          ? { w: metrics.notchWidth, h: metrics.notchHeight, earR: 6, botR: 10, expand: 0, presence: 1 }
           : { w: 220, h: 34, earR: 0, botR: 17, expand: 0, presence: 0 },
         { immediate: true },
       );

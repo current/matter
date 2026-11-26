@@ -135,7 +135,7 @@ export const layer = Layer.effect(
     let latestMetrics: IslandDisplayMetrics = {
       hasNotch: isMac,
       notchWidth: NOTCHED_DISPLAY_NOTCH_WIDTH,
-      notchHeight: 37,
+      notchHeight: 32,
       windowWidth: ISLAND_WINDOW_WIDTH,
     };
     let currentSettings: IslandSettings = DEFAULT_ISLAND_SETTINGS;
