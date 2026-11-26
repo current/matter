@@ -54,16 +54,33 @@ describe("shouldShowMattrComposerContextStrip", () => {
     isScratchProject: false,
     isDraftHeroState: false,
     showProviderSubagentBar: false,
-    persistInActiveThreads: false,
+    persistInActiveThreads: true,
     isGitRepo: true,
     showEnvironmentIndicator: false,
   };
 
-  it("shows the under-tray in both new-chat drafts and active threads for real projects", () => {
+  it("shows the under-tray in both new-chat drafts and active threads for real projects by default", () => {
     expect(shouldShowMattrComposerContextStrip({ ...base, isDraftHeroState: true })).toBe(true);
     expect(shouldShowMattrComposerContextStrip({ ...base, isDraftHeroState: false })).toBe(true);
     expect(
       shouldShowMattrComposerContextStrip({ ...base, isDraftHeroState: false, isGitRepo: false }),
+    ).toBe(true);
+  });
+
+  it("hides the under-tray in active threads when Keep context strip is turned off", () => {
+    expect(
+      shouldShowMattrComposerContextStrip({
+        ...base,
+        isDraftHeroState: false,
+        persistInActiveThreads: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowMattrComposerContextStrip({
+        ...base,
+        isDraftHeroState: true,
+        persistInActiveThreads: false,
+      }),
     ).toBe(true);
   });
 

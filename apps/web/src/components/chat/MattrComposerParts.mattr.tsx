@@ -67,7 +67,8 @@ export function shouldShowMattrComposerContextStrip(input: {
   readonly showEnvironmentIndicator: boolean;
 }): boolean {
   return shouldShowComposerContextStrip({
-    isDraftHeroState: input.isDraftHeroState || !input.isScratchProject,
+    isDraftHeroState:
+      input.isDraftHeroState || (!input.isScratchProject && input.persistInActiveThreads),
     persistInActiveThreads: input.persistInActiveThreads,
     hasActiveProject: !input.embedded && input.hasActiveProject && !input.showProviderSubagentBar,
     isGitRepo: input.isGitRepo,
