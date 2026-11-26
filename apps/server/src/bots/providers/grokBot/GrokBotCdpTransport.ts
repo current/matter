@@ -1,5 +1,4 @@
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
-import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -7,7 +6,6 @@ import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
@@ -27,10 +25,12 @@ import {
   buildCancelRunExpression,
   buildDiscoverBotsExpression,
   buildListMessagesExpression,
+  buildRespondToWidgetExpression,
   buildSendMessageExpression,
-  deduplicateGrokBotMessages,
-  normalizeGrokBotMessage,
+  GROK_BOT_SEND_SETTLE_MS,
+  normalizeGrokBotOpenWidget,
   normalizeGrokBotSummary,
+  normalizeGrokBotTranscript,
   parseGrokBotInfoPlist,
   selectGrokBotRendererTarget,
   validateLoopbackEndpoint,
@@ -45,12 +45,14 @@ import {
   GrokBotTransport,
   type GrokBotAppInfo,
   type GrokBotAvailability,
+  type GrokBotBridgeOperation,
   type GrokBotCancelResult,
   type GrokBotMessagePage,
+  type GrokBotOpenWidget,
+  type GrokBotRoster,
   type GrokBotSendResult,
   type GrokBotSummary,
   type GrokBotTransportError,
-  type GrokBotTransportEvent,
 } from "./GrokBotTransport.ts";
 
 export interface GrokBotCdpTransportConfig {
@@ -58,17 +60,14 @@ export interface GrokBotCdpTransportConfig {
   readonly port?: number;
   readonly appPath?: string;
   readonly connectTimeout?: Duration.Input;
+  /** How long a read waits for the renderer; sends and stops wait on Grok Bot itself too. */
   readonly requestTimeout?: Duration.Input;
-  readonly pollInterval?: Duration.Input;
-  readonly baseReconnectDelay?: Duration.Input;
-  readonly maxReconnectDelay?: Duration.Input;
 }
 
 const DEFAULT_CONNECT_TIMEOUT: Duration.Input = "3 seconds";
-const DEFAULT_REQUEST_TIMEOUT: Duration.Input = "5 seconds";
-const DEFAULT_POLL_INTERVAL: Duration.Input = "2 seconds";
-const DEFAULT_BASE_RECONNECT_DELAY: Duration.Input = "500 millis";
-const DEFAULT_MAX_RECONNECT_DELAY: Duration.Input = "30 seconds";
+const DEFAULT_REQUEST_TIMEOUT: Duration.Input = "8 seconds";
+/** The renderer settles a send within GROK_BOT_SEND_SETTLE_MS; this leaves room for the socket. */
+const ACTION_REQUEST_TIMEOUT: Duration.Input = Duration.millis(GROK_BOT_SEND_SETTLE_MS + 5_000);
 
 const CdpTargetSchema = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
@@ -119,17 +118,6 @@ interface ActiveCdpConnection {
   readonly pending: Map<number, Deferred.Deferred<CdpRpcResponse, GrokBotTransportError>>;
 }
 
-export function computeReconnectBackoffMs(
-  attempt: number,
-  baseDelayMs: number,
-  maxDelayMs: number,
-): number {
-  const safeBase = Math.max(10, Math.floor(baseDelayMs));
-  const safeMax = Math.max(safeBase, Math.floor(maxDelayMs));
-  const clampedAttempt = Math.max(0, Math.min(16, Math.floor(attempt)));
-  return Math.min(safeBase * 2 ** clampedAttempt, safeMax);
-}
-
 // Effect drops listeners before closing a connecting socket, which can trigger an unhandled `ws` error.
 export const safeWebSocketConstructorLayer = Layer.effect(
   Socket.WebSocketConstructor,
@@ -144,7 +132,7 @@ export const safeWebSocketConstructorLayer = Layer.effect(
 ).pipe(Layer.provide(NodeSocket.layerWebSocketConstructor));
 
 function extractBridgeEnvelope(
-  operation: "discover_bots" | "list_messages" | "send_message" | "cancel_run",
+  operation: GrokBotBridgeOperation,
   rpcResponse: CdpRpcResponse,
   botId?: string,
 ):
@@ -215,12 +203,17 @@ function extractBridgeEnvelope(
       rawReason === "action_rejected"
         ? rawReason
         : "invalid_payload";
+    const code =
+      typeof envelope.code === "string" && envelope.code.length > 0
+        ? envelope.code.slice(0, 120)
+        : undefined;
     return {
       ok: false,
       error: new GrokBotStoreBridgeError({
         operation,
         ...(botId ? { botId } : {}),
         reason,
+        ...(code ? { code } : {}),
       }),
     };
   }
@@ -250,20 +243,10 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
   const appPath = config?.appPath ?? GROK_BOT_APP_PATH;
   const connectTimeout = config?.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT;
   const requestTimeout = config?.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT;
-  const defaultPollInterval = config?.pollInterval ?? DEFAULT_POLL_INTERVAL;
-  const baseReconnectMs = Duration.toMillis(
-    Duration.fromInputUnsafe(config?.baseReconnectDelay ?? DEFAULT_BASE_RECONNECT_DELAY),
-  );
-  const maxReconnectMs = Duration.toMillis(
-    Duration.fromInputUnsafe(config?.maxReconnectDelay ?? DEFAULT_MAX_RECONNECT_DELAY),
-  );
 
-  const events = yield* PubSub.unbounded<GrokBotTransportEvent>();
   const connectionLock = yield* Semaphore.make(1);
   const activeConnectionRef = yield* Ref.make<ActiveCdpConnection | null>(null);
   const nextRequestIdRef = yield* Ref.make(1);
-  const nextNonceSeqRef = yield* Ref.make(1);
-  const reconnectAttemptsRef = yield* Ref.make(0);
 
   const requireEndpoint = Effect.fn("GrokBotCdpTransport.requireEndpoint")(function* () {
     const checked = validateLoopbackEndpoint({ host: rawHost, port: rawPort });
@@ -384,15 +367,9 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
     if (!current) return;
     yield* failPendingRequests(current.pending, current.wsUrl, reason);
     yield* Scope.close(current.scope, Exit.void).pipe(Effect.ignore);
-    yield* PubSub.publish(events, { type: "disconnected", reason }).pipe(Effect.ignore);
   });
 
-  yield* Effect.addFinalizer(() =>
-    Effect.gen(function* () {
-      yield* dropActiveConnection("transport_disposed");
-      yield* PubSub.shutdown(events).pipe(Effect.ignore);
-    }),
-  );
+  yield* Effect.addFinalizer(() => dropActiveConnection("transport_disposed"));
 
   const detectAvailability = Effect.fn("GrokBotCdpTransport.detectAvailability")(function* () {
     const endpoint = yield* requireEndpoint();
@@ -525,7 +502,6 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
         };
 
         yield* Ref.set(activeConnectionRef, connection);
-        yield* Ref.set(reconnectAttemptsRef, 0);
 
         const decoder = new TextDecoder();
         const pumpLoop = Effect.gen(function* () {
@@ -547,16 +523,8 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
           Effect.ensuring(
             Effect.gen(function* () {
               const current = yield* Ref.get(activeConnectionRef);
-              if (current === connection) {
-                yield* Ref.set(activeConnectionRef, null);
-                yield* failPendingRequests(pending, wsUrl, "cdp_socket_closed");
-                yield* PubSub.publish(events, {
-                  type: "disconnected",
-                  reason: "cdp_socket_closed",
-                }).pipe(Effect.ignore);
-              } else {
-                yield* failPendingRequests(pending, wsUrl, "cdp_socket_closed");
-              }
+              if (current === connection) yield* Ref.set(activeConnectionRef, null);
+              yield* failPendingRequests(pending, wsUrl, "cdp_socket_closed");
             }),
           ),
           Effect.ignoreCause,
@@ -569,7 +537,7 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
   });
 
   const evaluateInRenderer = Effect.fn("GrokBotCdpTransport.evaluateInRenderer")(function* (
-    operation: "discover_bots" | "list_messages" | "send_message" | "cancel_run",
+    operation: GrokBotBridgeOperation,
     expression: string,
     botId?: string,
   ) {
@@ -607,8 +575,9 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
       });
     }
 
+    const isAction = operation !== "discover_bots" && operation !== "list_messages";
     const rpcResponseOption = yield* Deferred.await(deferred).pipe(
-      Effect.timeoutOption(requestTimeout),
+      Effect.timeoutOption(isAction ? ACTION_REQUEST_TIMEOUT : requestTimeout),
     );
     if (Option.isNone(rpcResponseOption)) {
       connection.pending.delete(id);
@@ -630,15 +599,17 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
 
   const discoverBots = Effect.fn("GrokBotCdpTransport.discoverBots")(function* () {
     const data = yield* evaluateInRenderer("discover_bots", buildDiscoverBotsExpression());
-    const rawBots = Array.isArray(data.bots) ? data.bots : [];
-    const normalized: GrokBotSummary[] = [];
-    for (const entry of rawBots) {
+    const bots: GrokBotSummary[] = [];
+    for (const entry of Array.isArray(data.bots) ? data.bots : []) {
       const bot = normalizeGrokBotSummary(entry);
-      if (bot) {
-        normalized.push(bot);
-      }
+      if (bot) bots.push(bot);
     }
-    return normalized as readonly GrokBotSummary[];
+    const openWidgets: GrokBotOpenWidget[] = [];
+    for (const entry of Array.isArray(data.widgets) ? data.widgets : []) {
+      const widget = normalizeGrokBotOpenWidget(entry);
+      if (widget) openWidgets.push(widget);
+    }
+    return { bots, openWidgets } satisfies GrokBotRoster;
   });
 
   const listMessages = Effect.fn("GrokBotCdpTransport.listMessages")(function* (
@@ -650,113 +621,54 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
       buildListMessagesExpression(botId, cursor),
       botId,
     );
-    const rawMessages = Array.isArray(data.messages) ? data.messages : [];
-    const parsed = rawMessages
-      .map((entry, index) => normalizeGrokBotMessage(botId, entry, index))
-      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-    const messages = deduplicateGrokBotMessages(parsed);
+    const messages = normalizeGrokBotTranscript(
+      botId,
+      Array.isArray(data.messages) ? data.messages : [],
+    );
     const nextCursor = typeof data.nextCursor === "string" ? data.nextCursor : null;
-    const hasMore = data.hasMore === true && nextCursor !== null;
-
     return {
       botId,
       messages,
       nextCursor,
-      hasMore,
+      hasMore: data.hasMore === true && nextCursor !== null,
     } satisfies GrokBotMessagePage;
   });
 
   const sendMessage = Effect.fn("GrokBotCdpTransport.sendMessage")(function* (
     botId: string,
     text: string,
-    options?: { readonly clientNonce?: string },
   ) {
-    const nowMs = yield* Clock.currentTimeMillis;
-    const seq = yield* Ref.getAndUpdate(nextNonceSeqRef, (current) => current + 1);
-    const clientNonce =
-      options?.clientNonce && options.clientNonce.trim().length > 0
-        ? options.clientNonce.trim()
-        : `mattr-${nowMs}-${seq}`;
-
     const data = yield* evaluateInRenderer(
       "send_message",
-      buildSendMessageExpression(botId, text, clientNonce),
+      buildSendMessageExpression(botId, text),
       botId,
     );
-    const accepted = data.accepted !== false;
-    const messageId = typeof data.messageId === "string" ? data.messageId : null;
-
     return {
       botId,
-      clientNonce,
-      accepted,
-      messageId,
+      grokNonce: typeof data.nonce === "string" ? data.nonce : null,
+      state: data.state === "delivered" ? "delivered" : "queued",
     } satisfies GrokBotSendResult;
   });
 
   const cancelRun = Effect.fn("GrokBotCdpTransport.cancelRun")(function* (botId: string) {
-    const fallbackDeepLinkUrl = buildGrokBotPromptDeepLink({ botId });
     const data = yield* evaluateInRenderer("cancel_run", buildCancelRunExpression(botId), botId);
     return {
       botId,
       cancelled: data.cancelled === true,
-      fallbackDeepLinkUrl,
+      fallbackDeepLinkUrl: buildGrokBotPromptDeepLink({ botId }),
     } satisfies GrokBotCancelResult;
   });
 
-  const subscribe = Effect.fn("GrokBotCdpTransport.subscribe")(function* (options?: {
-    readonly pollInterval?: Duration.Input;
-  }) {
-    yield* requireEndpoint();
-    const subscriberScope = yield* Effect.scope;
-    const dequeue = yield* PubSub.subscribe(events);
-    const pollInterval = options?.pollInterval ?? defaultPollInterval;
-
-    const pollFiber = Effect.gen(function* () {
-      let previousById = new Map<string, GrokBotSummary>();
-      while (true) {
-        const result = yield* discoverBots().pipe(Effect.result);
-        if (result._tag === "Success") {
-          yield* Ref.set(reconnectAttemptsRef, 0);
-          const bots = result.success;
-          let changed = bots.length !== previousById.size;
-          const nextById = new Map<string, GrokBotSummary>();
-          for (const bot of bots) {
-            nextById.set(bot.id, bot);
-            const prev = previousById.get(bot.id);
-            if (
-              !prev ||
-              prev.status !== bot.status ||
-              prev.unreadCount !== bot.unreadCount ||
-              prev.lastMessagePreview !== bot.lastMessagePreview
-            ) {
-              changed = true;
-            }
-            if (prev && (prev.status !== bot.status || prev.unreadCount !== bot.unreadCount)) {
-              yield* PubSub.publish(events, {
-                type: "bot_status_changed",
-                botId: bot.id,
-                previousStatus: prev.status,
-                status: bot.status,
-                unreadCount: bot.unreadCount,
-              });
-            }
-          }
-          if (changed) {
-            previousById = nextById;
-            yield* PubSub.publish(events, { type: "bots_updated", bots });
-          }
-          yield* Effect.sleep(pollInterval);
-        } else {
-          const attempt = yield* Ref.getAndUpdate(reconnectAttemptsRef, (count) => count + 1);
-          const delayMs = computeReconnectBackoffMs(attempt, baseReconnectMs, maxReconnectMs);
-          yield* Effect.sleep(Duration.millis(delayMs));
-        }
-      }
-    }).pipe(Effect.ignoreCause);
-
-    yield* Effect.forkIn(pollFiber, subscriberScope);
-    return dequeue;
+  const respondToWidget = Effect.fn("GrokBotCdpTransport.respondToWidget")(function* (
+    botId: string,
+    entryId: string,
+    value: string,
+  ) {
+    yield* evaluateInRenderer(
+      "respond_widget",
+      buildRespondToWidgetExpression(botId, entryId, value),
+      botId,
+    );
   });
 
   return GrokBotTransport.of({
@@ -767,7 +679,7 @@ const make = Effect.fn("GrokBotCdpTransport.make")(function* (config?: GrokBotCd
     listMessages,
     sendMessage,
     cancelRun,
-    subscribe,
+    respondToWidget,
   });
 });
 

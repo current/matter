@@ -9,6 +9,8 @@ export interface BotAvatarProps {
   /** Square size in pixels. */
   readonly size: number;
   readonly activity: BotActivityState;
+  /** Shows the activity without motion, for dense lists such as the sidebar. */
+  readonly still?: boolean;
   readonly className?: string;
 }
 
@@ -74,9 +76,20 @@ const LazyGrokBotAvatar = lazy(() =>
   import("./GrokBotAvatar").then((module) => ({ default: module.GrokBotAvatar })),
 );
 
+/** Blank disc while the character code loads, so no initial flashes in first. */
+function GrokBotAvatarPlaceholder({ size, className }: BotAvatarProps) {
+  return (
+    <span
+      aria-hidden
+      style={{ width: size, height: size }}
+      className={cn("inline-block shrink-0 rounded-full bg-muted", className)}
+    />
+  );
+}
+
 function GrokBotAvatarSlot(props: BotAvatarProps) {
   return (
-    <Suspense fallback={<DefaultBotAvatar {...props} />}>
+    <Suspense fallback={<GrokBotAvatarPlaceholder {...props} />}>
       <LazyGrokBotAvatar {...props} />
     </Suspense>
   );

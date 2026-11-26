@@ -1,9 +1,6 @@
 import * as Context from "effect/Context";
-import type * as Duration from "effect/Duration";
 import type * as Effect from "effect/Effect";
-import type * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
-import type * as Scope from "effect/Scope";
 
 import type { GrokBotCapabilities } from "./grokBotDeepLinks.ts";
 
@@ -58,7 +55,34 @@ export interface GrokBotSummary {
   readonly unreadCount: number;
   readonly lastMessagePreview: string | null;
   readonly lastActivityAtMs: number | null;
+  /** Grok Bot's own live status line while it works, e.g. "is searching X for composers". */
+  readonly activityDetail: string | null;
   readonly deepLinkUrl: string;
+}
+
+export interface GrokBotWidgetOption {
+  readonly label: string;
+  readonly value: string;
+}
+
+/** A multiple-choice question a Bot asked that nobody has answered yet. */
+export interface GrokBotOpenWidget {
+  readonly botId: string;
+  readonly entryId: string;
+  readonly prompt: string;
+  readonly options: readonly GrokBotWidgetOption[];
+  readonly timestampMs: number | null;
+}
+
+export interface GrokBotRoster {
+  readonly bots: readonly GrokBotSummary[];
+  readonly openWidgets: readonly GrokBotOpenWidget[];
+}
+
+export interface GrokBotAttachment {
+  readonly id: string;
+  readonly name: string;
+  readonly sizeBytes: number | null;
 }
 
 export interface GrokBotMessage {
@@ -71,6 +95,16 @@ export interface GrokBotMessage {
   readonly clientNonce: string | null;
   readonly replyToId: string | null;
   readonly isStreaming: boolean;
+  readonly attachments: readonly GrokBotAttachment[];
+  /** Set when another Bot, not the user, wrote this message. */
+  readonly fromAgentName: string | null;
+  readonly fromAgentId: string | null;
+  readonly widget: {
+    readonly options: readonly GrokBotWidgetOption[];
+    readonly respondedValue: string | null;
+  } | null;
+  /** A Grok Bot card mattr can't draw, such as a connector prompt. */
+  readonly cardType: string | null;
 }
 
 export interface GrokBotMessagePage {
@@ -82,9 +116,10 @@ export interface GrokBotMessagePage {
 
 export interface GrokBotSendResult {
   readonly botId: string;
-  readonly clientNonce: string;
-  readonly accepted: boolean;
-  readonly messageId: string | null;
+  /** The nonce Grok Bot gave the send; its transcript echoes it on the user message. */
+  readonly grokNonce: string | null;
+  /** "queued" when Grok Bot journaled it but hasn't confirmed delivery yet. */
+  readonly state: "delivered" | "queued";
 }
 
 export interface GrokBotCancelResult {
@@ -92,32 +127,6 @@ export interface GrokBotCancelResult {
   readonly cancelled: boolean;
   readonly fallbackDeepLinkUrl: string;
 }
-
-export type GrokBotTransportEvent =
-  | {
-      readonly type: "availability_changed";
-      readonly availability: GrokBotAvailability;
-    }
-  | {
-      readonly type: "bots_updated";
-      readonly bots: readonly GrokBotSummary[];
-    }
-  | {
-      readonly type: "bot_status_changed";
-      readonly botId: string;
-      readonly previousStatus: GrokBotActivityStatus;
-      readonly status: GrokBotActivityStatus;
-      readonly unreadCount: number;
-    }
-  | {
-      readonly type: "message_upserted";
-      readonly botId: string;
-      readonly message: GrokBotMessage;
-    }
-  | {
-      readonly type: "disconnected";
-      readonly reason: string;
-    };
 
 export class GrokBotLoopbackViolationError extends Schema.TaggedError<GrokBotLoopbackViolationError>()(
   "GrokBotLoopbackViolationError",
@@ -178,11 +187,22 @@ export class GrokBotCdpProtocolError extends Schema.TaggedError<GrokBotCdpProtoc
   }
 }
 
+export const GrokBotBridgeOperation = Schema.Literals([
+  "discover_bots",
+  "list_messages",
+  "send_message",
+  "cancel_run",
+  "respond_widget",
+]);
+export type GrokBotBridgeOperation = typeof GrokBotBridgeOperation.Type;
+
 export class GrokBotStoreBridgeError extends Schema.TaggedError<GrokBotStoreBridgeError>()(
   "GrokBotStoreBridgeError",
   {
-    operation: Schema.Literals(["discover_bots", "list_messages", "send_message", "cancel_run"]),
+    operation: GrokBotBridgeOperation,
     botId: Schema.optionalKey(Schema.String),
+    /** Grok Bot's own failure code, such as `send/agent-read-only`. */
+    code: Schema.optionalKey(Schema.String),
     reason: Schema.Literals([
       "store_unavailable",
       "bot_not_found",
@@ -192,9 +212,10 @@ export class GrokBotStoreBridgeError extends Schema.TaggedError<GrokBotStoreBrid
   },
 ) {
   override get message(): string {
+    const code = this.code ? `, ${this.code}` : "";
     return this.botId
-      ? `Grok Bot bridge failed (${this.reason}) during ${this.operation} for bot ${this.botId}.`
-      : `Grok Bot bridge failed (${this.reason}) during ${this.operation}.`;
+      ? `Grok Bot bridge failed (${this.reason}${code}) during ${this.operation} for bot ${this.botId}.`
+      : `Grok Bot bridge failed (${this.reason}${code}) during ${this.operation}.`;
   }
 }
 
@@ -215,7 +236,7 @@ export interface GrokBotTransportShape {
     GrokBotAvailability,
     GrokBotLoopbackViolationError
   >;
-  readonly discoverBots: () => Effect.Effect<readonly GrokBotSummary[], GrokBotTransportError>;
+  readonly discoverBots: () => Effect.Effect<GrokBotRoster, GrokBotTransportError>;
   readonly listMessages: (
     botId: string,
     cursor?: string,
@@ -223,16 +244,13 @@ export interface GrokBotTransportShape {
   readonly sendMessage: (
     botId: string,
     text: string,
-    options?: { readonly clientNonce?: string },
   ) => Effect.Effect<GrokBotSendResult, GrokBotTransportError>;
   readonly cancelRun: (botId: string) => Effect.Effect<GrokBotCancelResult, GrokBotTransportError>;
-  readonly subscribe: (options?: {
-    readonly pollInterval?: Duration.Input;
-  }) => Effect.Effect<
-    PubSub.Subscription<GrokBotTransportEvent>,
-    GrokBotTransportError,
-    Scope.Scope
-  >;
+  readonly respondToWidget: (
+    botId: string,
+    entryId: string,
+    value: string,
+  ) => Effect.Effect<void, GrokBotTransportError>;
 }
 
 export class GrokBotTransport extends Context.Service<GrokBotTransport, GrokBotTransportShape>()(

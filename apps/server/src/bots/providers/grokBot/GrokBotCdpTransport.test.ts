@@ -7,7 +7,6 @@ import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import type * as NetAddress from "effect/net/NetAddress";
-import * as PubSub from "effect/PubSub";
 import * as Scope from "effect/Scope";
 import {
   FetchHttpClient,
@@ -240,9 +239,6 @@ describe("loopback enforcement & normalization", () => {
       version: "1.3.0",
       urlSchemes: [GROK_BOT_URL_SCHEME, "sand"],
     });
-    expect(GrokBotCdpTransport.computeReconnectBackoffMs(0, 500, 30_000)).toBe(500);
-    expect(GrokBotCdpTransport.computeReconnectBackoffMs(3, 500, 30_000)).toBe(4_000);
-    expect(GrokBotCdpTransport.computeReconnectBackoffMs(10, 500, 30_000)).toBe(30_000);
     expect(normalizeGrokBotStatus({ awaitingUserResponse: true, isRunning: true })).toBe(
       "attention",
     );
@@ -289,6 +285,11 @@ describe("loopback enforcement & normalization", () => {
         clientNonce: "nonce-1",
         replyToId: null,
         isStreaming: false,
+        attachments: [],
+        fromAgentName: null,
+        fromAgentId: null,
+        widget: null,
+        cardType: null,
       },
       {
         id: "msg-remote-1",
@@ -300,6 +301,11 @@ describe("loopback enforcement & normalization", () => {
         clientNonce: "nonce-1",
         replyToId: null,
         isStreaming: false,
+        attachments: [],
+        fromAgentName: null,
+        fromAgentId: null,
+        widget: null,
+        cardType: null,
       },
       {
         id: "msg-remote-2",
@@ -311,6 +317,11 @@ describe("loopback enforcement & normalization", () => {
         clientNonce: null,
         replyToId: "msg-remote-1",
         isStreaming: false,
+        attachments: [],
+        fromAgentName: null,
+        fromAgentId: null,
+        widget: null,
+        cardType: null,
       },
     ];
     expect(deduplicateGrokBotMessages(messages).map((m) => m.id)).toEqual([
@@ -427,17 +438,18 @@ describe("GrokBotCdpTransport integration", () => {
   );
 
   it.live(
-    "discovers bots, lists deduplicated history, sends, cancels, and disposes WS cleanly on scope close",
+    "discovers bots, lists history, sends, cancels, answers widgets, and closes the socket with its scope",
     () =>
       Effect.gen(function* () {
         const socketClosed = yield* Deferred.make<void>();
-        const sentNonces: string[] = [];
+        const sentTexts: string[] = [];
+        const widgetAnswers: string[] = [];
 
         yield* withMockCdpServer(
           {
             onSocketClosed: socketClosed,
             onEvaluate: (expression) => {
-              if (expression.includes("stores.roster.getAgents")) {
+              if (expression.includes("openWidgetWindow")) {
                 return {
                   type: "value",
                   value: {
@@ -453,6 +465,7 @@ describe("GrokBotCdpTransport integration", () => {
                           isRunning: true,
                           unreadCount: 2,
                           lastMessagePreview: "Working on build",
+                          activityDetail: "is running the build",
                         },
                         {
                           id: "bot-xss",
@@ -463,11 +476,20 @@ describe("GrokBotCdpTransport integration", () => {
                           awaitingUserResponse: true,
                         },
                       ],
+                      widgets: [
+                        {
+                          botId: "bot-xss",
+                          entryId: "t5s2",
+                          prompt: "Ship it?",
+                          options: [{ label: "Yes", value: "Yes, ship it" }, { value: "" }],
+                          timestampMs: 1000,
+                        },
+                      ],
                     },
                   },
                 };
               }
-              if (expression.includes("transcript.getMessages")) {
+              if (expression.includes("transcript.loadOlder(args.botId)")) {
                 return {
                   type: "value",
                   value: {
@@ -497,24 +519,32 @@ describe("GrokBotCdpTransport integration", () => {
                           timestampMs: 1020,
                         },
                       ],
-                      nextCursor: "seq:0",
+                      nextCursor: "1",
                       hasMore: true,
                     },
                   },
                 };
               }
-              if (expression.includes("transcript.sendMessage")) {
-                const nonceMatch = /"clientNonce":"([^"]+)"/.exec(expression);
-                if (nonceMatch?.[1]) sentNonces.push(nonceMatch[1]);
+              if (expression.includes("prompt: args.text")) {
+                const textMatch = /"text":"([^"]+)"/.exec(expression);
+                if (textMatch?.[1]) sentTexts.push(textMatch[1]);
                 return {
                   type: "value",
-                  value: {
-                    ok: true,
-                    data: { accepted: true, messageId: "remote-3" },
-                  },
+                  value:
+                    textMatch?.[1] === "Too long"
+                      ? { ok: false, reason: "action_rejected", code: "send/message-too-long" }
+                      : {
+                          ok: true,
+                          data: { accepted: true, nonce: "grok-nonce-1", state: "delivered" },
+                        },
                 };
               }
-              if (expression.includes("transcript.cancelRun")) {
+              if (expression.includes("respondToWidget({ agentId")) {
+                const valueMatch = /"value":"([^"]+)"/.exec(expression);
+                if (valueMatch?.[1]) widgetAnswers.push(valueMatch[1]);
+                return { type: "value", value: { ok: true, data: { accepted: true } } };
+              }
+              if (expression.includes("interruptAgentRun(request)")) {
                 return {
                   type: "value",
                   value: {
@@ -551,7 +581,8 @@ describe("GrokBotCdpTransport integration", () => {
               expect(availability.state).toBe("connected");
               expect(availability.targetTitle).toBe("Grok Bot");
 
-              const bots = yield* provider.discoverBots();
+              const roster = yield* provider.discoverBots();
+              const bots = roster.bots;
               expect(bots).toHaveLength(2);
               expect(bots[0]).toMatchObject({
                 id: "bot-alpha",
@@ -562,29 +593,48 @@ describe("GrokBotCdpTransport integration", () => {
                 status: "working",
                 unreadCount: 2,
                 lastMessagePreview: "Working on build",
+                activityDetail: "is running the build",
                 deepLinkUrl: "grokbot://app/v1/prompt?id=bot-alpha",
               });
               expect(bots[1]).toMatchObject({
                 id: "bot-xss",
                 avatarDataUrl: null,
                 status: "attention",
+                activityDetail: null,
               });
+              expect(roster.openWidgets).toEqual([
+                {
+                  botId: "bot-xss",
+                  entryId: "t5s2",
+                  prompt: "Ship it?",
+                  options: [{ label: "Yes", value: "Yes, ship it" }],
+                  timestampMs: 1000,
+                },
+              ]);
 
               const page = yield* provider.listMessages("bot-alpha");
               expect(page.messages.map((m) => m.id)).toEqual(["remote-1", "remote-2"]);
-              expect(page.nextCursor).toBe("seq:0");
+              expect(page.nextCursor).toBe("1");
               expect(page.hasMore).toBe(true);
 
-              const sent = yield* provider.sendMessage("bot-alpha", "Ship it", {
-                clientNonce: "nonce-ship",
-              });
+              const sent = yield* provider.sendMessage("bot-alpha", "Ship it");
               expect(sent).toEqual({
                 botId: "bot-alpha",
-                clientNonce: "nonce-ship",
-                accepted: true,
-                messageId: "remote-3",
+                grokNonce: "grok-nonce-1",
+                state: "delivered",
               });
-              expect(sentNonces).toEqual(["nonce-ship"]);
+              const refused = yield* provider
+                .sendMessage("bot-alpha", "Too long")
+                .pipe(Effect.flip);
+              expect(refused).toMatchObject({
+                _tag: "GrokBotStoreBridgeError",
+                reason: "action_rejected",
+                code: "send/message-too-long",
+              });
+              expect(sentTexts).toEqual(["Ship it", "Too long"]);
+
+              yield* provider.respondToWidget("bot-xss", "t5s2", "Yes, ship it");
+              expect(widgetAnswers).toEqual(["Yes, ship it"]);
 
               const cancelled = yield* provider.cancelRun("bot-alpha");
               expect(cancelled).toEqual({
@@ -601,7 +651,7 @@ describe("GrokBotCdpTransport integration", () => {
       }),
   );
 
-  it.live("handles unexpected CDP socket drop, emits disconnected event, and reconnects", () =>
+  it.live("fails pending reads when the CDP socket drops, then reconnects on the next call", () =>
     withMockCdpServer(
       {
         onEvaluate: (_expression, callIndex) => {
@@ -612,15 +662,7 @@ describe("GrokBotCdpTransport integration", () => {
             type: "value",
             value: {
               ok: true,
-              data: {
-                bots: [
-                  {
-                    id: "bot-recovered",
-                    name: "Recovered",
-                    isRunning: false,
-                  },
-                ],
-              },
+              data: { bots: [{ id: "bot-recovered", name: "Recovered", isRunning: false }] },
             },
           };
         },
@@ -628,18 +670,12 @@ describe("GrokBotCdpTransport integration", () => {
       (port) =>
         Effect.gen(function* () {
           const transport = yield* GrokBotTransport.GrokBotTransport;
-          const events = yield* transport.subscribe({ pollInterval: "60 seconds" });
-
-          const firstAttempt = yield* transport.discoverBots().pipe(Effect.result);
-          expect(firstAttempt._tag).toBe("Failure");
-
-          // Wait for either disconnected or recovered bots event cleanly via PubSub.take.
-          const event = yield* PubSub.take(events);
-          expect(["disconnected", "bots_updated"]).toContain(event.type);
+          const firstAttempt = yield* transport.discoverBots().pipe(Effect.flip);
+          expect(firstAttempt._tag).toBe("GrokBotCdpConnectionError");
 
           const recovered = yield* transport.discoverBots();
-          expect(recovered).toHaveLength(1);
-          expect(recovered[0]?.id).toBe("bot-recovered");
+          expect(recovered.bots.map((bot) => bot.id)).toEqual(["bot-recovered"]);
+          expect(recovered.openWidgets).toEqual([]);
         }).pipe(
           Effect.scoped,
           Effect.provide(

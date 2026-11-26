@@ -7,13 +7,17 @@ import {
 import {
   GrokBotLoopbackViolationError,
   type GrokBotActivityStatus,
+  type GrokBotAttachment,
   type GrokBotMessage,
   type GrokBotMessageRole,
+  type GrokBotOpenWidget,
   type GrokBotSummary,
+  type GrokBotWidgetOption,
 } from "./GrokBotTransport.ts";
 
 const GROK_BOT_MAX_AVATAR_DATA_URL_LENGTH = 512 * 1024;
 const GROK_BOT_MAX_PREVIEW_LENGTH = 280;
+const GROK_BOT_MAX_ACTIVITY_DETAIL_LENGTH = 160;
 
 const ALLOWED_AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -262,6 +266,11 @@ export function normalizeGrokBotSummary(raw: unknown): GrokBotSummary | null {
     record.lastActivityAtMs ?? record.updatedAtMs ?? record.lastMessageAtMs,
   );
 
+  const activityDetail = isRunning
+    ? (asNonEmptyString(record.activityDetail)?.slice(0, GROK_BOT_MAX_ACTIVITY_DETAIL_LENGTH) ??
+      null)
+    : null;
+
   return {
     id,
     name,
@@ -275,7 +284,37 @@ export function normalizeGrokBotSummary(raw: unknown): GrokBotSummary | null {
     unreadCount,
     lastMessagePreview,
     lastActivityAtMs,
+    activityDetail,
     deepLinkUrl: buildGrokBotPromptDeepLink({ botId: id }),
+  };
+}
+
+function normalizeWidgetOptions(raw: unknown): readonly GrokBotWidgetOption[] {
+  if (!Array.isArray(raw)) return [];
+  const options: GrokBotWidgetOption[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    const value = asNonEmptyString(record.value);
+    if (!value) continue;
+    options.push({ label: asNonEmptyString(record.label) ?? value, value });
+  }
+  return options;
+}
+
+export function normalizeGrokBotOpenWidget(raw: unknown): GrokBotOpenWidget | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const botId = asNonEmptyString(record.botId);
+  const entryId = asNonEmptyString(record.entryId);
+  const options = normalizeWidgetOptions(record.options);
+  if (!botId || !entryId || options.length === 0) return null;
+  return {
+    botId,
+    entryId,
+    prompt: typeof record.prompt === "string" ? record.prompt : "",
+    options,
+    timestampMs: asFiniteNumber(record.timestampMs),
   };
 }
 
@@ -286,7 +325,7 @@ function normalizeMessageRole(raw: unknown): GrokBotMessageRole {
   return "assistant";
 }
 
-export function normalizeGrokBotMessage(
+function normalizeGrokBotMessage(
   botId: string,
   raw: unknown,
   fallbackIndex: number,
@@ -298,28 +337,76 @@ export function normalizeGrokBotMessage(
       ? record.text
       : typeof record.content === "string"
         ? record.content
-        : typeof record.body === "string"
-          ? record.body
-          : "";
+        : "";
   const seq = asFiniteNumber(record.seq);
   const id =
-    asNonEmptyString(record.id ?? record.messageId ?? record.remoteId) ??
+    asNonEmptyString(record.id ?? record.messageId) ??
     (seq !== null ? `${botId}:seq:${seq}` : `${botId}:idx:${fallbackIndex}`);
-  const timestampMs = asFiniteNumber(record.timestampMs ?? record.createdAtMs ?? record.timestamp);
-  const clientNonce = asNonEmptyString(record.clientNonce ?? record.nonce);
-  const replyToId = asNonEmptyString(record.replyToId);
+  const kind = asNonEmptyString(record.kind);
+  const attachmentName = asNonEmptyString(record.attachmentName);
+  const attachments: readonly GrokBotAttachment[] =
+    kind === "attachment" && attachmentName
+      ? [{ id, name: attachmentName, sizeBytes: asFiniteNumber(record.attachmentBytes) }]
+      : [];
+  const options = kind === "widget" ? normalizeWidgetOptions(record.options) : [];
 
   return {
     id,
     seq,
     botId,
-    role: normalizeMessageRole(record.role ?? record.senderRole ?? record.author),
+    role: normalizeMessageRole(record.role),
     text,
-    timestampMs,
-    clientNonce,
-    replyToId,
+    timestampMs: asFiniteNumber(record.timestampMs),
+    clientNonce: asNonEmptyString(record.clientNonce),
+    replyToId: asNonEmptyString(record.replyToId),
     isStreaming: record.isStreaming === true,
+    attachments,
+    fromAgentName: asNonEmptyString(record.fromAgentName),
+    fromAgentId: asNonEmptyString(record.fromAgentId),
+    widget:
+      kind === "widget"
+        ? { options, respondedValue: asNonEmptyString(record.respondedValue) }
+        : null,
+    cardType: kind === "card" ? (asNonEmptyString(record.cardType) ?? "card") : null,
   };
+}
+
+/**
+ * Normalizes a transcript page. Grok Bot stores a user's uploads as their own entries beside the
+ * message they were sent with, so they fold into that message by its batch or nonce.
+ */
+export function normalizeGrokBotTranscript(
+  botId: string,
+  rawEntries: readonly unknown[],
+): readonly GrokBotMessage[] {
+  const messages: Array<GrokBotMessage | null> = [];
+  const userIndexByBatch = new Map<string, number>();
+  rawEntries.forEach((raw, index) => {
+    const message = normalizeGrokBotMessage(botId, raw, index);
+    if (!message) return;
+    const record = raw as Record<string, unknown>;
+    const batch =
+      message.role === "user" ? (asNonEmptyString(record.batchId) ?? message.clientNonce) : null;
+    const hostIndex = batch === null ? undefined : userIndexByBatch.get(batch);
+    const host = hostIndex === undefined ? null : messages[hostIndex];
+    if (batch === null || hostIndex === undefined || !host) {
+      if (batch !== null) userIndexByBatch.set(batch, messages.length);
+      messages.push(message);
+      return;
+    }
+    const isUpload = record.kind === "attachment";
+    if (isUpload) {
+      messages[hostIndex] = { ...host, attachments: [...host.attachments, ...message.attachments] };
+      return;
+    }
+    // The text arrived after its uploads: it takes their place and keeps them.
+    messages[hostIndex] = null;
+    userIndexByBatch.set(batch, messages.length);
+    messages.push({ ...message, attachments: [...host.attachments, ...message.attachments] });
+  });
+  return deduplicateGrokBotMessages(
+    messages.filter((message): message is GrokBotMessage => message !== null),
+  );
 }
 
 export function deduplicateGrokBotMessages(
@@ -368,276 +455,291 @@ export function deduplicateGrokBotMessages(
 }
 
 /**
- * Self-contained read-only Fiber/store lookup shared by CDP Runtime.evaluate expressions.
- * Touches only renderer UI stores (roster/transcript); never reads tokens, cookies, or Keychain.
+ * Finds Grok Bot's own renderer stores (roster, transcript, sendJournal) through the React context
+ * a mounted component reads. Every operation goes through them, so mattr never switches the chat
+ * Grok Bot shows, and never reads tokens, cookies or the Keychain.
  */
-const RENDERER_STORE_HELPER_SNIPPET = `
-  const findGrokShellProps = () => {
+const RENDERER_STORES_SNIPPET = `
+  const findGrokStores = () => {
     const root = document.getElementById("root");
     if (!root) return null;
-    const containerKey = Object.keys(root).find((k) => k.startsWith("__reactContainer$"));
-    if (!containerKey) return null;
-    const start = root[containerKey] && root[containerKey].current ? root[containerKey].current : root[containerKey];
-    const stack = start ? [start] : [];
+    const key = Object.keys(root).find((k) => k.startsWith("__reactContainer$"));
+    if (!key) return null;
+    const container = root[key];
+    const stack = [container && container.current ? container.current : container];
     let visited = 0;
-    while (stack.length > 0 && visited < 1500) {
-      const f = stack.pop();
+    while (stack.length > 0 && visited < 20000) {
+      const fiber = stack.pop();
       visited += 1;
-      if (!f) continue;
-      const p = f.memoizedProps;
-      if (p && typeof p === "object" && Array.isArray(p.agents) && p.transcriptActionsRef && p.screenInputs) {
-        return p;
+      if (!fiber) continue;
+      let dep = fiber.dependencies ? fiber.dependencies.firstContext : null;
+      for (let n = 0; dep && n < 64; n += 1) {
+        const v = dep.memoizedValue;
+        if (
+          v && typeof v === "object" && v.sendJournal && v.transcript && v.roster && v.roster.snapshots &&
+          typeof v.sendJournal.sendPrompt === "function" && typeof v.transcript.snapshotsFor === "function"
+        ) return v;
+        dep = dep.next;
       }
-      if (f.sibling) stack.push(f.sibling);
-      if (f.child) stack.push(f.child);
+      if (fiber.sibling) stack.push(fiber.sibling);
+      if (fiber.child) stack.push(fiber.child);
     }
     return null;
   };
-
-  const extractShellText = (entry) => {
-    if (!entry || typeof entry !== "object") return "";
-    if (entry.kind === "message") {
-      if (typeof entry.content === "string") return entry.content;
-      if (typeof entry.text === "string") return entry.text;
-      return "";
-    }
-    if (entry.kind === "send-message") {
-      if (typeof entry.message === "string") return entry.message;
-      if (entry.message && typeof entry.message === "object") {
-        if (typeof entry.message.content === "string") return entry.message.content;
-        if (typeof entry.message.text === "string") return entry.message.text;
-      }
-      return "";
-    }
-    return "";
+  const rosterRows = (stores) => {
+    const snapshot = stores.roster.snapshots.get();
+    const agents = snapshot ? snapshot.agents : null;
+    if (agents && Array.isArray(agents.rows)) return agents.rows;
+    return Array.isArray(agents) ? agents : [];
   };
-
-  const mapShellEntries = (entries, cursor) => {
-    const normalized = [];
-    for (let i = 0; i < entries.length; i += 1) {
-      const e = entries[i];
-      if (!e || (e.kind !== "message" && e.kind !== "send-message")) continue;
-      const text = extractShellText(e).trim();
-      if (!text) continue;
-      normalized.push({
-        id: e.id || String(e.seq ?? i),
-        seq: e.seq ?? null,
-        role: e.kind === "send-message" ? "assistant" : (e.role || "assistant"),
-        text,
-        timestampMs: e.timestampMs ?? e.createdAtMs ?? null,
-        clientNonce: e.clientNonce ?? null,
-        replyToId: e.replyToId ?? null,
-        isStreaming: Boolean(e.isStreaming),
-      });
-    }
-    const pageSize = 50;
-    const endIdx = cursor && /^\\d+$/.test(cursor) ? Math.min(normalized.length, Number(cursor)) : normalized.length;
-    const startIdx = Math.max(0, endIdx - pageSize);
-    return {
-      messages: normalized.slice(startIdx, endIdx),
-      nextCursor: startIdx > 0 ? String(startIdx) : null,
-      hasMore: startIdx > 0,
+  const str = (v) => (typeof v === "string" ? v : null);
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const delay = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
+  const failureCode = (error) =>
+    error && error.failure && typeof error.failure.code === "string" ? error.failure.code : null;
+  const mapEntry = (e) => {
+    if (!e || typeof e !== "object") return null;
+    const base = {
+      id: str(e.id),
+      seq: num(e.seq),
+      timestampMs: num(e.timestampMs),
+      clientNonce: str(e.clientNonce),
+      batchId: str(e.batchId),
+      isStreaming: e.isStreaming === true,
     };
-  };
-
-  const findStores = () => {
-    const shell = findGrokShellProps();
-    if (shell) {
-      const selectAndWait = async (botId) => {
-        if (shell.currentAgentId === botId) return findGrokShellProps() || shell;
-        const select = shell.screenInputs && typeof shell.screenInputs.selectAgent === "function"
-          ? shell.screenInputs.selectAgent
-          : typeof shell.openAgentChat === "function"
-            ? shell.openAgentChat
-            : null;
-        if (!select) return null;
-        select(botId);
-        for (let attempt = 0; attempt < 25; attempt += 1) {
-          await new Promise((r) => setTimeout(r, 80));
-          const fresh = findGrokShellProps();
-          if (fresh && fresh.currentAgentId === botId) return fresh;
-        }
-        return findGrokShellProps();
-      };
+    if (e.kind === "message") {
+      const from = e.fromAgent && typeof e.fromAgent === "object" ? e.fromAgent : null;
+      const to = e.toAgent && typeof e.toAgent === "object" ? e.toAgent : null;
       return {
-        roster: { agents: shell.agents },
-        transcript: {
-          getMessages: async (botId, cursor) => {
-            const exists = shell.agents.some((a) => a && a.id === botId);
-            if (!exists) return null;
-            const active = await selectAndWait(botId);
-            const reader = active && active.transcriptActionsRef && active.transcriptActionsRef.current && active.transcriptActionsRef.current.readEntries;
-            if (typeof reader !== "function") return { messages: [], nextCursor: null, hasMore: false };
-            const entries = await reader();
-            return mapShellEntries(Array.isArray(entries) ? entries : [], cursor);
-          },
-          sendMessage: async (botId, text) => {
-            const exists = shell.agents.some((a) => a && a.id === botId);
-            if (!exists) throw new Error("bot_not_found");
-            const active = await selectAndWait(botId);
-            const composer = active && active.screenInputs && active.screenInputs.composer;
-            if (!composer || typeof composer.submitPrompt !== "function") throw new Error("no_composer");
-            await composer.submitPrompt(text, []);
-            return { id: null };
-          },
-          cancelRun: async () => {
-            const fresh = findGrokShellProps() || shell;
-            const actions = fresh && fresh.screenInputs && fresh.screenInputs.composer && fresh.screenInputs.composer.sendActions;
-            if (actions && typeof actions.cancelQueued === "function") {
-              await actions.cancelQueued();
-            }
-          },
-        },
+        ...base,
+        kind: "message",
+        role: e.role === "user" ? "user" : e.role === "system" ? "system" : "assistant",
+        text: str(e.content) ?? str(e.text) ?? "",
+        fromAgentName: from ? str(from.name) : null,
+        fromAgentId: from ? str(from.id) : null,
+        toAgentName: to ? str(to.name) : null,
       };
     }
-
-    const rootEl = document.querySelector(".sand-agent-item") || document.querySelector("#root") || document.body;
-    if (!rootEl) return null;
-    const fiberKey = Object.keys(rootEl).find((k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"));
-    if (!fiberKey) return null;
-    let fiber = rootEl[fiberKey];
-    const found = { roster: null, transcript: null };
-    let depth = 0;
-    while (fiber && depth < 160) {
-      const value = fiber.memoizedProps && fiber.memoizedProps.value;
-      if (value && typeof value === "object") {
-        if (!found.roster && (Array.isArray(value.agents) || typeof value.getAgents === "function" || Array.isArray(value.bots))) {
-          found.roster = value;
-        }
-        if (!found.transcript && (typeof value.getMessages === "function" || typeof value.sendPrompt === "function" || typeof value.sendMessage === "function" || value.byAgentId)) {
-          found.transcript = value;
-        }
-      }
-      fiber = fiber.return;
-      depth += 1;
+    if (e.kind === "user-attachment") {
+      return { ...base, kind: "attachment", role: "user", text: "", attachmentName: str(e.file_name) ?? "Attachment", attachmentBytes: num(e.byteSize) };
     }
-    return found.roster || found.transcript ? found : null;
+    if (e.kind !== "send-message") return null;
+    const m = e.message;
+    if (typeof m === "string") return { ...base, kind: "message", role: "assistant", text: m };
+    if (!m || typeof m !== "object") return null;
+    if (m.type === "text" || (m.type === undefined && typeof m.content === "string")) {
+      return { ...base, kind: "message", role: "assistant", text: str(m.content) ?? str(m.text) ?? "" };
+    }
+    if (m.type === "attachment") {
+      return { ...base, kind: "attachment", role: "assistant", text: "", attachmentName: str(m.file_name) ?? str(m.alt) ?? "Attachment", attachmentBytes: null };
+    }
+    if (m.type === "widget" && m.widget && typeof m.widget === "object") {
+      const options = (Array.isArray(m.widget.options) ? m.widget.options : [])
+        .map((o) => ({ label: str(o && o.label) ?? "", value: str(o && o.value) ?? str(o && o.label) ?? "" }))
+        .filter((o) => o.value.length > 0);
+      return { ...base, kind: "widget", role: "assistant", text: str(m.widget.prompt) ?? "", options, respondedValue: str(e.respondedValue), dismissed: e.widgetDismissed === true };
+    }
+    return { ...base, kind: "card", role: "assistant", text: "", cardType: str(m.type) ?? "card" };
   };
 `;
 
+const expression = (args: Record<string, unknown>, body: string) => `(async () => {
+  try {
+    const args = ${JSON.stringify(args)};
+    ${RENDERER_STORES_SNIPPET}
+    const stores = findGrokStores();
+    if (!stores) return { ok: false, reason: "store_unavailable" };
+    ${body}
+  } catch (error) {
+    return { ok: false, reason: "store_unavailable", code: error && error.name ? String(error.name) : null };
+  }
+})()`;
+
+/** Widgets older than the last few entries are history, not open questions. */
+const OPEN_WIDGET_WINDOW = 20;
+
 export function buildDiscoverBotsExpression(): string {
-  return `(async () => {
-    try {
-      ${RENDERER_STORE_HELPER_SNIPPET}
-      const stores = findStores();
-      if (!stores || !stores.roster) {
-        return { ok: false, reason: "store_unavailable" };
+  return expression(
+    { openWidgetWindow: OPEN_WIDGET_WINDOW },
+    `
+    const bots = [];
+    const widgets = [];
+    for (const a of rosterRows(stores)) {
+      if (!a || typeof a.id !== "string" || a.isRemovedFromSidebar === true) continue;
+      const activity = a.currentActivity && typeof a.currentActivity === "object" ? a.currentActivity : null;
+      bots.push({
+        id: a.id,
+        name: str(a.name),
+        description: str(a.description),
+        avatarDataUrl: str(a.avatarDataUrl),
+        avatarShape: str(a.avatarShape),
+        avatarColor: str(a.avatarColor),
+        status: str(a.status),
+        isRunning: a.isRunning === true || a.isRunningTurn === true || a.isComposingMessage === true,
+        awaitingUserResponse: Boolean(a.awaitingUserResponse),
+        unreadCount: num(a.unreadCount),
+        hasUnread: a.hasUnread === true,
+        lastMessagePreview: str(a.lastMessagePreview),
+        lastActivityAtMs: num(a.lastActivityAt) ?? num(a.updatedAt),
+        activityDetail: activity ? str(activity.detail) : null,
+      });
+      const snapshot = stores.transcript.snapshotsFor(a.id).get();
+      const entries = snapshot && Array.isArray(snapshot.entries) ? snapshot.entries : [];
+      const tail = entries.slice(-args.openWidgetWindow);
+      for (let i = tail.length - 1; i >= 0; i -= 1) {
+        const e = tail[i];
+        if (e && e.kind === "message" && e.role === "user") break;
+        const mapped = mapEntry(e);
+        if (mapped && mapped.kind === "widget" && mapped.id && !mapped.respondedValue && !mapped.dismissed && mapped.options.length > 0) {
+          widgets.push({ botId: a.id, entryId: mapped.id, prompt: mapped.text, options: mapped.options, timestampMs: mapped.timestampMs });
+          break;
+        }
       }
-      const rawAgents = typeof stores.roster.getAgents === "function"
-        ? await stores.roster.getAgents()
-        : Array.isArray(stores.roster.agents)
-          ? stores.roster.agents
-          : Array.isArray(stores.roster.bots)
-            ? stores.roster.bots
-            : [];
-      const bots = rawAgents.map((a) => ({
-        id: a && (a.id ?? a.agentId ?? a.botId),
-        name: a && (a.name ?? a.title),
-        description: a && a.description,
-        avatarDataUrl: a && (a.avatarDataUrl ?? a.avatarUrl),
-        avatarShape: a && (a.avatarShape ?? a.shape),
-        avatarColor: a && (a.avatarColor ?? a.color),
-        status: a && (a.status ?? a.activityState),
-        isRunning: Boolean(a && (a.isRunning || a.isRunningTurn || a.isComposingMessage)),
-        awaitingUserResponse: Boolean(a && a.awaitingUserResponse),
-        unreadCount: a && a.unreadCount,
-        hasUnread: Boolean(a && a.hasUnread),
-        lastMessagePreview: a && (a.lastMessagePreview ?? a.preview ?? (a.lastEntry && a.lastEntry.text)),
-        lastActivityAtMs: a && (a.lastActivityAtMs ?? a.lastActivityAt ?? a.updatedAtMs ?? a.updatedAt),
-      }));
-      return { ok: true, data: { bots } };
-    } catch {
-      return { ok: false, reason: "store_unavailable" };
     }
-  })()`;
+    return { ok: true, data: { bots, widgets } };
+    `,
+  );
 }
+
+const GROK_BOT_MESSAGES_PAGE_SIZE = 50;
 
 export function buildListMessagesExpression(botId: string, cursor?: string): string {
-  const argsJson = JSON.stringify({ botId, cursor: cursor ?? null });
-  return `(async () => {
-    try {
-      const args = ${argsJson};
-      ${RENDERER_STORE_HELPER_SNIPPET}
-      const stores = findStores();
-      if (!stores || !stores.transcript) {
-        return { ok: false, reason: "store_unavailable" };
-      }
-      const transcript = stores.transcript;
-      const result = typeof transcript.getMessages === "function"
-        ? await transcript.getMessages(args.botId, args.cursor)
-        : transcript.byAgentId && transcript.byAgentId[args.botId]
-          ? { messages: transcript.byAgentId[args.botId], nextCursor: null, hasMore: false }
-          : null;
-      if (!result) {
-        return { ok: false, reason: "bot_not_found" };
-      }
-      const messages = Array.isArray(result) ? result : Array.isArray(result.messages) ? result.messages : [];
-      return {
-        ok: true,
-        data: {
-          messages,
-          nextCursor: typeof result.nextCursor === "string" ? result.nextCursor : null,
-          hasMore: Boolean(result.hasMore),
-        },
+  return expression(
+    { botId, cursor: cursor ?? null, limit: GROK_BOT_MESSAGES_PAGE_SIZE, loadWaitMs: 4000 },
+    `
+    if (!rosterRows(stores).some((a) => a && a.id === args.botId)) return { ok: false, reason: "bot_not_found" };
+    const transcript = stores.transcript;
+    const snapshots = transcript.snapshotsFor(args.botId);
+    const waitFor = (isDone) => new Promise((resolve) => {
+      if (isDone()) return resolve(true);
+      let unsubscribe = null;
+      let finished = false;
+      const finish = (value) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        if (typeof unsubscribe === "function") unsubscribe();
+        resolve(value);
       };
-    } catch {
-      return { ok: false, reason: "store_unavailable" };
+      const timer = setTimeout(() => finish(isDone()), args.loadWaitMs);
+      unsubscribe = snapshots.subscribe(() => { if (isDone()) finish(true); });
+    });
+    const isLoaded = () => {
+      const s = snapshots.get();
+      return s.loadState === "ready" || s.failure != null || (Array.isArray(s.entries) && s.entries.length > 0);
+    };
+    if (!isLoaded() && typeof transcript.load === "function") {
+      transcript.load(args.botId, { background: true });
+      await waitFor(isLoaded);
     }
-  })()`;
+    const before = args.cursor !== null && /^\\d+$/.test(args.cursor) ? Number(args.cursor) : null;
+    const seqOf = (e) => (e && typeof e.seq === "number" ? e.seq : Number.POSITIVE_INFINITY);
+    const page = () => {
+      const s = snapshots.get();
+      const all = Array.isArray(s.entries) ? s.entries : [];
+      const inWindow = before === null ? all : all.filter((e) => seqOf(e) < before);
+      return { s, mapped: inWindow.map(mapEntry).filter((m) => m !== null) };
+    };
+    let current = page();
+    if (before !== null && current.mapped.length < args.limit && current.s.hasOlder === true && typeof transcript.loadOlder === "function") {
+      const loading = Promise.resolve(transcript.loadOlder(args.botId)).catch(() => undefined);
+      await Promise.race([loading, delay(args.loadWaitMs)]);
+      current = page();
+    }
+    const messages = current.mapped.slice(-args.limit);
+    const oldestSeq = messages.reduce((min, m) => (m.seq !== null && m.seq < min ? m.seq : min), Number.POSITIVE_INFINITY);
+    const hasMore = Number.isFinite(oldestSeq) && (current.mapped.length > messages.length || current.s.hasOlder === true);
+    return {
+      ok: true,
+      data: {
+        messages,
+        nextCursor: hasMore ? String(oldestSeq) : null,
+        hasMore,
+        loadFailed: current.s.failure != null && messages.length === 0,
+      },
+    };
+    `,
+  );
 }
 
-export function buildSendMessageExpression(
-  botId: string,
-  text: string,
-  clientNonce: string,
-): string {
-  const argsJson = JSON.stringify({ botId, text, clientNonce });
-  return `(async () => {
+/** Grok Bot's send journal settles well inside this; the CDP request waits a little longer. */
+export const GROK_BOT_SEND_SETTLE_MS = 10_000;
+
+export function buildSendMessageExpression(botId: string, text: string): string {
+  return expression(
+    { botId, text, settleMs: GROK_BOT_SEND_SETTLE_MS },
+    `
+    if (!rosterRows(stores).some((a) => a && a.id === args.botId)) return { ok: false, reason: "bot_not_found" };
+    let nonce = null;
+    let journaled = false;
     try {
-      const args = ${argsJson};
-      ${RENDERER_STORE_HELPER_SNIPPET}
-      const stores = findStores();
-      if (!stores || !stores.transcript) {
-        return { ok: false, reason: "store_unavailable" };
-      }
-      const transcript = stores.transcript;
-      if (typeof transcript.sendMessage === "function") {
-        const res = await transcript.sendMessage(args.botId, args.text, { clientNonce: args.clientNonce });
-        return { ok: true, data: { accepted: true, messageId: res && typeof res.id === "string" ? res.id : null } };
-      }
-      if (typeof transcript.sendPrompt === "function") {
-        const res = await transcript.sendPrompt({ agentId: args.botId, text: args.text, clientNonce: args.clientNonce });
-        return { ok: true, data: { accepted: true, messageId: res && typeof res.id === "string" ? res.id : null } };
-      }
-      return { ok: false, reason: "action_rejected" };
-    } catch {
-      return { ok: false, reason: "action_rejected" };
-    }
-  })()`;
+      const claim = stores.egressTunnel && typeof stores.egressTunnel.claim === "function" ? stores.egressTunnel.claim() : null;
+      if (claim && typeof claim.catch === "function") claim.catch(() => undefined);
+    } catch {}
+    const sending = Promise.resolve().then(() => stores.sendJournal.sendPrompt({
+      agentId: args.botId,
+      prompt: args.text,
+      onNonceAssigned: (event) => { nonce = event && typeof event.nonce === "string" ? event.nonce : nonce; },
+      onJournaled: () => { journaled = true; },
+      onDispatched: (event) => {
+        journaled = true;
+        try {
+          if (stores.agentUsageRefusalHolds && event) stores.agentUsageRefusalHolds.noteSent(event.agentId, event.nonce);
+        } catch {}
+      },
+    }));
+    const outcome = await Promise.race([
+      sending.then(
+        () => ({ state: "delivered" }),
+        (error) => ({ state: "failed", code: failureCode(error) ?? (error && error.name ? String(error.name) : null) }),
+      ),
+      delay(args.settleMs, { state: "timeout" }),
+    ]);
+    if (outcome.state === "failed") return { ok: false, reason: "action_rejected", code: outcome.code };
+    if (outcome.state === "timeout" && !journaled && nonce === null) return { ok: false, reason: "action_rejected", code: "send/timeout" };
+    return { ok: true, data: { accepted: true, nonce, state: outcome.state === "delivered" ? "delivered" : "queued" } };
+    `,
+  );
 }
 
 export function buildCancelRunExpression(botId: string): string {
-  const argsJson = JSON.stringify({ botId });
-  return `(async () => {
-    try {
-      const args = ${argsJson};
-      ${RENDERER_STORE_HELPER_SNIPPET}
-      const stores = findStores();
-      if (!stores || !stores.transcript) {
-        return { ok: false, reason: "store_unavailable" };
-      }
-      const transcript = stores.transcript;
-      if (typeof transcript.cancelRun === "function") {
-        await transcript.cancelRun(args.botId);
-        return { ok: true, data: { cancelled: true } };
-      }
-      if (typeof transcript.interruptAgentRun === "function") {
-        await transcript.interruptAgentRun(args.botId);
-        return { ok: true, data: { cancelled: true } };
-      }
-      return { ok: true, data: { cancelled: false } };
-    } catch {
-      return { ok: true, data: { cancelled: false } };
-    }
-  })()`;
+  return expression(
+    { botId, settleMs: 8000 },
+    `
+    const agent = rosterRows(stores).find((a) => a && a.id === args.botId);
+    if (!agent) return { ok: false, reason: "bot_not_found" };
+    if (typeof stores.roster.interruptAgentRun !== "function") return { ok: true, data: { cancelled: false } };
+    const sessions = Array.isArray(agent.runningSessionIds) ? agent.runningSessionIds.filter((s) => typeof s === "string") : [];
+    const requests = sessions.length === 0
+      ? [{ agentId: args.botId }]
+      : sessions.map((sessionId) => ({ agentId: args.botId, sessionId }));
+    const settled = await Promise.race([
+      Promise.allSettled(requests.map((request) => Promise.resolve().then(() => stores.roster.interruptAgentRun(request)))),
+      delay(args.settleMs, null),
+    ]);
+    const cancelled = Array.isArray(settled) && settled.every((result) => result.status === "fulfilled");
+    return { ok: true, data: { cancelled } };
+    `,
+  );
+}
+
+export function buildRespondToWidgetExpression(
+  botId: string,
+  entryId: string,
+  value: string,
+): string {
+  return expression(
+    { botId, entryId, value, settleMs: 8000 },
+    `
+    if (typeof stores.transcript.respondToWidget !== "function") return { ok: false, reason: "action_rejected", code: "widget/unsupported" };
+    const outcome = await Promise.race([
+      Promise.resolve()
+        .then(() => stores.transcript.respondToWidget({ agentId: args.botId, entryId: args.entryId, value: args.value }))
+        .then((result) => ({ accepted: !(result && result.accepted === false) }), (error) => ({ accepted: false, code: failureCode(error) })),
+      delay(args.settleMs, { accepted: false, code: "widget/timeout" }),
+    ]);
+    if (!outcome.accepted) return { ok: false, reason: "action_rejected", code: outcome.code ?? null };
+    return { ok: true, data: { accepted: true } };
+    `,
+  );
 }

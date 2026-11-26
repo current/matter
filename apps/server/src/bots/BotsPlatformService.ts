@@ -15,6 +15,7 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Latch from "effect/Latch";
@@ -102,6 +103,8 @@ interface RunningProvider {
   /** Completes on the first status other than `connecting`. */
   readonly settled: Deferred.Deferred<void>;
   session: BotProviderSession | null;
+  /** Completing it ends the current poll wait early, e.g. right after a send. */
+  wake: Deferred.Deferred<void> | null;
 }
 
 /** Provider errors that mean the session is gone, so the platform restarts it. */
@@ -198,6 +201,7 @@ const make = Effect.gen(function* () {
 
   const pollLoop = Effect.fn("BotsPlatformService.pollLoop")(function* (
     adapter: BotProviderAdapter,
+    entry: RunningProvider,
     session: BotProviderSession,
   ) {
     const poll = session.poll;
@@ -212,7 +216,12 @@ const make = Effect.gen(function* () {
       if (Exit.isSuccess(exit)) {
         failures = 0;
         yield* setStatus(adapter.providerId, yield* session.status);
-        yield* Effect.sleep(exit.value.active ? activeMs : idleMs);
+        const wake = yield* Deferred.make<void>();
+        entry.wake = wake;
+        yield* Deferred.await(wake).pipe(
+          Effect.timeoutOption(Duration.millis(exit.value.active ? activeMs : idleMs)),
+        );
+        entry.wake = null;
         continue;
       }
       const error = Exit.findErrorOption(exit);
@@ -256,7 +265,7 @@ const make = Effect.gen(function* () {
             trackEvent(adapter.providerId, { type: "pending-request", request }),
           );
         }
-        yield* pollLoop(adapter, session);
+        yield* pollLoop(adapter, entry, session);
       } else {
         const error = Exit.findErrorOption(started);
         if (error._tag === "None") return yield* Effect.failCause(started.cause);
@@ -273,7 +282,12 @@ const make = Effect.gen(function* () {
     adapter: BotProviderAdapter,
   ) {
     const scope = yield* Scope.make();
-    const entry: RunningProvider = { scope, settled: yield* Deferred.make<void>(), session: null };
+    const entry: RunningProvider = {
+      scope,
+      settled: yield* Deferred.make<void>(),
+      session: null,
+      wake: null,
+    };
     running.set(adapter.providerId, entry);
     yield* runProvider(adapter, entry).pipe(
       Effect.catchCause((cause) =>
@@ -397,6 +411,13 @@ const make = Effect.gen(function* () {
     return yield* addonStatus(addonId);
   });
 
+  /** Polls the provider now instead of after its idle interval, so a reply shows up promptly. */
+  const wakeProvider = (providerId: string) =>
+    Effect.suspend(() => {
+      const wake = running.get(providerId)?.wake;
+      return wake ? Deferred.succeed(wake, undefined).pipe(Effect.asVoid) : Effect.void;
+    });
+
   const listBots = Effect.fn("BotsPlatformService.listBots")(function* (providerId: string) {
     const session = yield* requireSession(providerId);
     return yield* session.listBots.pipe(Effect.mapError(platformErrorFromProvider));
@@ -448,7 +469,10 @@ const make = Effect.gen(function* () {
         clientNonce: input.clientNonce,
         replyToId: input.replyToId ?? null,
       })
-      .pipe(Effect.mapError(platformErrorFromProvider));
+      .pipe(
+        Effect.mapError(platformErrorFromProvider),
+        Effect.tap(() => wakeProvider(input.providerId)),
+      );
   });
 
   const respondToRequest = Effect.fn("BotsPlatformService.respondToRequest")(function* (
@@ -476,6 +500,7 @@ const make = Effect.gen(function* () {
       providerId: input.providerId,
       requestId: input.requestId,
     });
+    yield* wakeProvider(input.providerId);
   });
 
   const cancel = Effect.fn("BotsPlatformService.cancel")(function* (input: BotCancelRequest) {
@@ -486,6 +511,7 @@ const make = Effect.gen(function* () {
     yield* session
       .cancel({ conversationId: input.conversationId })
       .pipe(Effect.mapError(platformErrorFromProvider));
+    yield* wakeProvider(input.providerId);
   });
 
   const listPendingRequests = Ref.get(pending).pipe(

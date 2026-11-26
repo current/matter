@@ -1,4 +1,12 @@
-import type { BotEvent, BotMessage } from "@t3tools/contracts";
+import type {
+  BotEvent,
+  BotIdentity,
+  BotMessage,
+  BotPendingRequest,
+  BotProviderDescriptor,
+} from "@t3tools/contracts";
+
+import { botNeedsAttention } from "../sidebar/mattr/mattrBots.logic";
 
 /** Orders by provider sequence when both have one, otherwise by time. */
 function compareMessages(left: BotMessage, right: BotMessage) {
@@ -20,6 +28,21 @@ export function upsertBotMessage(
       !(message.clientNonce !== null && existing.clientNonce === message.clientNonce),
   );
   return [...rest, message].toSorted(compareMessages);
+}
+
+/**
+ * Applies the copy the send request returned. The provider's own transcript copy can arrive over
+ * the event stream before the request settles; it is the truth, so the echo never replaces it.
+ */
+export function confirmBotSend(
+  messages: ReadonlyArray<BotMessage>,
+  echo: BotMessage,
+): ReadonlyArray<BotMessage> {
+  const current = messages.find(
+    (message) => echo.clientNonce !== null && message.clientNonce === echo.clientNonce,
+  );
+  if (current && current.deliveryState === "sent") return messages;
+  return upsertBotMessage(messages, echo);
 }
 
 /** Older messages from a page load, merged without duplicating any already shown. */
@@ -78,4 +101,83 @@ export function scheduledTriggerDetail(markdown: string): { readonly detail: str
     .replace(/[#*_`>]/g, "")
     .trim();
   return { detail: firstLine.length > 80 ? `${firstLine.slice(0, 79)}…` : firstLine };
+}
+
+/**
+ * Grok Bot's live status line ("is searching X for composers") as a sentence fragment
+ * ("Searching X for composers"). Only meaningful while the Bot is working.
+ */
+export function botActivityDetail(bot: BotIdentity): string | null {
+  if (bot.status !== "working") return null;
+  const raw = bot.metadata["activityDetail"];
+  if (typeof raw !== "string") return null;
+  const text = raw
+    .trim()
+    .replace(/^is\s+/i, "")
+    .trim();
+  if (text.length === 0) return null;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export type BotPresence =
+  | { readonly kind: "disconnected" }
+  | { readonly kind: "offline" }
+  | { readonly kind: "connecting" }
+  | { readonly kind: "needs-you" }
+  | { readonly kind: "working"; readonly detail: string | null }
+  | { readonly kind: "error" }
+  | { readonly kind: "ready" };
+
+/** The one status a Bot's header shows: the connection first, then what the Bot is doing. */
+export function botPresence(
+  provider: BotProviderDescriptor,
+  bot: BotIdentity,
+  pending: ReadonlyArray<BotPendingRequest>,
+): BotPresence {
+  if (provider.status.kind === "connecting") return { kind: "connecting" };
+  if (provider.status.kind !== "connected") return { kind: "disconnected" };
+  if (bot.status === "offline") return { kind: "offline" };
+  if (botNeedsAttention(bot, pending)) return { kind: "needs-you" };
+  if (bot.status === "working") return { kind: "working", detail: botActivityDetail(bot) };
+  if (bot.status === "error") return { kind: "error" };
+  return { kind: "ready" };
+}
+
+/**
+ * A message another Bot wrote into this conversation. Providers prefix its text with the sender
+ * (`**Trading:** …`); the prefix becomes the row's author and leaves the body.
+ */
+export function otherBotAuthor(
+  message: BotMessage,
+): { readonly name: string | null; readonly markdown: string } | null {
+  if (message.attribution !== "other-agent") return null;
+  const match = /^\*\*([^*\n]{1,80}):\*\*\s*/.exec(message.markdown);
+  return match?.[1]
+    ? { name: match[1].trim(), markdown: message.markdown.slice(match[0].length) }
+    : { name: null, markdown: message.markdown };
+}
+
+function senderKey(message: BotMessage): string {
+  if (message.role !== "agent" && scheduledTriggerDetail(message.markdown)) {
+    return `trigger:${message.remoteId}`;
+  }
+  const other = otherBotAuthor(message);
+  if (other) return `other:${message.authorBotId ?? other.name ?? ""}`;
+  return message.role;
+}
+
+/** Consecutive messages from one sender, shown as one block like a native chat turn. */
+export function botMessageRuns(
+  messages: ReadonlyArray<BotMessage>,
+): ReadonlyArray<ReadonlyArray<BotMessage>> {
+  const runs: Array<Array<BotMessage>> = [];
+  let lastKey: string | null = null;
+  for (const message of messages) {
+    const key = senderKey(message);
+    const current = runs.at(-1);
+    if (current && key === lastKey) current.push(message);
+    else runs.push([message]);
+    lastKey = key;
+  }
+  return runs;
 }

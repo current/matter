@@ -1,9 +1,6 @@
 import * as Context from "effect/Context";
-import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type * as PubSub from "effect/PubSub";
-import type * as Scope from "effect/Scope";
 
 import {
   buildGrokBotLaunchCommand,
@@ -19,10 +16,9 @@ import {
   type GrokBotAvailability,
   type GrokBotCancelResult,
   type GrokBotMessagePage,
+  type GrokBotRoster,
   type GrokBotSendResult,
-  type GrokBotSummary,
   type GrokBotTransportError,
-  type GrokBotTransportEvent,
   type GrokBotLoopbackViolationError,
 } from "./GrokBotTransport.ts";
 
@@ -38,7 +34,7 @@ export interface GrokBotProviderShape {
     GrokBotAvailability,
     GrokBotLoopbackViolationError
   >;
-  readonly discoverBots: () => Effect.Effect<readonly GrokBotSummary[], GrokBotTransportError>;
+  readonly discoverBots: () => Effect.Effect<GrokBotRoster, GrokBotTransportError>;
   readonly listMessages: (
     botId: string,
     cursor?: string,
@@ -46,16 +42,13 @@ export interface GrokBotProviderShape {
   readonly sendMessage: (
     botId: string,
     text: string,
-    options?: { readonly clientNonce?: string },
   ) => Effect.Effect<GrokBotSendResult, GrokBotTransportError>;
   readonly cancelRun: (botId: string) => Effect.Effect<GrokBotCancelResult, GrokBotTransportError>;
-  readonly subscribe: (options?: {
-    readonly pollInterval?: Duration.Input;
-  }) => Effect.Effect<
-    PubSub.Subscription<GrokBotTransportEvent>,
-    GrokBotTransportError,
-    Scope.Scope
-  >;
+  readonly respondToWidget: (
+    botId: string,
+    entryId: string,
+    value: string,
+  ) => Effect.Effect<void, GrokBotTransportError>;
   readonly getActionFallback: (
     action: GrokBotActionCapabilityKey,
     context?: { readonly botId?: string; readonly text?: string },
@@ -82,7 +75,7 @@ const make = Effect.gen(function* () {
     listMessages: transport.listMessages,
     sendMessage: transport.sendMessage,
     cancelRun: transport.cancelRun,
-    subscribe: transport.subscribe,
+    respondToWidget: transport.respondToWidget,
     getActionFallback: (action, context) =>
       getGrokBotActionFallback(transport.capabilities, action, context),
     buildPromptDeepLink: buildGrokBotPromptDeepLink,

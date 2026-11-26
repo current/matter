@@ -238,9 +238,9 @@ describe("AddonsSettingsPanel", () => {
     await expect
       .element(page.getByText('open -a "Grok Bot" --args --remote-debugging-port=9333'))
       .toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Test connection" }));
+    await userEvent.click(page.getByRole("button", { name: "Save and test" }));
 
-    await expect.element(page.getByText("Connected")).toBeVisible();
+    await expect.element(page.getByText("Connected", { exact: true })).toBeVisible();
     expect(grokConfig).toEqual({ cdpPort: 9333 });
     const paths = fetchMock.mock.calls.map(([input]) => new URL(String(input)).pathname);
     expect(paths).toContain("/api/mattr/addons/reconnect");

@@ -112,7 +112,7 @@ function BotSidebarRow({ bot }: { bot: BotIdentity }) {
           />
         }
       >
-        <BotAvatar bot={bot} size={16} activity={bot.status} />
+        <BotAvatar bot={bot} size={16} activity={bot.status} still />
         <span className="min-w-0 flex-1 truncate">{bot.name}</span>
         {dot ? (
           <span

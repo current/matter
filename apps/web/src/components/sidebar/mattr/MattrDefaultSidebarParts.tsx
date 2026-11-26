@@ -299,13 +299,16 @@ function CrewBotRow({
   const status = needsYou ? (
     <span className="mfs-need">{gt("Needs you")}</span>
   ) : bot.status === "working" ? (
-    <span className="mfs-a" data-tone="running">
+    <span className="mfs-st" data-tone="running" data-bot-working="">
+      <span aria-hidden className="mfs-dot bg-success" />
       {age || m(BOT_ACTIVITY_LABELS.working)}
     </span>
   ) : unread ? (
     <span className="mfs-a">{gt("{count} new", { count: bot.unreadCount })}</span>
   ) : (
-    <span className="mfs-a">{age || m(BOT_ACTIVITY_LABELS[bot.status])}</span>
+    <span className="mfs-a">
+      {age || (bot.status === "idle" ? null : m(BOT_ACTIVITY_LABELS[bot.status]))}
+    </span>
   );
   return (
     <li>
@@ -318,7 +321,7 @@ function CrewBotRow({
         className="mfs-row"
       >
         <span className="mfs-av">
-          <BotAvatar bot={bot} size={18} activity={bot.status} />
+          <BotAvatar bot={bot} size={18} activity={bot.status} still />
         </span>
         <span className="mfs-t">{bot.name}</span>
         {status}

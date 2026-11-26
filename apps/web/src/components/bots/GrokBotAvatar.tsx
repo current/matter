@@ -82,7 +82,7 @@ function exactPixelSizeClass(size: number): string | undefined {
 }
 
 /** Draws a Grok Bot Bot as its own character; loaded only once a Grok Bot avatar renders. */
-export function GrokBotAvatar({ bot, size, activity, className }: BotAvatarProps) {
+export function GrokBotAvatar({ bot, size, activity, still, className }: BotAvatarProps) {
   const avatar = bot.avatar;
   const resolvedClassName = cn(exactPixelSizeClass(size), className);
   return (
@@ -94,6 +94,7 @@ export function GrokBotAvatar({ bot, size, activity, className }: BotAvatarProps
       color={avatar?.kind === "parametric" ? avatar.color : null}
       activityState={grokBotCharacterActivity({ bot, activity })}
       size={grokBotCharacterSize(size)}
+      {...(still ? { reducedMotion: true } : {})}
       {...(resolvedClassName ? { className: resolvedClassName } : {})}
     />
   );

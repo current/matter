@@ -31,8 +31,10 @@ const layer = BotsPlatformService.layer.pipe(
 
 interface MockGrokBot {
   jsonRequests: number;
-  readonly sentNonces: Array<string>;
+  readonly sentTexts: Array<string>;
+  readonly widgetAnswers: Array<string>;
   readonly messages: Array<Record<string, unknown>>;
+  widgets: Array<Record<string, unknown>>;
   readonly socketClosed: Deferred.Deferred<void>;
 }
 
@@ -40,16 +42,43 @@ interface MockGrokBot {
 const startMockGrokBot = Effect.gen(function* () {
   const state: MockGrokBot = {
     jsonRequests: 0,
-    sentNonces: [],
+    sentTexts: [],
+    widgetAnswers: [],
     messages: [
-      { id: "remote-1", seq: 1, role: "user", text: "Run checks", timestampMs: 1_000 },
-      { id: "remote-2", seq: 2, role: "assistant", text: "All green!", timestampMs: 1_020 },
+      {
+        kind: "message",
+        id: "remote-1",
+        seq: 1,
+        role: "user",
+        text: "Run checks",
+        timestampMs: 1_000,
+      },
+      {
+        kind: "message",
+        id: "remote-2",
+        seq: 2,
+        role: "assistant",
+        text: "All green!",
+        timestampMs: 1_020,
+      },
+    ],
+    widgets: [
+      {
+        botId: "bot-alpha",
+        entryId: "t5s2",
+        prompt: "Deploy to production?",
+        options: [
+          { label: "Deploy", value: "Yes, deploy" },
+          { label: "Not yet", value: "Not yet" },
+        ],
+        timestampMs: 1_030,
+      },
     ],
     socketClosed: yield* Deferred.make<void>(),
   };
   const portRef = { current: 0 };
   const answer = (expression: string): unknown => {
-    if (expression.includes("stores.roster.getAgents")) {
+    if (expression.includes("openWidgetWindow")) {
       return {
         ok: true,
         data: {
@@ -63,20 +92,41 @@ const startMockGrokBot = Effect.gen(function* () {
               isRunning: true,
               unreadCount: 1,
               lastMessagePreview: String(state.messages.at(-1)?.text ?? ""),
+              activityDetail: "is running the checks",
             },
           ],
+          widgets: state.widgets,
         },
       };
     }
-    if (expression.includes("transcript.getMessages")) {
-      return { ok: true, data: { messages: state.messages, nextCursor: "seq:0", hasMore: true } };
+    if (expression.includes("transcript.loadOlder(args.botId)")) {
+      return { ok: true, data: { messages: state.messages, nextCursor: "1", hasMore: true } };
     }
-    if (expression.includes("transcript.sendMessage")) {
-      const nonce = /"clientNonce":"([^"]+)"/.exec(expression)?.[1];
-      if (nonce) state.sentNonces.push(nonce);
-      return { ok: true, data: { accepted: true, messageId: "remote-3" } };
+    if (expression.includes("prompt: args.text")) {
+      const text = /"text":"([^"]+)"/.exec(expression)?.[1] ?? "";
+      state.sentTexts.push(text);
+      if (text === "Too long") {
+        return { ok: false, reason: "action_rejected", code: "send/message-too-long" };
+      }
+      // Grok Bot's transcript echoes its own nonce on the user message it journaled.
+      state.messages.push({
+        kind: "message",
+        id: "remote-3",
+        seq: 3,
+        role: "user",
+        text,
+        clientNonce: "grok-nonce-3",
+        timestampMs: 1_050,
+      });
+      return { ok: true, data: { accepted: true, nonce: "grok-nonce-3", state: "delivered" } };
     }
-    if (expression.includes("transcript.cancelRun")) {
+    if (expression.includes("respondToWidget({ agentId")) {
+      const value = /"value":"([^"]+)"/.exec(expression)?.[1];
+      if (value) state.widgetAnswers.push(value);
+      state.widgets = [];
+      return { ok: true, data: { accepted: true } };
+    }
+    if (expression.includes("interruptAgentRun(request)")) {
       return { ok: true, data: { cancelled: true } };
     }
     return { ok: false, reason: "store_unavailable" };
@@ -195,110 +245,172 @@ describe("GrokBotAdapter through BotsPlatformService", () => {
     }).pipe(Effect.scoped, Effect.provide(layer)),
   );
 
-  it.live("discovers, reads, sends, streams and tears down cleanly on disable", () =>
-    Effect.gen(function* () {
-      const { state, port } = yield* startMockGrokBot;
-      const platform = yield* BotsPlatformService.BotsPlatformService;
-      const config = yield* AddonConfigService.AddonConfigService;
-      yield* config.updateConfig("grok-bot", { cdpPort: port });
-      yield* platform.register(
-        yield* GrokBotAdapter.make({
-          appPath: yield* fakeApp,
-          pollIntervals: { idleMs: 2_000, activeMs: 2_000 },
-        }),
-      );
-      const waitFor = yield* collectEvents;
+  it.live(
+    "discovers, reads, sends, answers questions, follows replies and tears down on disable",
+    () =>
+      Effect.gen(function* () {
+        const { state, port } = yield* startMockGrokBot;
+        const platform = yield* BotsPlatformService.BotsPlatformService;
+        const config = yield* AddonConfigService.AddonConfigService;
+        yield* config.updateConfig("grok-bot", { cdpPort: port });
+        yield* platform.register(
+          yield* GrokBotAdapter.make({
+            appPath: yield* fakeApp,
+            pollIntervals: { idleMs: 2_000, activeMs: 2_000 },
+          }),
+        );
+        const waitFor = yield* collectEvents;
 
-      // Enabling alone starts the provider: the platform follows the add-on's changes.
-      yield* config.setEnabled({ id: "grok-bot", enabled: true });
-      yield* waitFor((e) => e.type === "provider-status" && e.status.kind === "connected");
-      const changed = yield* waitFor((e) => e.type === "bots-changed");
-      assert.strictEqual(changed.type === "bots-changed" && changed.bots[0]?.name, "Alpha");
-      yield* waitFor((e) => e.type === "message-upserted" && e.message.remoteId === "remote-2");
+        // Enabling alone starts the provider: the platform follows the add-on's changes.
+        yield* config.setEnabled({ id: "grok-bot", enabled: true });
+        const connected = yield* waitFor(
+          (e) => e.type === "provider-status" && e.status.kind === "connected",
+        );
+        assert.strictEqual(
+          connected.type === "provider-status" && connected.status.detail,
+          "Grok Bot 1.3.0 · 1 Bot",
+        );
+        const changed = yield* waitFor((e) => e.type === "bots-changed");
+        assert.strictEqual(changed.type === "bots-changed" && changed.bots[0]?.name, "Alpha");
+        yield* waitFor((e) => e.type === "message-upserted" && e.message.remoteId === "remote-2");
 
-      const [descriptor] = yield* platform.listProviders;
-      assert.strictEqual(descriptor?.transport, "local-app-bridge");
-      assert.strictEqual(descriptor?.officialAppUrl, "grokbot://app/v1/prompt");
-      assert.deepStrictEqual(
-        {
-          sendMessage: descriptor?.capabilities.sendMessage,
-          history: descriptor?.capabilities.history,
-          cancel: descriptor?.capabilities.cancel,
-          approvals: descriptor?.capabilities.approvals,
-          questions: descriptor?.capabilities.questions,
-          streaming: descriptor?.capabilities.streaming,
-          sync: descriptor?.capabilities.sync,
-        },
-        {
-          sendMessage: true,
-          history: "paged",
-          cancel: true,
-          approvals: false,
-          questions: false,
-          streaming: false,
-          sync: "poll",
-        },
-      );
+        const [descriptor] = yield* platform.listProviders;
+        assert.strictEqual(descriptor?.transport, "local-app-bridge");
+        assert.strictEqual(descriptor?.officialAppUrl, "grokbot://app/v1/prompt");
+        assert.deepStrictEqual(
+          {
+            sendMessage: descriptor?.capabilities.sendMessage,
+            history: descriptor?.capabilities.history,
+            cancel: descriptor?.capabilities.cancel,
+            approvals: descriptor?.capabilities.approvals,
+            questions: descriptor?.capabilities.questions,
+            streaming: descriptor?.capabilities.streaming,
+            sync: descriptor?.capabilities.sync,
+          },
+          {
+            sendMessage: true,
+            history: "paged",
+            cancel: true,
+            approvals: false,
+            questions: true,
+            streaming: false,
+            sync: "poll",
+          },
+        );
 
-      const [bot] = yield* platform.listBots("grok-bot");
-      assert.deepStrictEqual(bot?.avatar, {
-        kind: "parametric",
-        shape: "squircle",
-        color: "cobalt",
-        seed: "bot-alpha",
-      });
-      assert.strictEqual(bot?.status, "working");
-      assert.strictEqual(bot?.metadata.grokActivity, "thinking");
-      assert.strictEqual(bot?.defaultConversationId, "bot-alpha");
-      assert.strictEqual(bot?.officialAppUrl, "grokbot://app/v1/prompt?id=bot-alpha");
+        const [bot] = yield* platform.listBots("grok-bot");
+        assert.deepStrictEqual(bot?.avatar, {
+          kind: "parametric",
+          shape: "squircle",
+          color: "cobalt",
+          seed: "bot-alpha",
+        });
+        assert.strictEqual(bot?.status, "working");
+        assert.strictEqual(bot?.metadata.grokActivity, "thinking");
+        assert.strictEqual(bot?.metadata.activityDetail, "is running the checks");
+        assert.strictEqual(bot?.defaultConversationId, "bot-alpha");
+        assert.strictEqual(bot?.officialAppUrl, "grokbot://app/v1/prompt?id=bot-alpha");
 
-      const page = yield* platform.getMessages({
-        providerId: "grok-bot",
-        conversationId: "bot-alpha",
-        olderCursor: null,
-        limit: 50,
-      });
-      assert.deepStrictEqual(
-        page.messages.map((message) => [message.remoteId, message.role]),
-        [
-          ["remote-1", "user"],
-          ["remote-2", "agent"],
-        ],
-      );
-      assert.strictEqual(page.olderCursor, "seq:0");
+        const page = yield* platform.getMessages({
+          providerId: "grok-bot",
+          conversationId: "bot-alpha",
+          olderCursor: null,
+          limit: 50,
+        });
+        assert.deepStrictEqual(
+          page.messages.map((message) => [message.remoteId, message.role]),
+          [
+            ["remote-1", "user"],
+            ["remote-2", "agent"],
+          ],
+        );
+        assert.strictEqual(page.olderCursor, "1");
 
-      const sent = yield* platform.sendMessage({
-        providerId: "grok-bot",
-        conversationId: "bot-alpha",
-        text: "Ship it",
-        clientNonce: "nonce-ship",
-      });
-      assert.strictEqual(sent.remoteId, "remote-3");
-      assert.strictEqual(sent.attribution, "user-via-mattr");
-      assert.deepStrictEqual(state.sentNonces, ["nonce-ship"]);
-      yield* platform.cancel({ providerId: "grok-bot", conversationId: "bot-alpha" });
+        const sent = yield* platform.sendMessage({
+          providerId: "grok-bot",
+          conversationId: "bot-alpha",
+          text: "Ship it",
+          clientNonce: "nonce-ship",
+        });
+        assert.strictEqual(sent.clientNonce, "nonce-ship");
+        assert.strictEqual(sent.attribution, "user-via-mattr");
+        assert.strictEqual(sent.deliveryState, "sent");
+        // The transcript copy carries mattr's nonce, so the client swaps its pending copy for it.
+        const echoed = yield* waitFor(
+          (e) => e.type === "message-upserted" && e.message.remoteId === "remote-3",
+        );
+        assert.deepStrictEqual(
+          echoed.type === "message-upserted" && [
+            echoed.message.clientNonce,
+            echoed.message.attribution,
+          ],
+          ["nonce-ship", "user-via-mattr"],
+        );
 
-      state.messages.push({
-        id: "remote-4",
-        seq: 4,
-        role: "assistant",
-        text: "Shipped.",
-        timestampMs: 1_100,
-      });
-      const streamed = yield* waitFor(
-        (e) => e.type === "message-upserted" && e.message.remoteId === "remote-4",
-      );
-      assert.strictEqual(
-        streamed.type === "message-upserted" && streamed.message.markdown,
-        "Shipped.",
-      );
+        const refused = yield* platform
+          .sendMessage({
+            providerId: "grok-bot",
+            conversationId: "bot-alpha",
+            text: "Too long",
+            clientNonce: "nonce-long",
+          })
+          .pipe(Effect.flip);
+        assert.deepStrictEqual(
+          { code: refused.code, detail: refused.detail },
+          { code: "provider_error", detail: "That message is too long for Grok Bot." },
+        );
+        assert.deepStrictEqual(state.sentTexts, ["Ship it", "Too long"]);
 
-      yield* config.setEnabled({ id: "grok-bot", enabled: false });
-      yield* waitFor((e) => e.type === "provider-status" && e.status.kind === "disabled");
-      yield* Deferred.await(state.socketClosed).pipe(Effect.timeout("5 seconds"));
-      assert.deepStrictEqual(yield* platform.runningProviderIds, []);
-      assert.deepStrictEqual(yield* config.getConfig("grok-bot"), { cdpPort: port });
-    }).pipe(Effect.scoped, Effect.provide(layer)),
+        const [question] = yield* platform.listPendingRequests;
+        assert.deepStrictEqual(
+          question && {
+            requestId: question.requestId,
+            kind: question.kind,
+            title: question.title,
+            options: question.options,
+          },
+          {
+            requestId: "bot-alpha:t5s2",
+            kind: "question",
+            title: "Deploy to production?",
+            options: [
+              { id: "0", label: "Deploy" },
+              { id: "1", label: "Not yet" },
+            ],
+          },
+        );
+        yield* platform.respondToRequest({
+          providerId: "grok-bot",
+          requestId: "bot-alpha:t5s2",
+          response: { kind: "option", optionId: "0" },
+        });
+        assert.deepStrictEqual(state.widgetAnswers, ["Yes, deploy"]);
+        assert.deepStrictEqual(yield* platform.listPendingRequests, []);
+
+        yield* platform.cancel({ providerId: "grok-bot", conversationId: "bot-alpha" });
+
+        state.messages.push({
+          kind: "message",
+          id: "remote-4",
+          seq: 4,
+          role: "assistant",
+          text: "Shipped.",
+          timestampMs: 1_100,
+        });
+        const streamed = yield* waitFor(
+          (e) => e.type === "message-upserted" && e.message.remoteId === "remote-4",
+        );
+        assert.strictEqual(
+          streamed.type === "message-upserted" && streamed.message.markdown,
+          "Shipped.",
+        );
+
+        yield* config.setEnabled({ id: "grok-bot", enabled: false });
+        yield* waitFor((e) => e.type === "provider-status" && e.status.kind === "disabled");
+        yield* Deferred.await(state.socketClosed).pipe(Effect.timeout("5 seconds"));
+        assert.deepStrictEqual(yield* platform.runningProviderIds, []);
+        assert.deepStrictEqual(yield* config.getConfig("grok-bot"), { cdpPort: port });
+      }).pipe(Effect.scoped, Effect.provide(layer)),
   );
 
   it.live("reports a missing debug port and a missing app without touching Grok Bot", () =>

@@ -51,7 +51,7 @@ export const GROK_BOT_CDP_CAPABILITIES: GrokBotCapabilities = {
   attachmentsUpload: false,
   attachmentsDownload: false,
   interrupt: true,
-  interactiveWidgets: false,
+  interactiveWidgets: true,
   approvals: false,
   routines: false,
   botCrud: false,

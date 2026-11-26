@@ -1,4 +1,5 @@
 import type {
+  AddonRuntimeStatus,
   BotEvent,
   BotIdentity,
   BotListResponse,
@@ -9,6 +10,7 @@ import type {
 } from "@t3tools/contracts";
 import { useSyncExternalStore } from "react";
 
+import { getAddonStoreState, reconnectAddon } from "../../addons/addonStore";
 import { mattrApiRequest, mattrFetchCredentials, type MattrApiConfig } from "../../addons/mattrApi";
 
 export interface BotsState {
@@ -215,6 +217,27 @@ export function retainBotsSync(config: MattrApiConfig): () => void {
       emit(EMPTY);
     }
   };
+}
+
+/**
+ * Asks the server to reconnect a provider's add-on and applies the status it settles on, so the
+ * page updates even before the event stream reports it. Returns that status, or null when the
+ * request failed.
+ */
+export async function reconnectBotProvider(
+  config: MattrApiConfig,
+  provider: Pick<BotProviderDescriptor, "providerId" | "addonId">,
+): Promise<AddonRuntimeStatus | null> {
+  await reconnectAddon(config, provider.addonId);
+  const addons = getAddonStoreState();
+  const entry = addons.entries.find((candidate) => candidate.manifest.id === provider.addonId);
+  if (addons.error !== null || !entry) return null;
+  const status = entry.state.status;
+  emit(applyBotEvent(state, { type: "provider-status", providerId: provider.providerId, status }));
+  if (status.kind === "connected" && controller !== null) {
+    void loadSnapshot(config, controller.signal).catch(() => undefined);
+  }
+  return status;
 }
 
 export function findBot(
