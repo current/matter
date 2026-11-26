@@ -1,6 +1,15 @@
 import * as Schema from "effect/Schema";
 import { msg } from "gt-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+
+import { STREAM_CARET_CLASS } from "./components/chat/mattrStreamHast";
 
 import {
   readLocalStorageValue,
@@ -186,4 +195,28 @@ export function useMattrStreamingText(
   const animation = useEffectiveMattrStreamAnimation(streaming);
   const paced = usePacedText(text, animation === "typewriter");
   return { text: paced, animation };
+}
+
+/**
+ * A streaming message that mounts while the app is navigating (opening a running thread) shows
+ * as it is: its words' entrances and upstream's block fade finish before paint. Only text that
+ * arrives afterwards animates, and a message that starts streaming in the open thread animates
+ * from its first word. `data-panel-animations` is "false" for the first frames of a navigation.
+ */
+export function useSettledOpeningStreamText(
+  rootRef: RefObject<HTMLElement | null>,
+  streaming: boolean,
+): void {
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- finishes CSS entrances in the DOM before paint when a running message opens with its thread
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!streaming || root === null) return;
+    const navigating = root.closest("[data-panel-animations]");
+    if (navigating?.getAttribute("data-panel-animations") !== "false") return;
+    for (const entrance of root.getAnimations({ subtree: true })) {
+      const target = (entrance.effect as KeyframeEffect | null)?.target;
+      if (target?.classList.contains(STREAM_CARET_CLASS)) continue;
+      if (Number.isFinite(entrance.effect?.getComputedTiming().endTime)) entrance.finish();
+    }
+  }, [rootRef, streaming]);
 }

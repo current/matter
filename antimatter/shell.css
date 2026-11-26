@@ -371,15 +371,21 @@
     justify-content: flex-end;
   }
 
-  [data-panel-animations="true"] [data-thread-details-panel="inline"] {
-    animation: mattr-panel-in var(--mattr-sidebar-duration) var(--mattr-sidebar-ease) both;
+  /* A transition from @starting-style, not a keyframe animation: the attribute flipping back on
+     after a navigation would restart an animation, so the card would blink on every switch. */
+  [data-panel-animations="true"] [data-thread-details-panel="inline"] > [data-thread-details-card] {
+    transition:
+      opacity var(--mattr-sidebar-duration) var(--mattr-sidebar-ease),
+      translate var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
   }
-}
 
-@keyframes mattr-panel-in {
-  from {
-    opacity: 0;
-    translate: 16px 0;
+  @starting-style {
+    [data-panel-animations="true"]
+      [data-thread-details-panel="inline"]
+      > [data-thread-details-card] {
+      opacity: 0;
+      translate: 16px 0;
+    }
   }
 }
 

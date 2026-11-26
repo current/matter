@@ -353,6 +353,14 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
   const searchHint = shortcutLabelForCommand(keybindings, "commandPalette.toggle") ?? "⌘K";
   const newThreadHint = shortcutLabelForCommand(keybindings, "chat.new");
 
+  // A tree opened for the open thread stays open after leaving it (until toggled), so moving
+  // between subagents never collapses a tree and shifts the rows under the pointer.
+  const activeTreeKey =
+    children.find((child) => child.key === activeThreadKey)?.ancestorKey ??
+    (activeThreadKey !== null && childrenByParent.has(activeThreadKey) ? activeThreadKey : null);
+  if (activeTreeKey !== null && expansion[activeTreeKey] === undefined) {
+    setExpansion((current) => ({ ...current, [activeTreeKey]: true }));
+  }
   const isExpanded = (item: MattrThreadItem, subagents: ReadonlyArray<MattrThreadItem>) =>
     expansion[item.key] ?? shouldAutoExpand(item, subagents, activeThreadKey);
   const onToggleExpanded = (item: MattrThreadItem, next: boolean) =>

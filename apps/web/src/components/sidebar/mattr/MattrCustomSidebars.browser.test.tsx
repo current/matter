@@ -322,6 +322,36 @@ describe("MattrDefaultSidebar", () => {
     expect(last!.trunk.content).toBe("none");
   });
 
+  it("keeps a tree it opened for the open thread when another tree's subagent is opened", async () => {
+    using _server = useServer(false);
+    const finished = [
+      subagent("Write matrix doc"),
+      subagent("Check settings copy", {}, "Settings in shell card"),
+    ];
+    const at = (activeThreadKey: string) => (
+      <SidebarProvider>
+        <MattrDefaultSidebar model={model({ children: finished, activeThreadKey })} />
+      </SidebarProvider>
+    );
+    await using screen = await render(at(finished[0]!.key));
+    const muse = page.getByRole("list", { name: "Subagents of Muse provider matrix" });
+    const settings = page.getByRole("list", { name: "Subagents of Settings in shell card" });
+    await expect.element(muse).toBeVisible();
+    await expect.element(settings).not.toBeInTheDocument();
+    const below = () =>
+      page.getByRole("button", { name: "Settings in shell card", exact: true }).element();
+    const top = below().getBoundingClientRect().top;
+
+    // Rows jumping under the pointer while moving between subagents reads as flicker.
+    await screen.rerender(at(finished[1]!.key));
+    await expect.element(settings).toBeVisible();
+    await expect.element(muse).toBeVisible();
+    expect(below().getBoundingClientRect().top).toBe(top);
+
+    await page.getByRole("button", { name: "Hide subagents of Muse provider matrix" }).click();
+    await expect.element(muse).not.toBeInTheDocument();
+  });
+
   it("nests subagents-of-subagents and counts and keeps subagents that need you", async () => {
     using _server = useServer(false);
     const settledParent = thread("Settled release", MATTR, { settledOverride: "settled" });

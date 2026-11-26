@@ -99,4 +99,43 @@ describe("mattr shell stylesheet", () => {
     expect([r, g, b]).toEqual(hexChannels(adaptShellColor("#4b4fa8", "dark")));
     expect(a).toBeCloseTo(0.3, 2);
   });
+
+  it("slides the docked details card in when it opens, but never replays that on a thread switch", async () => {
+    using shell = await mountShell();
+    const { wrapper } = shell;
+    const running = () =>
+      wrapper.getAnimations({ subtree: true }).filter((entry) => entry.playState === "running");
+    const navigate = () => {
+      // panelAnimations.ts turns panel animations off for the first frames of every navigation.
+      wrapper.dataset.panelAnimations = "false";
+      getComputedStyle(card()).opacity;
+      wrapper.dataset.panelAnimations = "true";
+      getComputedStyle(card()).opacity;
+    };
+    const card = () => wrapper.querySelector<HTMLElement>("[data-thread-details-card]")!;
+    const openDetails = () =>
+      wrapper.insertAdjacentHTML(
+        "beforeend",
+        `<aside data-thread-details-panel="inline"><div data-thread-details-card>details</div></aside>`,
+      );
+
+    wrapper.dataset.panelAnimations = "true";
+    openDetails();
+    getComputedStyle(card()).opacity;
+    expect(running().length).toBeGreaterThan(0);
+    for (const entry of running()) entry.finish();
+
+    navigate();
+    expect(running()).toEqual([]);
+    expect(getComputedStyle(card()).opacity).toBe("1");
+
+    // A details card that mounts with the new thread shows in place, too.
+    wrapper.querySelector("aside")!.remove();
+    wrapper.dataset.panelAnimations = "false";
+    openDetails();
+    getComputedStyle(card()).opacity;
+    wrapper.dataset.panelAnimations = "true";
+    expect(running()).toEqual([]);
+    expect(getComputedStyle(card()).opacity).toBe("1");
+  });
 });

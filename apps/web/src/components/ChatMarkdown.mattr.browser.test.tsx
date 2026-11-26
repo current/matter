@@ -19,6 +19,15 @@ const words = (container: HTMLElement) =>
 const caret = (container: HTMLElement) => container.querySelector(`.${STREAM_CARET_CLASS}`);
 const markdownRoot = (container: HTMLElement) =>
   container.querySelector<HTMLElement>(".chat-markdown")!;
+const entrances = (root: HTMLElement) =>
+  root
+    .getAnimations({ subtree: true })
+    .filter(
+      (animation) =>
+        !(animation.effect as KeyframeEffect | null)?.target?.classList.contains(
+          STREAM_CARET_CLASS,
+        ),
+    );
 
 function streamMode(mode: MattrStreamAnimation): Disposable {
   setLocalStorageItem(MATTR_STREAM_ANIMATION_STORAGE_KEY, mode, MattrStreamAnimation);
@@ -64,6 +73,40 @@ describe("ChatMarkdown streaming text animation", () => {
     // The caret rides only the live paragraph.
     expect(caret(container)?.parentElement?.textContent).toContain("second paragraph");
     expect(container.querySelectorAll(`.${STREAM_CARET_CLASS}`)).toHaveLength(1);
+  });
+
+  it.each(["instant", "blur", "fade", "rise", "typewriter"] as const)(
+    "%s: opening a running thread shows its streaming message without replaying it",
+    async (mode) => {
+      using _mode = streamMode(mode);
+      const arrived = "Words that arrived before this thread was opened";
+      // The app turns panel animations off for the first frames of a navigation.
+      const opening = (text: string, navigating: boolean) => (
+        <div data-panel-animations={navigating ? "false" : "true"}>{message(text, true)}</div>
+      );
+      await using screen = await render(opening(arrived, true));
+      const { container, rerender } = screen;
+      expect(container.textContent).toContain(arrived);
+      // Neither the words nor their blocks fade, blur or rise in again; the caret may breathe.
+      expect(entrances(markdownRoot(container))).toEqual([]);
+      for (const node of [...words(container), ...markdownRoot(container).children]) {
+        expect(getComputedStyle(node).opacity).toBe("1");
+      }
+
+      if (mode === "instant" || mode === "typewriter") return;
+      await rerender(opening(`${arrived} and then more`, false));
+      const fresh = words(container).at(-1)!;
+      expect(fresh.textContent).toBe("more");
+      expect(fresh.getAnimations()).not.toEqual([]);
+    },
+  );
+
+  it("animates a message that starts streaming in the open thread from its first words", async () => {
+    using _mode = streamMode("blur");
+    await using screen = await render(
+      <div data-panel-animations="true">{message("Hello there", true)}</div>,
+    );
+    for (const node of words(screen.container)) expect(node.getAnimations()).not.toEqual([]);
   });
 
   it("keeps markdown formatting while streaming", async () => {

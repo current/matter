@@ -208,7 +208,11 @@ import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
 import { collectComposerModelMentions } from "@t3tools/client-runtime/composer-model-mentions";
 import { splitMarkdownBlocks } from "./chat/markdownStreamBlocks";
 import { mattrStreamHast } from "./chat/mattrStreamHast";
-import { type MattrAnimatedStream, useMattrStreamingText } from "../mattrStreamAnimation";
+import {
+  type MattrAnimatedStream,
+  useMattrStreamingText,
+  useSettledOpeningStreamText,
+} from "../mattrStreamAnimation";
 import { MarkdownMermaidCodeBlock } from "./chat/MarkdownMermaidCodeBlock";
 import { MarkdownTable } from "./chat/MarkdownTable";
 import { MarkdownDetails } from "./chat/MarkdownDetails";
@@ -2097,6 +2101,7 @@ function ChatMarkdown({
       : null;
   const { componentState, handleCopy, markdownRef, localMediaPreview, closeLocalMediaPreview } =
     useChatMarkdownState({ text, inline, ...props }, streamingBlocks);
+  useSettledOpeningStreamText(markdownRef, props.isStreaming === true && !inline);
   const Root = inline ? "span" : "div";
   const bindMarkdownRef = (node: HTMLElement | null) => {
     markdownRef.current = node;
