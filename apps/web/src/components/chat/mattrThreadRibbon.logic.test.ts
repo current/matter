@@ -176,19 +176,19 @@ describe("pill summary", () => {
 });
 
 describe("ribbon density", () => {
-  it("collapses chips as the available header content width narrows", () => {
-    expect(resolveMattrRibbonDensity(820)).toBe("full");
-    expect(resolveMattrRibbonDensity(819)).toBe("compact");
-    expect(resolveMattrRibbonDensity(660)).toBe("compact");
-    expect(resolveMattrRibbonDensity(659)).toBe("condensed");
-    expect(resolveMattrRibbonDensity(480)).toBe("condensed");
-    expect(resolveMattrRibbonDensity(479)).toBe("minimal");
+  it("collapses primary chips as the available header content width narrows", () => {
+    expect(resolveMattrRibbonDensity(560)).toBe("full");
+    expect(resolveMattrRibbonDensity(559)).toBe("condensed");
+    expect(resolveMattrRibbonDensity(420)).toBe("condensed");
+    expect(resolveMattrRibbonDensity(419)).toBe("minimal");
   });
 
-  it("moves secondary chips into More before the diff", () => {
-    expect(mattrRibbonOverflows("compact", "openIn")).toBe(false);
-    expect(mattrRibbonOverflows("condensed", "openIn")).toBe(true);
+  it("moves PR into More before the diff", () => {
+    expect(mattrRibbonOverflows("full", "pr")).toBe(false);
+    expect(mattrRibbonOverflows("full", "diff")).toBe(false);
+    expect(mattrRibbonOverflows("condensed", "pr")).toBe(true);
     expect(mattrRibbonOverflows("condensed", "diff")).toBe(false);
+    expect(mattrRibbonOverflows("minimal", "pr")).toBe(true);
     expect(mattrRibbonOverflows("minimal", "diff")).toBe(true);
   });
 });

@@ -148,7 +148,7 @@ export function deriveMattrWhisperRows(input: {
 
 const FINISHED_STATUSES = new Set(["completed", "failed", "cancelled", "interrupted", "idle"]);
 
-/** The count on the Ribbon's agents button: subagents this thread already finished with. */
+/** The count on the More menu's Previous agents entry: subagents this thread already finished with. */
 export function countMattrPreviousAgents(
   subagents: ReadonlyArray<Pick<OrchestrationV2Subagent, "status">>,
 ): number {
@@ -190,25 +190,20 @@ export function isMattrWhisperActive(input: {
 
 /**
  * How much of the Ribbon fits beside the title within the header's available content width
- * (excluding sidebar-collapse padding and titlebar controls): `compact` drops Open in and Actions to
- * icons, `condensed` moves them and the PR chip into More, `minimal` moves the diff too and Git to
- * its icon.
+ * (excluding sidebar-collapse padding and titlebar controls): `condensed` moves the PR chip into
+ * More, and `minimal` moves the diff too and drops Git to its icon.
  */
-export type MattrRibbonDensity = "full" | "compact" | "condensed" | "minimal";
+export type MattrRibbonDensity = "full" | "condensed" | "minimal";
 
 export function resolveMattrRibbonDensity(availableWidth: number): MattrRibbonDensity {
-  if (availableWidth >= 820) return "full";
-  if (availableWidth >= 660) return "compact";
-  if (availableWidth >= 480) return "condensed";
+  if (availableWidth >= 560) return "full";
+  if (availableWidth >= 420) return "condensed";
   return "minimal";
 }
 
-export function mattrRibbonOverflows(
-  density: MattrRibbonDensity,
-  item: "pr" | "openIn" | "scripts" | "diff",
-): boolean {
-  if (density === "full" || density === "compact") return false;
-  if (density === "condensed") return item !== "diff";
+export function mattrRibbonOverflows(density: MattrRibbonDensity, item: "pr" | "diff"): boolean {
+  if (density === "full") return false;
+  if (density === "condensed") return item === "pr";
   return true;
 }
 

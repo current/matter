@@ -6,6 +6,7 @@ import {
   type ProjectScript,
   type ThreadPullRequestLink,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
@@ -83,6 +84,12 @@ vi.mock(import("./MattrWhisperPill.mattr"), async (importOriginal) => ({
   ...(await importOriginal()),
   useMattrThreadAutomationCounts: (() => ({ bound: 0, running: 0 })) as never,
 }));
+// The drilldowns reuse the details card's own panel; its behavior has its own tests.
+vi.mock(import("./ThreadRelationshipsControl"), () => ({
+  ThreadRelationshipsPanel: ((props: { showLineage: boolean; showSideChats: boolean }) => (
+    <p>{props.showLineage ? "Lineage panel" : "Side chats panel"}</p>
+  )) as never,
+}));
 
 import { useRef, useState, type CSSProperties } from "react";
 import shellCss from "../../../../../antimatter/shell.css?inline";
@@ -117,11 +124,24 @@ const devScript: ProjectScript = {
 };
 
 function finishedAgent(id: string) {
+  const timestamp = DateTime.makeUnsafe("2026-11-26T10:00:00.000Z");
   return {
     id: NodeId.make(id),
     threadId: THREAD,
-    status: "completed",
+    runId: null,
+    origin: "app_owned",
+    driver: "claudeAgent",
+    providerInstanceId: "claudeAgent",
     childThreadId: ThreadId.make(`child-${id}`),
+    nativeTaskRef: null,
+    title: `Agent ${id}`,
+    prompt: `Task ${id}`,
+    model: null,
+    result: null,
+    status: "completed",
+    startedAt: timestamp,
+    completedAt: timestamp,
+    updatedAt: timestamp,
   };
 }
 
@@ -149,12 +169,14 @@ function Ribbon({
   controlsWidth = 0,
   rightPanelOpen = false,
   onToggleChanges,
+  onRunProjectScript,
 }: {
   width: number;
   paddingLeft?: number;
   controlsWidth?: number;
   rightPanelOpen?: boolean;
   onToggleChanges?: () => void;
+  onRunProjectScript?: (script: ProjectScript) => void;
 }) {
   const result = async () => ({ ok: true }) as never;
   return (
@@ -200,7 +222,7 @@ function Ribbon({
           gitCwd="/repo"
           workspaceMutationId={null}
           isGitRepo
-          onRunProjectScript={() => {}}
+          onRunProjectScript={onRunProjectScript ?? (() => {})}
           onAddProjectScript={result}
           onUpdateProjectScript={result}
           onDeleteProjectScript={result}
@@ -287,16 +309,22 @@ function DesktopCanvasHarness() {
 }
 
 describe("MattrThreadRibbon", () => {
-  it("shows diff, editor, actions and git chips, 26px tall, with the quiet agents button", async () => {
+  it("shows only primary diff, git and More chips on the topbar, hiding Open, Actions and finished agents", async () => {
     using _styles = withStyles();
     state.subagents = [finishedAgent("a"), finishedAgent("b"), finishedAgent("c")];
     const onToggleChanges = vi.fn();
     await using screen = await render(<Ribbon width={1200} onToggleChanges={onToggleChanges} />);
     const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
     await expect.element(page.getByRole("group", { name: /Git actions/ })).toBeVisible();
-    await expect.element(page.getByRole("group", { name: "Open in editor" })).toBeVisible();
-    await expect.element(page.getByRole("group", { name: "Project scripts" })).toBeVisible();
-    await expect.element(page.getByRole("button", { name: "Agents: 3 previous" })).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "More thread actions" })).toBeVisible();
+    await expect
+      .element(page.getByRole("group", { name: "Open in editor" }))
+      .not.toBeInTheDocument();
+    await expect
+      .element(page.getByRole("group", { name: "Project scripts" }))
+      .not.toBeInTheDocument();
+    expect(ribbon.querySelector("[data-mattr-ribbon-slot='agents']")).toBeNull();
+    expect(ribbon.querySelector("[data-mattr-ribbon-chip='agents']")).toBeNull();
     expect(ribbon.dataset.density).toBe("full");
 
     const diff = ribbon.querySelector<HTMLElement>("[data-mattr-ribbon-slot='diff'] > button")!;
@@ -325,13 +353,43 @@ describe("MattrThreadRibbon", () => {
     expect(popup.hasAttribute("data-mattr-frosted")).toBe(true);
   });
 
-  it("opens the Lineage popover from the agents button", async () => {
+  it("keeps Open in, project actions and Previous agents accessible inside More", async () => {
     using _styles = withStyles();
-    state.subagents = [finishedAgent("a")];
-    await using _screen = await render(<Ribbon width={1200} />);
-    await page.getByRole("button", { name: "Agents: 1 previous" }).click();
+    state.subagents = [finishedAgent("a"), finishedAgent("b"), finishedAgent("c")];
+    const onRunProjectScript = vi.fn();
+    await using _screen = await render(
+      <Ribbon width={1200} onRunProjectScript={onRunProjectScript} />,
+    );
+    await page.getByRole("button", { name: "More thread actions" }).click();
+    await expect.element(page.getByRole("menuitem", { name: "Open in Cursor" })).toBeVisible();
+    await expect.element(page.getByRole("menuitem", { name: "Open in…" })).toBeVisible();
+    await expect.element(page.getByRole("menuitem", { name: "Run dev" })).toBeVisible();
+    await expect.element(page.getByRole("menuitem", { name: "Project actions" })).toBeVisible();
+    await expect.element(page.getByRole("menuitem", { name: /Previous agents/ })).toBeVisible();
+    expect(document.querySelector("[data-slot='menu-item-detail']")?.textContent?.trim()).toBe("3");
+
+    // Clicking Run dev executes the project script handler cleanly.
+    await page.getByRole("menuitem", { name: "Run dev" }).click();
+    expect(onRunProjectScript).toHaveBeenCalledWith(devScript);
+
+    // Clicking Previous agents opens the Lineage popover anchored to the ribbon on the previous view.
+    await page.getByRole("button", { name: "More thread actions" }).click();
+    await page.getByRole("menuitem", { name: /Previous agents/ }).click();
+    const popup = document.querySelector<HTMLElement>("[data-mattr-lineage-popup='ribbon']");
+    expect(popup).not.toBeNull();
+    await expect.element(page.getByText("Lineage panel")).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "Back to lineage" })).toBeVisible();
+    await page.getByRole("button", { name: "Back to lineage" }).click();
     await expect.element(page.getByText("Lineage", { exact: true })).toBeVisible();
-    await expect.element(page.getByRole("button", { name: /Previous agents/ })).toBeVisible();
+  });
+
+  it("keeps the project script editor dialog open after clicking Add action from More", async () => {
+    using _styles = withStyles();
+    await using _screen = await render(<Ribbon width={1200} />);
+    await page.getByRole("button", { name: "More thread actions" }).click();
+    await page.getByRole("menuitem", { name: "Project actions" }).hover();
+    await page.getByRole("menuitem", { name: "Add action" }).click();
+    await expect.element(page.getByRole("dialog")).toBeVisible();
   });
 
   it("keeps the full card one click away and the classic card a setting away", async () => {
@@ -352,22 +410,24 @@ describe("MattrThreadRibbon", () => {
     ).toBe(true);
   });
 
-  it("moves secondary chips into More as the header narrows", async () => {
+  it("folds PR and diff into More as the header narrows", async () => {
     using _styles = withStyles();
     state.pullRequests = [linkedPullRequest];
-    await using screen = await render(<Ribbon width={620} />);
+    await using screen = await render(<Ribbon width={500} onToggleChanges={() => {}} />);
     const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
     await expect.poll(() => ribbon.dataset.density).toBe("condensed");
     await expect
-      .element(page.getByRole("group", { name: "Open in editor" }))
-      .not.toBeInTheDocument();
-    await expect
       .element(page.getByRole("button", { name: "Pull request #142" }))
       .not.toBeInTheDocument();
+    expect(ribbon.querySelector("[data-mattr-ribbon-slot='diff']")).not.toBeNull();
     await expect.element(page.getByRole("group", { name: /Git actions/ })).toBeVisible();
     await page.getByRole("button", { name: "More thread actions" }).click();
-    await expect.element(page.getByRole("menuitem", { name: "Open in…" })).toBeVisible();
     await expect.element(page.getByRole("menuitem", { name: /Pull request #142/ })).toBeVisible();
+    await expect.element(page.getByRole("menuitem", { name: "Open in…" })).toBeVisible();
+
+    await screen.rerender(<Ribbon width={400} onToggleChanges={() => {}} />);
+    await expect.poll(() => ribbon.dataset.density).toBe("minimal");
+    expect(ribbon.querySelector("[data-mattr-ribbon-slot='diff']")).toBeNull();
   });
 
   it("stays upright in dark mode", async () => {
@@ -421,10 +481,10 @@ describe("MattrThreadRibbon", () => {
   it("measures available width minus collapsed-sidebar padding and titlebar controls, and tracks control resizes", async () => {
     using _styles = withStyles();
     await using screen = await render(
-      <Ribbon width={960} paddingLeft={204} controlsWidth={100} rightPanelOpen={false} />,
+      <Ribbon width={840} paddingLeft={204} controlsWidth={100} rightPanelOpen={false} />,
     );
     const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
-    // 960 - 204 - (100 + 8) = 648px available -> condensed (not full).
+    // 840 - 204 - (100 + 8) = 528px available -> condensed (not full).
     await expect.poll(() => ribbon.dataset.density).toBe("condensed");
     expect(ribbon.style.getPropertyValue("--mattr-ribbon-controls-inset")).toBe("108px");
 
@@ -436,15 +496,17 @@ describe("MattrThreadRibbon", () => {
     await expect
       .poll(() => ribbon.style.getPropertyValue("--mattr-ribbon-controls-inset"))
       .toBe("188px");
+    // 840 - 204 - (180 + 8) = 448px available -> still condensed.
+    await expect.poll(() => ribbon.dataset.density).toBe("condensed");
 
     // Opening the right panel moves the controls off the header, clearing the inset.
     await screen.rerender(
-      <Ribbon width={960} paddingLeft={204} controlsWidth={180} rightPanelOpen />,
+      <Ribbon width={840} paddingLeft={204} controlsWidth={180} rightPanelOpen />,
     );
     await expect
       .poll(() => ribbon.style.getPropertyValue("--mattr-ribbon-controls-inset"))
       .toBe("0px");
-    // 960 - 204 = 756px available -> compact.
-    await expect.poll(() => ribbon.dataset.density).toBe("compact");
+    // 840 - 204 = 636px available -> full.
+    await expect.poll(() => ribbon.dataset.density).toBe("full");
   });
 });

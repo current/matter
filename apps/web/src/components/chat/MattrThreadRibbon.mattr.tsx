@@ -6,6 +6,7 @@ import {
   CircleDotIcon,
   EllipsisIcon,
   FileDiffIcon,
+  HistoryIcon,
   PanelRightIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import { useThreadDisplayedPullRequest } from "../ThreadStatusIndicators";
 import {
   Menu,
   MenuItem,
+  MenuItemDetail,
   MenuItemLabel,
   MenuPopup,
   MenuSeparator,
@@ -42,7 +44,7 @@ import { ThreadDetailsItemsMenuItems } from "./ThreadDetailsItemsMenu";
 import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
 import { resolveThreadDetailsVisibility } from "./threadDetailsItems";
 import {
-  MattrLineagePopover,
+  MattrLineagePopoverContent,
   type MattrBackgroundWork,
   useMattrLineageModel,
   useMattrThreadAutomationCounts,
@@ -51,6 +53,7 @@ import {
   closeMattrLineagePopover,
   type MattrRibbonDensity,
   mattrRibbonOverflows,
+  openMattrLineagePopover,
   resolveMattrRibbonDensity,
   useMattrLineagePopover,
   writeMattrThreadRibbon,
@@ -106,16 +109,18 @@ function flagOpenGitMenu(slot: HTMLDivElement | null) {
 }
 
 /**
- * The Topbar Ribbon: the thread's diff, pull request, editor, project actions, git and agents as
- * chips in the 38pt shell topbar, in place of the docked Thread Details card. Every chip reuses the
- * card's own control, so nothing the card did is lost; the full card stays one click away in the
- * More menu.
+ * The Topbar Ribbon: the thread's primary diff, pull request, git and More chips in the 38pt shell
+ * topbar, in place of the docked Thread Details card. Open in, project actions, previous agents /
+ * lineage and the full card stay one click away in the More menu, and PR / diff fold into More as
+ * the header narrows.
  */
 export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
   const gt = useGT();
   const visible = useClientSettings(resolveThreadDetailsVisibility);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const moreSlotRef = useRef<HTMLDivElement | null>(null);
   const [density, setDensity] = useState<MattrRibbonDensity>("full");
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const threadRef = { environmentId: props.environmentId, threadId: props.threadId };
   const t3File = useT3ProjectFileState(
@@ -205,15 +210,26 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
     (lineage.previousCount > 0 || lineage.sideChatCount > 0 || lineage.rows.length > 0);
   const lineagePopover = useMattrLineagePopover();
   const ribbonLineageOpen =
-    lineagePopover.threadKey === lineage.threadKey && lineagePopover.anchor === "ribbon";
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the external lineage popover store if the ribbon's agents chip disappears while open
+    showAgents &&
+    lineagePopover.threadKey === lineage.threadKey &&
+    lineagePopover.anchor === "ribbon";
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the external lineage popover store if the thread's lineage disappears while open
   useLayoutEffect(() => {
-    if (!showAgents && ribbonLineageOpen) closeMattrLineagePopover();
-  }, [showAgents, ribbonLineageOpen]);
-  const overflowOpenIn = showOpenIn && mattrRibbonOverflows(density, "openIn");
-  const overflowScripts = showScripts && mattrRibbonOverflows(density, "scripts");
+    if (
+      !showAgents &&
+      lineagePopover.threadKey === lineage.threadKey &&
+      lineagePopover.anchor === "ribbon"
+    ) {
+      closeMattrLineagePopover();
+    }
+  }, [showAgents, lineagePopover.threadKey, lineagePopover.anchor, lineage.threadKey]);
   const overflowPr = showPr && mattrRibbonOverflows(density, "pr");
   const overflowDiff = showDiff && mattrRibbonOverflows(density, "diff");
+  const hasMoreTopSection =
+    (overflowDiff && props.onToggleChanges !== undefined) ||
+    overflowPr ||
+    showOpenIn ||
+    (showScripts && props.activeProjectScripts !== undefined);
   const activeThreadRef = threadRef;
   const openAllDetails = () =>
     useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", true);
@@ -319,35 +335,6 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
         </div>
       ) : null}
 
-      {showOpenIn && !overflowOpenIn ? (
-        <div data-mattr-ribbon-slot="openIn">
-          <OpenInPicker
-            keybindings={props.keybindings}
-            environmentId={props.environmentId}
-            availableEditors={props.availableEditors}
-            openInCwd={props.gitCwd}
-            enableShortcut={props.openInShortcutEnabled}
-            compact={density !== "full"}
-          />
-        </div>
-      ) : null}
-
-      {showScripts && !overflowScripts && props.activeProjectScripts ? (
-        <div data-mattr-ribbon-slot="scripts">
-          <ProjectScriptsControl
-            environmentId={props.environmentId}
-            scripts={props.activeProjectScripts}
-            fileScripts={t3File.scripts}
-            onActionsMenuOpen={t3File.refresh}
-            preferredScriptId={props.preferredScriptId}
-            onRunScript={props.onRunProjectScript}
-            onAddScript={props.onAddProjectScript}
-            onUpdateScript={props.onUpdateProjectScript}
-            onDeleteScript={props.onDeleteProjectScript}
-          />
-        </div>
-      ) : null}
-
       {showGitActions && props.gitCwd ? (
         <div data-mattr-ribbon-slot="git" ref={flagOpenGitMenu}>
           <GitActionsControl
@@ -363,50 +350,8 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
         </div>
       ) : null}
 
-      {showAgents || ribbonLineageOpen ? (
-        <div data-mattr-ribbon-slot="agents">
-          <MattrLineagePopover
-            environmentId={props.environmentId}
-            threadId={props.threadId}
-            backgroundWork={props.backgroundWork}
-            anchor="ribbon"
-            closed={!showAgents}
-            model={lineage}
-            serverCount={servers.length}
-            automationCount={automations.bound}
-            trigger={
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <PopoverTrigger
-                      render={
-                        <button
-                          type="button"
-                          data-mattr-ribbon-chip="agents"
-                          aria-label={gt("Agents: {count} previous", {
-                            count: lineage.previousCount,
-                          })}
-                        />
-                      }
-                    />
-                  }
-                >
-                  <BotIcon aria-hidden data-mattr-ribbon-icon />
-                  {lineage.previousCount > 0 ? (
-                    <span data-mattr-ribbon-num>{lineage.previousCount}</span>
-                  ) : null}
-                </TooltipTrigger>
-                <TooltipPopup side="bottom">
-                  <T>Lineage: running and previous agents, side chats</T>
-                </TooltipPopup>
-              </Tooltip>
-            }
-          />
-        </div>
-      ) : null}
-
-      <div data-mattr-ribbon-slot="more">
-        <Menu>
+      <div data-mattr-ribbon-slot="more" ref={moreSlotRef}>
+        <Menu open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
           <Tooltip>
             <TooltipTrigger
               render={
@@ -427,7 +372,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
               <T>More thread actions</T>
             </TooltipPopup>
           </Tooltip>
-          <MenuPopup align="end" data-mattr-frosted="">
+          <MenuPopup align="end" data-mattr-frosted="" keepMounted={showScripts}>
             {overflowDiff && props.onToggleChanges ? (
               <MenuItem onClick={props.onToggleChanges}>
                 <FileDiffIcon aria-hidden />
@@ -450,7 +395,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
                 </MenuItemLabel>
               </MenuItem>
             ) : null}
-            {overflowOpenIn ? (
+            {showOpenIn ? (
               <OpenInPicker
                 keybindings={props.keybindings}
                 environmentId={props.environmentId}
@@ -460,9 +405,10 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
                 presentation="menu"
               />
             ) : null}
-            {overflowScripts && props.activeProjectScripts ? (
+            {showScripts && props.activeProjectScripts ? (
               <ProjectScriptsControl
                 presentation="menu"
+                onRequestMenuClose={() => setMoreMenuOpen(false)}
                 environmentId={props.environmentId}
                 scripts={props.activeProjectScripts}
                 fileScripts={t3File.scripts}
@@ -474,8 +420,34 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
                 onDeleteScript={props.onDeleteProjectScript}
               />
             ) : null}
-            {overflowDiff || overflowPr || overflowOpenIn || overflowScripts ? (
-              <MenuSeparator />
+            {hasMoreTopSection ? <MenuSeparator /> : null}
+            {showAgents ? (
+              <MenuItem
+                onClick={() =>
+                  openMattrLineagePopover(
+                    lineage.threadKey,
+                    "ribbon",
+                    lineage.previousCount > 0 ? "previous" : "main",
+                  )
+                }
+              >
+                {lineage.previousCount > 0 ? (
+                  <>
+                    <HistoryIcon aria-hidden />
+                    <MenuItemLabel>
+                      <T>Previous agents</T>
+                    </MenuItemLabel>
+                    <MenuItemDetail>{lineage.previousCount}</MenuItemDetail>
+                  </>
+                ) : (
+                  <>
+                    <BotIcon aria-hidden />
+                    <MenuItemLabel>
+                      <T>Lineage</T>
+                    </MenuItemLabel>
+                  </>
+                )}
+              </MenuItem>
             ) : null}
             <MenuItem onClick={openAllDetails}>
               <PanelRightIcon aria-hidden />
@@ -502,6 +474,34 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
             </MenuItem>
           </MenuPopup>
         </Menu>
+        <Popover
+          open={ribbonLineageOpen}
+          onOpenChange={(next) => {
+            if (!next) closeMattrLineagePopover();
+          }}
+        >
+          <PopoverPopup
+            anchor={moreSlotRef}
+            data-mattr-frosted=""
+            data-mattr-lineage-popup="ribbon"
+            side="bottom"
+            align="end"
+            sideOffset={6}
+            padding="none"
+          >
+            {ribbonLineageOpen ? (
+              <MattrLineagePopoverContent
+                environmentId={props.environmentId}
+                threadId={props.threadId}
+                backgroundWork={props.backgroundWork}
+                view={lineagePopover.view}
+                model={lineage}
+                serverCount={servers.length}
+                automationCount={automations.bound}
+              />
+            ) : null}
+          </PopoverPopup>
+        </Popover>
       </div>
 
       <Menu open={contextMenu !== null} onOpenChange={(open) => !open && setContextMenu(null)}>

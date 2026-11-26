@@ -188,21 +188,6 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
   padding-inline: 0;
 }
 
-/* Editor and project action labels: the toolbar hides them below its old 48rem header query. */
-[data-mattr-ribbon][data-density="full"]
-  :is([data-mattr-ribbon-slot="openIn"], [data-mattr-ribbon-slot="scripts"])
-  button
-  > span.sr-only {
-  position: static;
-  width: auto;
-  height: auto;
-  margin: 0;
-  overflow: visible;
-  clip: auto;
-  clip-path: none;
-  white-space: nowrap;
-}
-
 /* The diff chip: only the +X -Y counts. */
 [data-mattr-ribbon-slot="diff"] > button > svg,
 [data-mattr-ribbon-slot="diff"] > button > span > :not(:last-child) {
