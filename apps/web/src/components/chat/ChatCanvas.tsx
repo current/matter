@@ -8,6 +8,7 @@ import {
   type RightPanelWidthTransition,
 } from "./canvasStore";
 import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
+import { useMattrThreadRibbonEnabled } from "./mattrThreadRibbon.logic";
 import { observeResize } from "../../lib/observeResize";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 
@@ -178,11 +179,14 @@ export function ChatCanvas({
       stopObserving();
     };
   }, [store, composerOverlayElement, timelineElement, detailsCardTopInset]);
-  const detailsCardInlineOpen = useRightPanelStore((state) =>
-    threadRef === null
-      ? false
-      : selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, threadRef, "inline"),
-  );
+  // mattr: with the Topbar Ribbon on, the details card only opens as a popover.
+  const mattrThreadRibbon = useMattrThreadRibbonEnabled();
+  const detailsCardInlineOpen =
+    useRightPanelStore((state) =>
+      threadRef === null
+        ? false
+        : selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, threadRef, "inline"),
+    ) && !mattrThreadRibbon;
   const model = resolveChatCanvasModel({
     measurements,
     detailsCardMeasurement,
@@ -198,8 +202,8 @@ export function ChatCanvas({
     registerTimeline,
     measureDetailsCard: store.getState().measureDetailsCard,
     detailsCardTopInset: model.detailsCardTopInset,
-    preferredDetailsCard: model.preferredDetailsCard,
-    detailsCardPlacement: model.detailsCardPlacement,
+    preferredDetailsCard: mattrThreadRibbon ? null : model.preferredDetailsCard,
+    detailsCardPlacement: mattrThreadRibbon ? null : model.detailsCardPlacement,
   };
   const { layout } = context;
   const htmlPreviewLane =

@@ -334,6 +334,13 @@ import {
 } from "./chat/PanelLayoutControls";
 import type { ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { ThreadDetailsPanel } from "./chat/ThreadDetailsPanel";
+import { MattrThreadRibbon } from "./chat/MattrThreadRibbon.mattr";
+import { MattrWhisperPill } from "./chat/MattrWhisperPill.mattr";
+import {
+  readMattrLineagePopover,
+  toggleMattrLineagePopover,
+  useMattrThreadRibbonEnabled,
+} from "./chat/mattrThreadRibbon.logic";
 import { NoActiveThreadState } from "./NoActiveThreadState";
 import {
   offersWorkspaceModes,
@@ -481,6 +488,8 @@ export default function ChatView(props: ChatViewProps) {
     embedded: parentPanel,
   } = props;
   const embedded = parentPanel !== undefined;
+  // mattr: the Topbar Ribbon and Whisper Pill stand in for the docked details card.
+  const mattrThreadRibbon = useMattrThreadRibbonEnabled() && !embedded;
   const panelHostShell = useQuietThreadShell(parentPanel?.hostRef ?? null);
   const canOperateThread = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
@@ -2099,12 +2108,13 @@ export default function ChatView(props: ChatViewProps) {
       ? activePreviewMiniPlayer
       : null;
   const canvasPreview = useThreadPreviewCanvasSource(activeThreadRef, shownPreviewMiniPlayer);
-  const threadPanelInlineOpen = useRightPanelStore((state) =>
-    selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, activeThreadRef, "inline"),
-  );
+  const threadPanelInlineOpen =
+    useRightPanelStore((state) =>
+      selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, activeThreadRef, "inline"),
+    ) && !mattrThreadRibbon;
   // Selects only the mode, so canvas resizes rerender the chat view only when the
   // card switches presentation.
-  const threadPanelPresentation = useStore(
+  const canvasThreadPanelPresentation = useStore(
     chatCanvasStore,
     (state) =>
       resolveChatCanvasModel({
@@ -2115,6 +2125,7 @@ export default function ChatView(props: ChatViewProps) {
         detailsCardInlineOpen: threadPanelInlineOpen,
       }).detailsCardMode,
   );
+  const threadPanelPresentation = mattrThreadRibbon ? "popover" : canvasThreadPanelPresentation;
   const threadPanelOpen = useRightPanelStore((state) =>
     selectThreadPanelOpen(
       state.threadPanelVisibilityByThreadKey,
@@ -2548,6 +2559,7 @@ export default function ChatView(props: ChatViewProps) {
     duplicateBrowserSurfaceStable,
     moveRightPanelSurfaceStable,
     onOpenToolDiffStable,
+    onToggleDiffStable,
     openChangesFromThreadPanelStable,
     openFileSurfaceStable,
     toggleRightPanelMaximizedStable,
@@ -2585,7 +2597,9 @@ export default function ChatView(props: ChatViewProps) {
     acknowledgeActiveThreadWoke,
     activeBranchMismatchKey,
     attentionNow,
-    workNow,
+    workNow: lifecycleWorkNow,
+    backgroundWorkNow,
+    mattrBackgroundWork,
     childInputNow,
     goalNow,
     handleSwitchCheckoutToThread,
@@ -2635,6 +2649,9 @@ export default function ChatView(props: ChatViewProps) {
     scrollToEnd,
     persistThreadSettingsForNextTurn,
   });
+  // The Whisper Pill lists background work, so the timeline's line for it would say it twice.
+  const workNow =
+    mattrThreadRibbon && lifecycleWorkNow === backgroundWorkNow ? null : lifecycleWorkNow;
   const activeThreadHasCompactableConversation = hasCompactableConversation({
     visibleTurnItems: serverVisibleTurnItems,
     hasMoreHistory: serverThreadHistory.hasMoreHistory,
@@ -2951,6 +2968,24 @@ export default function ChatView(props: ChatViewProps) {
       ...terminalShortcuts,
       ...rightPanelShortcuts,
       ...threadLifecycleShortcuts,
+      ...(mattrThreadRibbon && activeThreadKey !== null
+        ? {
+            "threadPanel.toggle": () => {
+              const pillVisible = document.querySelector("[data-mattr-whisper-pill]") !== null;
+              const ribbonAgentsVisible =
+                document.querySelector("[data-mattr-ribbon-chip='agents']") !== null;
+              if (
+                readMattrLineagePopover().threadKey === activeThreadKey ||
+                pillVisible ||
+                ribbonAgentsVisible
+              ) {
+                toggleMattrLineagePopover(activeThreadKey, pillVisible);
+              } else {
+                toggleThreadPanelStable();
+              }
+            },
+          }
+        : {}),
       "thread.copyReference": ({ event }) => {
         if (!event.repeat) copyActiveThreadReference();
       },
@@ -3538,7 +3573,7 @@ export default function ChatView(props: ChatViewProps) {
   const panelToggleControls = (
     <PanelLayoutControls
       {...panelToggleControlProps}
-      showThreadPanelControl={!inlineRightPanelOwnsTitleBar}
+      showThreadPanelControl={!inlineRightPanelOwnsTitleBar && !mattrThreadRibbon}
     />
   );
   const threadPanelHeaderControl = <ThreadPanelHeaderControl {...panelToggleControlProps} />;
@@ -3611,7 +3646,7 @@ export default function ChatView(props: ChatViewProps) {
               />
             ) : null}
             {!rightPanelControlsAtRoot && !rightPanelControlsInPanel ? panelLayoutControls : null}
-            {inlineRightPanelOwnsTitleBar ? threadPanelHeaderControl : null}
+            {inlineRightPanelOwnsTitleBar && !mattrThreadRibbon ? threadPanelHeaderControl : null}
             <ChatHeader
               activeThreadEnvironmentId={activeThread.environmentId}
               activeThreadId={activeThread.id}
@@ -3628,6 +3663,42 @@ export default function ChatView(props: ChatViewProps) {
                 : {})}
               {...(threadFindEnabled ? { onFindInThread: openThreadFindStable } : {})}
             />
+            {mattrThreadRibbon ? (
+              <MattrThreadRibbon
+                environmentId={activeThread.environmentId}
+                threadId={activeThread.id}
+                projectId={activeThread.projectId}
+                worktreePath={activeThread.worktreePath}
+                isServerThread={isServerThread}
+                {...(draftId ? { draftId } : {})}
+                composerDraftTarget={composerDraftTarget}
+                activeProjectName={activeProject?.title}
+                activeProjectScripts={activeProject ? activeProjectScripts : undefined}
+                preferredScriptId={
+                  activeProject ? (lastInvokedScriptByProjectId[activeProject.id] ?? null) : null
+                }
+                keybindings={keybindings}
+                availableEditors={availableEditors}
+                showOpenInPicker={showOpenInPicker}
+                openInShortcutEnabled={
+                  !(
+                    rightPanelOpen &&
+                    renderedRightPanelSurface?.kind === "file" &&
+                    renderedRightPanelSurface.attachment === undefined
+                  )
+                }
+                gitCwd={gitCwd}
+                workspaceMutationId={workspaceRevision.revision}
+                isGitRepo={isGitRepo}
+                onRunProjectScript={runProjectScriptStable}
+                onAddProjectScript={saveProjectScriptStable}
+                onUpdateProjectScript={updateProjectScriptStable}
+                onDeleteProjectScript={deleteProjectScriptStable}
+                {...(isServerThread && isGitRepo ? { onToggleChanges: onToggleDiffStable } : {})}
+                backgroundWork={mattrBackgroundWork}
+                rightPanelOpen={inlineRightPanelOwnsTitleBar}
+              />
+            ) : null}
           </header>
         )}
 
@@ -3843,6 +3914,13 @@ export default function ChatView(props: ChatViewProps) {
                         : undefined
                     }
                   >
+                    {mattrThreadRibbon && !isDraftHeroState && isServerThread ? (
+                      <MattrWhisperPill
+                        environmentId={activeThread.environmentId}
+                        threadId={activeThread.id}
+                        backgroundWork={mattrBackgroundWork}
+                      />
+                    ) : null}
                     <ChildThreadApprovals threadRef={activeThreadRef} />
                     <div className="relative">
                       <ComposerSurface.Shell

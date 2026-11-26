@@ -795,6 +795,15 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     // A Stop that went unanswered needs the user; one in progress is the thread's work.
     attentionNow: runStop?.state === "unresponsive" ? runStopNow : childInputNow,
     workNow: runStop?.state === "stopping" ? runStopNow : (quietRunNow ?? backgroundWorkNow),
+    backgroundWorkNow,
+    mattrBackgroundWork: {
+      tasks: activeBackgroundTasks,
+      onStop:
+        runIsLive || !canOperateThread || isStoppingBackgroundWork
+          ? null
+          : handleStopBackgroundWorkStable,
+      stopping: isStoppingBackgroundWork,
+    },
     childInputNow,
     goalNow,
     handleSwitchCheckoutToThread,

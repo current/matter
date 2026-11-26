@@ -17,6 +17,10 @@ import { MattrSidebarLayoutSetting } from "../sidebar/mattr/MattrSidebarLayoutSe
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { DEFAULT_MATTR_GOOEY_SEND, useMattrGooeySendSetting } from "../../mattrGooeySend";
+import {
+  DEFAULT_MATTR_THREAD_RIBBON,
+  useMattrThreadRibbonSetting,
+} from "../chat/mattrThreadRibbon.logic";
 import { MattrAiStatusSetting } from "./MattrAiStatusSetting";
 import {
   AppearanceSlider,
@@ -61,6 +65,7 @@ export function MattrShellAppearanceSettings() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const [gooeySend, setGooeySend] = useMattrGooeySendSetting();
+  const [threadRibbon, setThreadRibbon] = useMattrThreadRibbonSetting();
   const material = settings.shellMaterial;
   // Blur amount and glass style drive macOS-only native calls; Windows maps materials to
   // acrylic and mica, which have no such knobs.
@@ -306,6 +311,29 @@ export function MattrShellAppearanceSettings() {
             checked={gooeySend}
             onCheckedChange={(checked) => setGooeySend(Boolean(checked))}
             aria-label={gt("Gooey send button")}
+          />
+        }
+      />
+      <SettingsRow
+        id="mattr-thread-ribbon"
+        title={gt("Thread ribbon")}
+        description={gt(
+          "Show thread actions in the top bar and running agents above the composer. Turn off for the classic details card.",
+        )}
+        devicePreference
+        resetAction={
+          threadRibbon !== DEFAULT_MATTR_THREAD_RIBBON ? (
+            <SettingResetButton
+              ariaLabel={gt("Reset thread ribbon to default")}
+              onClick={() => setThreadRibbon(DEFAULT_MATTR_THREAD_RIBBON)}
+            />
+          ) : null
+        }
+        control={
+          <Switch
+            checked={threadRibbon}
+            onCheckedChange={(checked) => setThreadRibbon(Boolean(checked))}
+            aria-label={gt("Thread ribbon")}
           />
         }
       />

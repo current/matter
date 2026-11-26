@@ -1,0 +1,662 @@
+/* mattr Topbar Ribbon + Detached Whisper Pill (Doop "whisper pill" frames): the thread's chips in
+   the 38pt shell topbar and a 28px pill above the composer, in place of the docked Thread Details
+   card. Unlayered and scoped by data attributes, so it wins over the reused upstream controls'
+   Tailwind utilities without restyling their markup. Popups only exist while open, so the frosted
+   blur costs nothing at rest. */
+[data-mattr-ribbon],
+[data-mattr-whisper-pill-row],
+[data-mattr-frosted] {
+  --mr-chip: color-mix(in srgb, var(--foreground) 3.5%, transparent);
+  --mr-chip-hover: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --mr-chip-strong: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --mr-line: color-mix(in srgb, var(--foreground) 9%, transparent);
+  --mr-line-hover: color-mix(in srgb, var(--foreground) 14%, transparent);
+  --mr-text: color-mix(in srgb, var(--foreground) 86%, transparent);
+  --mr-muted: var(--muted-foreground);
+  --mr-row-hover: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --mr-add: var(--color-diff-addition-foreground, #3fb950);
+  --mr-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --mw-bg: #ffffff;
+  --mw-line: rgb(0 0 0 / 8%);
+  --mw-shadow: 0 1px 2px rgb(20 22 30 / 6%);
+}
+
+.dark :is([data-mattr-ribbon], [data-mattr-whisper-pill-row], [data-mattr-frosted]) {
+  --mw-bg: #1a1b1e;
+  --mw-line: rgb(255 255 255 / 8%);
+  --mw-shadow: none;
+}
+
+html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
+  --mw-bg: var(--app-theme-surface-raised, var(--card));
+  --mw-line: var(--app-theme-toolbar-border, var(--border));
+}
+
+:is([data-mattr-ribbon], [data-mattr-whisper-pill-row], [data-mattr-frosted]),
+:is([data-mattr-ribbon], [data-mattr-whisper-pill-row], [data-mattr-frosted]) * {
+  font-style: normal;
+}
+
+/* The title keeps the room the old reserved padding gave the window controls. */
+[data-chat-header] > :has(+ [data-mattr-ribbon]) {
+  padding-inline-end: 8px;
+}
+
+[data-mattr-ribbon] {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: var(--mattr-ribbon-controls-inset, 0px);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--mr-text);
+  -webkit-app-region: no-drag;
+}
+
+/* The subtle divider before the terminal and panel toggles. */
+[data-mattr-ribbon]:not([data-right-panel-open])::after {
+  content: "";
+  width: 1px;
+  height: 16px;
+  margin-inline-start: 4px;
+  background-color: var(--mr-line);
+}
+
+[data-mattr-ribbon-slot] {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+[data-mattr-ribbon-slot]:empty {
+  display: none;
+}
+
+/* Every chip: the reused control's group (split button) or lone button becomes one 26px chip. */
+[data-mattr-ribbon-slot] > :is([role="group"], button),
+[data-mattr-ribbon-chip] {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  min-height: 26px;
+  overflow: hidden;
+  border: 1px solid var(--mr-line);
+  border-radius: 7px;
+  background-color: var(--mr-chip);
+  box-shadow: none;
+  color: var(--mr-text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    translate 120ms ease;
+}
+
+[data-mattr-ribbon-slot] > :is([role="group"], button):hover,
+[data-mattr-ribbon-chip]:hover,
+[data-mattr-ribbon-chip][data-popup-open] {
+  border-color: var(--mr-line-hover);
+}
+
+[data-mattr-ribbon-slot] > button:hover,
+[data-mattr-ribbon-chip]:hover,
+[data-mattr-ribbon-chip][data-popup-open] {
+  background-color: var(--mr-chip-hover);
+}
+
+[data-mattr-ribbon-slot="git"] > :is([role="group"], button) {
+  background-color: var(--mr-chip-strong);
+}
+
+[data-mattr-ribbon-slot] :is(button, [role="group"])::before {
+  display: none;
+}
+
+/* The buttons inside a split chip lose their own frame and share the chip's. */
+[data-mattr-ribbon-slot] > [role="group"] > :is(button, [data-slot]):not([data-slot="separator"]),
+[data-mattr-ribbon-slot] > button,
+[data-mattr-ribbon-chip] {
+  gap: 5px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 8px;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+[data-mattr-ribbon-slot] > [role="group"] > :is(button, [data-slot]):not([data-slot="separator"]) {
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+}
+
+[data-mattr-ribbon-slot] > button,
+[data-mattr-ribbon-chip] {
+  border-radius: 7px;
+}
+
+[data-mattr-ribbon-slot]
+  > [role="group"]
+  > :is(button, [data-slot]):not([data-slot="separator"]):hover,
+[data-mattr-ribbon-slot] > [role="group"] > [data-popup-open] {
+  background-color: var(--mr-chip-hover);
+}
+
+/* The chevron half sits tight against the label, as one chip. */
+[data-mattr-ribbon-slot] > [role="group"] > :is(button, [data-slot]):last-child:not(:first-child) {
+  padding-inline: 2px 6px;
+}
+
+[data-mattr-ribbon-slot] > [role="group"] > :is([data-slot="separator"], span[aria-hidden="true"]) {
+  display: none;
+}
+
+[data-mattr-ribbon] svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+[data-mattr-ribbon-slot] > [role="group"] > :last-child:not(:first-child) svg,
+[data-mattr-ribbon-slot] svg[data-mattr-chevron] {
+  width: 12px;
+  height: 12px;
+  color: var(--mr-muted);
+}
+
+[data-mattr-ribbon-num] {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-ribbon-chip] [data-mattr-ribbon-icon] {
+  color: var(--mr-muted);
+}
+
+[data-mattr-ribbon-chip="more"] {
+  width: 26px;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* Editor and project action labels: the toolbar hides them below its old 48rem header query. */
+[data-mattr-ribbon][data-density="full"]
+  :is([data-mattr-ribbon-slot="openIn"], [data-mattr-ribbon-slot="scripts"])
+  button
+  > span.sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: nowrap;
+}
+
+/* The diff chip: only the +X -Y counts. */
+[data-mattr-ribbon-slot="diff"] > button > svg,
+[data-mattr-ribbon-slot="diff"] > button > span > :not(:last-child) {
+  display: none;
+}
+
+[data-mattr-ribbon-slot="diff"] > button > span,
+[data-mattr-ribbon-slot="diff"] > button > span > :last-child {
+  flex: none;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Git drops to its icon when the header gets narrow. */
+[data-mattr-ribbon][data-density="minimal"]
+  [data-mattr-ribbon-slot="git"]
+  [role="group"]
+  > button:first-child:not([aria-labelledby])
+  > span {
+  display: none;
+}
+
+/* Base UI sizes the git menu to its anchor; the Ribbon's chip is narrower than the card's row.
+   MattrThreadRibbon flags the open menu on <html>, since a document-wide :has() restyles the page. */
+html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="menu-popup"] {
+  min-width: 15rem;
+}
+
+/* Detached Whisper Pill: 8px above the composer card, aligned with its edge (shelf 4px + 1px). */
+[data-mattr-whisper-pill-row] {
+  display: flex;
+  padding-block-end: 8px;
+  padding-inline-start: 5px;
+  pointer-events: none;
+}
+
+[data-mattr-whisper-pill] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding-inline: 4px 9px;
+  border: 1px solid var(--mw-line);
+  border-radius: 999px;
+  background-color: var(--mw-bg);
+  box-shadow: var(--mw-shadow);
+  color: var(--mr-text);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+[data-mattr-whisper-pill]:hover,
+[data-mattr-whisper-pill][data-popup-open] {
+  border-color: var(--mr-line-hover);
+  background-color: color-mix(in srgb, var(--mw-bg) 94%, var(--foreground));
+}
+
+[data-mattr-whisper-pill]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+[data-mattr-whisper-avatars] {
+  display: inline-flex;
+  align-items: center;
+  padding-inline-start: 2px;
+}
+
+[data-mattr-whisper-avatar] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background-color: var(--mw-bg);
+  box-shadow: 0 0 0 1.5px var(--mw-bg);
+}
+
+[data-mattr-whisper-avatar] + [data-mattr-whisper-avatar] {
+  margin-inline-start: -5px;
+}
+
+[data-mattr-whisper-avatar] svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Status dots sit top right, ringed in the pill's own color, so none is covered by its neighbor. */
+:is([data-mattr-whisper-avatar], [data-mattr-lineage-row])
+  span[aria-hidden="true"].rounded-full:empty {
+  top: -2px;
+  right: -2px;
+  bottom: auto;
+  width: 7px;
+  height: 7px;
+  border-width: 1.5px;
+  border-color: var(--mw-bg);
+}
+
+[data-mattr-whisper-label] {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-whisper-timer] {
+  color: var(--mr-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-whisper-server] {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--mr-add) 14%, transparent);
+  color: var(--mr-add);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-whisper-chevron] {
+  width: 12px;
+  height: 12px;
+  color: var(--mr-muted);
+  transition: rotate 160ms var(--mr-ease);
+}
+
+[data-mattr-whisper-pill][data-popup-open] [data-mattr-whisper-chevron] {
+  rotate: 180deg;
+}
+
+/* Frosted popovers and menus: the blur exists only while a popup is mounted. */
+[data-mattr-frosted] {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--popover) 78%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  transition-property: scale, opacity, translate;
+  transition-duration: 160ms;
+  transition-timing-function: var(--mr-ease);
+}
+
+[data-mattr-frosted]::before {
+  border-radius: 11px;
+}
+
+[data-mattr-frosted]:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  scale: 0.97;
+}
+
+[data-mattr-frosted][data-side="top"]:is([data-starting-style], [data-ending-style]) {
+  translate: 0 4px;
+}
+
+[data-mattr-frosted][data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
+  translate: 0 -4px;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  [data-mattr-frosted] {
+    background: var(--popover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mattr-frosted],
+  [data-mattr-whisper-chevron],
+  [data-mattr-whisper-pill],
+  [data-mattr-ribbon-slot] > :is([role="group"], button),
+  [data-mattr-ribbon-chip] {
+    transition: none;
+  }
+
+  [data-mattr-frosted]:is([data-starting-style], [data-ending-style]) {
+    scale: 1;
+    translate: none;
+  }
+}
+
+/* Lineage popover body. */
+[data-mattr-lineage] {
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 2rem));
+  padding: 6px;
+  color: var(--mr-text);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+[data-mattr-lineage-header] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 2px 4px 4px 10px;
+}
+
+[data-mattr-lineage-title] {
+  color: var(--mr-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+:is([data-mattr-lineage-stop-all], [data-mattr-lineage-back]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding-inline: 7px;
+  border-radius: 6px;
+  color: var(--mr-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+:is([data-mattr-lineage-stop-all], [data-mattr-lineage-back]):hover:not(:disabled) {
+  background-color: var(--mr-row-hover);
+}
+
+:is([data-mattr-lineage-stop-all], [data-mattr-lineage-back]):disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+[data-mattr-lineage-stop-all] svg {
+  width: 8px;
+  height: 8px;
+  fill: currentColor;
+}
+
+[data-mattr-lineage-back] {
+  margin-inline-start: -6px;
+  color: var(--mr-muted);
+}
+
+[data-mattr-lineage-back] svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-mattr-lineage-rows] {
+  display: flex;
+  flex-direction: column;
+  max-height: min(60dvh, 15.5rem);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+[data-mattr-lineage-row] {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 31px;
+  padding-inline-end: 4px;
+  border-radius: 8px;
+  transition: background-color 120ms ease;
+}
+
+[data-mattr-lineage-row]:is(:hover, :focus-within) {
+  background-color: var(--mr-row-hover);
+}
+
+[data-mattr-lineage-row-open] {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  height: 100%;
+  padding-inline: 8px 4px;
+  border-radius: 8px;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+[data-mattr-lineage-row-open]:disabled {
+  cursor: default;
+}
+
+[data-mattr-lineage-row-open]:focus-visible,
+[data-mattr-lineage-row-stop]:focus-visible,
+[data-mattr-lineage-link]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+[data-mattr-lineage-row-glyph] {
+  width: 16px;
+  height: 16px;
+  color: var(--mr-muted);
+}
+
+[data-mattr-lineage-row] span[aria-hidden="true"].rounded-full:empty {
+  border-color: color-mix(in srgb, var(--popover) 90%, var(--foreground));
+}
+
+[data-mattr-lineage-row-title] {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:is([data-mattr-lineage-row-time], [data-mattr-lineage-row-meta]) {
+  flex-shrink: 0;
+  color: var(--mr-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-lineage-row-meta] {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-mattr-lineage-row-stop] {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background-color: var(--mr-chip-hover);
+  color: var(--mr-text);
+  cursor: pointer;
+  opacity: 1;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease;
+}
+
+[data-mattr-lineage-row-stop] svg {
+  width: 8px;
+  height: 8px;
+  fill: currentColor;
+}
+
+[data-mattr-lineage-row-stop]:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--destructive) 18%, transparent);
+  color: var(--destructive);
+}
+
+[data-mattr-lineage-row]:is(:hover, :focus-within) [data-mattr-lineage-row-stop],
+[data-mattr-lineage-row-stop][data-stopping] {
+  display: inline-flex;
+}
+
+@starting-style {
+  [data-mattr-lineage-row]:is(:hover, :focus-within) [data-mattr-lineage-row-stop] {
+    opacity: 0;
+  }
+}
+
+@media (hover: none) {
+  [data-mattr-lineage-row-stop] {
+    display: inline-flex;
+  }
+}
+
+[data-mattr-lineage-empty] {
+  margin: 0;
+  padding: 6px 10px 8px;
+  color: var(--mr-muted);
+  font-size: 12px;
+}
+
+[data-mattr-lineage-footer] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--mr-line);
+}
+
+[data-mattr-lineage-link] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding-inline: 8px 6px;
+  border-radius: 7px;
+  color: var(--mr-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+[data-mattr-lineage-link]:hover {
+  background-color: var(--mr-row-hover);
+  color: var(--mr-text);
+}
+
+[data-mattr-lineage-link] svg {
+  width: 13px;
+  height: 13px;
+}
+
+[data-mattr-lineage-link-label] {
+  color: var(--mr-text);
+}
+
+[data-mattr-lineage-link-count] {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-lineage-link-chevron] {
+  width: 12px;
+  height: 12px;
+}
+
+[data-mattr-lineage-drilldown] {
+  max-height: min(60dvh, 26rem);
+  overflow-y: auto;
+}
+
+/* The Ribbon's PR / issues popover reuses the details card's own rows. */
+[data-mattr-ribbon-panel] {
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 2rem));
+  max-height: min(60dvh, 26rem);
+  padding: 6px;
+  overflow-y: auto;
+}
+
+/* Reused controls tint their labels differently; in the Ribbon every label reads the same. */
+[data-mattr-ribbon-slot] button > span:not([aria-hidden="true"]) {
+  color: var(--mr-text);
+  font-weight: 500;
+}

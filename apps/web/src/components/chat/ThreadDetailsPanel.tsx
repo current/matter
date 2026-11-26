@@ -49,7 +49,7 @@ import {
 } from "./threadDetailsPanelStyles";
 import { Menu, MenuPopup } from "../ui/menu";
 
-interface ThreadDetailsPanelProps extends Pick<
+export interface ThreadDetailsPanelProps extends Pick<
   ComponentProps<typeof ThreadDetailsCard>,
   "anchor" | "handle"
 > {
