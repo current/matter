@@ -60,6 +60,7 @@ import { speechHttpApiLayer } from "./speech/http.ts";
 import { speechStreamRouteLayer } from "./speech/stream.ts";
 import * as VoiceAssistantService from "./voiceAssistant/VoiceAssistantService.ts";
 import * as MattrComposerPredictions from "./mattr/composerPredictions/MattrComposerPredictions.ts";
+import * as MattrDelegationInstructions from "./mattr/delegation/MattrDelegationInstructions.ts";
 import * as VoiceTtsService from "./voiceAssistant/VoiceTtsService.ts";
 import { layerMattrAddonsAndBots } from "./bots/botsHttp.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
@@ -935,6 +936,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(VoiceTtsService.layer),
     ),
     layerMattrAddonsAndBots,
+    MattrDelegationInstructions.layer,
   ),
   McpHttpServer.layer.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),

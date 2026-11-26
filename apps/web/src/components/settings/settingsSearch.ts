@@ -341,6 +341,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     environmentOnly: true,
   },
   {
+    id: "mattr-multi-provider-delegation",
+    title: msg("Multi-provider delegation"),
+    to: "/settings/threads",
+    scope: "environment-defaults",
+    searchTerms: [msg("subagent delegate parallel subscription account usage quota provider")],
+    environmentOnly: true,
+  },
+  {
     id: "default-permissions",
     title: msg("Permissions"),
     to: "/settings/threads",

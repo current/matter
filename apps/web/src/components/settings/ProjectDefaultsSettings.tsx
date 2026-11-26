@@ -26,6 +26,7 @@ import { TraitsPicker } from "../chat/TraitsPicker";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { toastManager } from "../ui/toast";
 import { Switch } from "../ui/switch";
+import { MattrDelegationSettings } from "./MattrDelegationSettings";
 import { MattrSwitchableAccounts } from "./MattrSwitchableAccounts";
 import { resolveDefaultModelSettingsPresentation } from "./ProjectDefaultsSettings.logic";
 import type { ProjectSettingsCategory } from "./ProjectSettingsPanel";
@@ -398,6 +399,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
           {modelRow}
           {fallbackRow}
           {availableAccountsRow}
+          <MattrDelegationSettings entries={entries} disabled={unavailable} />
           {workspaceRow}
         </>
       ) : category === "general" ? (
@@ -405,6 +407,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
           {modelRow}
           {fallbackRow}
           {availableAccountsRow}
+          <MattrDelegationSettings entries={entries} disabled={unavailable} />
           <SettingsRow
             serverScoped
             settingKeys={["defaultRuntimeMode"]}

@@ -1539,6 +1539,14 @@ export const ServerSettings = Schema.Struct({
   fallbackExcludedInstanceIds: Schema.Array(ProviderInstanceId).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  /** mattr: agents spread delegated subagents across every enabled subscription by usage left. */
+  mattrMultiProviderDelegation: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(true)),
+  ),
+  /** mattr: instances agents never delegate to; picking one by hand still works. */
+  mattrDelegationExcludedInstanceIds: Schema.Array(ProviderInstanceId).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
   defaultRuntimeMode: RuntimeMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE)),
   ),
@@ -2004,6 +2012,8 @@ export const ServerSettingsPatch = Schema.Struct({
   fallbackModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   fallbackToAvailableAccounts: Schema.optionalKey(Schema.Boolean),
   fallbackExcludedInstanceIds: Schema.optionalKey(Schema.Array(ProviderInstanceId)),
+  mattrMultiProviderDelegation: Schema.optionalKey(Schema.Boolean),
+  mattrDelegationExcludedInstanceIds: Schema.optionalKey(Schema.Array(ProviderInstanceId)),
   /** Replaces each project's override set; null removes it. Omitted providerInstances retains its stored value. */
   projectSettingsOverrides: Schema.optionalKey(
     Schema.Record(

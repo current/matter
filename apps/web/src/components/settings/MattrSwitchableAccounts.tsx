@@ -4,16 +4,18 @@ import { useGT } from "gt-react";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { Checkbox } from "../ui/checkbox";
 
-/** mattr: which instances automatic account switching may move work onto. */
+/** mattr: which instances automatic account switching (or delegation) may move work onto. */
 export function MattrSwitchableAccounts({
   entries,
   excludedInstanceIds,
   disabled,
+  legend,
   onChange,
 }: {
   readonly entries: ReadonlyArray<ProviderInstanceEntry>;
   readonly excludedInstanceIds: ReadonlyArray<ProviderInstanceId>;
   readonly disabled: boolean;
+  readonly legend?: string;
   readonly onChange: (excludedInstanceIds: ReadonlyArray<ProviderInstanceId>) => void;
 }) {
   const gt = useGT();
@@ -21,7 +23,9 @@ export function MattrSwitchableAccounts({
   if (candidates.length === 0) return null;
   return (
     <fieldset className="mt-2 mb-2 border-l-2 border-border/60 ps-3">
-      <legend className="pb-1 text-xs text-muted-foreground">{gt("Can be switched to")}</legend>
+      <legend className="pb-1 text-xs text-muted-foreground">
+        {legend ?? gt("Can be switched to")}
+      </legend>
       <ul>
         {candidates.map((entry) => (
           <li key={entry.instanceId}>

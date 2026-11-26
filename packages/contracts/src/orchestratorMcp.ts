@@ -691,6 +691,8 @@ export const OrchestratorMcpProviderCapability = Schema.Struct({
   canRunChildTask: Schema.Boolean,
   canRunCrossProviderChildTask: Schema.Boolean,
   constraints: Schema.Array(Schema.String),
+  /** mattr: the user keeps this instance out of delegate_task. */
+  excludedFromDelegation: Schema.optional(Schema.Boolean),
 });
 export type OrchestratorMcpProviderCapability = typeof OrchestratorMcpProviderCapability.Type;
 
@@ -1019,6 +1021,7 @@ export class OrchestratorMcpFailure extends Schema.TaggedError<OrchestratorMcpFa
       "orchestration_error",
       "thread_credential_required",
       "target_required",
+      "instance_excluded",
     ]),
     message: Schema.String,
   },

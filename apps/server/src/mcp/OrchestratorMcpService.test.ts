@@ -3520,7 +3520,10 @@ describe("OrchestratorMcpService provider resolution", () => {
         Layer.mock(SecretRequests.SecretRequests)({}),
         Layer.mock(RemoteDelegation.RemoteDelegation)({}),
         Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
-        ServerSettings.layerTest({ agentUsageLimitsVisible: !hidden }),
+        ServerSettings.layerTest({
+          agentUsageLimitsVisible: !hidden,
+          mattrMultiProviderDelegation: false,
+        }),
       );
 
       yield* Effect.gen(function* () {
