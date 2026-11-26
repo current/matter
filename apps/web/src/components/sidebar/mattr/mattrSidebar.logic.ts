@@ -125,6 +125,36 @@ export function toMattrThreadItem(
 }
 
 /**
+ * Provider-native subagent threads still working. They have no run of their own, so their shells
+ * stay idle (fresh or resumed); the parent's pending background work names them by child thread.
+ */
+export function workingNativeSubagentKeys(
+  threads: ReadonlyArray<Pick<EnvironmentThreadShell, "environmentId" | "pendingBackgroundTasks">>,
+): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const thread of threads) {
+    for (const task of thread.pendingBackgroundTasks) {
+      if (task.kind !== "subagent" || task.childThreadId == null) continue;
+      keys.add(scopedThreadKey(scopeThreadRef(thread.environmentId, task.childThreadId)));
+    }
+  }
+  return keys;
+}
+
+/** Shows those subagent threads as running, since their latest message (the launch or resume). */
+export function withNativeSubagentWork<T extends MattrThreadItem>(
+  items: ReadonlyArray<T>,
+  workingKeys: ReadonlySet<string>,
+): ReadonlyArray<T> {
+  if (workingKeys.size === 0) return items;
+  return items.map((item) =>
+    !workingKeys.has(item.key) || item.attention === "needs" || item.attention === "running"
+      ? item
+      : { ...item, attention: "running", runningSince: item.activityAt },
+  );
+}
+
+/**
  * Threads with a subagent or delegated task still running anywhere below them, keyed to when
  * the earliest of those runs started. Walks `parentKey` up from each running thread, so a
  * grandchild counts for every ancestor; a lineage cycle stops at the first repeat.

@@ -7,7 +7,9 @@ import {
   resolveProjectAttention,
   toMattrThreadItem,
   withDescendantWork,
+  withNativeSubagentWork,
   workingDescendantSince,
+  workingNativeSubagentKeys,
   type MattrThreadItem,
 } from "./mattrSidebar.logic";
 import { buildTimelineBuckets } from "./mattrTimelineSidebar.logic";
@@ -135,5 +137,40 @@ describe("descendant work", () => {
       filter: "all",
     });
     expect(groups[0]!.items[0]!.attention).toBe("running");
+  });
+
+  // A provider-native subagent has no run of its own, so its shell stays idle while it works,
+  // fresh or resumed with SendMessage; its parent's pending background work names it.
+  it("lifts a provider-native subagent its parent still waits on, and the parent with it", () => {
+    const parentShell = makeThreadFixture({
+      id: ThreadId.make("Parent"),
+      pendingBackgroundTasks: [
+        {
+          taskId: "a23fce52fceecdff9",
+          kind: "subagent",
+          description: "Fix findings",
+          childThreadId: ThreadId.make("Child"),
+        },
+        { taskId: "dev-server", kind: "command", description: "vite" },
+      ],
+    });
+    const child = subagentOf("Parent", "Child", {
+      latestUserMessageAt: "2026-03-10T14:50:00.000Z",
+    });
+    const finished = subagentOf("Parent", "Finished");
+    expect(child.attention).not.toBe("running");
+
+    const working = workingNativeSubagentKeys([parentShell]);
+    const children = withNativeSubagentWork([child, finished], working);
+    expect(children.map((entry) => entry.attention)).toEqual(["running", finished.attention]);
+    expect(children[0]!.runningSince).toBe("2026-03-10T14:50:00.000Z");
+    const [lifted] = lift([parent], children).items;
+    expect(lifted).toMatchObject({
+      attention: "running",
+      runningSince: "2026-03-10T14:50:00.000Z",
+    });
+
+    const done = withNativeSubagentWork([child], workingNativeSubagentKeys([makeThreadFixture()]));
+    expect(lift([parent], done).items[0]).toBe(parent);
   });
 });

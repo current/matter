@@ -1,8 +1,10 @@
 import {
+  isOrchestrationV2WorkActive,
   NodeId,
   CommandId,
   OrchestrationV2DomainEvent,
   OrchestrationV2StoredEvent,
+  type OrchestrationV2AppThread,
   type OrchestrationV2PlanArtifact,
   type OrchestrationV2Run,
   type OrchestrationV2Subagent,
@@ -347,13 +349,15 @@ export const layer: Layer.Layer<
     );
 
     /** Providers may reveal native subagent models late; lock full-row updates against concurrent thread commands. */
-    const syncSubagentThreadModel = Effect.fn("ProviderEventIngestor.syncSubagentThreadModel")(
+    const syncSubagentThreadState = Effect.fn("ProviderEventIngestor.syncSubagentThreadState")(
       function* (input: ProviderEventIngestInput, subagent: OrchestrationV2Subagent) {
         const { childThreadId, model } = subagent;
+        const reportsModel = model !== null || subagent.modelSelection !== undefined;
+        const working = isOrchestrationV2WorkActive(subagent.status);
         if (
           subagent.origin !== "provider_native" ||
           childThreadId === null ||
-          (model === null && subagent.modelSelection === undefined)
+          (!reportsModel && !working)
         ) {
           return [];
         }
@@ -362,9 +366,19 @@ export const layer: Layer.Layer<
           (model === null || model === modelSelection.model
             ? modelSelection
             : { instanceId: modelSelection.instanceId, model });
+        const staleModel = (thread: OrchestrationV2AppThread) =>
+          reportsModel && !modelSelectionsEqual(thread.modelSelection, reportedSelection(thread));
+        // A task started again (Claude's SendMessage resume) after its thread settled reopens it,
+        // as a new run unsettles a settled thread. Settling during that run is left alone.
+        const settledBeforeStart = (thread: OrchestrationV2AppThread) =>
+          working &&
+          thread.settledOverride === "settled" &&
+          thread.settledAt !== null &&
+          subagent.startedAt !== null &&
+          DateTime.isLessThan(thread.settledAt, subagent.startedAt);
         const staleThread = projections.getThread(childThreadId).pipe(
           Effect.map((thread) =>
-            modelSelectionsEqual(thread.modelSelection, reportedSelection(thread)) ? null : thread,
+            staleModel(thread) || settledBeforeStart(thread) ? thread : null,
           ),
           Effect.catchTags({ ProjectionStoreThreadNotFoundError: () => Effect.succeed(null) }),
         );
@@ -375,17 +389,31 @@ export const layer: Layer.Layer<
             const thread = yield* staleThread;
             if (thread === null) return [];
             const now = yield* DateTime.now;
-            const event = yield* makeDomainEvent(input, {
-              type: "thread.model-selection-updated",
-              threadId: thread.id,
-              payload: {
-                ...thread,
-                modelSelection: reportedSelection(thread),
-                updatedAt: now,
-              },
-              occurredAt: now,
-            });
-            return yield* eventSink.write({ events: [event] }).pipe(retryLockTimeout);
+            const events: Array<OrchestrationV2DomainEvent> = [];
+            let next = thread;
+            if (staleModel(thread)) {
+              next = { ...next, modelSelection: reportedSelection(thread), updatedAt: now };
+              events.push(
+                yield* makeDomainEvent(input, {
+                  type: "thread.model-selection-updated",
+                  threadId: thread.id,
+                  payload: next,
+                  occurredAt: now,
+                }),
+              );
+            }
+            if (settledBeforeStart(thread)) {
+              next = { ...next, settledOverride: null, settledAt: null, unsettledAt: now };
+              events.push(
+                yield* makeDomainEvent(input, {
+                  type: "thread.unsettled",
+                  threadId: thread.id,
+                  payload: { ...next, updatedAt: now },
+                  occurredAt: now,
+                }),
+              );
+            }
+            return yield* eventSink.write({ events }).pipe(retryLockTimeout);
           }),
         );
       },
@@ -876,7 +904,7 @@ export const layer: Layer.Layer<
               Effect.flatMap((storedEvents) =>
                 storedEvents.length === 0 || input.event.type !== "subagent.updated"
                   ? Effect.succeed(storedEvents)
-                  : syncSubagentThreadModel(input, input.event.subagent).pipe(
+                  : syncSubagentThreadState(input, input.event.subagent).pipe(
                       Effect.map((synced) => [...storedEvents, ...synced]),
                       Effect.mapError(
                         (cause) =>
