@@ -42,7 +42,7 @@ export function buildIslandHtml(): string {
     --muted: rgba(245, 245, 247, 0.6);
     --subtle: rgba(245, 245, 247, 0.5);
     --line: rgba(255, 255, 255, 0.08);
-    --surface: rgba(255, 255, 255, 0.07);
+    --surface: rgba(255, 255, 255, 0.09);
     --surface-hover: rgba(255, 255, 255, 0.12);
     --amber: #ff9f0a;
     --red: #ff453a;
@@ -101,6 +101,7 @@ export function buildIslandHtml(): string {
   .glyph { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg); }
   .glyph svg { width: 16px; height: 16px; fill: currentColor; }
   .glyph.monogram { flex: none; font-weight: 600; font-size: 9.5px; line-height: 1; border-radius: 4px; background: none; border: 1.25px solid rgba(255,255,255,0.55); }
+  .ring-wrap { display: inline-flex; }
   .ring { width: 16px; height: 16px; }
   .ring circle { fill: none; stroke-width: 2.25; }
   .dots { display: flex; gap: 3px; }
@@ -153,7 +154,7 @@ export function buildIslandHtml(): string {
   .btn.primary:hover { background: rgba(255,255,255,0.86); }
   .btn.small { height: 24px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
   .btn kbd { font: inherit; font-weight: 450; opacity: 0.5; margin-left: 5px; }
-  .btn kbd.sym { font-family: "SF Pro Text", -apple-system, "Apple Symbols", sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 0; opacity: 0.6; }
+  .btn kbd.sym { font-family: "SF Pro Text", -apple-system, "Apple Symbols", sans-serif; font-size: 12px; font-weight: 400; letter-spacing: 0.04em; opacity: 0.6; }
   .btn.primary[disabled] { background: var(--surface); color: var(--subtle); }
   .btn.primary[disabled]:hover { background: var(--surface); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
@@ -169,7 +170,7 @@ export function buildIslandHtml(): string {
     padding: 8px 10px; color: var(--fg); white-space: pre-wrap; word-break: break-word; display: -webkit-box;
     -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .muted { color: var(--muted); }
-  .reason { color: var(--muted); font-size: 12px; margin: 6px 2px 0; text-wrap: balance; }
+  .reason { color: var(--muted); font-size: 12px; margin: 6px 2px 0; text-wrap: pretty; }
   .options { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: 248px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
   .options.has-more { mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent); }
   .option { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; text-align: left; }
@@ -199,13 +200,13 @@ export function buildIslandHtml(): string {
   .target span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .target svg { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   .target:hover { background: var(--surface-hover); }
-  .badge { height: 20px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center;
+  .badge { height: 24px; padding: 0 8px; border-radius: 8px; font-size: 11px; font-weight: 500; display: inline-flex; align-items: center;
     background: rgba(255,255,255,0.14); }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 4px 0 9px; border-radius: 8px;
     background: var(--surface); font-size: 12px; max-width: 220px; }
   .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chip button { width: 18px; height: 18px; border-radius: 5px; color: var(--muted); }
+  .chip button { width: 18px; height: 18px; border-radius: 5px; color: var(--muted); font-size: 14px; line-height: 1; }
   .chip button:hover { background: var(--surface-hover); color: var(--fg); }
   .composer-foot { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
   .composer-foot .hint { flex: 1; padding-left: 2px; color: var(--subtle); font-size: 11.5px; }
@@ -406,9 +407,9 @@ export function buildIslandHtml(): string {
           const r = 6.5, c = 2 * Math.PI * r;
           const done = c * Math.min(1, w.progress.completed / w.progress.total);
           return { key: "ring:" + w.progress.completed + "/" + w.progress.total, html:
-            '<svg class="ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="' + r + '" stroke="rgba(255,255,255,0.22)"/>' +
+            '<span class="ring-wrap"><svg class="ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="' + r + '" stroke="rgba(255,255,255,0.22)"/>' +
             '<circle cx="8" cy="8" r="' + r + '" stroke="#f5f5f7" stroke-linecap="round" stroke-dasharray="' + done.toFixed(2) + " " + c.toFixed(2) +
-            '" transform="rotate(-90 8 8)"/></svg>' };
+            '" transform="rotate(-90 8 8)"/></svg></span>' };
         }
         const lit = w.step % 3;
         return { key: "dots:" + lit, html: '<span class="dots">' + [0, 1, 2].map((i) => "<i" + (i === lit ? ' class="on"' : "") + "></i>").join("") + "</span>" };
@@ -562,7 +563,7 @@ export function buildIslandHtml(): string {
     if (!t) return "No target";
     if (t.kind === "new-thread") return "New thread";
     if (t.kind === "task") return "Task";
-    return "→ " + (M.threadTitle(snapshot, t.environmentId + ":" + t.threadId) || "Thread");
+    return M.threadTitle(snapshot, t.environmentId + ":" + t.threadId) || "Thread";
   }
 
   function ensureTarget() {
@@ -598,7 +599,7 @@ export function buildIslandHtml(): string {
 
   function glanceStatus(thread) {
     const tone = thread.status === "running" ? "running" : thread.status === "approval" || thread.status === "input" ? "needs"
-      : thread.status === "failed" ? "failed" : thread.status === "done" ? "done" : null;
+      : thread.status === "failed" ? "failed" : null;
     const age = '<span class="meta' + (tone === "running" ? " running" : "") + '">' + relTime(thread.updatedAt) + "</span>";
     return '<span class="status">' + (tone ? '<span class="state-dot ' + tone + '"></span>' : "") + age + "</span>";
   }
