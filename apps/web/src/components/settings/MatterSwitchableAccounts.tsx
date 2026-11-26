@@ -4,8 +4,8 @@ import { useGT } from "gt-react";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { Checkbox } from "../ui/checkbox";
 
-/** mattr: which instances automatic account switching (or delegation) may move work onto. */
-export function MattrSwitchableAccounts({
+/** Matter: which instances automatic account switching (or delegation) may move work onto. */
+export function MatterSwitchableAccounts({
   entries,
   excludedInstanceIds,
   disabled,

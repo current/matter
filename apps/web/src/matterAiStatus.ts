@@ -6,15 +6,15 @@ import { toolGroupAction } from "@t3tools/client-runtime/work-log/presentation";
 import type { TimelineRow } from "./components/chat/timelineRowContext";
 import { readLocalStorageValue, useLocalStorage } from "./hooks/useLocalStorage";
 
-export const MATTR_AI_STATUS_STYLE_STORAGE_KEY = "mattr:ai-status-style:v1";
+export const MATTER_AI_STATUS_STYLE_STORAGE_KEY = "mattr:ai-status-style:v1";
 
-export const MattrAiStatusStyle = Schema.Literals(["default", "rareui"]);
-export type MattrAiStatusStyle = typeof MattrAiStatusStyle.Type;
+export const MatterAiStatusStyle = Schema.Literals(["default", "rareui"]);
+export type MatterAiStatusStyle = typeof MatterAiStatusStyle.Type;
 
-export const DEFAULT_MATTR_AI_STATUS_STYLE: MattrAiStatusStyle = "default";
+export const DEFAULT_MATTER_AI_STATUS_STYLE: MatterAiStatusStyle = "default";
 
-export const MATTR_AI_STATUS_STYLES: ReadonlyArray<{
-  readonly id: MattrAiStatusStyle;
+export const MATTER_AI_STATUS_STYLES: ReadonlyArray<{
+  readonly id: MatterAiStatusStyle;
   readonly name: string;
   readonly description: string;
 }> = [
@@ -32,24 +32,24 @@ export const MATTR_AI_STATUS_STYLES: ReadonlyArray<{
   },
 ];
 
-export function readMattrAiStatusStyle(): MattrAiStatusStyle {
+export function readMatterAiStatusStyle(): MatterAiStatusStyle {
   return readLocalStorageValue(
-    MATTR_AI_STATUS_STYLE_STORAGE_KEY,
-    DEFAULT_MATTR_AI_STATUS_STYLE,
-    MattrAiStatusStyle,
+    MATTER_AI_STATUS_STYLE_STORAGE_KEY,
+    DEFAULT_MATTER_AI_STATUS_STYLE,
+    MatterAiStatusStyle,
   );
 }
 
-export function useMattrAiStatusStyle() {
+export function useMatterAiStatusStyle() {
   return useLocalStorage(
-    MATTR_AI_STATUS_STYLE_STORAGE_KEY,
-    DEFAULT_MATTR_AI_STATUS_STYLE,
-    MattrAiStatusStyle,
+    MATTER_AI_STATUS_STYLE_STORAGE_KEY,
+    DEFAULT_MATTER_AI_STATUS_STYLE,
+    MatterAiStatusStyle,
   );
 }
 
 /** What the agent is doing during a live turn. */
-export type MattrAiStatusPhase =
+export type MatterAiStatusPhase =
   | "thinking"
   | "searching"
   | "reading"
@@ -64,7 +64,7 @@ export type MattrAiStatusPhase =
   | "setup";
 
 /** The RareUI icon a status draws; `done` only ends the Settings preview. */
-export type MattrAiStatusIcon =
+export type MatterAiStatusIcon =
   | "thinking"
   | "researching"
   | "analyzing"
@@ -72,9 +72,9 @@ export type MattrAiStatusIcon =
   | "input"
   | "done";
 
-export const MATTR_AI_STATUS_PHASES: Record<
-  MattrAiStatusPhase,
-  { readonly label: string; readonly icon: MattrAiStatusIcon; readonly active: boolean }
+export const MATTER_AI_STATUS_PHASES: Record<
+  MatterAiStatusPhase,
+  { readonly label: string; readonly icon: MatterAiStatusIcon; readonly active: boolean }
 > = {
   thinking: { label: msg("Thinking", { $context: "AI status" }), icon: "thinking", active: true },
   searching: {
@@ -120,7 +120,7 @@ export const MATTR_AI_STATUS_PHASES: Record<
 
 type WorkLiveRow = Extract<TimelineRow, { kind: "work-live" }>;
 
-function toolPhase(entry: WorkLiveRow["entry"]): MattrAiStatusPhase {
+function toolPhase(entry: WorkLiveRow["entry"]): MatterAiStatusPhase {
   if (entry.itemType === "reasoning") return "thinking";
   switch (toolGroupAction(entry)) {
     case "read":
@@ -142,14 +142,14 @@ function toolPhase(entry: WorkLiveRow["entry"]): MattrAiStatusPhase {
 }
 
 /** The live turn's phase, read from the rows after its working indicator. */
-export function deriveMattrAiStatusPhase(
+export function deriveMatterAiStatusPhase(
   rows: ReadonlyArray<TimelineRow>,
   activity: {
     readonly awaitingUser: boolean;
     readonly compacting: boolean;
     readonly preparingWorktree: boolean;
   },
-): MattrAiStatusPhase {
+): MatterAiStatusPhase {
   if (activity.awaitingUser) return "input";
   if (activity.preparingWorktree) return "setup";
   if (activity.compacting) return "compacting";
@@ -171,16 +171,16 @@ export function deriveMattrAiStatusPhase(
   return "thinking";
 }
 
-export const MattrAiStatusPhaseCtx = createContext<MattrAiStatusPhase>("thinking");
+export const MatterAiStatusPhaseCtx = createContext<MatterAiStatusPhase>("thinking");
 
-export interface MattrThinkingCoordination {
+export interface MatterThinkingCoordination {
   /** Plain thinking row sits directly under the working row, which already renders RareUI Thinking. */
   readonly suppressPlainThinkingRow: boolean;
   /** A visible thinking row owns the live status (e.g. below a reply/steer or with custom content). */
   readonly thinkingRowOwnsStatus: boolean;
 }
 
-const DEFAULT_THINKING_COORDINATION: MattrThinkingCoordination = {
+const DEFAULT_THINKING_COORDINATION: MatterThinkingCoordination = {
   suppressPlainThinkingRow: false,
   thinkingRowOwnsStatus: false,
 };
@@ -189,7 +189,7 @@ const DEFAULT_THINKING_COORDINATION: MattrThinkingCoordination = {
  * Coordinates the top working row and bottom thinking row in RareUI mode so a turn never shows
  * duplicate "Thinking" indicators (at turn start, or above and below a reply / steer).
  */
-export function deriveMattrThinkingCoordination(
+export function deriveMatterThinkingCoordination(
   rows: ReadonlyArray<TimelineRow>,
   activity: {
     readonly awaitingUser: boolean;
@@ -200,7 +200,7 @@ export function deriveMattrThinkingCoordination(
     readonly providerStartingLabel: boolean;
     readonly liveAnswerPreview: boolean;
   },
-): MattrThinkingCoordination {
+): MatterThinkingCoordination {
   if (activity.isPreparingWorktree || activity.isCompacting) {
     return DEFAULT_THINKING_COORDINATION;
   }
@@ -232,6 +232,6 @@ export function deriveMattrThinkingCoordination(
   return { suppressPlainThinkingRow: false, thinkingRowOwnsStatus: true };
 }
 
-export const MattrThinkingCoordinationCtx = createContext<MattrThinkingCoordination>(
+export const MatterThinkingCoordinationCtx = createContext<MatterThinkingCoordination>(
   DEFAULT_THINKING_COORDINATION,
 );

@@ -4,34 +4,34 @@ import { SettingResetButton, SettingsRow } from "../../settings/settingsLayout";
 import { Switch } from "../../ui/switch";
 import { Toggle, ToggleGroup } from "../../ui/toggle-group";
 import {
-  DEFAULT_MATTR_SIDEBAR_LAYOUT,
-  MattrSidebarLayout,
-  useMattrSidebarLayout,
-  useMattrTimelineSubagents,
-} from "./mattrSidebarStore";
+  DEFAULT_MATTER_SIDEBAR_LAYOUT,
+  MatterSidebarLayout,
+  useMatterSidebarLayout,
+  useMatterTimelineSubagents,
+} from "./matterSidebarStore";
 import * as Schema from "effect/Schema";
 
-const isMattrSidebarLayout = Schema.is(MattrSidebarLayout);
+const isMatterSidebarLayout = Schema.is(MatterSidebarLayout);
 
 /** Settings → Appearance rows choosing the sidebar body; saved on this device. */
-export function MattrSidebarLayoutSetting() {
+export function MatterSidebarLayoutSetting() {
   const gt = useGT();
-  const [layout, setLayout] = useMattrSidebarLayout();
-  const [showSubagents, setShowSubagents] = useMattrTimelineSubagents();
+  const [layout, setLayout] = useMatterSidebarLayout();
+  const [showSubagents, setShowSubagents] = useMatterTimelineSubagents();
   return (
     <>
       <SettingsRow
-        id="mattr-sidebar-layout"
+        id="matter-sidebar-layout"
         title={gt("Sidebar layout")}
         description={gt(
           "The default groups threads by project with their subagents nested. Spaces shows one project at a time. Timeline lists threads by day with their branch and pull request. Classic keeps the original sidebar.",
         )}
         devicePreference
         resetAction={
-          layout !== DEFAULT_MATTR_SIDEBAR_LAYOUT ? (
+          layout !== DEFAULT_MATTER_SIDEBAR_LAYOUT ? (
             <SettingResetButton
               ariaLabel={gt("Reset sidebar layout to default")}
-              onClick={() => setLayout(DEFAULT_MATTR_SIDEBAR_LAYOUT)}
+              onClick={() => setLayout(DEFAULT_MATTER_SIDEBAR_LAYOUT)}
             />
           ) : null
         }
@@ -42,7 +42,7 @@ export function MattrSidebarLayoutSetting() {
             value={[layout]}
             onValueChange={(next) => {
               const value = next[0];
-              if (isMattrSidebarLayout(value)) setLayout(value);
+              if (isMatterSidebarLayout(value)) setLayout(value);
             }}
           >
             <Toggle value="inbox">{gt("Default")}</Toggle>
@@ -54,7 +54,7 @@ export function MattrSidebarLayoutSetting() {
       />
       {layout === "timeline" ? (
         <SettingsRow
-          id="mattr-timeline-subagents"
+          id="matter-timeline-subagents"
           title={gt("Show active subagents")}
           description={gt(
             "Nest a thread's running subagents under it. Each one leaves the list when it finishes.",

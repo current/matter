@@ -5,10 +5,10 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 import { Kbd } from "../ui/kbd";
-import { isPredictionClamped } from "./promptPrediction.mattr";
+import { isPredictionClamped } from "./promptPrediction.matter";
 
 /**
- * mattr: the predicted next message as composer ghost text, clamped to three lines. The accept
+ * Matter: the predicted next message as composer ghost text, clamped to three lines. The accept
  * chip follows the last word; once the text is clamped it floats to the end of the third line,
  * after the ellipsis, so it never drops out of view or grows the composer.
  */
@@ -41,7 +41,7 @@ function PredictionGhostText(props: { readonly text: string; readonly onAccept: 
       type="button"
       tabIndex={-1}
       aria-label={gt("Use suggested prompt")}
-      data-mattr-prediction-chip=""
+      data-matter-prediction-chip=""
       className={cn(
         "pointer-events-auto relative inline-flex cursor-pointer rounded align-[1px] [&:hover_kbd]:text-foreground",
         // A larger invisible hit area for touch, without moving the chip.
@@ -63,7 +63,7 @@ function PredictionGhostText(props: { readonly text: string; readonly onAccept: 
     <span className="flex min-w-0">
       <span
         ref={textRef}
-        data-mattr-prediction-ghost=""
+        data-matter-prediction-ghost=""
         className="line-clamp-3 min-w-0 [overflow-wrap:anywhere]"
       >
         {clamped ? <span aria-hidden className="float-right h-[calc(100%-1lh)]" /> : null}

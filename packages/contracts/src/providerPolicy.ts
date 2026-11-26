@@ -42,7 +42,7 @@ const RUNTIME_MODE_RANK: Record<RuntimeMode, number> = {
 export const isRuntimeModeAbove = (mode: RuntimeMode, ceiling: RuntimeMode | undefined): boolean =>
   ceiling !== undefined && RUNTIME_MODE_RANK[mode] > RUNTIME_MODE_RANK[ceiling];
 
-/** `goal` runs with `default`'s authority plus autonomous end-to-end instructions (mattr). */
+/** `goal` runs with `default`'s authority plus autonomous end-to-end instructions (Matter). */
 export const ProviderInteractionMode = Schema.Literals(["default", "plan", "goal"]);
 export type ProviderInteractionMode = typeof ProviderInteractionMode.Type;
 export const DEFAULT_PROVIDER_INTERACTION_MODE: ProviderInteractionMode = "default";

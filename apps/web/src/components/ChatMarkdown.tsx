@@ -208,12 +208,12 @@ import type { Element as HastElement } from "hast";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
 import { collectComposerModelMentions } from "@t3tools/client-runtime/composer-model-mentions";
 import { splitMarkdownBlocks } from "./chat/markdownStreamBlocks";
-import { mattrStreamHast } from "./chat/mattrStreamHast";
+import { matterStreamHast } from "./chat/matterStreamHast";
 import {
-  type MattrAnimatedStream,
-  useMattrStreamingText,
+  type MatterAnimatedStream,
+  useMatterStreamingText,
   useSettledOpeningStreamText,
-} from "../mattrStreamAnimation";
+} from "../matterStreamAnimation";
 import { MarkdownMermaidCodeBlock } from "./chat/MarkdownMermaidCodeBlock";
 import { MarkdownTable } from "./chat/MarkdownTable";
 import { MarkdownDetails } from "./chat/MarkdownDetails";
@@ -2071,7 +2071,7 @@ const MarkdownSource = memo(function MarkdownSource({
   markdown: WordsHastOptions;
   /** The text will not change again; streamed text would only fill the cache with prefixes. */
   cache: boolean;
-  animation: MattrAnimatedStream | null;
+  animation: MatterAnimatedStream | null;
 }) {
   const render = markdownRenderer(markdown);
   const entry = render.parse(text);
@@ -2084,7 +2084,7 @@ const MarkdownSource = memo(function MarkdownSource({
     <ChatMarkdownTextContext value={text}>
       {islandState
         ? renderHastWithIslands(
-            ...mattrStreamHast(entry.tree, markdownIslandOptions(islandState), animation, !cache),
+            ...matterStreamHast(entry.tree, markdownIslandOptions(islandState), animation, !cache),
           )
         : render.element(entry)}
     </ChatMarkdownTextContext>
@@ -2101,7 +2101,7 @@ function ChatMarkdown({
   renderInsights = false,
   ...props
 }: ChatMarkdownProps) {
-  const stream = useMattrStreamingText(arrivedText, props.isStreaming === true && !inline);
+  const stream = useMatterStreamingText(arrivedText, props.isStreaming === true && !inline);
   const text = stream.text;
   const { isStreaming, streamingId } = props;
   const [textAtMount] = useState(text);
@@ -2145,7 +2145,7 @@ function ChatMarkdown({
       data-streaming={
         componentState.isStreaming && (!remounted || text !== textAtMount) ? "" : undefined
       }
-      data-mattr-stream={stream.animation ?? undefined}
+      data-matter-stream={stream.animation ?? undefined}
       onCopy={handleCopy}
     >
       <ChatMarkdownRendererContext value={componentState}>

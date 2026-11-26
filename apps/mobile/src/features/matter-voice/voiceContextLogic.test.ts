@@ -45,7 +45,7 @@ describe("mapVoiceThreadStatus", () => {
 
 describe("buildVoiceWorkspaceContext", () => {
   const projects = [
-    { id: "project-1", title: "mattr", workspaceRoot: "/code/mattr", archivedAt: null },
+    { id: "project-1", title: "Matter", workspaceRoot: "/code/matter", archivedAt: null },
     {
       id: "project-2",
       title: "Old",
@@ -58,7 +58,7 @@ describe("buildVoiceWorkspaceContext", () => {
     const context = buildVoiceWorkspaceContext({
       activeEnvironmentId: "env-1",
       activeThreadId: "b",
-      activeRoute: "MattrVoiceMode",
+      activeRoute: "MatterVoiceMode",
       projects,
       threads: [
         thread({ id: "a", updatedAt: "2026-11-25T08:00:00.000Z" }),
@@ -71,7 +71,7 @@ describe("buildVoiceWorkspaceContext", () => {
 
     expect(context.threads.map((entry) => entry.threadId)).toEqual(["b", "a"]);
     expect(context.threads[0]).toMatchObject({
-      projectTitle: "mattr",
+      projectTitle: "Matter",
       status: "running",
       isActive: true,
     });
@@ -172,7 +172,7 @@ describe("buildVoiceWorkspaceContext", () => {
     );
     const activeOld = thread({
       id: "old-active",
-      title: "Antimatter setup check",
+      title: "Matter setup check",
       updatedAt: "2026-11-24T01:00:00.000Z",
       latestUserMessage: "Check setup",
       latestAssistantMessage: "Everything looks healthy.",
@@ -181,7 +181,7 @@ describe("buildVoiceWorkspaceContext", () => {
     const context = buildVoiceWorkspaceContext({
       activeEnvironmentId: "env-1",
       activeThreadId: "old-active",
-      activeRoute: "MattrVoiceMode",
+      activeRoute: "MatterVoiceMode",
       projects,
       threads: [...newer, activeOld],
       approvals: [],
@@ -192,7 +192,7 @@ describe("buildVoiceWorkspaceContext", () => {
     expect(context.threads).toHaveLength(MAX_VOICE_CONTEXT_THREADS);
     expect(context.threads[0]).toMatchObject({
       threadId: "old-active",
-      title: "Antimatter setup check",
+      title: "Matter setup check",
       isActive: true,
       latestUserMessage: "Check setup",
       latestAssistantMessage: "Everything looks healthy.",
@@ -205,7 +205,7 @@ describe("buildVoiceWorkspaceContext", () => {
       activeEnvironmentId: "env-2",
       activeThreadId: "thread-unloaded",
       activeThreadFallbackTitle: "Voice test thread",
-      activeRoute: "MattrVoiceMode",
+      activeRoute: "MatterVoiceMode",
       projects: [],
       threads: [],
       approvals: [],

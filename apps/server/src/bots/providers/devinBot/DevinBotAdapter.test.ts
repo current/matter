@@ -379,7 +379,7 @@ describe("DevinBotAdapter through BotsPlatformService", () => {
         clientNonce: "nonce-1",
         confirmUsage: true,
       });
-      assert.strictEqual(sent.attribution, "user-via-mattr");
+      assert.strictEqual(sent.attribution, "user-via-matter");
       assert.deepStrictEqual(state.sent, [{ devinId: SESSION, text: "Ship Tuesday" }]);
 
       // A new message on the last page arrives by re-reading that page from its cursor.

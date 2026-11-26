@@ -1,8 +1,8 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet antimatter/sidebar.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet matter/sidebar.css, which loads outside Tailwind. */
 import { render } from "../../../../test/render";
 import {
   EnvironmentId,
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   NO_BOT_PROVIDER_CAPABILITIES,
   ProjectId,
   ProviderDriverKind,
@@ -19,7 +19,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import "../../../index.css";
 // The rail's look, and the hit areas its rows click through, live in the fork stylesheet.
-import "../../../../../../antimatter/sidebar.css";
+import "../../../../../../matter/sidebar.css";
 import { resetAddonStoreForTests } from "../../../addons/addonStore";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
@@ -31,24 +31,24 @@ const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} })
 // Thread jump shortcuts only bind in the desktop app, where Spaces reuses them.
 vi.mock(import("../../../env"), async (original) => ({ ...(await original()), isElectron: true }));
 
-vi.mock(import("../../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
-import { MattrDefaultSidebar } from "./MattrDefaultSidebar";
-import { MattrUsageMeters } from "./MattrDefaultSidebarParts";
-import type { MattrChildItem } from "./mattrFinalSidebar.logic";
-import { toMattrThreadItem } from "./mattrSidebar.logic";
-import { MattrScopeLine } from "./MattrScopeLine";
-import { MATTR_SIDEBAR_LAYOUT_STORAGE_KEY } from "./mattrSidebarStore";
-import { MattrSpacesSidebar } from "./MattrSpacesSidebar";
-import type { MattrSidebarModel, MattrSidebarProject } from "./useMattrSidebarModel";
+import { MatterDefaultSidebar } from "./MatterDefaultSidebar";
+import { MatterUsageMeters } from "./MatterDefaultSidebarParts";
+import type { MatterChildItem } from "./matterFinalSidebar.logic";
+import { toMatterThreadItem } from "./matterSidebar.logic";
+import { MatterScopeLine } from "./MatterScopeLine";
+import { MATTER_SIDEBAR_LAYOUT_STORAGE_KEY } from "./matterSidebarStore";
+import { MatterSpacesSidebar } from "./MatterSpacesSidebar";
+import type { MatterSidebarModel, MatterSidebarProject } from "./useMatterSidebarModel";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
 const environmentId = EnvironmentId.make("local");
 
-function project(id: string, name: string): MattrSidebarProject {
+function project(id: string, name: string): MatterSidebarProject {
   const group = {
     environmentId,
     id: ProjectId.make(id),
@@ -60,11 +60,15 @@ function project(id: string, name: string): MattrSidebarProject {
   return { key: `${environmentId}:${id}`, name, group };
 }
 
-const MATTR = project("mattr", "mattr");
+const MATTER = project("Matter", "Matter");
 const LILT = project("lilt", "Lilt");
 
-function thread(title: string, owner: MattrSidebarProject, overrides: ThreadFixtureOverrides = {}) {
-  return toMattrThreadItem(
+function thread(
+  title: string,
+  owner: MatterSidebarProject,
+  overrides: ThreadFixtureOverrides = {},
+) {
+  return toMatterThreadItem(
     makeThreadFixture({
       environmentId,
       id: ThreadId.make(title),
@@ -89,9 +93,9 @@ const runtime = (status: "running" | "completed") => ({
 });
 
 const items = [
-  thread("Run xcodebuild on device", MATTR, { hasPendingApprovals: true }),
-  thread("Island spring morphs", MATTR, { runtime: runtime("running") }),
-  thread("Settings in shell card", MATTR, {
+  thread("Run xcodebuild on device", MATTER, { hasPendingApprovals: true }),
+  thread("Island spring morphs", MATTER, { runtime: runtime("running") }),
+  thread("Settings in shell card", MATTER, {
     runtime: runtime("completed"),
     lastVisitedAt: "2026-03-10T14:00:00.000Z",
     latestRun: {
@@ -103,9 +107,9 @@ const items = [
       assistantMessageId: null,
     },
   }),
-  thread("Muse provider matrix", MATTR),
-  thread("Pinned plan", MATTR, { pinnedAt: "2026-03-01T00:00:00.000Z" }),
-  thread("Old notes", MATTR, { latestUserMessageAt: "2026-03-01T10:00:00.000Z" }),
+  thread("Muse provider matrix", MATTER),
+  thread("Pinned plan", MATTER, { pinnedAt: "2026-03-01T00:00:00.000Z" }),
+  thread("Old notes", MATTER, { latestUserMessageAt: "2026-03-01T10:00:00.000Z" }),
   thread("Onboarding copy pass", LILT),
 ];
 
@@ -114,8 +118,8 @@ const subagent = (
   overrides: ThreadFixtureOverrides = {},
   parent = "Muse provider matrix",
   ancestor = parent,
-): MattrChildItem => ({
-  ...thread(title, MATTR, {
+): MatterChildItem => ({
+  ...thread(title, MATTER, {
     lineage: {
       rootThreadId: ThreadId.make(ancestor),
       parentThreadId: ThreadId.make(parent),
@@ -131,11 +135,11 @@ const children = [
   subagent("Write matrix doc"),
 ];
 
-function model(overrides: Partial<MattrSidebarModel> = {}): MattrSidebarModel {
+function model(overrides: Partial<MatterSidebarModel> = {}): MatterSidebarModel {
   return {
     items,
     children,
-    projects: [MATTR, LILT],
+    projects: [MATTER, LILT],
     activeThreadKey: items[1]!.key,
     nowMs: Date.parse(NOW_ISO),
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
@@ -145,7 +149,7 @@ function model(overrides: Partial<MattrSidebarModel> = {}): MattrSidebarModel {
 }
 
 const addons = (grokEnabled: boolean): ReadonlyArray<AddonEntry> =>
-  MATTR_ADDON_MANIFESTS.map((manifest) => {
+  MATTER_ADDON_MANIFESTS.map((manifest) => {
     const enabled = manifest.id === "grok-bot" && grokEnabled;
     return {
       manifest,
@@ -229,20 +233,20 @@ function useServer(
   };
 }
 
-describe("MattrDefaultSidebar", () => {
+describe("MatterDefaultSidebar", () => {
   it("groups threads by project and shows no Crew while the add-on is off", async () => {
     using server = useServer(false);
     const current = model();
     await using screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar model={current} />
+        <MatterDefaultSidebar model={current} />
       </SidebarProvider>,
     );
-    const mattr = page.getByRole("region", { name: "mattr" });
-    await expect.element(mattr).toBeVisible();
+    const projectGroup = page.getByRole("region", { name: "Matter" });
+    await expect.element(projectGroup).toBeVisible();
     await expect.element(page.getByRole("region", { name: "Lilt" })).toBeVisible();
     const titles = [
-      ...screen.container.querySelectorAll('section[aria-label="mattr"] > ul > li'),
+      ...screen.container.querySelectorAll('section[aria-label="Matter"] > ul > li'),
     ].map((row) => row.querySelector(".mfs-t")?.textContent);
     expect(titles[0]).toBe("Pinned plan");
     expect(titles).toContain("Old notes");
@@ -254,7 +258,7 @@ describe("MattrDefaultSidebar", () => {
     expect(inbox.getBoundingClientRect()).toMatchObject({ width: 28, height: 28 });
     expect(getComputedStyle(inbox)).toMatchObject({ borderRadius: "7px", boxShadow: "none" });
 
-    await mattr.getByRole("button", { name: /^mattr/ }).click();
+    await projectGroup.getByRole("button", { name: /^Matter/ }).click();
     await expect.element(page.getByText("Pinned plan")).not.toBeInTheDocument();
 
     await expect.poll(() => server.addonCalls().length).toBeGreaterThan(0);
@@ -267,13 +271,13 @@ describe("MattrDefaultSidebar", () => {
     const current = model();
     await using screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar model={current} />
+        <MatterDefaultSidebar model={current} />
       </SidebarProvider>,
     );
     const tree = page.getByRole("list", { name: "Subagents of Muse provider matrix" });
     await expect.element(tree).toBeVisible();
     const rows = screen.container.querySelectorAll(
-      'ul[aria-label="Subagents of Muse provider matrix"] > li[data-mattr-subagent]',
+      'ul[aria-label="Subagents of Muse provider matrix"] > li[data-matter-subagent]',
     );
     expect([...rows].map((row) => row.querySelector(".mfs-t")?.textContent)).toEqual([
       "Audit adapters",
@@ -296,7 +300,7 @@ describe("MattrDefaultSidebar", () => {
     using _server = useServer(false);
     await using screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar model={model()} />
+        <MatterDefaultSidebar model={model()} />
       </SidebarProvider>,
     );
     await expect
@@ -330,7 +334,7 @@ describe("MattrDefaultSidebar", () => {
     ];
     const at = (activeThreadKey: string) => (
       <SidebarProvider>
-        <MattrDefaultSidebar model={model({ children: finished, activeThreadKey })} />
+        <MatterDefaultSidebar model={model({ children: finished, activeThreadKey })} />
       </SidebarProvider>
     );
     await using screen = await render(at(finished[0]!.key));
@@ -354,7 +358,7 @@ describe("MattrDefaultSidebar", () => {
 
   it("nests subagents-of-subagents and counts and keeps subagents that need you", async () => {
     using _server = useServer(false);
-    const settledParent = thread("Settled release", MATTR, { settledOverride: "settled" });
+    const settledParent = thread("Settled release", MATTER, { settledOverride: "settled" });
     const nested = [
       ...children,
       subagent("Probe one adapter", {}, "Audit adapters", "Muse provider matrix"),
@@ -362,13 +366,13 @@ describe("MattrDefaultSidebar", () => {
     ];
     await using screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar
+        <MatterDefaultSidebar
           model={model({ items: [...items, settledParent], children: nested })}
         />
       </SidebarProvider>,
     );
     const muse = screen.container.querySelectorAll(
-      'ul[aria-label="Subagents of Muse provider matrix"] > li[data-mattr-subagent] .mfs-t',
+      'ul[aria-label="Subagents of Muse provider matrix"] > li[data-matter-subagent] .mfs-t',
     );
     expect([...muse].map((title) => title.textContent)).toContain("Probe one adapter");
 
@@ -388,7 +392,7 @@ describe("MattrDefaultSidebar", () => {
     const current = model();
     await using _screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar model={current} />
+        <MatterDefaultSidebar model={current} />
       </SidebarProvider>,
     );
     const needsYou = page.getByRole("button", { name: /Needs you/ });
@@ -417,7 +421,7 @@ describe("MattrDefaultSidebar", () => {
     using _server = useServer(true);
     await using _screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar model={model()} />
+        <MatterDefaultSidebar model={model()} />
       </SidebarProvider>,
     );
     const crew = page.getByRole("region", { name: "Crew" });
@@ -450,7 +454,7 @@ describe("MattrDefaultSidebar", () => {
     });
     await using _screen = await render(
       <SidebarProvider>
-        <MattrDefaultSidebar model={model()} />
+        <MatterDefaultSidebar model={model()} />
       </SidebarProvider>,
     );
     await expect
@@ -462,11 +466,11 @@ describe("MattrDefaultSidebar", () => {
   });
 });
 
-describe("MattrUsageMeters", () => {
+describe("MatterUsageMeters", () => {
   it("renders live usage per provider and opens Usage on click", async () => {
     const onOpen = vi.fn();
     await using _screen = await render(
-      <MattrUsageMeters
+      <MatterUsageMeters
         nowMs={Date.parse(NOW_ISO)}
         onOpen={onOpen}
         meters={[
@@ -504,7 +508,7 @@ describe("MattrUsageMeters", () => {
   it("draws each meter as a 4px track that stays above its reset line", async () => {
     await using screen = await render(
       <div className="mfs" style={{ width: 280 }}>
-        <MattrUsageMeters
+        <MatterUsageMeters
           nowMs={Date.parse(NOW_ISO)}
           onOpen={() => {}}
           meters={[
@@ -544,10 +548,10 @@ describe("Default layout titlebar", () => {
     "hides the duplicate wordmark linked as %s",
     async (href) => {
       await using screen = await render(
-        <div data-mattr-sidebar-layout="inbox">
+        <div data-matter-sidebar-layout="inbox">
           <header>
             <a href={href} style={{ display: "flex" }}>
-              mattr
+              Matter
             </a>
             <button type="button">Toggle</button>
           </header>
@@ -562,16 +566,16 @@ describe("Default layout titlebar", () => {
   );
 });
 
-describe("MattrSpacesSidebar", () => {
+describe("MatterSpacesSidebar", () => {
   it("shows one project at a time with Pinned, Today, and a folded Earlier", async () => {
     using _server = useServer(false);
     const current = model();
     await using screen = await render(
       <SidebarProvider>
-        <MattrSpacesSidebar model={current} />
+        <MatterSpacesSidebar model={current} />
       </SidebarProvider>,
     );
-    await expect.element(page.getByRole("heading", { name: "mattr", level: 2 })).toBeVisible();
+    await expect.element(page.getByRole("heading", { name: "Matter", level: 2 })).toBeVisible();
     const sectionText = (name: string) =>
       screen.container.querySelector(`section[aria-label="${name}"]`)?.textContent ?? "";
     expect(sectionText("Pinned")).toContain("Pinned plan");
@@ -581,8 +585,8 @@ describe("MattrSpacesSidebar", () => {
     await page.getByRole("button", { name: /Earlier/ }).click();
     await expect.element(page.getByText("Old notes")).toBeVisible();
 
-    await page.getByRole("button", { name: /New thread in mattr/ }).click();
-    expect(current.actions.newThread).toHaveBeenCalledWith(MATTR.key);
+    await page.getByRole("button", { name: /New thread in Matter/ }).click();
+    expect(current.actions.newThread).toHaveBeenCalledWith(MATTER.key);
 
     await page.getByRole("group", { name: "Spaces" }).getByRole("button", { name: "Lilt" }).click();
     await expect.element(page.getByRole("heading", { name: "Lilt", level: 2 })).toBeVisible();
@@ -595,7 +599,7 @@ describe("MattrSpacesSidebar", () => {
     using _server = useServer(true);
     await using _screen = await render(
       <SidebarProvider>
-        <MattrSpacesSidebar model={model()} />
+        <MatterSpacesSidebar model={model()} />
       </SidebarProvider>,
     );
     const botsGroup = page.getByRole("group", { name: "Bots" });
@@ -611,21 +615,21 @@ describe("MattrSpacesSidebar", () => {
     using _server = useServer(false);
     await using _screen = await render(
       <SidebarProvider>
-        <MattrSpacesSidebar model={model()} />
+        <MatterSpacesSidebar model={model()} />
       </SidebarProvider>,
     );
-    await expect.element(page.getByRole("heading", { name: "mattr", level: 2 })).toBeVisible();
+    await expect.element(page.getByRole("heading", { name: "Matter", level: 2 })).toBeVisible();
     await userEvent.keyboard("{Control>}2{/Control}");
     await expect.element(page.getByRole("heading", { name: "Lilt", level: 2 })).toBeVisible();
   });
 });
 
-describe("MattrScopeLine", () => {
+describe("MatterScopeLine", () => {
   it("persists the layout chosen from its menu", async () => {
     using _server = useServer(false);
-    await using _screen = await render(<MattrScopeLine />);
+    await using _screen = await render(<MatterScopeLine />);
     await page.getByRole("button", { name: /Sidebar view/ }).click();
     await page.getByRole("menuitemradio", { name: "Spaces" }).click();
-    expect(window.localStorage.getItem(MATTR_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"spaces"');
+    expect(window.localStorage.getItem(MATTER_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"spaces"');
   });
 });

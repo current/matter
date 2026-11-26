@@ -7,7 +7,7 @@ import type {
   VoiceAssistantTurnRequest,
   VoiceAssistantTurnResponse,
   VoiceSpeakRequest,
-} from "../../../../antimatter/voice-assistant/types.ts";
+} from "../../../../matter/voice-assistant/types.ts";
 import type * as VoiceAssistantService from "./VoiceAssistantService.ts";
 import { encodeVoiceTurnStream, makeVoiceTurnStream } from "./voiceTurnStream.ts";
 import type * as VoiceTtsService from "./VoiceTtsService.ts";

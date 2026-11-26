@@ -1,10 +1,10 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mtk-*` classes come from the fork stylesheet antimatter/tasks.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mtk-*` classes come from the fork stylesheet matter/tasks.css, which loads outside Tailwind. */
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   EnvironmentId,
   ThreadId,
-  type MattrTaskThreadRef,
+  type MatterTaskThreadRef,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
@@ -15,13 +15,13 @@ import { useQuietThreadShell } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { resolveSidebarRowStatus } from "../Sidebar.logic";
-import type { MattrTaskThreadState } from "./mattrTasks.logic";
+import type { MatterTaskThreadState } from "./matterTasks.logic";
 
-function toScopedThreadRef(ref: MattrTaskThreadRef): ScopedThreadRef {
+function toScopedThreadRef(ref: MatterTaskThreadRef): ScopedThreadRef {
   return scopeThreadRef(EnvironmentId.make(ref.environmentId), ThreadId.make(ref.threadId));
 }
 
-function taskThreadState(thread: EnvironmentThreadShell | null): MattrTaskThreadState {
+function taskThreadState(thread: EnvironmentThreadShell | null): MatterTaskThreadState {
   if (thread === null) return "idle";
   switch (resolveSidebarRowStatus(thread)) {
     case "approval":
@@ -41,7 +41,7 @@ function taskThreadState(thread: EnvironmentThreadShell | null): MattrTaskThread
   }
 }
 
-export function useTaskThread(ref: MattrTaskThreadRef | null) {
+export function useTaskThread(ref: MatterTaskThreadRef | null) {
   const thread = useQuietThreadShell(ref === null ? null : toScopedThreadRef(ref));
   const providers = useEnvironmentProviders();
   const instanceId = thread?.modelSelection.instanceId ?? null;
@@ -55,7 +55,7 @@ export function useTaskThread(ref: MattrTaskThreadRef | null) {
 
 export function useTaskThreadStateLabel() {
   const gt = useGT();
-  return (state: MattrTaskThreadState) => {
+  return (state: MatterTaskThreadState) => {
     switch (state) {
       case "running":
         return gt("Running");
@@ -73,7 +73,7 @@ export function useTaskThreadStateLabel() {
 
 export function useOpenTaskThread() {
   const navigate = useNavigate();
-  return (ref: MattrTaskThreadRef) =>
+  return (ref: MatterTaskThreadRef) =>
     void navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(toScopedThreadRef(ref)),
@@ -81,7 +81,7 @@ export function useOpenTaskThread() {
 }
 
 /** The linked thread's provider and live state; clicking it opens the thread. */
-export function TaskThreadChip({ threadRef }: { readonly threadRef: MattrTaskThreadRef }) {
+export function TaskThreadChip({ threadRef }: { readonly threadRef: MatterTaskThreadRef }) {
   const gt = useGT();
   const { thread, state, provider } = useTaskThread(threadRef);
   const label = useTaskThreadStateLabel();

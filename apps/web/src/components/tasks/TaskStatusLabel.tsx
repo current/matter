@@ -1,9 +1,9 @@
-import type { MattrTaskStatus } from "@t3tools/contracts";
+import type { MatterTaskStatus } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 
 export function useTaskStatusLabel() {
   const gt = useGT();
-  return (status: MattrTaskStatus) => {
+  return (status: MatterTaskStatus) => {
     switch (status) {
       case "todo":
         return gt("To Do", { $context: "task board column" });

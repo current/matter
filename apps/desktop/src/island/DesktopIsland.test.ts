@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
-import { islandModelRuntime } from "../../../../antimatter/island/islandModel.ts";
+import { buildIslandHtml } from "../../../../matter/island/islandHtml.ts";
+import { islandModelRuntime } from "../../../../matter/island/islandModel.ts";
 import {
   ISLAND_DROP_ARM_HEIGHT,
   ISLAND_DROP_CATCH_HEIGHT,
   ISLAND_WINDOW_HEIGHT,
   ISLAND_WINDOW_WIDTH,
   computeIslandPlacement,
-} from "../../../../antimatter/island/islandPlacement.ts";
-import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
+} from "../../../../matter/island/islandPlacement.ts";
+import { shouldKeepIslandWindowAlive } from "../../../../matter/island/islandVisibility.ts";
 import {
   MODIFIER_POLLER_SCRIPT,
   MODIFIER_TAP_MAX_SECONDS,
   parseModifierMonitorLine,
   type MacMonitorEvent,
-} from "../../../../antimatter/island/MacControlTapMonitor.ts";
+} from "../../../../matter/island/MacControlTapMonitor.ts";
 import {
   INITIAL_MODIFIER_ROUTING,
   buildIslandWindowOptions,
@@ -31,8 +31,8 @@ import {
   SIRI_WAVE_FRAG,
   SIRI_WAVE_VERT,
   siriWaveStretch,
-} from "../../../../antimatter/island/siriWaveShaders.ts";
-import type { MacModifierEvent } from "../../../../antimatter/island/MacControlTapMonitor.ts";
+} from "../../../../matter/island/siriWaveShaders.ts";
+import type { MacModifierEvent } from "../../../../matter/island/MacControlTapMonitor.ts";
 
 function islandScript(): string {
   const match = buildIslandHtml().match(/<script>([\s\S]*?)<\/script>/);

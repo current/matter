@@ -11,39 +11,39 @@ import { useSyncExternalStore } from "react";
 
 import { useLocalStorage, writeLocalStorageValue } from "../../hooks/useLocalStorage";
 
-const MATTR_THREAD_RIBBON_STORAGE_KEY = "mattr:thread-ribbon:v1";
+const MATTER_THREAD_RIBBON_STORAGE_KEY = "mattr:thread-ribbon:v1";
 /** Tests keep upstream's details card, so suites that render the chat see the structure they assert on. */
-export const DEFAULT_MATTR_THREAD_RIBBON = import.meta.env.MODE !== "test";
+export const DEFAULT_MATTER_THREAD_RIBBON = import.meta.env.MODE !== "test";
 
-export function writeMattrThreadRibbon(enabled: boolean): void {
+export function writeMatterThreadRibbon(enabled: boolean): void {
   writeLocalStorageValue(
-    MATTR_THREAD_RIBBON_STORAGE_KEY,
+    MATTER_THREAD_RIBBON_STORAGE_KEY,
     enabled,
-    DEFAULT_MATTR_THREAD_RIBBON,
+    DEFAULT_MATTER_THREAD_RIBBON,
     Schema.Boolean,
   );
 }
 
 /** Topbar Ribbon + Whisper Pill in place of the docked Thread Details card, per device. */
-export function useMattrThreadRibbonSetting() {
+export function useMatterThreadRibbonSetting() {
   return useLocalStorage(
-    MATTR_THREAD_RIBBON_STORAGE_KEY,
-    DEFAULT_MATTR_THREAD_RIBBON,
+    MATTER_THREAD_RIBBON_STORAGE_KEY,
+    DEFAULT_MATTER_THREAD_RIBBON,
     Schema.Boolean,
   );
 }
 
-export function useMattrThreadRibbonEnabled(): boolean {
-  return useMattrThreadRibbonSetting()[0];
+export function useMatterThreadRibbonEnabled(): boolean {
+  return useMatterThreadRibbonSetting()[0];
 }
 
 const ACTIVE_STATUSES = new Set(["pending", "running", "waiting"]);
 
-export type MattrWhisperRowKind = OrchestrationV2PendingBackgroundTask["kind"];
+export type MatterWhisperRowKind = OrchestrationV2PendingBackgroundTask["kind"];
 
-export interface MattrWhisperRow {
+export interface MatterWhisperRow {
   readonly key: string;
-  readonly kind: MattrWhisperRowKind;
+  readonly kind: MatterWhisperRowKind;
   readonly title: string;
   readonly status: "pending" | "running" | "waiting";
   readonly driver: ProviderDriverKind | null;
@@ -76,7 +76,7 @@ type WhisperSubagent = Pick<
 >;
 
 /** Same rule the lineage panel uses: app-owned agents, and Claude tasks it can address by id. */
-export function canStopMattrSubagent(agent: WhisperSubagent): boolean {
+export function canStopMatterSubagent(agent: WhisperSubagent): boolean {
   if (agent.startedAt === null || !ACTIVE_STATUSES.has(agent.status)) return false;
   if (agent.origin === "app_owned") return true;
   return (
@@ -91,12 +91,12 @@ export function canStopMattrSubagent(agent: WhisperSubagent): boolean {
  * Everything still working under a thread: its running subagents and the background commands it
  * waits on. Newest first, so the row that just started sits at the top of the list.
  */
-export function deriveMattrWhisperRows(input: {
+export function deriveMatterWhisperRows(input: {
   readonly subagents: ReadonlyArray<WhisperSubagent>;
   readonly backgroundTasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>;
   readonly fallbackTitle: string;
-}): ReadonlyArray<MattrWhisperRow> {
-  const rows: MattrWhisperRow[] = [];
+}): ReadonlyArray<MatterWhisperRow> {
+  const rows: MatterWhisperRow[] = [];
   const childThreadIds = new Set<string>();
   const nativeIds = new Set<string>();
   for (const agent of input.subagents) {
@@ -107,12 +107,12 @@ export function deriveMattrWhisperRows(input: {
       key: `subagent:${agent.id}`,
       kind: "subagent",
       title: formatSubagentDisplayTitle(agent.title?.trim() || input.fallbackTitle),
-      status: agent.status as MattrWhisperRow["status"],
+      status: agent.status as MatterWhisperRow["status"],
       driver: agent.driver,
       providerInstanceId: agent.providerInstanceId,
       childThreadId: agent.childThreadId,
       startedAtMs: agent.startedAt === null ? null : DateTime.toEpochMillis(agent.startedAt),
-      stopTarget: canStopMattrSubagent(agent)
+      stopTarget: canStopMatterSubagent(agent)
         ? { threadId: agent.threadId, subagentId: agent.id }
         : null,
       remoteLabel: agent.remoteChild?.label ?? null,
@@ -149,14 +149,14 @@ export function deriveMattrWhisperRows(input: {
 const FINISHED_STATUSES = new Set(["completed", "failed", "cancelled", "interrupted", "idle"]);
 
 /** The count on the More menu's Previous agents entry: subagents this thread already finished with. */
-export function countMattrPreviousAgents(
+export function countMatterPreviousAgents(
   subagents: ReadonlyArray<Pick<OrchestrationV2Subagent, "status">>,
 ): number {
   return subagents.filter((agent) => FINISHED_STATUSES.has(agent.status)).length;
 }
 
 /** The longest-running row's start, for the pill's one timer. */
-export function oldestMattrWhisperStart(rows: ReadonlyArray<MattrWhisperRow>): number | null {
+export function oldestMatterWhisperStart(rows: ReadonlyArray<MatterWhisperRow>): number | null {
   let oldest: number | null = null;
   for (const row of rows) {
     if (row.startedAtMs !== null && (oldest === null || row.startedAtMs < oldest)) {
@@ -166,21 +166,21 @@ export function oldestMattrWhisperStart(rows: ReadonlyArray<MattrWhisperRow>): n
   return oldest;
 }
 
-const MATTR_WHISPER_MAX_AVATARS = 3;
+const MATTER_WHISPER_MAX_AVATARS = 3;
 
 /**
  * The stacked avatars, oldest first in z-order: each overlaps the one after it, so the earlier
  * avatar draws on top and its status dot (top right) is never covered.
  */
-export function stackMattrWhisperAvatars(
-  rows: ReadonlyArray<MattrWhisperRow>,
-  max = MATTR_WHISPER_MAX_AVATARS,
-): ReadonlyArray<{ readonly row: MattrWhisperRow; readonly zIndex: number }> {
+export function stackMatterWhisperAvatars(
+  rows: ReadonlyArray<MatterWhisperRow>,
+  max = MATTER_WHISPER_MAX_AVATARS,
+): ReadonlyArray<{ readonly row: MatterWhisperRow; readonly zIndex: number }> {
   const shown = rows.slice(0, max);
   return shown.map((row, index) => ({ row, zIndex: shown.length - index }));
 }
 
-export function isMattrWhisperActive(input: {
+export function isMatterWhisperActive(input: {
   readonly rowCount: number;
   readonly serverCount: number;
   readonly runningAutomationCount: number;
@@ -193,26 +193,26 @@ export function isMattrWhisperActive(input: {
  * (excluding sidebar-collapse padding and titlebar controls): `condensed` moves the PR chip into
  * More, and `minimal` moves the diff too and drops Git to its icon.
  */
-export type MattrRibbonDensity = "full" | "condensed" | "minimal";
+export type MatterRibbonDensity = "full" | "condensed" | "minimal";
 
-export function resolveMattrRibbonDensity(availableWidth: number): MattrRibbonDensity {
+export function resolveMatterRibbonDensity(availableWidth: number): MatterRibbonDensity {
   if (availableWidth >= 560) return "full";
   if (availableWidth >= 420) return "condensed";
   return "minimal";
 }
 
-export function mattrRibbonOverflows(density: MattrRibbonDensity, item: "pr" | "diff"): boolean {
+export function matterRibbonOverflows(density: MatterRibbonDensity, item: "pr" | "diff"): boolean {
   if (density === "full") return false;
   if (density === "condensed") return item === "pr";
   return true;
 }
 
-export type MattrLineageView = "main" | "previous" | "sideChats" | "servers" | "automations";
+export type MatterLineageView = "main" | "previous" | "sideChats" | "servers" | "automations";
 
 interface LineagePopoverState {
   readonly threadKey: string | null;
   readonly anchor: "pill" | "ribbon";
-  readonly view: MattrLineageView;
+  readonly view: MatterLineageView;
 }
 
 let lineagePopoverState: LineagePopoverState = { threadKey: null, anchor: "pill", view: "main" };
@@ -228,42 +228,42 @@ function subscribeLineagePopover(listener: () => void) {
   return () => lineageListeners.delete(listener);
 }
 
-export function readMattrLineagePopover(): LineagePopoverState {
+export function readMatterLineagePopover(): LineagePopoverState {
   return lineagePopoverState;
 }
 
 /** The thread whose Lineage popover is open, where it hangs, and which list it shows. */
-export function useMattrLineagePopover(): LineagePopoverState {
+export function useMatterLineagePopover(): LineagePopoverState {
   return useSyncExternalStore(
     subscribeLineagePopover,
-    readMattrLineagePopover,
-    readMattrLineagePopover,
+    readMatterLineagePopover,
+    readMatterLineagePopover,
   );
 }
 
-export function openMattrLineagePopover(
+export function openMatterLineagePopover(
   threadKey: string,
   anchor: LineagePopoverState["anchor"],
-  view: MattrLineageView = "main",
+  view: MatterLineageView = "main",
 ) {
   setLineagePopoverState({ threadKey, anchor, view });
 }
 
-export function setMattrLineageView(view: MattrLineageView) {
+export function setMatterLineageView(view: MatterLineageView) {
   if (lineagePopoverState.threadKey === null) return;
   setLineagePopoverState({ ...lineagePopoverState, view });
 }
 
-export function closeMattrLineagePopover() {
+export function closeMatterLineagePopover() {
   if (lineagePopoverState.threadKey === null) return;
   setLineagePopoverState({ ...lineagePopoverState, threadKey: null, view: "main" });
 }
 
 /** The thread details shortcut: the pill while it shows, else the Ribbon's agents button. */
-export function toggleMattrLineagePopover(threadKey: string, pillVisible: boolean) {
+export function toggleMatterLineagePopover(threadKey: string, pillVisible: boolean) {
   if (lineagePopoverState.threadKey === threadKey) {
-    closeMattrLineagePopover();
+    closeMatterLineagePopover();
     return;
   }
-  openMattrLineagePopover(threadKey, pillVisible ? "pill" : "ribbon");
+  openMatterLineagePopover(threadKey, pillVisible ? "pill" : "ribbon");
 }

@@ -2443,7 +2443,7 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
           event.type === "subagent.updated" ? [event.subagent.status] : [],
         );
       const prompt = yield* throughPromptSettled;
-      // mattr's idle proof reads the child's last transcript step, so a child that reported during
+      // Matter's idle proof reads the child's last transcript step, so a child that reported during
       // the prompt may turn idle just after the reply closes; the run's end checks it below.
       if (!duringPrompt) assert.equal(statuses(prompt).at(-1), "running");
       if (!duringPrompt) {
@@ -3339,7 +3339,7 @@ describe("AntigravityAdapterV2 runtime mode ceiling", () => {
   );
 });
 
-describe("AntigravityAdapterV2 mattr Goal mode", () => {
+describe("AntigravityAdapterV2 Matter Goal mode", () => {
   it.effect("runs Goal in the session's Default mode, with no reconfigure or mode note", () =>
     Effect.gen(function* () {
       const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;

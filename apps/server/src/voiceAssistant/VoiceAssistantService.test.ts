@@ -38,7 +38,7 @@ import { vi } from "vite-plus/test";
 import type {
   VoiceAssistantTurnRequest,
   VoiceWorkspaceContext,
-} from "../../../../antimatter/voice-assistant/types.ts";
+} from "../../../../matter/voice-assistant/types.ts";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as SessionStore from "../auth/SessionStore.ts";
 import * as ServerConfig from "../config.ts";
@@ -379,7 +379,7 @@ describe("VoiceAssistantService", () => {
   it.effect("runs a second pass when read_thread is requested", () =>
     Effect.gen(function* () {
       const threadId = ThreadId.make("thread-auth-refactor");
-      const projectId = ProjectId.make("project-mattr");
+      const projectId = ProjectId.make("project-matter");
       const now = DateTime.nowUnsafe();
 
       const firstPlan = JSON.stringify({
@@ -435,7 +435,7 @@ describe("VoiceAssistantService", () => {
                   threadId,
                   title: "Auth Refactor",
                   projectId,
-                  projectTitle: "mattr",
+                  projectTitle: "Matter",
                   status: "done",
                   updatedAt: DateTime.formatIso(now),
                   latestUserMessage: "Refactor token middleware",
@@ -784,7 +784,7 @@ describe("VoiceAssistantService", () => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const tempRoot = yield* fs.makeTempDirectoryScoped({ prefix: "mattr-voice-search-" });
+        const tempRoot = yield* fs.makeTempDirectoryScoped({ prefix: "matter-voice-search-" });
         yield* fs.makeDirectory(path.join(tempRoot, "docs"), { recursive: true });
         yield* fs.makeDirectory(path.join(tempRoot, "apps/server"), { recursive: true });
         yield* fs.writeFileString(
@@ -800,11 +800,11 @@ describe("VoiceAssistantService", () => {
           '{"elevenlabsApiKey":"top-secret-key"}\n',
         );
 
-        const projectId = ProjectId.make("project-mattr");
+        const projectId = ProjectId.make("project-matter");
         const now = DateTime.nowUnsafe();
         const project: Project = {
           id: projectId,
-          title: "mattr",
+          title: "Matter",
           workspaceRoot: tempRoot,
           repositoryIdentity: null,
           faviconPath: null,
@@ -884,12 +884,12 @@ describe("VoiceAssistantService", () => {
         const securityPlan = JSON.stringify({
           route: "assistant",
           actions: [
-            { type: "read_project_file", projectName: "mattr", relativePath: "docs/grok-bot.md" },
-            { type: "read_project_file", projectName: "mattr", relativePath: "../../etc/passwd" },
-            { type: "read_project_file", projectName: "mattr", relativePath: ".env" },
+            { type: "read_project_file", projectName: "Matter", relativePath: "docs/grok-bot.md" },
+            { type: "read_project_file", projectName: "Matter", relativePath: "../../etc/passwd" },
+            { type: "read_project_file", projectName: "Matter", relativePath: ".env" },
             {
               type: "read_project_file",
-              projectName: "mattr",
+              projectName: "Matter",
               relativePath: "mattr-voice-secrets.json",
             },
           ],
@@ -935,7 +935,7 @@ describe("VoiceAssistantService", () => {
             service.generateBriefing({
               kind: "approval",
               threadTitle: "API Migration",
-              projectTitle: "mattr",
+              projectTitle: "Matter",
               detail: "run database migration",
               latestAssistantMessage: null,
             }),
@@ -954,7 +954,7 @@ describe("VoiceAssistantService", () => {
             service.generateBriefing({
               kind: "question",
               threadTitle: "UI Polish",
-              projectTitle: "mattr",
+              projectTitle: "Matter",
               detail: null,
               latestAssistantMessage: null,
               questionPrompts: ["Should we keep the compact header on mobile?"],
@@ -973,7 +973,7 @@ describe("VoiceAssistantService", () => {
             service.generateBriefing({
               kind: "completed",
               threadTitle: "Voice Engine",
-              projectTitle: "mattr",
+              projectTitle: "Matter",
               detail: null,
               latestAssistantMessage:
                 "## Summary\n\nImplemented `VoiceTtsService` and verified **all tests** pass.\n\n```ts\nconst ok = true;\n```",
@@ -1114,7 +1114,7 @@ describe("VoiceTtsService", () => {
     const raw = [
       "## Build Complete",
       "",
-      "- Fixed `VoiceTtsService` in [PR #42](https://github.com/current/mattr/pull/42)",
+      "- Fixed `VoiceTtsService` in [PR #42](https://github.com/current/matter/pull/42)",
       "- See https://example.com/logs/123 for details",
       "",
       "```ts",
@@ -1148,7 +1148,7 @@ describe("VoiceTtsService", () => {
         return;
       }
       const ttsLayer = VoiceTtsService.layer.pipe(
-        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mattr-voice-tts-macos-" })),
+        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "matter-voice-tts-macos-" })),
         Layer.provide(ServerSettings.layerTest({})),
         Layer.provide(
           Layer.succeed(SecretResolver.SecretResolver, {
@@ -1166,7 +1166,7 @@ describe("VoiceTtsService", () => {
         const tts = yield* VoiceTtsService.VoiceTtsService;
         const available = yield* tts.getAvailableTtsInfo;
         const spoken = yield* tts.speak({
-          text: "Hello from mattr voice assistant.",
+          text: "Hello from Matter voice assistant.",
           provider: "macos",
           voice: "Samantha",
           speed: 1.08,
@@ -1196,7 +1196,7 @@ describe("VoiceTtsService", () => {
           }),
       );
       const ttsLayer = VoiceTtsService.layer.pipe(
-        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mattr-voice-dg-tts-" })),
+        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "matter-voice-dg-tts-" })),
         Layer.provide(ServerSettings.layerTest({})),
         Layer.provide(
           Layer.succeed(SecretResolver.SecretResolver, {
@@ -1260,7 +1260,7 @@ describe("VoiceTtsService", () => {
         }),
       );
       const ttsLayer = VoiceTtsService.layer.pipe(
-        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "mattr-voice-dg-stt-" })),
+        Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "matter-voice-dg-stt-" })),
         Layer.provide(ServerSettings.layerTest({})),
         Layer.provide(
           Layer.succeed(SecretResolver.SecretResolver, {
@@ -1302,7 +1302,7 @@ describe("VoiceTtsService", () => {
   it.effect("persists and clears the Deepgram API key in stateDir/mattr-voice-secrets.json", () =>
     Effect.gen(function* () {
       const configLayer = ServerConfig.layerTest(process.cwd(), {
-        prefix: "mattr-voice-dg-secrets-",
+        prefix: "matter-voice-dg-secrets-",
       }).pipe(Layer.provide(NodeServices.layer));
       const fullLayer = Layer.mergeAll(
         configLayer,
@@ -1392,7 +1392,7 @@ describe("VoiceTtsService ElevenLabs", () => {
           .speak({ text: "Hello from **ElevenLabs**.", provider: "elevenlabs" })
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
         return [saved, spoken] as const;
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-tts-")));
+      }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-tts-")));
 
       assert.strictEqual(status.elevenlabsConfigured, true);
       assert.notInclude(JSON.stringify(status), "xi-test-key");
@@ -1441,7 +1441,7 @@ describe("VoiceTtsService ElevenLabs", () => {
             model: "eleven_multilingual_evil",
           })
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-allow-")));
+      }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-allow-")));
 
       const [firstUrl, firstInit] = upstream.mock.calls[0]!;
       assert.include(
@@ -1475,7 +1475,7 @@ describe("VoiceTtsService ElevenLabs", () => {
           .speak({ text: "Fallback please." })
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
         return [available, spoken] as const;
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-fallback-")));
+      }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-fallback-")));
 
       assert.strictEqual(info.elevenlabsAvailable, true);
       assert.strictEqual(info.deepgramAvailable, true);
@@ -1515,7 +1515,7 @@ describe("VoiceTtsService ElevenLabs", () => {
           .speak({ text: "ElevenLabs from the phone." })
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
         return [prefs, yield* tts.getAvailableTtsInfo] as const;
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-prefs-")));
+      }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-prefs-")));
 
       assert.deepStrictEqual(saved, {
         ttsProvider: "deepgram",
@@ -1575,7 +1575,7 @@ describe("VoiceTtsService ElevenLabs", () => {
             .speak({ text: "Custom tuned ElevenLabs voice." })
             .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
           return saved;
-        }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-tuning-")));
+        }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-tuning-")));
 
         assert.strictEqual(prefs.customVoiceId, "MyCustomLibraryVoice1234");
         assert.strictEqual(prefs.stability, 1);
@@ -1609,7 +1609,7 @@ describe("VoiceTtsService ElevenLabs", () => {
         return yield* tts
           .speak({ text: "Hello." })
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream), Effect.flip);
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-browser-")));
+      }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-browser-")));
 
       assert.strictEqual(error._tag, "VoiceTtsUnavailableError");
       assert.strictEqual(upstream.mock.calls.length, 0);
@@ -1639,7 +1639,7 @@ describe("VoiceTtsService ElevenLabs", () => {
       assert.deepStrictEqual(JSON.parse(yield* fs.readFileString(secretsPath)), {
         deepgramApiKey: "dg-key",
       });
-    }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-secrets-"))),
+    }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-secrets-"))),
   );
 
   it.effect("keeps speech-to-text on Deepgram even when only ElevenLabs is configured", () =>
@@ -1651,7 +1651,7 @@ describe("VoiceTtsService ElevenLabs", () => {
         return yield* tts
           .transcribeDeepgram(new Uint8Array([0x52, 0x49, 0x46, 0x46]), "en")
           .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream), Effect.flip);
-      }).pipe(Effect.provide(makeTtsTestLayer("mattr-voice-el-stt-")));
+      }).pipe(Effect.provide(makeTtsTestLayer("matter-voice-el-stt-")));
 
       if (!DEEPGRAM_ENV_KEY) {
         assert.strictEqual(error._tag, "VoiceTtsUnavailableError");

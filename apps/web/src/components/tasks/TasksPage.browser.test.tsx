@@ -1,8 +1,8 @@
 import { render } from "../../../test/render";
 import {
   DEFAULT_SERVER_SETTINGS,
-  type MattrTask,
-  type MattrTaskMove,
+  type MatterTask,
+  type MatterTaskMove,
   type ServerProvider,
 } from "@t3tools/contracts";
 import type { ReactNode } from "react";
@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import "../../index.css";
-import "../../../../../antimatter/tasks.css";
+import "../../../../../matter/tasks.css";
 
 const mocks = vi.hoisted(() => ({
   config: { baseUrl: "http://server.test", headers: {} },
@@ -20,13 +20,13 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock(import("../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => mocks.config,
+  useMatterApiConfig: () => mocks.config,
 }));
 
-vi.mock(import("../MattrInsetPage"), () => ({
-  MattrInsetPage: ({
+vi.mock(import("../MatterInsetPage"), () => ({
+  MatterInsetPage: ({
     breadcrumb,
     actions,
     children,
@@ -48,8 +48,8 @@ vi.mock(import("../MattrInsetPage"), () => ({
 const project = {
   id: "project-1",
   environmentId: "env-1",
-  title: "mattr",
-  workspaceRoot: "/tmp/mattr",
+  title: "Matter",
+  workspaceRoot: "/tmp/matter",
   defaultModelSelection: null,
   scripts: [],
   createdAt: "2026-11-01T00:00:00.000Z",
@@ -88,7 +88,7 @@ vi.mock(import("./useStartTaskThread"), () => ({
   useStartTaskThread: () => mocks.startTaskThread as never,
 }));
 
-import { resetMattrTasksStoreForTests } from "./mattrTasksStore";
+import { resetMatterTasksStoreForTests } from "./matterTasksStore";
 import { TasksPage } from "./TasksPage";
 
 const json = (body: unknown) =>
@@ -96,9 +96,9 @@ const json = (body: unknown) =>
 
 const realFetch = globalThis.fetch;
 
-function useTasksServer(initial: ReadonlyArray<Partial<MattrTask> & { title: string }> = []) {
+function useTasksServer(initial: ReadonlyArray<Partial<MatterTask> & { title: string }> = []) {
   let next = 0;
-  const make = (input: Partial<MattrTask> & { title: string }): MattrTask => {
+  const make = (input: Partial<MatterTask> & { title: string }): MatterTask => {
     next += 1;
     return {
       id: `task-${next}`,
@@ -130,7 +130,7 @@ function useTasksServer(initial: ReadonlyArray<Partial<MattrTask> & { title: str
     if (method === "GET") return json({ tasks: server.tasks });
     if (method === "POST" && id === "reorder") {
       server.moves.push(body);
-      for (const move of body.moves as MattrTaskMove[]) {
+      for (const move of body.moves as MatterTaskMove[]) {
         server.tasks = server.tasks.map((entry) =>
           entry.id === move.id ? { ...entry, status: move.status, order: move.order } : entry,
         );
@@ -153,7 +153,7 @@ function useTasksServer(initial: ReadonlyArray<Partial<MattrTask> & { title: str
     }
     return new Response(null, { status: 404 });
   });
-  resetMattrTasksStoreForTests();
+  resetMatterTasksStoreForTests();
   mocks.startTaskThread.mockClear();
   vi.stubGlobal("fetch", fetchMock);
   try {
@@ -206,7 +206,7 @@ describe("TasksPage", () => {
     await expect.poll(() => server.patches).toContainEqual({ note: "Only on Safari." });
 
     await userEvent.click(page.getByRole("button", { name: "Project" }).last());
-    await userEvent.click(page.getByRole("menuitemradio", { name: "mattr" }));
+    await userEvent.click(page.getByRole("menuitemradio", { name: "Matter" }));
     await expect.poll(() => server.patches).toContainEqual({ projectId: "project-1" });
 
     await userEvent.click(start);

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { useMattrApiConfig } from "../../../addons/mattrApi";
+import { useMatterApiConfig } from "../../../addons/matterApi";
 import { useEnabledBotProviderAddons, useIsAddonEnabled } from "../../../addons/useAddonRegistry";
 import { contextMenuSourceOf } from "../../../contextMenuSource";
 import { setVoiceModeOpen } from "../../../island/voiceAssistantStore";
@@ -19,11 +19,11 @@ import { BotAvatar } from "../../bots/BotAvatarRenderer";
 import { BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
 import { retainBotsSync, useBotsState } from "../../bots/botsStore";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../../ui/tooltip";
-import type { MattrThreadItem } from "./mattrSidebar.logic";
-import type { MattrSidebarActions } from "./useMattrSidebarModel";
+import type { MatterThreadItem } from "./matterSidebar.logic";
+import type { MatterSidebarActions } from "./useMatterSidebarModel";
 
 /** A hover label for an icon-only control. */
-export function MattrTip({
+export function MatterTip({
   label,
   side = "bottom",
   children,
@@ -46,11 +46,11 @@ export function compactAge(iso: string | null, nowMs: number): string {
   return formatRelativeTime(iso, nowMs)?.value ?? "";
 }
 
-function MattrStatusDot({
+function MatterStatusDot({
   item,
   className,
 }: {
-  item: MattrThreadItem;
+  item: MatterThreadItem;
   className?: string | undefined;
 }) {
   const gt = useGT();
@@ -76,7 +76,7 @@ function MattrStatusDot({
   );
 }
 
-export function MattrThreadRow({
+export function MatterThreadRow({
   item,
   active,
   meta,
@@ -84,12 +84,12 @@ export function MattrThreadRow({
   trailing,
   actions,
 }: {
-  item: MattrThreadItem;
+  item: MatterThreadItem;
   active: boolean;
   meta?: ReactNode;
   subtitle?: ReactNode;
   trailing?: ReactNode;
-  actions: MattrSidebarActions;
+  actions: MatterSidebarActions;
 }) {
   const onContextMenu = (event: ReactMouseEvent) => {
     event.preventDefault();
@@ -102,7 +102,7 @@ export function MattrThreadRow({
   const hasTrailing = trailing !== undefined && trailing !== null;
   return (
     <li
-      data-mattr-thread-row={item.key}
+      data-matter-thread-row={item.key}
       className={cn(
         "flex items-center rounded-md transition-colors",
         hasTrailing
@@ -127,7 +127,7 @@ export function MattrThreadRow({
               : "text-sidebar-foreground/90 transition-colors hover:bg-sidebar-row-hover",
         )}
       >
-        <MattrStatusDot item={item} className={subtitle ? "mt-[5px]" : undefined} />
+        <MatterStatusDot item={item} className={subtitle ? "mt-[5px]" : undefined} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(
@@ -154,7 +154,7 @@ export function MattrThreadRow({
   );
 }
 
-export function MattrSectionHeader({
+export function MatterSectionHeader({
   icon,
   label,
   count,
@@ -216,22 +216,22 @@ export function MattrSectionHeader({
  * Renders its children with the connected Bots, but only while an add-on that provides Bots is
  * enabled. Disabled, it renders nothing and opens no event stream.
  */
-export function MattrBotsSlot({
+export function MatterBotsSlot({
   children,
 }: {
   children: (bots: ReadonlyArray<BotIdentity>) => ReactNode;
 }) {
   const providers = useEnabledBotProviderAddons();
   if (providers.length === 0) return null;
-  return <MattrBotsSlotContent>{children}</MattrBotsSlotContent>;
+  return <MatterBotsSlotContent>{children}</MatterBotsSlotContent>;
 }
 
-function MattrBotsSlotContent({
+function MatterBotsSlotContent({
   children,
 }: {
   children: (bots: ReadonlyArray<BotIdentity>) => ReactNode;
 }) {
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const state = useBotsState();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the Bots event stream open while a Bots surface is mounted
   useEffect(() => {
@@ -245,7 +245,7 @@ function MattrBotsSlotContent({
   return children(bots);
 }
 
-function MattrBotBadge({ bot }: { bot: BotIdentity }) {
+function MatterBotBadge({ bot }: { bot: BotIdentity }) {
   const needsUser = bot.status === "waiting_for_user" || bot.status === "waiting_for_approval";
   // One calm signal: unread wins, then a block on the user, then a failure. Working shows in text.
   const dot =
@@ -260,7 +260,7 @@ function MattrBotBadge({ bot }: { bot: BotIdentity }) {
   return (
     <span
       aria-hidden
-      data-mattr-bot-dot
+      data-matter-bot-dot
       className={cn(
         "pointer-events-none absolute -top-1 -right-1 size-2 rounded-full ring-2 ring-sidebar",
         dot,
@@ -269,7 +269,7 @@ function MattrBotBadge({ bot }: { bot: BotIdentity }) {
   );
 }
 
-export function MattrBotLink({
+export function MatterBotLink({
   bot,
   variant = "crew",
   className,
@@ -292,7 +292,7 @@ export function MattrBotLink({
       : `${bot.name} · ${statusLabel}`;
 
   return (
-    <MattrTip label={tipLabel} side={variant === "crew" ? "top" : "bottom"}>
+    <MatterTip label={tipLabel} side={variant === "crew" ? "top" : "bottom"}>
       <Link
         to="/bots/$providerId/$botId"
         params={{ providerId: bot.providerId, botId: bot.remoteBotId }}
@@ -324,15 +324,15 @@ export function MattrBotLink({
         >
           {/* 24px maps GrokBotCharacter to "sm" (size-6) with full face details instead of 16px "xs". */}
           <BotAvatar bot={bot} size={24} activity={bot.status} />
-          <MattrBotBadge bot={bot} />
+          <MatterBotBadge bot={bot} />
         </span>
         <span className="max-w-full truncate text-3xs leading-none">{bot.name}</span>
       </Link>
-    </MattrTip>
+    </MatterTip>
   );
 }
 
-function MattrVoiceWaveformGlyph({ className }: { className?: string | undefined }) {
+function MatterVoiceWaveformGlyph({ className }: { className?: string | undefined }) {
   return (
     <svg
       aria-hidden
@@ -349,12 +349,12 @@ function MattrVoiceWaveformGlyph({ className }: { className?: string | undefined
 }
 
 /** A Voice Mode trigger, shown only while the Voice Assistant add-on is enabled. */
-export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" }) {
+export function MatterVoiceTrigger({ variant }: { variant: "pill" | "tile" }) {
   const gt = useGT();
   const enabled = useIsAddonEnabled("voice-assistant");
   if (!enabled) return null;
   return (
-    <MattrTip label={gt("Voice Mode")} side={variant === "pill" ? "top" : "bottom"}>
+    <MatterTip label={gt("Voice Mode")} side={variant === "pill" ? "top" : "bottom"}>
       <button
         type="button"
         onClick={() => setVoiceModeOpen(true)}
@@ -366,13 +366,13 @@ export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" }) {
             : "h-12 w-full flex-col gap-1 rounded-lg bg-sidebar-row-hover/40 px-1 text-sidebar-muted-foreground ring-1 ring-inset ring-sidebar-border/45 hover:bg-sidebar-row-hover/85 hover:text-sidebar-foreground hover:ring-sidebar-border/75",
         )}
       >
-        <MattrVoiceWaveformGlyph
+        <MatterVoiceWaveformGlyph
           className={variant === "tile" ? "h-4 w-4.5 text-sidebar-foreground" : undefined}
         />
         <span className={variant === "tile" ? "text-3xs leading-none" : undefined}>
           {gt("Voice")}
         </span>
       </button>
-    </MattrTip>
+    </MatterTip>
   );
 }

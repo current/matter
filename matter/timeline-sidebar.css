@@ -1,5 +1,5 @@
-/* mattr Timeline sidebar (Synara frames 04 "pure" and 05 "full", Doop canvas _1uGShyX4Q).
-   Outer hover/selected pills inset 8px (matching --mattr-shell-gap); leading/trailing content
+/* Matter Timeline sidebar (Synara frames 04 "pure" and 05 "full", Doop canvas _1uGShyX4Q).
+   Outer hover/selected pills inset 8px (matching --matter-shell-gap); leading/trailing content
    locks to 16px; nav labels, thread titles, line-2 projects and Settings share a 38px text rail.
    The root also carries .mfs, so the brand menu, Crew, notices and popovers keep sidebar.css.
    Rules are scoped `.mts .mts-*` so they outrank `.mfs button { color: inherit }`. */
@@ -48,8 +48,8 @@
 }
 
 /* Keep muted metadata opaque over translucent Blur and Liquid Glass wallpapers. */
-html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) .mts,
-html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) .mts {
+html[data-matter-shell-material]:not([data-matter-shell-material="solid"]) .mts,
+html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"]) .mts {
   --mts-muted: var(--mts-secondary);
 }
 
@@ -364,7 +364,7 @@ html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) .m
   scrollbar-width: none;
 }
 
-html:not([data-mattr-scroll-fade="off"])
+html:not([data-matter-scroll-fade="off"])
   .mts
   .mts-list[data-scrolled-top]:not([data-scrolled-bottom]) {
   -webkit-mask-image: linear-gradient(
@@ -391,7 +391,7 @@ html:not([data-mattr-scroll-fade="off"])
   );
 }
 
-html:not([data-mattr-scroll-fade="off"])
+html:not([data-matter-scroll-fade="off"])
   .mts
   .mts-list[data-scrolled-bottom]:not([data-scrolled-top]) {
   -webkit-mask-image: linear-gradient(
@@ -418,7 +418,7 @@ html:not([data-mattr-scroll-fade="off"])
   );
 }
 
-html:not([data-mattr-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data-scrolled-bottom] {
+html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data-scrolled-bottom] {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0px,

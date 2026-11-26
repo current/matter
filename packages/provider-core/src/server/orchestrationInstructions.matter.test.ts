@@ -4,18 +4,18 @@ import {
   acpEffectiveInteractionMode,
   buildT3AcpInstructions,
   t3AcpPromptWithInstructions,
-  withMattrGoalModeInstructions,
+  withMatterGoalModeInstructions,
 } from "./orchestrationInstructions.ts";
 
-describe("mattr interaction mode instructions", () => {
+describe("Matter interaction mode instructions", () => {
   it("adds nothing to Default or Plan turns, so native plan modes run untouched", () => {
     for (const nativeGoals of [false, true]) {
       assert.equal(
-        withMattrGoalModeInstructions("Fix the bug", "default", nativeGoals),
+        withMatterGoalModeInstructions("Fix the bug", "default", nativeGoals),
         "Fix the bug",
       );
       assert.equal(
-        withMattrGoalModeInstructions("Fix the bug", "plan", nativeGoals),
+        withMatterGoalModeInstructions("Fix the bug", "plan", nativeGoals),
         "Fix the bug",
       );
     }
@@ -23,18 +23,18 @@ describe("mattr interaction mode instructions", () => {
 
   it("leaves Goal turns bare on providers with a native /goal", () => {
     assert.equal(
-      withMattrGoalModeInstructions("Ship the importer", "goal", true),
+      withMatterGoalModeInstructions("Ship the importer", "goal", true),
       "Ship the importer",
     );
   });
 
   it("appends the fallback Goal block after the user's words on other providers", () => {
-    const text = withMattrGoalModeInstructions("Ship the importer", "goal", false);
-    assert.isTrue(text.startsWith("Ship the importer\n\n<mattr_goal_mode>\n"));
-    assert.isTrue(text.endsWith("</mattr_goal_mode>"));
+    const text = withMatterGoalModeInstructions("Ship the importer", "goal", false);
+    assert.isTrue(text.startsWith("Ship the importer\n\n<matter_goal_mode>\n"));
+    assert.isTrue(text.endsWith("</matter_goal_mode>"));
     for (const cue of ["end to end", "- [ ]", "subagents", "verified"]) assert.include(text, cue);
     assert.isBelow(text.length, 800);
-    assert.equal(withMattrGoalModeInstructions("  ", "goal", false), "  ");
+    assert.equal(withMatterGoalModeInstructions("  ", "goal", false), "  ");
   });
 
   it("keeps ACP's Default mode text for Goal, since Goal edits like Default", () => {

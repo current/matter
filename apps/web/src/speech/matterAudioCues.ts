@@ -1,17 +1,17 @@
 import {
-  MATTR_AUDIO_CUE_SAMPLE_RATE,
-  renderMattrAudioCuePcm,
-  type MattrAudioCueId,
-} from "../../../../antimatter/voice-assistant/audioCuesSynth";
+  MATTER_AUDIO_CUE_SAMPLE_RATE,
+  renderMatterAudioCuePcm,
+  type MatterAudioCueId,
+} from "../../../../matter/voice-assistant/audioCuesSynth";
 import { getIslandSettings } from "../island/islandSettingsStore";
 
-export type { MattrAudioCueId };
+export type { MatterAudioCueId };
 
 type AudioContextConstructor = typeof AudioContext;
 
 let sharedContext: AudioContext | null = null;
-const bufferCache = new Map<MattrAudioCueId, AudioBuffer>();
-let testObserver: ((cue: MattrAudioCueId) => void) | null = null;
+const bufferCache = new Map<MatterAudioCueId, AudioBuffer>();
+let testObserver: ((cue: MatterAudioCueId) => void) | null = null;
 
 function resolveAudioContextConstructor(): AudioContextConstructor | null {
   if (typeof globalThis === "undefined") return null;
@@ -36,15 +36,15 @@ function getOrCreateAudioContext(): AudioContext | null {
   }
 }
 
-function getOrCreateCueBuffer(ctx: AudioContext, cue: MattrAudioCueId): AudioBuffer | null {
+function getOrCreateCueBuffer(ctx: AudioContext, cue: MatterAudioCueId): AudioBuffer | null {
   const cached = bufferCache.get(cue);
   if (cached) return cached;
   try {
     const sampleRate =
       typeof ctx.sampleRate === "number" && Number.isFinite(ctx.sampleRate) && ctx.sampleRate > 0
         ? ctx.sampleRate
-        : MATTR_AUDIO_CUE_SAMPLE_RATE;
-    const pcm = renderMattrAudioCuePcm(cue, sampleRate);
+        : MATTER_AUDIO_CUE_SAMPLE_RATE;
+    const pcm = renderMatterAudioCuePcm(cue, sampleRate);
     const buffer = ctx.createBuffer(1, pcm.length, sampleRate);
     if (typeof buffer.copyToChannel === "function") {
       buffer.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0);
@@ -58,7 +58,7 @@ function getOrCreateCueBuffer(ctx: AudioContext, cue: MattrAudioCueId): AudioBuf
   }
 }
 
-export function isMattrAudioCueEnabled(cue: MattrAudioCueId): boolean {
+export function isMatterAudioCueEnabled(cue: MatterAudioCueId): boolean {
   const voice = getIslandSettings().voiceAssistant;
   if (!voice.soundCuesEnabled) return false;
   if (cue === "voice-mode-thinking" && !voice.thinkingCueEnabled) return false;
@@ -69,11 +69,11 @@ export function isMattrAudioCueEnabled(cue: MattrAudioCueId): boolean {
  * Plays a Lilt-family audio cue via Web Audio API.
  * Never throws or blocks mic capture / TTS when audio hardware or AudioContext is unavailable.
  */
-export function playMattrAudioCue(
-  cue: MattrAudioCueId,
+export function playMatterAudioCue(
+  cue: MatterAudioCueId,
   options?: { readonly force?: boolean },
 ): boolean {
-  if (!options?.force && !isMattrAudioCueEnabled(cue)) {
+  if (!options?.force && !isMatterAudioCueEnabled(cue)) {
     return false;
   }
 
@@ -112,13 +112,13 @@ export function playMattrAudioCue(
   }
 }
 
-export function setMattrAudioCueObserverForTests(
-  observer: ((cue: MattrAudioCueId) => void) | null,
+export function setMatterAudioCueObserverForTests(
+  observer: ((cue: MatterAudioCueId) => void) | null,
 ): void {
   testObserver = observer;
 }
 
-export function resetMattrAudioCuesForTests(): void {
+export function resetMatterAudioCuesForTests(): void {
   testObserver = null;
   bufferCache.clear();
   if (sharedContext) {

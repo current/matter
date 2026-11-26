@@ -78,7 +78,7 @@ import {
 } from "@t3tools/provider-core/server/subagentProjection";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
-import { withoutNativePromptSuggestions } from "../mattr/composerPredictions/nativePromptSuggestions.ts";
+import { withoutNativePromptSuggestions } from "../matter/composerPredictions/nativePromptSuggestions.ts";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 // Without native resume, a released session comes back as a summary of the thread, so it stays longer.

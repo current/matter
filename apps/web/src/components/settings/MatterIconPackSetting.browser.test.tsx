@@ -8,8 +8,8 @@ import {
   ICON_PACK_OPTIONS,
   getIconPack,
   setIconPack,
-} from "../../../../../antimatter/icons/iconPack";
-import { useMattrIconPack } from "../../mattrIconPack";
+} from "../../../../../matter/icons/iconPack";
+import { useMatterIconPack } from "../../matterIconPack";
 
 vi.mock(import("./settingsLayout"), async (original) => ({
   ...(await original()),
@@ -21,13 +21,13 @@ vi.mock(import("./settingsLayout"), async (original) => ({
   ),
 }));
 
-import { MattrIconPackSetting } from "./MattrIconPackSetting";
+import { MatterIconPackSetting } from "./MatterIconPackSetting";
 
 function PackProbe() {
-  return <output data-testid="pack-probe">{useMattrIconPack()}</output>;
+  return <output data-testid="pack-probe">{useMatterIconPack()}</output>;
 }
 
-describe("MattrIconPackSetting", () => {
+describe("MatterIconPackSetting", () => {
   it("switches every subscriber to a picked pack at once and saves it on the device", async () => {
     using _pack = {
       [Symbol.dispose]: () => {
@@ -37,7 +37,7 @@ describe("MattrIconPackSetting", () => {
     };
     await using _screen = await render(
       <>
-        <MattrIconPackSetting />
+        <MatterIconPackSetting />
         <PackProbe />
       </>,
       { router: false },

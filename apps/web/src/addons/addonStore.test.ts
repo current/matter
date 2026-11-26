@@ -1,5 +1,5 @@
 import type { AddonEntry, AddonListResponse } from "@t3tools/contracts";
-import { MATTR_ADDON_MANIFESTS } from "@t3tools/contracts";
+import { MATTER_ADDON_MANIFESTS } from "@t3tools/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -15,7 +15,7 @@ import {
 const config = { baseUrl: "http://server.test", headers: {} };
 
 function serverEntries(enabled: Record<string, boolean>, source = "user" as const) {
-  return MATTR_ADDON_MANIFESTS.map((manifest): AddonEntry => ({
+  return MATTER_ADDON_MANIFESTS.map((manifest): AddonEntry => ({
     manifest,
     state: {
       id: manifest.id,
@@ -65,7 +65,7 @@ describe("addonStore", () => {
     const state = getAddonStoreState();
     expect(state.source).toBe("local");
     expect(state.entries.map((entry) => entry.manifest.id)).toEqual(
-      MATTR_ADDON_MANIFESTS.map((manifest) => manifest.id),
+      MATTER_ADDON_MANIFESTS.map((manifest) => manifest.id),
     );
     expect(state.entries.every((entry) => !entry.state.enabled)).toBe(true);
     expect(isAddonEnabled("grok-bot")).toBe(false);

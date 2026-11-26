@@ -1,7 +1,7 @@
-/* mattr default sidebar ("final choice", Doop canvas G72oInDU44). Every size below is copied from
+/* Matter default sidebar ("final choice", Doop canvas G72oInDU44). Every size below is copied from
    that frame; dark values are its exact tokens, light ones are the same roles mixed from the
    sidebar's own foreground so they hold over every shell material. Scoped to .mfs so nothing
-   upstream inherits it. Rendered by apps/web/src/components/sidebar/mattr/MattrDefaultSidebar.tsx. */
+   upstream inherits it. Rendered by apps/web/src/components/sidebar/matter/MatterDefaultSidebar.tsx. */
 
 .mfs {
   --mfs-fg: var(--sidebar-foreground);
@@ -91,13 +91,13 @@
 /* The brand row replaces the titlebar wordmark, so the titlebar keeps only its controls. */
 /* The header is the host's first child; web and the PWA render it without .drag-region. Electron
    uses hash history, so its home link's href ends in "#/" rather than being "/". */
-[data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]),
-[data-mattr-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) {
+[data-matter-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]),
+[data-matter-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) {
   display: none !important;
 }
 
-[data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]) + div,
-[data-mattr-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) + div {
+[data-matter-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]) + div,
+[data-matter-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) + div {
   margin-inline-start: var(--workspace-titlebar-content-left);
 }
 

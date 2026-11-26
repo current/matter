@@ -18,9 +18,9 @@ import {
   buildUserMessageReplyRecord,
   extractLeadingReplyReference,
   extractReplyExcerpt,
-  MATTR_REPLY_EXCERPT_MAX_CHARS,
+  MATTER_REPLY_EXCERPT_MAX_CHARS,
   resolveReplyRole,
-} from "./mattrMessageReply.mattr";
+} from "./matterMessageReply.matter";
 
 const decodeMessageContext = Schema.decodeUnknownSync(OrchestrationMessageContext);
 
@@ -53,8 +53,8 @@ describe("extractReplyExcerpt", () => {
 
   it("caps long excerpts cleanly without splitting surrogate pairs", () => {
     const emojiBoundary = `${"a".repeat(178)}😀 trailing words that should not fit`;
-    const excerpt = extractReplyExcerpt(emojiBoundary, MATTR_REPLY_EXCERPT_MAX_CHARS);
-    expect(excerpt.length).toBeLessThanOrEqual(MATTR_REPLY_EXCERPT_MAX_CHARS);
+    const excerpt = extractReplyExcerpt(emojiBoundary, MATTER_REPLY_EXCERPT_MAX_CHARS);
+    expect(excerpt.length).toBeLessThanOrEqual(MATTER_REPLY_EXCERPT_MAX_CHARS);
     expect(excerpt.endsWith("…")).toBe(true);
     expect(excerpt).toBe(`${"a".repeat(178)}…`);
     // Ensure no lone high surrogate at the boundary.

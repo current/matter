@@ -63,7 +63,7 @@ function SiriWaveFallback(props: { readonly width: number; readonly height: numb
 }
 
 /**
- * Lilt's GLSL Siri Wave, the one voice visual across mattr, in a transparent WebGL WebView.
+ * Lilt's GLSL Siri Wave, the one voice visual across Matter, in a transparent WebGL WebView.
  * The microphone level never crosses the bridge: it stretches the view on the UI thread, as
  * `scaleY` does on web. Only state changes reach the page, and the page stops drawing while
  * inactive or in the background.

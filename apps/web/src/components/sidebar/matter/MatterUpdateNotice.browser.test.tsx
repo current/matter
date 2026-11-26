@@ -1,9 +1,9 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet antimatter/sidebar.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet matter/sidebar.css, which loads outside Tailwind. */
 import type { DesktopUpdateState } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import "~/index.css";
-import "../../../../../../antimatter/sidebar.css";
+import "../../../../../../matter/sidebar.css";
 import { act, render } from "../../../../test/render";
 import { SidebarProvider } from "../../ui/sidebar";
 
@@ -44,7 +44,7 @@ vi.mock("../useUpdateEverything", () => ({
   }),
 }));
 
-import { MattrUpdateNotice } from "./MattrDefaultSidebarParts";
+import { MatterUpdateNotice } from "./MatterDefaultSidebarParts";
 
 function updateState(status: DesktopUpdateState["status"]): DesktopUpdateState {
   return {
@@ -67,14 +67,14 @@ function updateState(status: DesktopUpdateState["status"]): DesktopUpdateState {
   };
 }
 
-describe("MattrUpdateNotice", () => {
+describe("MatterUpdateNotice", () => {
   it("shows the update pill only while an update applies, without a list marker", async () => {
     mocks.update = updateState("up-to-date");
     mocks.hasUpdates = false;
     await using screen = await render(
       <SidebarProvider>
         <div className="mfs-notices">
-          <MattrUpdateNotice />
+          <MatterUpdateNotice />
         </div>
       </SidebarProvider>,
     );

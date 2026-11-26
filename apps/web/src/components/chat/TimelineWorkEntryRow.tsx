@@ -82,7 +82,7 @@ import {
   sliceThoughtPreviewSource,
   thoughtPreviewMarkdown,
 } from "./TimelineWorkEntryRow.logic";
-import { rebrandTimelineServerText } from "./mattrRebrandTimelineText";
+import { rebrandTimelineServerText } from "./matterRebrandTimelineText";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
   const rawThreadId = threadReadTargetId(entry);

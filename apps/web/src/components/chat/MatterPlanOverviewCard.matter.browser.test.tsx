@@ -1,5 +1,5 @@
 import "~/index.css";
-import "../../../../../antimatter/questions-plan.css";
+import "../../../../../matter/questions-plan.css";
 
 import { EnvironmentId, PlanId, ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -9,15 +9,15 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, fakeTimers, render } from "../../../test/render";
 import {
-  MATTR_PLAN_AUTO_APPROVE_STORAGE_KEY,
-  writeMattrPlanAutoApprove,
-} from "../../mattrPlanAutoApprove";
+  MATTER_PLAN_AUTO_APPROVE_STORAGE_KEY,
+  writeMatterPlanAutoApprove,
+} from "../../matterPlanAutoApprove";
 import { toastManager } from "../ui/toast";
 import {
-  MattrPlanOverviewCard,
-  resetDisarmedMattrPlanAutoApproveForTests,
-  type MattrPlanOverviewCardProps,
-} from "./MattrPlanOverviewCard.mattr";
+  MatterPlanOverviewCard,
+  resetDisarmedMatterPlanAutoApproveForTests,
+  type MatterPlanOverviewCardProps,
+} from "./MatterPlanOverviewCard.matter";
 
 const environmentId = EnvironmentId.make("env");
 const threadRef = { environmentId, threadId: ThreadId.make("thread") };
@@ -37,9 +37,9 @@ const PLAN = [
   "- [x] Write rollout notes",
 ].join("\n");
 
-function card(overrides: Partial<MattrPlanOverviewCardProps> = {}) {
+function card(overrides: Partial<MatterPlanOverviewCardProps> = {}) {
   return (
-    <MattrPlanOverviewCard
+    <MatterPlanOverviewCard
       planMarkdown={PLAN}
       fallbackTitle="Proposed plan"
       environmentId={environmentId}
@@ -57,19 +57,19 @@ function card(overrides: Partial<MattrPlanOverviewCardProps> = {}) {
 }
 
 function stepTexts(container: HTMLElement) {
-  return [...container.querySelectorAll("[data-mattr-plan-step-text]")].map(
+  return [...container.querySelectorAll("[data-matter-plan-step-text]")].map(
     (step) => step.textContent,
   );
 }
 
 function resetDisarmedPlans() {
-  resetDisarmedMattrPlanAutoApproveForTests();
+  resetDisarmedMatterPlanAutoApproveForTests();
   return {
-    [Symbol.dispose]: resetDisarmedMattrPlanAutoApproveForTests,
+    [Symbol.dispose]: resetDisarmedMatterPlanAutoApproveForTests,
   };
 }
 
-describe("MattrPlanOverviewCard", () => {
+describe("MatterPlanOverviewCard", () => {
   it("shows the title, summary and first three to-dos with a count", async () => {
     await using screen = await render(card());
     await expect.element(screen.getByText("Plan Overview")).toBeVisible();
@@ -81,7 +81,7 @@ describe("MattrPlanOverviewCard", () => {
       .toBeVisible();
     await expect.element(screen.getByText("To-dos")).toBeVisible();
     await expect
-      .element(screen.container.querySelector<HTMLElement>("[data-mattr-plan-count]"))
+      .element(screen.container.querySelector<HTMLElement>("[data-matter-plan-count]"))
       .toHaveTextContent("6");
     expect(stepTexts(screen.container)).toEqual([
       "Add migration for sessions table",
@@ -96,7 +96,7 @@ describe("MattrPlanOverviewCard", () => {
     await expect.element(screen.getByRole("button", { name: "Show less" })).toBeVisible();
     expect(stepTexts(screen.container)).toHaveLength(6);
     expect(
-      screen.container.querySelector<HTMLElement>("[data-mattr-plan-step][data-done]"),
+      screen.container.querySelector<HTMLElement>("[data-matter-plan-step][data-done]"),
     ).not.toBeNull();
     await screen.getByRole("button", { name: "Show less" }).click();
     await expect.element(screen.getByRole("button", { name: "3 more" })).toBeVisible();
@@ -108,20 +108,20 @@ describe("MattrPlanOverviewCard", () => {
       card({ planMarkdown: "# Just prose\n\nNo lists here, only a paragraph." }),
     );
     await expect
-      .element(screen.container.querySelector<HTMLElement>("[data-mattr-plan-preview]"))
+      .element(screen.container.querySelector<HTMLElement>("[data-matter-plan-preview]"))
       .toBeInTheDocument();
     expect(
-      screen.container.querySelector<HTMLElement>("[data-mattr-plan-todos-header]"),
+      screen.container.querySelector<HTMLElement>("[data-matter-plan-todos-header]"),
     ).toBeNull();
   });
 
   it("View Plan reveals the full markdown and Download calls back", async () => {
     const onDownload = vi.fn();
     await using screen = await render(card({ onDownload }));
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-full]")).toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-full]")).toBeNull();
     await screen.getByRole("button", { name: "View Plan" }).click();
     await expect
-      .element(screen.container.querySelector<HTMLElement>("[data-mattr-plan-full]"))
+      .element(screen.container.querySelector<HTMLElement>("[data-matter-plan-full]"))
       .toHaveAttribute("data-open", "");
     await expect.element(screen.getByRole("button", { name: "Hide Plan" })).toBeVisible();
     await screen.getByRole("button", { name: "Download as markdown" }).click();
@@ -143,7 +143,7 @@ describe("MattrPlanOverviewCard", () => {
       await using screen = await render(card());
       await expect.element(screen.getByRole("button", { name: "View Plan" })).toBeVisible();
       expect(
-        screen.container.querySelector<HTMLElement>('[data-mattr-qp-pill-button="primary"]'),
+        screen.container.querySelector<HTMLElement>('[data-matter-qp-pill-button="primary"]'),
       ).toBeNull();
     }
     await using screen = await render(card({ onApprove }));
@@ -153,20 +153,20 @@ describe("MattrPlanOverviewCard", () => {
   });
 
   it("does not count down unless auto-approve is on", async () => {
-    localStorage.removeItem(MATTR_PLAN_AUTO_APPROVE_STORAGE_KEY);
+    localStorage.removeItem(MATTER_PLAN_AUTO_APPROVE_STORAGE_KEY);
     await using screen = await render(card({ onApprove: vi.fn(async () => {}) }));
     await expect.element(screen.getByRole("button", { name: /Approve/ })).toBeVisible();
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
   });
 
   it("auto-approves after the countdown when the device setting is on", async () => {
-    writeMattrPlanAutoApprove(true);
+    writeMatterPlanAutoApprove(true);
     using _timers = fakeTimers();
     const onApprove = vi.fn(async () => {});
     try {
       await using screen = await render(card({ onApprove }));
       const label = () =>
-        screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto-label]");
+        screen.container.querySelector<HTMLElement>("[data-matter-plan-auto-label]");
       expect(label()?.textContent).toBe("Auto Approve in 30s");
       await act(() => vi.advanceTimersByTime(3_000));
       expect(label()?.textContent).toBe("Auto Approve in 27s");
@@ -174,7 +174,7 @@ describe("MattrPlanOverviewCard", () => {
       await act(() => vi.advanceTimersByTime(27_000));
       expect(onApprove).toHaveBeenCalledTimes(1);
     } finally {
-      localStorage.removeItem(MATTR_PLAN_AUTO_APPROVE_STORAGE_KEY);
+      localStorage.removeItem(MATTER_PLAN_AUTO_APPROVE_STORAGE_KEY);
     }
   });
 
@@ -182,14 +182,15 @@ describe("MattrPlanOverviewCard", () => {
     using _timers = fakeTimers();
     const onApprove = vi.fn(async () => {});
     await using screen = await render(card({ onApprove, autoApprove: true }));
-    const label = () => screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto-label]");
+    const label = () =>
+      screen.container.querySelector<HTMLElement>("[data-matter-plan-auto-label]");
     const ring = screen.getByRole("button", { name: "Cancel auto-approve" });
     await act(() => vi.advanceTimersByTime(3_000));
     expect(label()?.textContent).toBe("Auto Approve in 27s");
 
     await userEvent.hover(ring);
-    const tip = screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto-tip]")!;
-    const cardEl = screen.container.querySelector<HTMLElement>("[data-mattr-plan]")!;
+    const tip = screen.container.querySelector<HTMLElement>("[data-matter-plan-auto-tip]")!;
+    const cardEl = screen.container.querySelector<HTMLElement>("[data-matter-plan]")!;
     await expect.element(tip).toHaveStyle({ opacity: "1" });
     expect(tip.getBoundingClientRect().left).toBeGreaterThanOrEqual(
       cardEl.getBoundingClientRect().left,
@@ -206,7 +207,7 @@ describe("MattrPlanOverviewCard", () => {
     expect(label()?.textContent).toBe("Auto Approve in 25s");
 
     const ringButton = screen.container.querySelector<HTMLButtonElement>(
-      "[data-mattr-plan-auto-ring]",
+      "[data-matter-plan-auto-ring]",
     )!;
     await act(() => ringButton.focus());
     await act(() => vi.advanceTimersByTime(40_000));
@@ -214,7 +215,7 @@ describe("MattrPlanOverviewCard", () => {
     expect(onApprove).not.toHaveBeenCalled();
 
     await ring.click();
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
     await expect.element(screen.getByRole("button", { name: /Approve/ })).toBeEnabled();
     await act(() => vi.advanceTimersByTime(40_000));
     expect(onApprove).not.toHaveBeenCalled();
@@ -227,10 +228,10 @@ describe("MattrPlanOverviewCard", () => {
     {
       await using screen = await render(card({ planId, onApprove, autoApprove: true }));
       await screen.getByRole("button", { name: "Cancel auto-approve" }).click();
-      expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+      expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
     }
     await using remounted = await render(card({ planId, onApprove, autoApprove: true }));
-    expect(remounted.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+    expect(remounted.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
   });
 
   it("disarms auto-approve when View Plan or Open full plan is clicked", async () => {
@@ -241,9 +242,9 @@ describe("MattrPlanOverviewCard", () => {
       await using screen = await render(
         card({ planId: PlanId.make("plan-view"), onApprove, autoApprove: true }),
       );
-      expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).not.toBeNull();
+      expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).not.toBeNull();
       await screen.getByRole("button", { name: "View Plan" }).click();
-      expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+      expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
       await act(() => vi.advanceTimersByTime(40_000));
       expect(onApprove).not.toHaveBeenCalled();
     }
@@ -251,9 +252,9 @@ describe("MattrPlanOverviewCard", () => {
       await using screen = await render(
         card({ planId: PlanId.make("plan-dialog"), onApprove, autoApprove: true }),
       );
-      expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).not.toBeNull();
+      expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).not.toBeNull();
       await screen.getByRole("button", { name: "Open full plan" }).click();
-      expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+      expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
       await act(() => vi.advanceTimersByTime(40_000));
       expect(onApprove).not.toHaveBeenCalled();
     }
@@ -263,7 +264,7 @@ describe("MattrPlanOverviewCard", () => {
     await using screen = await render(
       card({ onApprove: vi.fn(async () => {}), autoApprove: true, autoApproveEligible: false }),
     );
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-auto]")).toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-auto]")).toBeNull();
     await expect.element(screen.getByRole("button", { name: /Approve/ })).toBeEnabled();
   });
 
@@ -271,10 +272,12 @@ describe("MattrPlanOverviewCard", () => {
     await using screen = await render(
       card({ planMarkdown: "# Just prose\n\nNo lists here, only a paragraph." }),
     );
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-preview]")).not.toBeNull();
+    expect(
+      screen.container.querySelector<HTMLElement>("[data-matter-plan-preview]"),
+    ).not.toBeNull();
     await screen.getByRole("button", { name: "View Plan" }).click();
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-preview]")).toBeNull();
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-plan-full]")).not.toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-preview]")).toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-plan-full]")).not.toBeNull();
   });
 
   it("suppresses error toasts when approval is interrupted and resets approving state", async () => {

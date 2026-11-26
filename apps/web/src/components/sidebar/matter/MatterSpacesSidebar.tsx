@@ -15,24 +15,24 @@ import {
   buildSpaceSections,
   resolveActiveSpaceKey,
   resolveProjectAttention,
-  type MattrThreadAttention,
-} from "./mattrSidebar.logic";
+  type MatterThreadAttention,
+} from "./matterSidebar.logic";
 import {
   compactAge,
-  MattrBotLink,
-  MattrBotsSlot,
-  MattrSectionHeader,
-  MattrThreadRow,
-  MattrTip,
-  MattrVoiceTrigger,
-} from "./MattrSidebarParts";
-import { MattrScopeLine } from "./MattrScopeLine";
-import { useMattrActiveSpace, useMattrEarlierExpanded } from "./mattrSidebarStore";
-import type { MattrSidebarModel } from "./useMattrSidebarModel";
+  MatterBotLink,
+  MatterBotsSlot,
+  MatterSectionHeader,
+  MatterThreadRow,
+  MatterTip,
+  MatterVoiceTrigger,
+} from "./MatterSidebarParts";
+import { MatterScopeLine } from "./MatterScopeLine";
+import { useMatterActiveSpace, useMatterEarlierExpanded } from "./matterSidebarStore";
+import type { MatterSidebarModel } from "./useMatterSidebarModel";
 
 const MAX_FAVORITES = 8;
 
-const ATTENTION_DOT: Record<MattrThreadAttention, string | null> = {
+const ATTENTION_DOT: Record<MatterThreadAttention, string | null> = {
   needs: "bg-warning",
   running: "bg-success",
   review: "bg-info",
@@ -50,11 +50,11 @@ function useHasConnectedBots(): boolean {
   );
 }
 
-export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
+export function MatterSpacesSidebar({ model }: { model: MatterSidebarModel }) {
   const gt = useGT();
   const { items, projects, activeThreadKey, nowMs, keybindings, actions } = model;
-  const [storedSpace, setActiveSpace] = useMattrActiveSpace();
-  const [earlierExpanded, setEarlierExpanded] = useMattrEarlierExpanded();
+  const [storedSpace, setActiveSpace] = useMatterActiveSpace();
+  const [earlierExpanded, setEarlierExpanded] = useMatterEarlierExpanded();
   const hasConnectedBots = useHasConnectedBots();
   const voiceEnabled = useIsAddonEnabled("voice-assistant");
   const projectKeys = projects.map((project) => project.key);
@@ -88,7 +88,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
   }, [keybindings, projectKeys, setActiveSpace]);
 
   const row = (item: (typeof items)[number]) => (
-    <MattrThreadRow
+    <MatterThreadRow
       key={item.key}
       item={item}
       active={item.key === activeThreadKey}
@@ -102,15 +102,15 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-mattr-sidebar="spaces">
-      <MattrScopeLine />
+    <div className="flex min-h-0 flex-1 flex-col" data-matter-sidebar="spaces">
+      <MatterScopeLine />
       <div className="flex shrink-0 flex-col gap-1.5 px-2 pt-1">
         <div role="group" aria-label={gt("Spaces")} className="grid grid-cols-4 gap-1.5">
           {favorites.map((project, index) => {
             const dot = ATTENTION_DOT[resolveProjectAttention(items, project.key) ?? "idle"];
             const selected = project.key === activeKey;
             return (
-              <MattrTip
+              <MatterTip
                 key={project.key}
                 label={index < 9 ? `${project.name} (${shortcutPrefix}${index + 1})` : project.name}
               >
@@ -134,27 +134,27 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
                     />
                   ) : null}
                 </button>
-              </MattrTip>
+              </MatterTip>
             );
           })}
         </div>
-        <MattrBotsSlot>
+        <MatterBotsSlot>
           {(bots) => (
             <div role="group" aria-label={gt("Bots")} className="grid grid-cols-4 gap-1.5">
               {bots.slice(0, voiceEnabled ? 3 : 4).map((bot) => (
-                <MattrBotLink
+                <MatterBotLink
                   key={`${bot.providerId}:${bot.remoteBotId}`}
                   bot={bot}
                   variant="tile"
                 />
               ))}
-              <MattrVoiceTrigger variant="tile" />
+              <MatterVoiceTrigger variant="tile" />
             </div>
           )}
-        </MattrBotsSlot>
+        </MatterBotsSlot>
         {!hasConnectedBots && voiceEnabled ? (
           <div className="flex justify-end">
-            <MattrVoiceTrigger variant="pill" />
+            <MatterVoiceTrigger variant="pill" />
           </div>
         ) : null}
       </div>
@@ -191,12 +191,12 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
           <>
             {sections.pinned.length > 0 ? (
               <section aria-label={gt("Pinned")}>
-                <MattrSectionHeader icon={<PinIcon aria-hidden />} label={gt("Pinned")} ruled />
+                <MatterSectionHeader icon={<PinIcon aria-hidden />} label={gt("Pinned")} ruled />
                 <ul className="flex flex-col gap-0.5">{sections.pinned.map(row)}</ul>
               </section>
             ) : null}
             <section aria-label={gt("Today")}>
-              <MattrSectionHeader label={gt("Today")} ruled />
+              <MatterSectionHeader label={gt("Today")} ruled />
               <ul className="flex flex-col gap-0.5">{sections.today.map(row)}</ul>
               {sections.today.length === 0 ? (
                 <p className="px-2 py-1.5 text-xs text-sidebar-muted-foreground">
@@ -206,7 +206,7 @@ export function MattrSpacesSidebar({ model }: { model: MattrSidebarModel }) {
             </section>
             {sections.earlier.length > 0 ? (
               <section aria-label={gt("Earlier")}>
-                <MattrSectionHeader
+                <MatterSectionHeader
                   icon={<ArchiveIcon aria-hidden />}
                   label={gt("Earlier")}
                   count={sections.earlier.length}

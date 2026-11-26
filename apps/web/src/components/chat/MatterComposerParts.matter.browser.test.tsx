@@ -1,28 +1,28 @@
 import "~/index.css";
-import "../../../../../antimatter/composer.css";
+import "../../../../../matter/composer.css";
 
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 import { act, fakeTimers, render } from "../../../test/render";
 
 import {
-  MATTR_GOOEY_SEND_STORAGE_KEY,
-  useMattrGooeySendSetting,
-  writeMattrGooeySend,
-} from "../../mattrGooeySend";
+  MATTER_GOOEY_SEND_STORAGE_KEY,
+  useMatterGooeySendSetting,
+  writeMatterGooeySend,
+} from "../../matterGooeySend";
 import { ComposerSurface } from "./ComposerSurface";
 import {
-  MattrComposerAttachButton,
-  MattrComposerProjectLabel,
-  MattrDictateIcon,
-  MattrGooeySendAnchor,
-  type MattrGooeySendAction,
-  MattrVoiceModeIcon,
-} from "./MattrComposerParts.mattr";
+  MatterComposerAttachButton,
+  MatterComposerProjectLabel,
+  MatterDictateIcon,
+  MatterGooeySendAnchor,
+  type MatterGooeySendAction,
+  MatterVoiceModeIcon,
+} from "./MatterComposerParts.matter";
 
 function gooeySetting(enabled: boolean): Disposable {
-  writeMattrGooeySend(enabled);
-  return { [Symbol.dispose]: () => localStorage.removeItem(MATTR_GOOEY_SEND_STORAGE_KEY) };
+  writeMatterGooeySend(enabled);
+  return { [Symbol.dispose]: () => localStorage.removeItem(MATTER_GOOEY_SEND_STORAGE_KEY) };
 }
 
 function reduceMotion(matches: boolean): Disposable {
@@ -48,19 +48,19 @@ function Composer(props: {
   readonly onDictate?: () => void;
   readonly onVoiceMode?: () => void;
 }) {
-  const [gooeySend] = useMattrGooeySendSetting();
-  const actions: MattrGooeySendAction[] = [
+  const [gooeySend] = useMatterGooeySendSetting();
+  const actions: MatterGooeySendAction[] = [
     {
       id: "dictate",
       label: "Dictate",
       shortcut: "Alt+Space",
-      icon: <MattrDictateIcon />,
+      icon: <MatterDictateIcon />,
       onSelect: () => props.onDictate?.(),
     },
     {
       id: "voice-mode",
       label: "Voice mode",
-      icon: <MattrVoiceModeIcon />,
+      icon: <MatterVoiceModeIcon />,
       onSelect: () => props.onVoiceMode?.(),
     },
   ];
@@ -84,14 +84,14 @@ function Composer(props: {
           props.onSubmit?.();
         }}
       >
-        <ComposerSurface.Shell data-mattr-composer="" contextRow={props.contextRow}>
+        <ComposerSurface.Shell data-matter-composer="" contextRow={props.contextRow}>
           <ComposerSurface.Host>
             <ComposerSurface.Main>
               <div data-chat-composer-surface="true">
                 <div data-chat-composer-body="true" />
                 <div data-chat-composer-footer="true" className="flex items-center">
                   <div className="me-2">
-                    <MattrComposerAttachButton onOpenPicker={() => {}} />
+                    <MatterComposerAttachButton onOpenPicker={() => {}} />
                   </div>
                   <div data-chat-composer-actions="right" className="flex flex-1 items-center">
                     <div
@@ -112,21 +112,21 @@ function Composer(props: {
                           aria-label="Start voice input"
                           onClick={() => props.onDictate?.()}
                         >
-                          <MattrDictateIcon />
+                          <MatterDictateIcon />
                         </button>
                         <button
                           type="button"
                           aria-label="Start voice mode"
                           onClick={() => props.onVoiceMode?.()}
                         >
-                          <MattrVoiceModeIcon />
+                          <MatterVoiceModeIcon />
                         </button>
                       </>
                     ) : null}
                     {gooeySend ? (
-                      <MattrGooeySendAnchor actions={actions} anchorActive={!props.sendDisabled}>
+                      <MatterGooeySendAnchor actions={actions} anchorActive={!props.sendDisabled}>
                         {sendButton}
-                      </MattrGooeySendAnchor>
+                      </MatterGooeySendAnchor>
                     ) : (
                       sendButton
                     )}
@@ -137,7 +137,7 @@ function Composer(props: {
           </ComposerSurface.Host>
           {props.contextRow ? (
             <ComposerSurface.ContextStrip>
-              <MattrComposerProjectLabel title="mattr" />
+              <MatterComposerProjectLabel title="Matter" />
               <div className="flex flex-1 items-center">
                 {props.activeThread ? (
                   <span data-composer-context-control="">t3-gooey</span>
@@ -173,7 +173,7 @@ function Composer(props: {
 }
 
 const style = (element: Element) => getComputedStyle(element);
-const shell = () => document.querySelector("[data-mattr-composer]")!;
+const shell = () => document.querySelector("[data-matter-composer]")!;
 
 describe("final choice composer", () => {
   it("wraps the card and under-tray in one shelf with identical order in drafts and active threads", async () => {
@@ -186,7 +186,7 @@ describe("final choice composer", () => {
       expect(style(host).borderTopLeftRadius).toBe("13px");
       const strip = document.querySelector('[data-slot="composer-context-strip"]')!;
       expect(style(strip).minHeight).toBe("38px");
-      const project = document.querySelector("[data-mattr-composer-project]")!;
+      const project = document.querySelector("[data-matter-composer-project]")!;
       const workspace = document.querySelector(workspaceSelector)!;
       const permissions = document.querySelector(
         '[data-slot="composer-context-strip"] button[aria-haspopup="menu"]',
@@ -239,7 +239,7 @@ describe("final choice composer", () => {
 
   it("opens the file picker from the plus button", async () => {
     const onOpenPicker = vi.fn();
-    await using screen = await render(<MattrComposerAttachButton onOpenPicker={onOpenPicker} />, {
+    await using screen = await render(<MatterComposerAttachButton onOpenPicker={onOpenPicker} />, {
       router: false,
     });
     const button = screen.getByRole("button", { name: "Attach files" }).element() as HTMLElement;
@@ -262,16 +262,16 @@ describe("gooey send button", () => {
     const inlineVoice = page.getByRole("button", { name: "Start voice mode" });
     await expect.element(inlineMic).toBeVisible();
     await expect.element(inlineVoice).toBeVisible();
-    expect(document.querySelector('[data-mattr-icon="dictate"]')).not.toBeNull();
-    expect(document.querySelector('[data-mattr-icon="voice-mode"]')).not.toBeNull();
-    expect(document.querySelector("[data-mattr-gooey-anchor]")).toBeNull();
+    expect(document.querySelector('[data-matter-icon="dictate"]')).not.toBeNull();
+    expect(document.querySelector('[data-matter-icon="voice-mode"]')).not.toBeNull();
+    expect(document.querySelector("[data-matter-gooey-anchor]")).toBeNull();
 
-    await act(() => writeMattrGooeySend(true));
+    await act(() => writeMatterGooeySend(true));
     await expect.element(inlineMic).not.toBeInTheDocument();
     await expect.element(inlineVoice).not.toBeInTheDocument();
-    expect(document.querySelector("[data-mattr-gooey-anchor]")).not.toBeNull();
+    expect(document.querySelector("[data-matter-gooey-anchor]")).not.toBeNull();
     // Idle state mounts zero SVG filters.
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
     expect(document.querySelector("feGaussianBlur")).toBeNull();
   });
 
@@ -293,13 +293,13 @@ describe("gooey send button", () => {
     );
     using _timers = fakeTimers();
 
-    const anchor = document.querySelector("[data-mattr-gooey-anchor]")!;
+    const anchor = document.querySelector("[data-matter-gooey-anchor]")!;
     const openEvent = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     await act(() => {
       anchor.dispatchEvent(openEvent);
     });
     expect(openEvent.defaultPrevented).toBe(true);
-    expect(document.querySelector("[data-mattr-gooey-svg]")).not.toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).not.toBeNull();
     expect(document.querySelector("feGaussianBlur")).not.toBeNull();
     expect(document.querySelector("feColorMatrix")).not.toBeNull();
 
@@ -311,7 +311,7 @@ describe("gooey send button", () => {
     await act(() => (dictate.element() as HTMLButtonElement).click());
     expect(onDictate).toHaveBeenCalledTimes(1);
     await act(() => vi.advanceTimersByTime(400));
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
     expect(document.querySelector("feGaussianBlur")).toBeNull();
 
     // Reopen and trigger Voice Mode.
@@ -323,7 +323,7 @@ describe("gooey send button", () => {
     );
     expect(onVoiceMode).toHaveBeenCalledTimes(1);
     await act(() => vi.advanceTimersByTime(400));
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
   });
 
   it("closes cleanly on Escape, outside pointerdown, or second right-click, and keeps left-click submit working", async () => {
@@ -336,48 +336,48 @@ describe("gooey send button", () => {
     );
     using _timers = fakeTimers();
 
-    const anchor = document.querySelector("[data-mattr-gooey-anchor]")!;
+    const anchor = document.querySelector("[data-matter-gooey-anchor]")!;
     const sendButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
 
     // Left-click submits normally.
     await act(() => sendButton.click());
     expect(onSubmit).toHaveBeenCalledTimes(1);
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
 
     // Open -> Escape closes.
     await act(() => {
       sendButton.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     });
-    expect(document.querySelector("[data-mattr-gooey-svg]")).not.toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).not.toBeNull();
     await act(() => {
       window.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
       );
     });
     await act(() => vi.advanceTimersByTime(400));
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
 
     // Open -> outside click closes.
     await act(() => {
       anchor.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     });
-    expect(document.querySelector("[data-mattr-gooey-svg]")).not.toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).not.toBeNull();
     await act(() => {
       document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     });
     await act(() => vi.advanceTimersByTime(400));
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
 
     // Open -> second right-click toggles closed.
     await act(() => {
       anchor.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     });
-    expect(document.querySelector("[data-mattr-gooey-svg]")).not.toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).not.toBeNull();
     await act(() => {
       anchor.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     });
     await act(() => vi.advanceTimersByTime(400));
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
   });
 
   it("skips the SVG blur filter and snaps cleanly under reduced motion", async () => {
@@ -385,13 +385,13 @@ describe("gooey send button", () => {
     using _motion = reduceMotion(true);
     await using _screen = await render(<Composer sendDisabled contextRow />, { router: false });
 
-    const anchor = document.querySelector("[data-mattr-gooey-anchor]")!;
+    const anchor = document.querySelector("[data-matter-gooey-anchor]")!;
     await act(() => {
       anchor.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
     });
     await expect.element(page.getByRole("button", { name: "Dictate" })).toBeVisible();
     await expect.element(page.getByRole("button", { name: "Voice mode" })).toBeVisible();
-    expect(document.querySelector("[data-mattr-gooey-svg]")).toBeNull();
+    expect(document.querySelector("[data-matter-gooey-svg]")).toBeNull();
     expect(document.querySelector("feGaussianBlur")).toBeNull();
 
     await userEvent.keyboard("{Escape}");

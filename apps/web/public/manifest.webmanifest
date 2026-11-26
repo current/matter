@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "mattr",
-  "short_name": "mattr",
+  "name": "Matter",
+  "short_name": "Matter",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

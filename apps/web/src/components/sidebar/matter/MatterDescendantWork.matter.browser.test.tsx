@@ -1,7 +1,7 @@
 import { render } from "../../../../test/render";
 import {
   EnvironmentId,
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   ProjectId,
   ProviderInstanceId,
   RunId,
@@ -13,17 +13,17 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 
 import "../../../index.css";
-import "../../../../../../antimatter/sidebar.css";
-import "../../../../../../antimatter/timeline-sidebar.css";
+import "../../../../../../matter/sidebar.css";
+import "../../../../../../matter/timeline-sidebar.css";
 import { resetAddonStoreForTests } from "../../../addons/addonStore";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
 import { resetBotsStoreForTests } from "../../bots/botsStore";
 import { SidebarProvider } from "../../ui/sidebar";
 
-vi.mock(import("../../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => ({ baseUrl: "http://server.test", headers: {} }),
+  useMatterApiConfig: () => ({ baseUrl: "http://server.test", headers: {} }),
 }));
 
 vi.mock(import("../../../state/environments"), async (original) => ({
@@ -32,30 +32,30 @@ vi.mock(import("../../../state/environments"), async (original) => ({
   useEnvironmentProviders: (() => new Map()) as never,
 }));
 
-import { MattrDefaultSidebar } from "./MattrDefaultSidebar";
-import type { MattrChildItem } from "./mattrFinalSidebar.logic";
+import { MatterDefaultSidebar } from "./MatterDefaultSidebar";
+import type { MatterChildItem } from "./matterFinalSidebar.logic";
 import {
-  toMattrThreadItem,
+  toMatterThreadItem,
   withDescendantWork,
   workingDescendantSince,
-} from "./mattrSidebar.logic";
-import { MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY } from "./mattrSidebarStore";
-import { MattrTimelineSidebar } from "./MattrTimelineSidebar";
-import type { MattrSidebarModel, MattrSidebarProject } from "./useMattrSidebarModel";
+} from "./matterSidebar.logic";
+import { MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY } from "./matterSidebarStore";
+import { MatterTimelineSidebar } from "./MatterTimelineSidebar";
+import type { MatterSidebarModel, MatterSidebarProject } from "./useMatterSidebarModel";
 
 const local = (day: number, hour: number, minute = 0) =>
   new Date(2026, 2, day, hour, minute).toISOString();
 const NOW_ISO = local(10, 12);
 const environmentId = EnvironmentId.make("local");
 
-const MATTR: MattrSidebarProject = {
-  key: `${environmentId}:mattr`,
-  name: "mattr",
+const MATTER: MatterSidebarProject = {
+  key: `${environmentId}:matter`,
+  name: "Matter",
   group: {
     environmentId,
-    id: ProjectId.make("mattr"),
-    title: "mattr",
-    workspaceRoot: "/repo/mattr",
+    id: ProjectId.make("Matter"),
+    title: "Matter",
+    workspaceRoot: "/repo/matter",
     faviconPath: null,
     projectIcon: { kind: "monogram", text: "m", color: "blue" },
   } as unknown as SidebarProjectSnapshot,
@@ -72,18 +72,18 @@ const runtime = (status: "running" | "completed" | "idle") => ({
 });
 
 function thread(title: string, overrides: ThreadFixtureOverrides = {}) {
-  return toMattrThreadItem(
+  return toMatterThreadItem(
     makeThreadFixture({
       environmentId,
       id: ThreadId.make(title),
-      projectId: ProjectId.make(MATTR.key),
+      projectId: ProjectId.make(MATTER.key),
       title,
       // Yesterday, so only running work keeps it in Recent.
       latestUserMessageAt: local(9, 15),
       createdAt: local(9, 15),
       ...overrides,
     }),
-    MATTR,
+    MATTER,
     NOW_ISO,
   );
 }
@@ -95,7 +95,7 @@ function subagent(
   title: string,
   status: "running" | "completed",
   parentTitle = parent.title,
-): MattrChildItem {
+): MatterChildItem {
   return {
     ...thread(title, {
       runtime: runtime(status),
@@ -109,12 +109,12 @@ function subagent(
   };
 }
 
-function model(children: ReadonlyArray<MattrChildItem>): MattrSidebarModel {
+function model(children: ReadonlyArray<MatterChildItem>): MatterSidebarModel {
   const since = workingDescendantSince([parent, ...children]);
   return {
     items: withDescendantWork([parent], since),
     children: withDescendantWork(children, since),
-    projects: [MATTR],
+    projects: [MATTER],
     activeThreadKey: null,
     nowMs: Date.parse(NOW_ISO),
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
@@ -122,7 +122,7 @@ function model(children: ReadonlyArray<MattrChildItem>): MattrSidebarModel {
   };
 }
 
-const addons: ReadonlyArray<AddonEntry> = MATTR_ADDON_MANIFESTS.map((manifest) => ({
+const addons: ReadonlyArray<AddonEntry> = MATTER_ADDON_MANIFESTS.map((manifest) => ({
   manifest,
   state: {
     id: manifest.id,
@@ -165,16 +165,16 @@ function useServer(storage: Record<string, unknown> = {}) {
 }
 
 const timelineRow = (container: HTMLElement) =>
-  container.querySelector<HTMLElement>(`[data-mattr-timeline-row="${parent.key}"]`);
+  container.querySelector<HTMLElement>(`[data-matter-timeline-row="${parent.key}"]`);
 
 describe("Timeline parent with working subagents", () => {
   it.each([true, false])(
     "spins and stays in Recent while a subagent runs (Show active subagents %s)",
     async (showSubagents) => {
-      using _server = useServer({ [MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY]: showSubagents });
-      const timeline = (children: ReadonlyArray<MattrChildItem>) => (
+      using _server = useServer({ [MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY]: showSubagents });
+      const timeline = (children: ReadonlyArray<MatterChildItem>) => (
         <SidebarProvider>
-          <MattrTimelineSidebar model={model(children)} />
+          <MatterTimelineSidebar model={model(children)} />
         </SidebarProvider>
       );
       await using screen = await render(timeline([subagent("Audit adapters", "running")]));
@@ -182,7 +182,7 @@ describe("Timeline parent with working subagents", () => {
       await expect.element(recent.getByRole("button", { name: parent.title })).toBeVisible();
       await expect.element(recent.getByRole("img", { name: "Running", exact: true })).toBeVisible();
       expect(timelineRow(screen.container)!.querySelector(".mts-spin")).not.toBeNull();
-      expect(screen.container.querySelector("[data-mattr-timeline-subagent]") !== null).toBe(
+      expect(screen.container.querySelector("[data-matter-timeline-subagent]") !== null).toBe(
         showSubagents,
       );
 
@@ -199,10 +199,10 @@ describe("Timeline parent with working subagents", () => {
   );
 
   it("spins for a grandchild that runs under a finished subagent", async () => {
-    using _server = useServer({ [MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY]: false });
+    using _server = useServer({ [MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY]: false });
     await using screen = await render(
       <SidebarProvider>
-        <MattrTimelineSidebar
+        <MatterTimelineSidebar
           model={model([
             subagent("Plan release", "completed"),
             subagent("Sign build", "running", "Plan release"),
@@ -222,14 +222,14 @@ describe("Timeline parent with working subagents", () => {
 describe("Default parent with working subagents", () => {
   it("shows running on the row and the folded project until the subagent finishes", async () => {
     using _server = useServer();
-    const rail = (children: ReadonlyArray<MattrChildItem>) => (
+    const rail = (children: ReadonlyArray<MatterChildItem>) => (
       <SidebarProvider>
-        <MattrDefaultSidebar model={model(children)} />
+        <MatterDefaultSidebar model={model(children)} />
       </SidebarProvider>
     );
     await using screen = await render(rail([subagent("Audit adapters", "running")]));
     const status = () =>
-      screen.container.querySelector(`[data-mattr-thread-row="${parent.key}"] .mfs-row .mfs-a`);
+      screen.container.querySelector(`[data-matter-thread-row="${parent.key}"] .mfs-row .mfs-a`);
     await expect.element(page.getByRole("button", { name: parent.title })).toBeVisible();
     expect(status()?.getAttribute("data-tone")).toBe("running");
     expect(status()?.textContent).toBe("4m");
@@ -237,13 +237,13 @@ describe("Default parent with working subagents", () => {
     await page.getByRole("button", { name: `Hide subagents of ${parent.title}` }).click();
     expect(status()?.getAttribute("data-tone")).toBe("running");
 
-    const group = page.getByRole("region", { name: "mattr" });
-    await group.getByRole("button", { name: /^mattr/ }).click();
+    const group = page.getByRole("region", { name: "Matter" });
+    await group.getByRole("button", { name: /^Matter/ }).click();
     await expect.element(group.getByRole("img", { name: "Running" })).toBeVisible();
 
     await screen.rerender(rail([subagent("Audit adapters", "completed")]));
     await expect.element(group.getByRole("img", { name: "Running" })).not.toBeInTheDocument();
-    await group.getByRole("button", { name: /^mattr/ }).click();
+    await group.getByRole("button", { name: /^Matter/ }).click();
     await expect.element(page.getByRole("button", { name: parent.title })).toBeVisible();
     expect(status()?.getAttribute("data-tone")).toBe("muted");
   });

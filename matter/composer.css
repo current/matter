@@ -1,8 +1,8 @@
-/* mattr "final choice composer" (Doop zX652hyA6X / 5K4fM2mBQ5): the prompt card sits inside a
+/* Matter "final choice composer" (Doop zX652hyA6X / 5K4fM2mBQ5): the prompt card sits inside a
    shelf that also holds the under-tray (project, Local/Worktree, branch). Scoped to the chat
-   composer by ChatView's data-mattr-composer; unlayered, so it wins over Tailwind utilities
+   composer by ChatView's data-matter-composer; unlayered, so it wins over Tailwind utilities
    without restyling upstream markup. */
-[data-mattr-composer] {
+[data-matter-composer] {
   --mc-shelf: #f3f3f5;
   --mc-shelf-line: rgb(0 0 0 / 6%);
   --mc-card: #ffffff;
@@ -34,7 +34,7 @@
   --mc-shelf-pad: 4px;
 }
 
-.dark [data-mattr-composer] {
+.dark [data-matter-composer] {
   --mc-shelf: #171717;
   --mc-shelf-line: rgb(255 255 255 / 9%);
   --mc-card: #1c1c1c;
@@ -58,7 +58,7 @@
 }
 
 /* Custom themes keep their own surfaces; only the shape and controls follow the frame. */
-html[data-theme-id] [data-mattr-composer] {
+html[data-theme-id] [data-matter-composer] {
   --mc-shelf: color-mix(in srgb, var(--app-theme-surface-raised) 55%, var(--background));
   --mc-shelf-line: var(--app-theme-toolbar-border);
   --mc-card: var(--app-theme-surface-raised);
@@ -67,56 +67,56 @@ html[data-theme-id] [data-mattr-composer] {
 
 /* The shelf: one rounded tray holding the card and the under-tray. Without an under-tray
    (no project / embedded / subagent bar), collapse the outer cradle so there is no empty rim. */
-[data-mattr-composer] {
+[data-matter-composer] {
   background-color: var(--mc-shelf);
   border: 1px solid var(--mc-shelf-line);
   border-radius: var(--mc-radius-shelf);
   padding: var(--mc-shelf-pad);
 }
 
-[data-mattr-composer][data-context-row] {
+[data-matter-composer][data-context-row] {
   padding-bottom: 0;
 }
 
-[data-mattr-composer]:not([data-context-row]) {
+[data-matter-composer]:not([data-context-row]) {
   background-color: transparent;
   border: 0;
   border-radius: var(--mc-radius-card);
   padding: 0;
 }
 
-[data-mattr-composer]::before {
+[data-matter-composer]::before {
   display: none;
 }
 
 /* The card. */
-[data-mattr-composer] [data-slot="composer-host"] {
+[data-matter-composer] [data-slot="composer-host"] {
   border-radius: var(--mc-radius-card);
   background-color: var(--mc-card);
   box-shadow: var(--mc-card-shadow);
 }
 
-[data-mattr-composer] [data-slot="composer-host"]::before {
+[data-matter-composer] [data-slot="composer-host"]::before {
   display: none;
 }
 
-[data-mattr-composer] [data-slot="composer-host"]::after {
+[data-matter-composer] [data-slot="composer-host"]::after {
   border-color: var(--mc-card-line);
   box-shadow: none;
 }
 
-[data-mattr-composer] [data-chat-composer-main-surface],
-[data-mattr-composer] [data-chat-composer-surface] {
+[data-matter-composer] [data-chat-composer-main-surface],
+[data-matter-composer] [data-chat-composer-surface] {
   border-radius: var(--mc-radius-card);
 }
 
 /* A banner attached above the card hands the card's paint to the main surface. */
-[data-mattr-composer]:has([data-composer-banner-surface="attached"]) [data-slot="composer-host"] {
+[data-matter-composer]:has([data-composer-banner-surface="attached"]) [data-slot="composer-host"] {
   background-color: transparent;
   box-shadow: none;
 }
 
-[data-mattr-composer]:has([data-composer-banner-surface="attached"])
+[data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   background-color: var(--mc-card);
   box-shadow: var(--mc-card-shadow);
@@ -125,47 +125,47 @@ html[data-theme-id] [data-mattr-composer] {
 }
 
 /* Prompt: 15px in from the top, two 20px lines tall at rest. */
-[data-mattr-composer] [data-chat-composer-body] {
+[data-matter-composer] [data-chat-composer-body] {
   padding: 15px 16px 7px;
 }
 
-[data-mattr-composer] [data-testid="composer-editor"] {
+[data-matter-composer] [data-testid="composer-editor"] {
   line-height: 20px;
 }
 
-[data-mattr-composer] [data-chat-composer-body] .placeholder,
-[data-mattr-composer] [data-chat-composer-body] [data-placeholder]::before,
-[data-mattr-composer] [data-chat-composer-body] .is-editor-empty::before {
+[data-matter-composer] [data-chat-composer-body] .placeholder,
+[data-matter-composer] [data-chat-composer-body] [data-placeholder]::before,
+[data-matter-composer] [data-chat-composer-body] .is-editor-empty::before {
   color: var(--mc-placeholder);
 }
 
 /* Footer bar: 44px, +, permissions on the left; model, mic, send on the right. */
-[data-mattr-composer] [data-chat-composer-footer] {
+[data-matter-composer] [data-chat-composer-footer] {
   min-height: 44px;
   padding: 0 8px 0 10px;
   font-size: 12.5px;
   color: var(--mc-icon);
 }
 
-[data-mattr-composer] [data-chat-composer-footer] > .me-2 {
+[data-matter-composer] [data-chat-composer-footer] > .me-2 {
   margin-inline-end: 2px;
 }
 
-[data-mattr-composer] [data-chat-composer-actions="right"] {
+[data-matter-composer] [data-chat-composer-actions="right"] {
   gap: 2px;
 }
 
-[data-mattr-composer] [data-chat-composer-footer-controls] {
+[data-matter-composer] [data-chat-composer-footer-controls] {
   gap: 2px;
 }
 
-[data-mattr-composer] [data-chat-composer-footer-controls] > [data-resting-block="mode"] {
+[data-matter-composer] [data-chat-composer-footer-controls] > [data-resting-block="mode"] {
   order: -1;
   margin-inline-end: auto;
 }
 
 /* Footer buttons: 28px, 8px corners, 14-15px solid glyphs in the icon gray. */
-[data-mattr-composer] [data-chat-composer-footer] button:not([type="submit"]):not(.rounded-full) {
+[data-matter-composer] [data-chat-composer-footer] button:not([type="submit"]):not(.rounded-full) {
   height: 28px;
   min-width: 28px;
   border-radius: 8px;
@@ -174,16 +174,16 @@ html[data-theme-id] [data-mattr-composer] {
   font-weight: 400;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
   button:not([type="submit"]):not(.rounded-full):hover,
-[data-mattr-composer] [data-chat-composer-footer] button[data-popup-open],
-[data-mattr-composer] [data-chat-composer-footer] button[data-pressed] {
+[data-matter-composer] [data-chat-composer-footer] button[data-popup-open],
+[data-matter-composer] [data-chat-composer-footer] button[data-pressed] {
   background-color: var(--mc-hover);
   color: var(--mc-text);
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
   button:not([type="submit"]):not(.rounded-full)
   svg {
@@ -192,36 +192,36 @@ html[data-theme-id] [data-mattr-composer] {
   color: inherit;
 }
 
-[data-mattr-composer] [data-mattr-composer-attach] {
+[data-matter-composer] [data-matter-composer-attach] {
   width: 27px;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[data-mattr-composer-attach]:not(:hover) {
+[data-matter-composer] [data-chat-composer-footer] button[data-matter-composer-attach]:not(:hover) {
   color: var(--mc-text);
 }
 
-[data-mattr-composer] [data-mattr-composer-attach] svg {
+[data-matter-composer] [data-matter-composer-attach] svg {
   width: 16px !important;
   height: 16px !important;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[aria-pressed="true"]:not(:hover) {
+[data-matter-composer] [data-chat-composer-footer] button[aria-pressed="true"]:not(:hover) {
   background-color: var(--mc-rest);
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Start voice input"] svg,
-[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Start voice mode"] svg {
+[data-matter-composer] [data-chat-composer-footer] button[aria-label="Start voice input"] svg,
+[data-matter-composer] [data-chat-composer-footer] button[aria-label="Start voice mode"] svg {
   width: 15px !important;
   height: 15px !important;
 }
 
 /* Permissions: the label alone, amber, since it only shows when it differs from the default. */
-[data-mattr-composer] [data-resting-block="mode"] button {
+[data-matter-composer] [data-resting-block="mode"] button {
   padding-inline: 7px;
   color: var(--mc-amber) !important;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-resting-block="mode"][data-composer-block-icon-only="false"]
   [data-composer-control-icon]:not([data-composer-control-compact-icon]) {
   display: none;
@@ -229,91 +229,91 @@ html[data-theme-id] [data-mattr-composer] {
 
 /* Interaction mode beside +: a quiet icon in Default; Plan (the theme's success green) and Goal
    (its warning amber) read as one tinted pill, its label then a clear button. No motion. */
-[data-mattr-composer] {
+[data-matter-composer] {
   --mc-plan: var(--success-foreground);
   --mc-plan-tint: color-mix(in srgb, var(--success) 11%, transparent);
   --mc-goal: var(--warning-foreground);
   --mc-goal-tint: color-mix(in srgb, var(--warning) 13%, transparent);
 }
 
-[data-mattr-composer] [data-chat-composer-footer] [data-mattr-mode-control] {
+[data-matter-composer] [data-chat-composer-footer] [data-matter-mode-control] {
   height: 28px;
   margin-inline-end: 2px;
   border-radius: 8px;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] [data-mattr-mode-control][data-mode="plan"] {
+[data-matter-composer] [data-chat-composer-footer] [data-matter-mode-control][data-mode="plan"] {
   --mc-mode: var(--mc-plan);
   background-color: var(--mc-plan-tint);
 }
 
-[data-mattr-composer] [data-chat-composer-footer] [data-mattr-mode-control][data-mode="goal"] {
+[data-matter-composer] [data-chat-composer-footer] [data-matter-mode-control][data-mode="goal"] {
   --mc-mode: var(--mc-goal);
   background-color: var(--mc-goal-tint);
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-mode-control]:not([data-mode="default"])
-  button[data-mattr-mode-trigger],
-[data-mattr-composer]
+  [data-matter-mode-control]:not([data-mode="default"])
+  button[data-matter-mode-trigger],
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-mode-control]:not([data-mode="default"])
-  button[data-mattr-mode-clear] {
+  [data-matter-mode-control]:not([data-mode="default"])
+  button[data-matter-mode-clear] {
   color: var(--mc-mode);
   background-color: transparent;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-mode-control]:not([data-mode="default"])
-  button[data-mattr-mode-trigger] {
+  [data-matter-mode-control]:not([data-mode="default"])
+  button[data-matter-mode-trigger] {
   gap: 5px;
   padding-inline: 7px 3px;
   font-weight: 500;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-mode-control]:not([data-mode="default"])
-  button[data-mattr-mode-clear] {
+  [data-matter-mode-control]:not([data-mode="default"])
+  button[data-matter-mode-clear] {
   width: 22px;
   min-width: 22px;
   padding: 0;
   opacity: 0.72;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-mode-control]:not([data-mode="default"])
-  button:is([data-mattr-mode-trigger], [data-mattr-mode-clear]):is(:hover, [data-popup-open]) {
+  [data-matter-mode-control]:not([data-mode="default"])
+  button:is([data-matter-mode-trigger], [data-matter-mode-clear]):is(:hover, [data-popup-open]) {
   color: var(--mc-mode);
   background-color: color-mix(in srgb, var(--mc-mode) 12%, transparent);
   opacity: 1;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-mode-control]
-  button[data-mattr-mode-clear]
+  [data-matter-mode-control]
+  button[data-matter-mode-clear]
   svg {
   width: 12px;
   height: 12px;
 }
 
 /* Model picker: provider glyph, name in the label gray, effort muted, then a chevron. */
-[data-mattr-composer] [data-chat-composer-footer] [data-chat-provider-model-picker] {
+[data-matter-composer] [data-chat-composer-footer] [data-chat-provider-model-picker] {
   padding-inline: 7px;
   gap: 6px;
   color: var(--mc-text);
 }
 
-[data-mattr-composer] [data-chat-provider-model-picker] > span {
+[data-matter-composer] [data-chat-provider-model-picker] > span {
   gap: 6px;
 }
 
-[data-mattr-composer] [data-chat-provider-model-picker] [data-chat-provider-model-picker-icon] svg,
-[data-mattr-composer]
+[data-matter-composer] [data-chat-provider-model-picker] [data-chat-provider-model-picker-icon] svg,
+[data-matter-composer]
   [data-chat-provider-model-picker]
   [data-chat-provider-model-picker-icon]
   > span {
@@ -321,17 +321,17 @@ html[data-theme-id] [data-mattr-composer] {
   height: 14px;
 }
 
-[data-mattr-composer] [data-chat-provider-model-picker-label] {
+[data-matter-composer] [data-chat-provider-model-picker-label] {
   color: var(--mc-text);
 }
 
-[data-mattr-composer] [data-chat-provider-model-picker] [data-composer-control-label] {
+[data-matter-composer] [data-chat-provider-model-picker] [data-composer-control-label] {
   color: var(--mc-placeholder);
 }
 
 @media (pointer: fine) {
-  [data-mattr-composer] [data-chat-composer-footer] [data-chat-provider-model-picker]::after,
-  [data-mattr-composer]
+  [data-matter-composer] [data-chat-composer-footer] [data-chat-provider-model-picker]::after,
+  [data-matter-composer]
     [data-slot="composer-context-strip"]
     :is(
       button[data-composer-shortcut~="composer.workspace"],
@@ -353,7 +353,7 @@ html[data-theme-id] [data-mattr-composer] {
 
 /* Send: a 28px signal-red circle with a white arrow; a quiet gray one while there is nothing
    to send. Stop shares the red circle. */
-[data-mattr-composer] [data-chat-composer-footer] button[type="submit"] {
+[data-matter-composer] [data-chat-composer-footer] button[type="submit"] {
   width: 28px;
   height: 28px;
   margin-inline-start: 4px;
@@ -362,28 +362,28 @@ html[data-theme-id] [data-mattr-composer] {
   box-shadow: none;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[type="submit"]:enabled:hover {
+[data-matter-composer] [data-chat-composer-footer] button[type="submit"]:enabled:hover {
   background-color: var(--mc-send-hover);
   transform: none;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[type="submit"]:disabled {
+[data-matter-composer] [data-chat-composer-footer] button[type="submit"]:disabled {
   background-color: var(--mc-send-idle);
   color: var(--mc-send-idle-ink);
   opacity: 1;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[type="submit"] [data-stage-art] {
+[data-matter-composer] [data-chat-composer-footer] button[type="submit"] [data-stage-art] {
   display: none;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[type="submit"] svg {
+[data-matter-composer] [data-chat-composer-footer] button[type="submit"] svg {
   width: 14px;
   height: 14px;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Stop generation"],
-[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Stopping"] {
+[data-matter-composer] [data-chat-composer-footer] button[aria-label="Stop generation"],
+[data-matter-composer] [data-chat-composer-footer] button[aria-label="Stopping"] {
   width: 28px;
   height: 28px;
   margin-inline-start: 4px;
@@ -392,7 +392,7 @@ html[data-theme-id] [data-mattr-composer] {
 }
 
 /* Under-tray: 38px, project name first, Local/Worktree beside it, branch on the right. */
-[data-mattr-composer] [data-slot="composer-context-strip"] {
+[data-matter-composer] [data-slot="composer-context-strip"] {
   min-height: 38px;
   padding: 0 6px;
   gap: 6px;
@@ -402,7 +402,7 @@ html[data-theme-id] [data-mattr-composer] {
   color: var(--mc-tray);
 }
 
-[data-mattr-composer] [data-slot="composer-context-strip"] button {
+[data-matter-composer] [data-slot="composer-context-strip"] button {
   height: 26px;
   padding-inline: 6px;
   gap: 6px;
@@ -411,7 +411,7 @@ html[data-theme-id] [data-mattr-composer] {
   color: var(--mc-tray);
 }
 
-[data-mattr-composer] [data-slot="composer-context-strip"] span[data-composer-context-control] {
+[data-matter-composer] [data-slot="composer-context-strip"] span[data-composer-context-control] {
   height: 26px;
   padding-inline: 6px;
   gap: 6px;
@@ -419,24 +419,24 @@ html[data-theme-id] [data-mattr-composer] {
   color: var(--mc-tray);
 }
 
-[data-mattr-composer] [data-slot="composer-context-strip"] button:hover,
-[data-mattr-composer] [data-slot="composer-context-strip"] button[data-popup-open] {
+[data-matter-composer] [data-slot="composer-context-strip"] button:hover,
+[data-matter-composer] [data-slot="composer-context-strip"] button[data-popup-open] {
   background-color: var(--mc-hover);
   color: var(--mc-text);
 }
 
-[data-mattr-composer] [data-slot="composer-context-strip"] svg {
+[data-matter-composer] [data-slot="composer-context-strip"] svg {
   width: 13px;
   height: 13px;
 }
 
 /* Under-tray order is identical in new-chat drafts and active threads: project, workspace
    (picker button or locked label), amber permissions, and branch pinned to the right edge. */
-[data-mattr-composer] [data-slot="composer-context-strip"] > [data-mattr-composer-project] {
+[data-matter-composer] [data-slot="composer-context-strip"] > [data-matter-composer-project] {
   order: -3;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-slot="composer-context-strip"]
   > :is(
     :has([data-composer-shortcut~="composer.workspace"]),
@@ -444,7 +444,7 @@ html[data-theme-id] [data-mattr-composer] {
         :has(button[data-slot="combobox-trigger"])
       )
   ),
-[data-mattr-composer]
+[data-matter-composer]
   [data-slot="composer-context-strip"]
   > .contents
   > :is([data-composer-shortcut~="composer.workspace"], span[data-composer-context-control]) {
@@ -452,7 +452,7 @@ html[data-theme-id] [data-mattr-composer] {
   flex: 0 1 auto;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-slot="composer-context-strip"]
   > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut]) {
   order: -1;
@@ -460,14 +460,14 @@ html[data-theme-id] [data-mattr-composer] {
   color: var(--mc-amber);
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-slot="composer-context-strip"]
   > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut])
   > svg {
   display: none;
 }
 
-[data-mattr-composer]
+[data-matter-composer]
   [data-slot="composer-context-strip"]
   > :has(button[data-slot="combobox-trigger"]):not(
     :has([data-composer-shortcut~="composer.workspace"])
@@ -475,7 +475,7 @@ html[data-theme-id] [data-mattr-composer] {
   margin-inline-start: auto;
 }
 
-[data-mattr-composer-project] {
+[data-matter-composer-project] {
   display: inline-flex;
   min-width: 0;
   flex: none;
@@ -488,7 +488,7 @@ html[data-theme-id] [data-mattr-composer] {
   color: var(--mc-tray);
 }
 
-[data-mattr-composer-project-name] {
+[data-matter-composer-project-name] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -498,11 +498,11 @@ html[data-theme-id] [data-mattr-composer] {
 
 /* Narrow panes drop the project name first, so Local and the branch keep their room. */
 @container composer-surface (max-width: 30rem) {
-  [data-mattr-composer-project] {
+  [data-matter-composer-project] {
     display: none;
   }
 
-  [data-mattr-composer]
+  [data-matter-composer]
     [data-slot="composer-context-strip"]
     > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut])
     > svg {
@@ -512,7 +512,7 @@ html[data-theme-id] [data-mattr-composer] {
 
 /* Gooey right-click Send pop-out (libraries.dev/gooey two-layer SVG silhouette + crisp DOM).
    The SVG filter mounts only while opening/open/closing; closed state carries zero GPU cost. */
-[data-mattr-gooey-anchor] {
+[data-matter-gooey-anchor] {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -523,23 +523,23 @@ html[data-theme-id] [data-mattr-composer] {
   flex: none;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] [data-mattr-gooey-anchor] {
+[data-matter-composer] [data-chat-composer-footer] [data-matter-gooey-anchor] {
   margin-inline-start: 4px;
 }
 
-[data-mattr-composer] [data-chat-composer-footer] [data-mattr-gooey-anchor] button[type="submit"],
-[data-mattr-composer]
+[data-matter-composer] [data-chat-composer-footer] [data-matter-gooey-anchor] button[type="submit"],
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-gooey-anchor]
+  [data-matter-gooey-anchor]
   button[aria-label="Stop generation"],
-[data-mattr-composer]
+[data-matter-composer]
   [data-chat-composer-footer]
-  [data-mattr-gooey-anchor]
+  [data-matter-gooey-anchor]
   button[aria-label="Stopping"] {
   margin-inline-start: 0;
 }
 
-[data-mattr-gooey-primary] {
+[data-matter-gooey-primary] {
   position: relative;
   z-index: 31;
   display: inline-flex;
@@ -547,14 +547,14 @@ html[data-theme-id] [data-mattr-composer] {
   justify-content: center;
 }
 
-[data-mattr-gooey-stage] {
+[data-matter-gooey-stage] {
   position: absolute;
   inset: 0;
   z-index: 30;
   pointer-events: none;
 }
 
-[data-mattr-gooey-svg] {
+[data-matter-gooey-svg] {
   position: absolute;
   right: -30px;
   bottom: -24px;
@@ -565,28 +565,28 @@ html[data-theme-id] [data-mattr-composer] {
   filter: var(--mc-gooey-shadow);
 }
 
-[data-mattr-gooey-blob="anchor"] {
+[data-matter-gooey-blob="anchor"] {
   fill: var(--mc-send-idle);
 }
 
-[data-mattr-gooey-blob="anchor"][data-active="true"] {
+[data-matter-gooey-blob="anchor"][data-active="true"] {
   fill: var(--mc-send);
 }
 
-[data-mattr-gooey-blob="satellite"] {
+[data-matter-gooey-blob="satellite"] {
   fill: var(--mc-gooey-satellite);
   transform-box: fill-box;
   transform-origin: center;
 }
 
-[data-mattr-gooey-actions] {
+[data-matter-gooey-actions] {
   position: absolute;
   inset: 0;
   z-index: 32;
   pointer-events: none;
 }
 
-[data-mattr-gooey-action] {
+[data-matter-gooey-action] {
   position: absolute;
   inset: 0;
   display: inline-flex;
@@ -605,29 +605,29 @@ html[data-theme-id] [data-mattr-composer] {
   transition: background-color 140ms ease;
 }
 
-[data-mattr-gooey-action]:hover,
-[data-mattr-gooey-action]:focus-visible {
+[data-matter-gooey-action]:hover,
+[data-matter-gooey-action]:focus-visible {
   background-color: var(--mc-gooey-satellite-hover);
 }
 
-[data-mattr-gooey-action]:focus-visible {
+[data-matter-gooey-action]:focus-visible {
   box-shadow: 0 0 0 2px var(--ring);
 }
 
-[data-mattr-gooey-action]:disabled {
+[data-matter-gooey-action]:disabled {
   cursor: default;
   opacity: 0.45;
   pointer-events: none;
 }
 
-[data-mattr-gooey-action] svg {
+[data-matter-gooey-action] svg {
   width: 15px !important;
   height: 15px !important;
   flex: none;
   pointer-events: none;
 }
 
-[data-mattr-gooey-label] {
+[data-matter-gooey-label] {
   position: absolute;
   right: calc(100% + 8px);
   top: 50%;
@@ -648,42 +648,43 @@ html[data-theme-id] [data-mattr-composer] {
     transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-[data-mattr-gooey-action]:hover [data-mattr-gooey-label],
-[data-mattr-gooey-action]:focus-visible [data-mattr-gooey-label] {
+[data-matter-gooey-action]:hover [data-matter-gooey-label],
+[data-matter-gooey-action]:focus-visible [data-matter-gooey-label] {
   opacity: 1;
   transform: translate3d(0, -50%, 0);
 }
 
-[data-mattr-gooey-stage][data-state="opening"] [data-mattr-gooey-blob="satellite"],
-[data-mattr-gooey-stage][data-state="open"] [data-mattr-gooey-blob="satellite"] {
-  animation: mattr-gooey-blob-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--mc-gooey-delay, 0ms)
+[data-matter-gooey-stage][data-state="opening"] [data-matter-gooey-blob="satellite"],
+[data-matter-gooey-stage][data-state="open"] [data-matter-gooey-blob="satellite"] {
+  animation: matter-gooey-blob-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) var(--mc-gooey-delay, 0ms)
     both;
 }
 
-[data-mattr-gooey-stage][data-state="closing"] [data-mattr-gooey-blob="satellite"] {
-  animation: mattr-gooey-blob-out 230ms cubic-bezier(0.4, 0, 0.2, 1) var(--mc-gooey-delay, 0ms) both;
+[data-matter-gooey-stage][data-state="closing"] [data-matter-gooey-blob="satellite"] {
+  animation: matter-gooey-blob-out 230ms cubic-bezier(0.4, 0, 0.2, 1) var(--mc-gooey-delay, 0ms)
+    both;
 }
 
-[data-mattr-gooey-stage][data-state="opening"] [data-mattr-gooey-action],
-[data-mattr-gooey-stage][data-state="open"] [data-mattr-gooey-action] {
-  animation: mattr-gooey-action-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1)
+[data-matter-gooey-stage][data-state="opening"] [data-matter-gooey-action],
+[data-matter-gooey-stage][data-state="open"] [data-matter-gooey-action] {
+  animation: matter-gooey-action-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1)
     var(--mc-gooey-delay, 0ms) both;
 }
 
-[data-mattr-gooey-stage][data-state="closing"] [data-mattr-gooey-action] {
+[data-matter-gooey-stage][data-state="closing"] [data-matter-gooey-action] {
   pointer-events: none;
-  animation: mattr-gooey-action-out 230ms cubic-bezier(0.4, 0, 0.2, 1) var(--mc-gooey-delay, 0ms)
+  animation: matter-gooey-action-out 230ms cubic-bezier(0.4, 0, 0.2, 1) var(--mc-gooey-delay, 0ms)
     both;
 }
 
-[data-mattr-gooey-stage][data-reduced-motion="true"] [data-mattr-gooey-action] {
+[data-matter-gooey-stage][data-reduced-motion="true"] [data-matter-gooey-action] {
   animation: none;
   background-color: var(--mc-gooey-satellite);
   box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
   transform: translate3d(0, var(--mc-gooey-y), 0);
 }
 
-@keyframes mattr-gooey-blob-in {
+@keyframes matter-gooey-blob-in {
   from {
     transform: translate3d(0, 0, 0) scale(0.82);
   }
@@ -692,7 +693,7 @@ html[data-theme-id] [data-mattr-composer] {
   }
 }
 
-@keyframes mattr-gooey-blob-out {
+@keyframes matter-gooey-blob-out {
   from {
     transform: translate3d(0, var(--mc-gooey-y), 0) scale(1);
   }
@@ -701,7 +702,7 @@ html[data-theme-id] [data-mattr-composer] {
   }
 }
 
-@keyframes mattr-gooey-action-in {
+@keyframes matter-gooey-action-in {
   0% {
     transform: translate3d(0, 0, 0) scale(0.82);
     opacity: 0;
@@ -715,7 +716,7 @@ html[data-theme-id] [data-mattr-composer] {
   }
 }
 
-@keyframes mattr-gooey-action-out {
+@keyframes matter-gooey-action-out {
   0% {
     transform: translate3d(0, var(--mc-gooey-y), 0) scale(1);
     opacity: 1;
@@ -730,20 +731,20 @@ html[data-theme-id] [data-mattr-composer] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-mattr-gooey-stage] [data-mattr-gooey-action],
-  [data-mattr-gooey-stage] [data-mattr-gooey-blob="satellite"] {
+  [data-matter-gooey-stage] [data-matter-gooey-action],
+  [data-matter-gooey-stage] [data-matter-gooey-blob="satellite"] {
     animation: none;
     transform: translate3d(0, var(--mc-gooey-y), 0);
   }
 
-  [data-mattr-gooey-label] {
+  [data-matter-gooey-label] {
     transition: none;
   }
 }
 
 /* In-chat Reply bar docked at the top of the prompt card, sent reply reference header
    above user bubbles, and finite one-shot target highlight flash. */
-[data-mattr-composer] [data-mattr-reply-bar] {
+[data-matter-composer] [data-matter-reply-bar] {
   display: flex;
   min-height: 34px;
   align-items: center;
@@ -757,18 +758,18 @@ html[data-theme-id] [data-mattr-composer] {
   font-style: normal;
 }
 
-[data-mattr-composer]:has([data-mattr-reply-bar]) [data-chat-composer-body] {
+[data-matter-composer]:has([data-matter-reply-bar]) [data-chat-composer-body] {
   padding-top: 11px;
 }
 
-[data-mattr-reply-bar-icon] {
+[data-matter-reply-bar-icon] {
   width: 13px;
   height: 13px;
   flex: none;
   color: var(--mc-icon, var(--muted-foreground));
 }
 
-[data-mattr-reply-bar-jump] {
+[data-matter-reply-bar-jump] {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -785,11 +786,11 @@ html[data-theme-id] [data-mattr-composer] {
   outline: none;
 }
 
-[data-mattr-reply-bar-jump]:focus-visible {
+[data-matter-reply-bar-jump]:focus-visible {
   box-shadow: 0 0 0 2px var(--ring);
 }
 
-[data-mattr-reply-bar-heading] {
+[data-matter-reply-bar-heading] {
   flex: none;
   font-weight: 500;
   color: var(--mc-text, var(--foreground));
@@ -797,12 +798,12 @@ html[data-theme-id] [data-mattr-composer] {
   font-style: normal;
 }
 
-[data-mattr-reply-bar-sep] {
+[data-matter-reply-bar-sep] {
   flex: none;
   color: var(--mc-placeholder, var(--muted-foreground));
 }
 
-[data-mattr-reply-bar-excerpt] {
+[data-matter-reply-bar-excerpt] {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -813,11 +814,11 @@ html[data-theme-id] [data-mattr-composer] {
   transition: color 120ms ease;
 }
 
-[data-mattr-reply-bar-jump]:hover [data-mattr-reply-bar-excerpt] {
+[data-matter-reply-bar-jump]:hover [data-matter-reply-bar-excerpt] {
   color: var(--mc-text, var(--foreground));
 }
 
-[data-mattr-reply-bar-dismiss] {
+[data-matter-reply-bar-dismiss] {
   display: inline-flex;
   width: 22px;
   height: 22px;
@@ -836,22 +837,22 @@ html[data-theme-id] [data-mattr-composer] {
     color 120ms ease;
 }
 
-[data-mattr-reply-bar-dismiss]:hover,
-[data-mattr-reply-bar-dismiss]:focus-visible {
+[data-matter-reply-bar-dismiss]:hover,
+[data-matter-reply-bar-dismiss]:focus-visible {
   background-color: var(--mc-hover, rgb(0 0 0 / 5%));
   color: var(--mc-text, var(--foreground));
 }
 
-[data-mattr-reply-bar-dismiss]:focus-visible {
+[data-matter-reply-bar-dismiss]:focus-visible {
   box-shadow: 0 0 0 2px var(--ring);
 }
 
-[data-mattr-reply-bar-dismiss] svg {
+[data-matter-reply-bar-dismiss] svg {
   width: 13px;
   height: 13px;
 }
 
-[data-mattr-reply-header] {
+[data-matter-reply-header] {
   display: inline-flex;
   max-width: 80%;
   min-width: 0;
@@ -874,41 +875,41 @@ html[data-theme-id] [data-mattr-composer] {
     color 120ms ease;
 }
 
-[data-mattr-reply-header]:hover,
-[data-mattr-reply-header]:focus-visible {
+[data-matter-reply-header]:hover,
+[data-matter-reply-header]:focus-visible {
   background-color: rgb(0 0 0 / 4.5%);
   color: var(--foreground);
 }
 
-.dark [data-mattr-reply-header]:hover,
-.dark [data-mattr-reply-header]:focus-visible {
+.dark [data-matter-reply-header]:hover,
+.dark [data-matter-reply-header]:focus-visible {
   background-color: rgb(255 255 255 / 6%);
 }
 
-[data-mattr-reply-header]:focus-visible {
+[data-matter-reply-header]:focus-visible {
   box-shadow: 0 0 0 2px var(--ring);
 }
 
-[data-mattr-reply-header-icon] {
+[data-matter-reply-header-icon] {
   width: 12px;
   height: 12px;
   flex: none;
   opacity: 0.78;
 }
 
-[data-mattr-reply-header-author] {
+[data-matter-reply-header-author] {
   flex: none;
   font-weight: 500;
   white-space: nowrap;
   font-style: normal;
 }
 
-[data-mattr-reply-header-sep] {
+[data-matter-reply-header-sep] {
   flex: none;
   opacity: 0.45;
 }
 
-[data-mattr-reply-header-excerpt] {
+[data-matter-reply-header-excerpt] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -917,13 +918,13 @@ html[data-theme-id] [data-mattr-composer] {
   font-style: normal;
 }
 
-[data-message-id][data-mattr-reply-highlight="true"] [data-user-message-bubble],
-[data-message-id][data-message-role="assistant"][data-mattr-reply-highlight="true"] {
+[data-message-id][data-matter-reply-highlight="true"] [data-user-message-bubble],
+[data-message-id][data-message-role="assistant"][data-matter-reply-highlight="true"] {
   border-radius: 14px;
-  animation: mattr-reply-highlight-flash 1500ms ease-out 1 both;
+  animation: matter-reply-highlight-flash 1500ms ease-out 1 both;
 }
 
-@keyframes mattr-reply-highlight-flash {
+@keyframes matter-reply-highlight-flash {
   0% {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 65%, transparent);
   }
@@ -936,14 +937,14 @@ html[data-theme-id] [data-mattr-composer] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-mattr-reply-bar-excerpt],
-  [data-mattr-reply-bar-dismiss],
-  [data-mattr-reply-header] {
+  [data-matter-reply-bar-excerpt],
+  [data-matter-reply-bar-dismiss],
+  [data-matter-reply-header] {
     transition: none;
   }
 
-  [data-message-id][data-mattr-reply-highlight="true"] [data-user-message-bubble],
-  [data-message-id][data-message-role="assistant"][data-mattr-reply-highlight="true"] {
+  [data-message-id][data-matter-reply-highlight="true"] [data-user-message-bubble],
+  [data-message-id][data-message-role="assistant"][data-matter-reply-highlight="true"] {
     animation: none;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 55%, transparent);
   }

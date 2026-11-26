@@ -1,5 +1,5 @@
 import {
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   type AddonConfig,
   type AddonConfigResponse,
   type AddonEntry,
@@ -12,7 +12,7 @@ import * as Schema from "effect/Schema";
 import { useSyncExternalStore } from "react";
 
 import { getLocalStorageItem, setLocalStorageItem } from "../hooks/useLocalStorage";
-import { mattrApiRequest, type MattrApiConfig } from "./mattrApi";
+import { matterApiRequest, type MatterApiConfig } from "./matterApi";
 
 /** Last enablement the server reported, so the first paint matches before the request returns. */
 const CACHE_KEY = "mattr:addons:v1";
@@ -80,7 +80,7 @@ const localStatus = (manifest: AddonManifest, enabled: boolean): AddonRuntimeSta
 
 function localEntries(): ReadonlyArray<AddonEntry> {
   const cache = readCache();
-  return MATTR_ADDON_MANIFESTS.map((manifest) => {
+  return MATTER_ADDON_MANIFESTS.map((manifest) => {
     const cached = cache[manifest.id];
     const legacy = manifest.id === "voice-assistant" && hasLegacyVoiceAssistantPreference();
     const enabled = cached ?? (legacy || manifest.defaultEnabled);
@@ -147,12 +147,12 @@ function applyServerResponse(response: AddonListResponse) {
 
 let inflight: Promise<void> | null = null;
 
-export function loadAddons(config: MattrApiConfig): Promise<void> {
+export function loadAddons(config: MatterApiConfig): Promise<void> {
   if (inflight) return inflight;
   emit({ loading: true });
   inflight = (async () => {
     try {
-      const response = await mattrApiRequest<AddonListResponse>(config, "/api/mattr/addons");
+      const response = await matterApiRequest<AddonListResponse>(config, "/api/mattr/addons");
       applyServerResponse(response);
       await migrateLegacyVoiceAssistant(config, response);
     } catch (error) {
@@ -165,11 +165,11 @@ export function loadAddons(config: MattrApiConfig): Promise<void> {
   return inflight;
 }
 
-async function migrateLegacyVoiceAssistant(config: MattrApiConfig, response: AddonListResponse) {
+async function migrateLegacyVoiceAssistant(config: MatterApiConfig, response: AddonListResponse) {
   const voice = response.addons.find((entry) => entry.manifest.id === "voice-assistant");
   if (!voice || voice.state.enablementSource !== "default" || voice.state.enabled) return;
   if (!hasLegacyVoiceAssistantPreference()) return;
-  const migrated = await mattrApiRequest<AddonListResponse>(config, "/api/mattr/addons/enabled", {
+  const migrated = await matterApiRequest<AddonListResponse>(config, "/api/mattr/addons/enabled", {
     method: "POST",
     body: { id: "voice-assistant", enabled: true, source: "migrated" },
   });
@@ -177,7 +177,7 @@ async function migrateLegacyVoiceAssistant(config: MattrApiConfig, response: Add
 }
 
 export async function setAddonEnabled(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   id: AddonId,
   enabled: boolean,
 ): Promise<void> {
@@ -199,10 +199,14 @@ export async function setAddonEnabled(
     ),
   });
   try {
-    const response = await mattrApiRequest<AddonListResponse>(config, "/api/mattr/addons/enabled", {
-      method: "POST",
-      body: { id, enabled, source: "user" },
-    });
+    const response = await matterApiRequest<AddonListResponse>(
+      config,
+      "/api/mattr/addons/enabled",
+      {
+        method: "POST",
+        body: { id, enabled, source: "user" },
+      },
+    );
     applyServerResponse(response);
   } catch (error) {
     emit({ entries: previous, error: error instanceof Error ? error.message : String(error) });
@@ -212,11 +216,11 @@ export async function setAddonEnabled(
 }
 
 /** Reconnects an enabled add-on now and applies the status it settles on. */
-export async function reconnectAddon(config: MattrApiConfig, id: AddonId): Promise<void> {
+export async function reconnectAddon(config: MatterApiConfig, id: AddonId): Promise<void> {
   emit({ pendingIds: [...state.pendingIds, id] });
   try {
     applyServerResponse(
-      await mattrApiRequest<AddonListResponse>(config, "/api/mattr/addons/reconnect", {
+      await matterApiRequest<AddonListResponse>(config, "/api/mattr/addons/reconnect", {
         method: "POST",
         body: { id },
       }),
@@ -229,11 +233,11 @@ export async function reconnectAddon(config: MattrApiConfig, id: AddonId): Promi
 }
 
 export async function getAddonConfig(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   id: AddonId,
   signal?: AbortSignal,
 ): Promise<AddonConfig> {
-  const response = await mattrApiRequest<AddonConfigResponse>(
+  const response = await matterApiRequest<AddonConfigResponse>(
     config,
     `/api/mattr/addons/config?id=${encodeURIComponent(id)}`,
     signal ? { signal } : {},
@@ -243,11 +247,11 @@ export async function getAddonConfig(
 
 /** Merges a patch into an add-on's non-secret config; a null value removes that key. */
 export async function updateAddonConfig(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   id: AddonId,
   patch: AddonConfig,
 ): Promise<AddonConfig> {
-  const response = await mattrApiRequest<AddonConfigResponse>(config, "/api/mattr/addons/config", {
+  const response = await matterApiRequest<AddonConfigResponse>(config, "/api/mattr/addons/config", {
     method: "POST",
     body: { id, config: patch },
   });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { DEFAULT_ISLAND_SETTINGS } from "../../../../antimatter/island/types";
+import { DEFAULT_ISLAND_SETTINGS } from "../../../../matter/island/types";
 import type {
   VoiceAssistantClientAction,
   VoiceAssistantTurnRequest,
@@ -9,8 +9,8 @@ import type {
   VoiceSpeakRequest,
   VoiceWorkspaceApprovalSummary,
   VoiceWorkspaceContext,
-} from "../../../../antimatter/voice-assistant/types";
-import { DEFAULT_VOICE_ASSISTANT_SETTINGS } from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
+import { DEFAULT_VOICE_ASSISTANT_SETTINGS } from "../../../../matter/voice-assistant/types";
 import { updateIslandSettings, updateVoiceAssistantSettings } from "./islandSettingsStore";
 import {
   applyThreadScopeToWorkspaceContext,
@@ -377,28 +377,28 @@ describe("voiceAssistantStore", () => {
     submitQuickBriefing({
       kind: "completed",
       threadTitle: "Build docs",
-      projectTitle: "mattr",
+      projectTitle: "Matter",
       detail: null,
       latestAssistantMessage: null,
     });
     submitQuickBriefing({
       kind: "failed",
       threadTitle: "Run migrations",
-      projectTitle: "mattr",
+      projectTitle: "Matter",
       detail: "exit 1",
       latestAssistantMessage: null,
     });
     submitQuickBriefing({
       kind: "question",
       threadTitle: "Refactor router",
-      projectTitle: "mattr",
+      projectTitle: "Matter",
       detail: "Choose strategy",
       latestAssistantMessage: null,
     });
     submitQuickBriefing({
       kind: "approval",
       threadTitle: "Deploy staging",
-      projectTitle: "mattr",
+      projectTitle: "Matter",
       detail: "rm -rf dist",
       latestAssistantMessage: null,
     });
@@ -1287,7 +1287,7 @@ describe("in-thread voice mode scoping", () => {
     const scoped = applyThreadScopeToWorkspaceContext(base, {
       environmentId: "env-2",
       threadId: "thread-99",
-      title: "Antimatter setup check",
+      title: "Matter setup check",
     });
 
     expect(scoped.activeEnvironmentId).toBe("env-2");
@@ -1295,7 +1295,7 @@ describe("in-thread voice mode scoping", () => {
     expect(scoped.threads[0]).toMatchObject({
       environmentId: "env-2",
       threadId: "thread-99",
-      title: "Antimatter setup check",
+      title: "Matter setup check",
       isActive: true,
     });
     expect(scoped.threads[1]?.isActive).toBe(false);
@@ -1345,7 +1345,7 @@ describe("in-thread voice mode scoping", () => {
       {
         environmentId: "env-2",
         threadId: "thread-77",
-        title: "Antimatter setup check",
+        title: "Matter setup check",
       },
       { autoStartHandsFree: false },
     );
@@ -1356,12 +1356,12 @@ describe("in-thread voice mode scoping", () => {
       scopedThread: {
         environmentId: "env-2",
         threadId: "thread-77",
-        title: "Antimatter setup check",
+        title: "Matter setup check",
       },
       originThread: {
         environmentId: "env-2",
         threadId: "thread-77",
-        title: "Antimatter setup check",
+        title: "Matter setup check",
       },
     });
 

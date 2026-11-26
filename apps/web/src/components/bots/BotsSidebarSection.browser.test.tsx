@@ -1,6 +1,6 @@
 import { render } from "../../../test/render";
 import {
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   NO_BOT_PROVIDER_CAPABILITIES,
   type AddonEntry,
   type BotIdentity,
@@ -16,15 +16,15 @@ import { resetBotsStoreForTests } from "./botsStore";
 
 const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} }));
 
-vi.mock(import("../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
 import { BotsSidebarSection } from "./BotsSidebarSection";
 
 const addons = (grokEnabled: boolean): ReadonlyArray<AddonEntry> =>
-  MATTR_ADDON_MANIFESTS.map((manifest) => {
+  MATTER_ADDON_MANIFESTS.map((manifest) => {
     const enabled = manifest.id === "grok-bot" && grokEnabled;
     return {
       manifest,
@@ -119,9 +119,9 @@ describe("BotsSidebarSection", () => {
         <BotsSidebarSection />
       </SidebarProvider>,
     );
-    const mattrCalls = () =>
+    const matterCalls = () =>
       fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/mattr/"));
-    await expect.poll(() => mattrCalls().length).toBe(1);
+    await expect.poll(() => matterCalls().length).toBe(1);
     expect(screen.container.querySelector("[data-bots-sidebar-section]")).toBeNull();
     expect(botsCalls(fetchMock)).toEqual([]);
   });

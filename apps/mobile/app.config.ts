@@ -3,9 +3,9 @@ import type { ExpoConfig } from "expo/config";
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 import {
-  resolveMattrPersonalTeamBundleIdentifier,
-  withMattrMobileConfig,
-} from "../../antimatter/mobile-config.ts";
+  resolveMatterPersonalTeamBundleIdentifier,
+  withMatterMobileConfig,
+} from "../../matter/mobile-config.ts";
 
 type AppVariant = "development" | "preview" | "production";
 
@@ -20,7 +20,10 @@ const runtimeVersionPolicy =
   process.env.MOBILE_VERSION_POLICY ??
   (APP_VARIANT === "development" ? "appVersion" : "fingerprint");
 
-const personalTeamBundleIdentifier = resolveMattrPersonalTeamBundleIdentifier(repoEnv, APP_VARIANT);
+const personalTeamBundleIdentifier = resolveMatterPersonalTeamBundleIdentifier(
+  repoEnv,
+  APP_VARIANT,
+);
 const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 
 // Compiled into the native project. Without a relay, Observe's native side could dispatch to
@@ -507,7 +510,7 @@ const upstreamConfig: ExpoConfig = {
   },
 };
 
-export default withMattrMobileConfig(upstreamConfig, {
+export default withMatterMobileConfig(upstreamConfig, {
   env: repoEnv,
   isIosPersonalTeamBuild,
   iosBundleIdentifier,

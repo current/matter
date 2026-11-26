@@ -403,7 +403,7 @@ function makePalette(
   };
 }
 
-// Calibrated against Grok Bot v1.3.0's 135deg gradient palette, refined for dark and light mattr cards.
+// Calibrated against Grok Bot v1.3.0's 135deg gradient palette, refined for dark and light Matter cards.
 const PALETTES: Readonly<Record<GrokBotPaletteId, GrokBotPaletteSpec>> = {
   black: makePalette("black", "#34373e", "#14161a", "rgb(255 255 255 / 0.16)"),
   gray: makePalette("gray", "#9499a3", "#60656f", "rgb(255 255 255 / 0.16)"),

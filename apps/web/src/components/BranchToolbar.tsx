@@ -75,7 +75,7 @@ import {
 import { Separator } from "./ui/separator";
 import { MiddleTruncate } from "./ui/middle-truncate";
 import { ComposerSurface } from "./chat/ComposerSurface";
-import { MattrComposerProjectLabel } from "./chat/MattrComposerParts.mattr";
+import { MatterComposerProjectLabel } from "./chat/MatterComposerParts.matter";
 import { useComposerMenuProps } from "./chat/composerEventScope";
 import { cn } from "~/lib/utils";
 
@@ -801,7 +801,7 @@ export const BranchToolbar = memo(function BranchToolbar({
       data-compact={labelsOverflow ? "" : undefined}
       className={cn("gap-1 text-xs font-normal text-foreground/70 dark:text-muted-foreground")}
     >
-      <MattrComposerProjectLabel title={activeProject.title} />
+      <MatterComposerProjectLabel title={activeProject.title} />
       {showGitControls ? (
         <div className="contents @xl/composer-surface:hidden">
           <RunContextSelector

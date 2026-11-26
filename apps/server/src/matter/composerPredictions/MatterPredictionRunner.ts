@@ -30,8 +30,8 @@ import {
   predictionFormatInstruction,
 } from "./predictionText.ts";
 
-export class MattrPredictionRunError extends Schema.TaggedError<MattrPredictionRunError>()(
-  "MattrPredictionRunError",
+export class MatterPredictionRunError extends Schema.TaggedError<MatterPredictionRunError>()(
+  "MatterPredictionRunError",
   {
     routeKind: Schema.Literals(["claude", "codex"]),
     instanceId: ProviderInstanceId,
@@ -45,8 +45,8 @@ export class MattrPredictionRunError extends Schema.TaggedError<MattrPredictionR
 }
 
 /** Runs one stateless prediction call; the coordinator owns timing, caching and clean-up. */
-export class MattrPredictionRunner extends Context.Service<
-  MattrPredictionRunner,
+export class MatterPredictionRunner extends Context.Service<
+  MatterPredictionRunner,
   {
     readonly routes: (input: {
       readonly threadInstanceId: ProviderInstanceId | null;
@@ -56,9 +56,9 @@ export class MattrPredictionRunner extends Context.Service<
       readonly route: PredictionRoute;
       readonly threadId: ThreadId;
       readonly transcript: string;
-    }) => Effect.Effect<unknown, MattrPredictionRunError>;
+    }) => Effect.Effect<unknown, MatterPredictionRunError>;
   }
->()("t3/mattr/composerPredictions/MattrPredictionRunner") {}
+>()("t3/matter/composerPredictions/MatterPredictionRunner") {}
 
 const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
@@ -80,7 +80,7 @@ const make = Effect.gen(function* () {
 
   const readSettings = settingsService.getSettings.pipe(Effect.option);
 
-  const routes = Effect.fn("MattrPredictionRunner.routes")(function* (input: {
+  const routes = Effect.fn("MatterPredictionRunner.routes")(function* (input: {
     readonly threadInstanceId: ProviderInstanceId | null;
   }) {
     const settings = yield* readSettings;
@@ -103,8 +103,12 @@ const make = Effect.gen(function* () {
     });
   });
 
-  const fail = (route: PredictionRoute, stage: MattrPredictionRunError["stage"], cause?: unknown) =>
-    new MattrPredictionRunError({
+  const fail = (
+    route: PredictionRoute,
+    stage: MatterPredictionRunError["stage"],
+    cause?: unknown,
+  ) =>
+    new MatterPredictionRunError({
       routeKind: route.kind,
       instanceId: route.instanceId,
       stage,
@@ -120,7 +124,7 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  const runClaude = Effect.fn("MattrPredictionRunner.runClaude")(
+  const runClaude = Effect.fn("MatterPredictionRunner.runClaude")(
     function* (route: PredictionRoute, transcript: string) {
       const settings = yield* readSettings;
       const config = Option.isSome(settings)
@@ -141,7 +145,7 @@ const make = Effect.gen(function* () {
         binary.length > 0 ? expandHomePath(binary, yield* HostProcess.HomeDirectory) : "claude";
       // An empty folder keeps project CLAUDE.md files and settings out of the call.
       const cwd = yield* fileSystem
-        .makeTempDirectoryScoped({ prefix: "mattr-prediction-" })
+        .makeTempDirectoryScoped({ prefix: "matter-prediction-" })
         .pipe(Effect.mapError((cause) => fail(route, "setup", cause)));
       const managedMcpConfig = yield* hasClaudeManagedMcpConfig();
       const spawnCommand = yield* resolveSpawnCommand(
@@ -198,14 +202,14 @@ const make = Effect.gen(function* () {
     Effect.provide(services),
   );
 
-  const runCodex = Effect.fn("MattrPredictionRunner.runCodex")(function* (
+  const runCodex = Effect.fn("MatterPredictionRunner.runCodex")(function* (
     route: PredictionRoute,
     transcript: string,
   ) {
     const instance = yield* instanceRegistry.getInstance(route.instanceId);
     if (instance === undefined) return yield* fail(route, "setup");
     const cwd = yield* fileSystem
-      .makeTempDirectoryScoped({ prefix: "mattr-prediction-" })
+      .makeTempDirectoryScoped({ prefix: "matter-prediction-" })
       .pipe(Effect.mapError((cause) => fail(route, "setup", cause)));
     const generated = yield* instance.textGeneration
       .generateTranscriptionPostProcessing({
@@ -217,14 +221,14 @@ const make = Effect.gen(function* () {
     return generated.transcription.trim().length === 0 ? null : generated.transcription;
   }, Effect.scoped);
 
-  const run = Effect.fn("MattrPredictionRunner.run")(function* (input: {
+  const run = Effect.fn("MatterPredictionRunner.run")(function* (input: {
     readonly route: PredictionRoute;
     readonly threadId: ThreadId;
     readonly transcript: string;
   }) {
     yield* Effect.annotateCurrentSpan({
-      "mattr.prediction.route": input.route.kind,
-      "mattr.prediction.instance_id": input.route.instanceId,
+      "matter.prediction.route": input.route.kind,
+      "matter.prediction.instance_id": input.route.instanceId,
       "orchestration_v2.thread_id": input.threadId,
     });
     return input.route.kind === "claude"
@@ -232,7 +236,7 @@ const make = Effect.gen(function* () {
       : yield* runCodex(input.route, input.transcript);
   });
 
-  return MattrPredictionRunner.of({ routes, run });
+  return MatterPredictionRunner.of({ routes, run });
 });
 
-export const layer = Layer.effect(MattrPredictionRunner, make);
+export const layer = Layer.effect(MatterPredictionRunner, make);

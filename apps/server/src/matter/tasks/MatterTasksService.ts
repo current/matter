@@ -1,10 +1,10 @@
 import {
-  MATTR_TASK_STATUSES,
-  MattrTask,
-  type MattrTaskCreateRequest,
-  type MattrTaskReorderRequest,
-  type MattrTaskStatus,
-  type MattrTaskUpdateRequest,
+  MATTER_TASK_STATUSES,
+  MatterTask,
+  type MatterTaskCreateRequest,
+  type MatterTaskReorderRequest,
+  type MatterTaskStatus,
+  type MatterTaskUpdateRequest,
 } from "@t3tools/contracts";
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
 import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
@@ -25,7 +25,7 @@ export const TASKS_FILENAME = "mattr-tasks.json";
 
 const StoredTasksFile = Schema.Struct({
   version: Schema.Literal(1),
-  tasks: Schema.Array(MattrTask),
+  tasks: Schema.Array(MatterTask),
 });
 type StoredTasksFile = typeof StoredTasksFile.Type;
 
@@ -35,45 +35,51 @@ const encodeStoredTasks = Schema.encodeEffect(StoredTasksJson);
 
 const EMPTY_FILE: StoredTasksFile = { version: 1, tasks: [] };
 
-export class MattrTasksError extends Schema.TaggedError<MattrTasksError>()("MattrTasksError", {
+export class MatterTasksError extends Schema.TaggedError<MatterTasksError>()("MatterTasksError", {
   reason: Schema.Literals(["not_found", "read_failed", "write_failed"]),
   detail: Schema.optional(Schema.String),
 }) {}
 
-export class MattrTasksService extends Context.Service<
-  MattrTasksService,
+export class MatterTasksService extends Context.Service<
+  MatterTasksService,
   {
-    readonly list: Effect.Effect<ReadonlyArray<MattrTask>, MattrTasksError>;
-    readonly create: (input: MattrTaskCreateRequest) => Effect.Effect<MattrTask, MattrTasksError>;
+    readonly list: Effect.Effect<ReadonlyArray<MatterTask>, MatterTasksError>;
+    readonly create: (
+      input: MatterTaskCreateRequest,
+    ) => Effect.Effect<MatterTask, MatterTasksError>;
     readonly update: (
       id: string,
-      patch: MattrTaskUpdateRequest,
-    ) => Effect.Effect<MattrTask, MattrTasksError>;
-    readonly remove: (id: string) => Effect.Effect<void, MattrTasksError>;
+      patch: MatterTaskUpdateRequest,
+    ) => Effect.Effect<MatterTask, MatterTasksError>;
+    readonly remove: (id: string) => Effect.Effect<void, MatterTasksError>;
     readonly reorder: (
-      input: MattrTaskReorderRequest,
-    ) => Effect.Effect<ReadonlyArray<MattrTask>, MattrTasksError>;
+      input: MatterTaskReorderRequest,
+    ) => Effect.Effect<ReadonlyArray<MatterTask>, MatterTasksError>;
   }
->()("t3/mattr/tasks/MattrTasksService") {}
+>()("t3/matter/tasks/MatterTasksService") {}
 
-const statusRank = (status: MattrTaskStatus) => MATTR_TASK_STATUSES.indexOf(status);
+const statusRank = (status: MatterTaskStatus) => MATTER_TASK_STATUSES.indexOf(status);
 
-const sortTasks = (tasks: ReadonlyArray<MattrTask>) =>
+const sortTasks = (tasks: ReadonlyArray<MatterTask>) =>
   tasks.toSorted((a, b) => statusRank(a.status) - statusRank(b.status) || a.order - b.order);
 
-const nextOrder = (tasks: ReadonlyArray<MattrTask>, status: MattrTaskStatus, excludeId?: string) =>
+const nextOrder = (
+  tasks: ReadonlyArray<MatterTask>,
+  status: MatterTaskStatus,
+  excludeId?: string,
+) =>
   tasks.reduce(
     (max, task) =>
       task.status === status && task.id !== excludeId ? Math.max(max, task.order + 1) : max,
     0,
   );
 
-const completedAtFor = (previous: MattrTask | null, status: MattrTaskStatus, now: string) => {
+const completedAtFor = (previous: MatterTask | null, status: MatterTaskStatus, now: string) => {
   if (status !== "done") return null;
   return previous?.status === "done" ? previous.completedAt : now;
 };
 
-const notFound = (id: string) => new MattrTasksError({ reason: "not_found", detail: id });
+const notFound = (id: string) => new MatterTasksError({ reason: "not_found", detail: id });
 
 export const make = Effect.gen(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
@@ -87,7 +93,7 @@ export const make = Effect.gen(function* () {
   // Read lazily so a server that never opens Tasks never touches the file.
   const cache = yield* Ref.make<StoredTasksFile | null>(null);
 
-  const preserveCorruptFile = Effect.fn("MattrTasksService.preserveCorruptFile")(function* (
+  const preserveCorruptFile = Effect.fn("MatterTasksService.preserveCorruptFile")(function* (
     cause: unknown,
   ) {
     const stamp = (yield* nowIso).replaceAll(":", "-");
@@ -96,13 +102,13 @@ export const make = Effect.gen(function* () {
       .rename(filePath, backupPath)
       .pipe(
         Effect.mapError(
-          (error) => new MattrTasksError({ reason: "read_failed", detail: error.message }),
+          (error) => new MatterTasksError({ reason: "read_failed", detail: error.message }),
         ),
       );
     yield* Effect.logWarning(`${TASKS_FILENAME} is unreadable; moved it to ${backupPath}.`, cause);
   });
 
-  const load = Effect.fn("MattrTasksService.load")(function* () {
+  const load = Effect.fn("MatterTasksService.load")(function* () {
     const cached = yield* Ref.get(cache);
     if (cached) return cached;
     const raw = yield* fileSystem.readFileString(filePath).pipe(
@@ -110,7 +116,7 @@ export const make = Effect.gen(function* () {
       // Any other read error must fail: falling back to empty would let the next write
       // overwrite tasks we simply couldn't read.
       Effect.mapError(
-        (error) => new MattrTasksError({ reason: "read_failed", detail: error.message }),
+        (error) => new MatterTasksError({ reason: "read_failed", detail: error.message }),
       ),
     );
     const decoded =
@@ -123,20 +129,20 @@ export const make = Effect.gen(function* () {
     return decoded;
   });
 
-  const persist = Effect.fn("MattrTasksService.persist")(function* (
-    tasks: ReadonlyArray<MattrTask>,
+  const persist = Effect.fn("MatterTasksService.persist")(function* (
+    tasks: ReadonlyArray<MatterTask>,
   ) {
     const next: StoredTasksFile = { version: 1, tasks: sortTasks(tasks) };
     const encoded = yield* encodeStoredTasks(next).pipe(
       Effect.mapError(
-        (error) => new MattrTasksError({ reason: "write_failed", detail: String(error) }),
+        (error) => new MatterTasksError({ reason: "write_failed", detail: String(error) }),
       ),
     );
     yield* writeFileStringAtomically({ filePath, contents: `${encoded}\n` }).pipe(
       Effect.provideService(FileSystem.FileSystem, fileSystem),
       Effect.provideService(Path.Path, path),
       Effect.mapError(
-        (error) => new MattrTasksError({ reason: "write_failed", detail: error.message }),
+        (error) => new MatterTasksError({ reason: "write_failed", detail: error.message }),
       ),
     );
     yield* Ref.set(cache, next);
@@ -145,15 +151,15 @@ export const make = Effect.gen(function* () {
 
   const list = Effect.gen(function* () {
     return sortTasks((yield* load()).tasks);
-  }).pipe(Effect.withSpan("MattrTasksService.list"));
+  }).pipe(Effect.withSpan("MatterTasksService.list"));
 
-  const create = Effect.fn("MattrTasksService.create")(function* (input: MattrTaskCreateRequest) {
+  const create = Effect.fn("MatterTasksService.create")(function* (input: MatterTaskCreateRequest) {
     return yield* writeLock.withPermit(
       Effect.gen(function* () {
         const { tasks } = yield* load();
         const now = yield* nowIso;
         const status = input.status ?? "todo";
-        const task: MattrTask = {
+        const task: MatterTask = {
           id: yield* random.uuidV4(),
           title: input.title,
           note: input.note ?? "",
@@ -178,9 +184,9 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const update = Effect.fn("MattrTasksService.update")(function* (
+  const update = Effect.fn("MatterTasksService.update")(function* (
     id: string,
-    patch: MattrTaskUpdateRequest,
+    patch: MatterTaskUpdateRequest,
   ) {
     return yield* writeLock.withPermit(
       Effect.gen(function* () {
@@ -192,7 +198,7 @@ export const make = Effect.gen(function* () {
         const order =
           patch.order ??
           (status === previous.status ? previous.order : nextOrder(tasks, status, id));
-        const next: MattrTask = {
+        const next: MatterTask = {
           ...previous,
           ...patch,
           status,
@@ -206,7 +212,7 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const remove = Effect.fn("MattrTasksService.remove")(function* (id: string) {
+  const remove = Effect.fn("MatterTasksService.remove")(function* (id: string) {
     yield* writeLock.withPermit(
       Effect.gen(function* () {
         const { tasks } = yield* load();
@@ -216,8 +222,8 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const reorder = Effect.fn("MattrTasksService.reorder")(function* (
-    input: MattrTaskReorderRequest,
+  const reorder = Effect.fn("MatterTasksService.reorder")(function* (
+    input: MatterTaskReorderRequest,
   ) {
     return yield* writeLock.withPermit(
       Effect.gen(function* () {
@@ -245,7 +251,7 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  return MattrTasksService.of({ list, create, update, remove, reorder });
+  return MatterTasksService.of({ list, create, update, remove, reorder });
 });
 
-export const layer = Layer.effect(MattrTasksService, make);
+export const layer = Layer.effect(MatterTasksService, make);

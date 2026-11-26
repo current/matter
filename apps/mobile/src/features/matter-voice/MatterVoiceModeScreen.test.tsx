@@ -71,7 +71,7 @@ vi.mock("../../state/entities", () => ({
     {
       environmentId: "env-1",
       id: "thread-9",
-      title: "Antimatter setup check",
+      title: "Matter setup check",
     },
   ],
 }));
@@ -98,7 +98,7 @@ vi.mock("./mobileVoiceContext", () => ({
     return {
       activeEnvironmentId: scope?.environmentId ?? null,
       activeThreadId: scope?.threadId ?? null,
-      activeRoute: "MattrVoiceMode",
+      activeRoute: "MatterVoiceMode",
       mainWindowFocused: true,
       composerFocused: false,
       projects: [],
@@ -145,7 +145,7 @@ vi.mock("./voiceModeSession", () => {
 });
 
 import { ComposerVoiceModeButton } from "./ComposerVoiceModeButton";
-import { MattrVoiceModeScreen } from "./MattrVoiceModeScreen";
+import { MatterVoiceModeScreen } from "./MatterVoiceModeScreen";
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -198,11 +198,11 @@ describe("ComposerVoiceModeButton (mobile)", () => {
   });
 });
 
-describe("MattrVoiceModeScreen thread scoping", () => {
+describe("MatterVoiceModeScreen thread scoping", () => {
   it("pre-scopes to the launched thread, reads thread-scoped context, and toggles to All workspace and back", () => {
     act(() => {
       root.render(
-        <MattrVoiceModeScreen
+        <MatterVoiceModeScreen
           route={{
             params: {
               environmentId: "env-1",
@@ -215,7 +215,7 @@ describe("MattrVoiceModeScreen thread scoping", () => {
     });
 
     // Live thread shell title takes precedence in the header pill.
-    expect(container.textContent).toContain("Antimatter setup check");
+    expect(container.textContent).toContain("Matter setup check");
     expect(harness.readContextCalls[0]).toEqual({
       environmentId: "env-1",
       threadId: "thread-9",
@@ -242,7 +242,7 @@ describe("MattrVoiceModeScreen thread scoping", () => {
     expect(harness.readContextCalls.at(-1)).toBeNull();
 
     const refocusBtn = container.querySelector(
-      'button[aria-label="Focus Antimatter setup check"]',
+      'button[aria-label="Focus Matter setup check"]',
     ) as HTMLButtonElement;
     expect(refocusBtn).not.toBeNull();
 
@@ -259,7 +259,7 @@ describe("MattrVoiceModeScreen thread scoping", () => {
 
   it("stays unscoped when opened globally without route params", () => {
     act(() => {
-      root.render(<MattrVoiceModeScreen />);
+      root.render(<MatterVoiceModeScreen />);
     });
 
     expect(container.querySelector('button[aria-label="Switch to all workspace"]')).toBeNull();

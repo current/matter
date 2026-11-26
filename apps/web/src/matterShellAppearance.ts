@@ -4,12 +4,12 @@ import type {
   ShellMaterial,
   ShellTransparency,
 } from "@t3tools/contracts/settings";
-import { adaptShellColor, shellFrameOpacity } from "../../../antimatter/shellTint";
+import { adaptShellColor, shellFrameOpacity } from "../../../matter/shellTint";
 
 const SHELL_GRAIN_TILE_SIZE = 180;
 const SHELL_GRAIN_MAX_OPACITY = 0.12;
 
-export function buildMattrShellGrainDataUrl(grainPercent: number): string {
+export function buildMatterShellGrainDataUrl(grainPercent: number): string {
   if (grainPercent <= 0) return "none";
   const clamped = Math.min(100, Math.max(0, grainPercent));
   const opacity = ((clamped / 100) * SHELL_GRAIN_MAX_OPACITY).toFixed(4);
@@ -29,36 +29,45 @@ export function buildMattrShellGrainDataUrl(grainPercent: number): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-export interface MattrShellAppearance {
+export interface MatterShellAppearance {
   readonly shellMaterial: ShellMaterial;
   readonly shellGrain: ShellGrain;
   readonly shellTransparency: ShellTransparency;
   readonly shellColor: ShellColor;
 }
 
-export function applyMattrShellAppearance(root: HTMLElement, settings: MattrShellAppearance): void {
-  root.dataset.mattrShellMaterial = settings.shellMaterial;
+export function applyMatterShellAppearance(
+  root: HTMLElement,
+  settings: MatterShellAppearance,
+): void {
+  root.dataset.matterShellMaterial = settings.shellMaterial;
   root.style.setProperty(
-    "--mattr-shell-opacity",
+    "--matter-shell-opacity",
     `${shellFrameOpacity(settings.shellMaterial, settings.shellTransparency) * 100}%`,
   );
   if (settings.shellColor === null) {
-    delete root.dataset.mattrShellTint;
-    root.style.removeProperty("--mattr-shell-tint-light");
-    root.style.removeProperty("--mattr-shell-tint-dark");
+    delete root.dataset.matterShellTint;
+    root.style.removeProperty("--matter-shell-tint-light");
+    root.style.removeProperty("--matter-shell-tint-dark");
   } else {
-    root.dataset.mattrShellTint = "on";
+    root.dataset.matterShellTint = "on";
     root.style.setProperty(
-      "--mattr-shell-tint-light",
+      "--matter-shell-tint-light",
       adaptShellColor(settings.shellColor, "light"),
     );
-    root.style.setProperty("--mattr-shell-tint-dark", adaptShellColor(settings.shellColor, "dark"));
+    root.style.setProperty(
+      "--matter-shell-tint-dark",
+      adaptShellColor(settings.shellColor, "dark"),
+    );
   }
   if (settings.shellGrain > 0) {
-    root.dataset.mattrShellGrain = "on";
-    root.style.setProperty("--mattr-shell-grain", buildMattrShellGrainDataUrl(settings.shellGrain));
+    root.dataset.matterShellGrain = "on";
+    root.style.setProperty(
+      "--matter-shell-grain",
+      buildMatterShellGrainDataUrl(settings.shellGrain),
+    );
   } else {
-    delete root.dataset.mattrShellGrain;
-    root.style.removeProperty("--mattr-shell-grain");
+    delete root.dataset.matterShellGrain;
+    root.style.removeProperty("--matter-shell-grain");
   }
 }

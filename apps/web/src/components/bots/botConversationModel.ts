@@ -6,7 +6,7 @@ import type {
   BotProviderDescriptor,
 } from "@t3tools/contracts";
 
-import { botNeedsAttention } from "../sidebar/mattr/mattrBots.logic";
+import { botNeedsAttention } from "../sidebar/matter/matterBots.logic";
 
 /** Orders by provider sequence when both have one, otherwise by time. */
 function compareMessages(left: BotMessage, right: BotMessage) {

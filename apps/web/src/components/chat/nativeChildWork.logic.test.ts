@@ -126,7 +126,7 @@ describe("buildNativeChildActivityItems", () => {
 
   it("recovers path targets from capped tool inputs whose JSON was truncated", () => {
     const truncatedInput =
-      '{"Path":"/Users/dev/repo/antimatter/shell.ts","Replacement":"very long text that got cut off…';
+      '{"Path":"/Users/dev/repo/matter/shell.ts","Replacement":"very long text that got cut off…';
     const steps: ReadonlyArray<OrchestrationV2NativeChildStep> = [
       {
         index: 13,
@@ -142,7 +142,7 @@ describe("buildNativeChildActivityItems", () => {
     expect(items[0]).toMatchObject({
       kind: "tool",
       verb: "edit",
-      target: "antimatter/shell.ts",
+      target: "matter/shell.ts",
     });
   });
 

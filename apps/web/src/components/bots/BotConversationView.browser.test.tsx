@@ -1,6 +1,6 @@
 import { render } from "../../../test/render";
 import {
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   NO_BOT_PROVIDER_CAPABILITIES,
   type BotEvent,
   type BotIdentity,
@@ -17,9 +17,9 @@ import { resetBotsStoreForTests } from "./botsStore";
 
 const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} }));
 
-vi.mock(import("../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
 import { BotConversationView } from "./BotConversationView";
@@ -62,7 +62,7 @@ const messages: ReadonlyArray<BotMessage> = [
     conversationId: "bot-black",
     providerId: "grok-bot",
     role: "user",
-    attribution: "user-via-mattr",
+    attribution: "user-via-matter",
     authorBotId: null,
     markdown: "Status check on nightly?",
     parts: [{ type: "markdown", text: "Status check on nightly?" }],
@@ -167,7 +167,7 @@ function useBotConversationServer(options: {
         return json({ cancelled: true });
       case "/api/mattr/addons/reconnect":
         return json({
-          addons: MATTR_ADDON_MANIFESTS.map((manifest) => ({
+          addons: MATTER_ADDON_MANIFESTS.map((manifest) => ({
             manifest,
             state: {
               id: manifest.id,

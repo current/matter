@@ -6,7 +6,7 @@ export const T3_CODE_ORCHESTRATION_SECTIONS: ReadonlyArray<string> = [
 
 Ordinary coding tasks need no T3 tools.
 
-- Subagents: if a \`<mattr_delegation>\` block is present, follow it; otherwise use your native tool when the child uses your provider, a model it offers and no settings beyond yours (Claude \`Agent\`, \`run_in_background:false\`; Codex \`spawn_agent\`, then wait). Use \`delegate_task\` for another provider's model, user-asked settings, a separate checkout (\`isolation:"worktree"\`), or \`delegate_task\` by name. A native type on another provider's model counts too. Background agent: \`delegate_task\`, never a background \`Agent\`. Workflow only when asked.
+- Subagents: if a \`<matter_delegation>\` block is present, follow it; otherwise use your native tool when the child uses your provider, a model it offers and no settings beyond yours (Claude \`Agent\`, \`run_in_background:false\`; Codex \`spawn_agent\`, then wait). Use \`delegate_task\` for another provider's model, user-asked settings, a separate checkout (\`isolation:"worktree"\`), or \`delegate_task\` by name. A native type on another provider's model counts too. Background agent: \`delegate_task\`, never a background \`Agent\`. Workflow only when asked.
 - Call \`orchestrator_capabilities\` once per thread, before the first \`delegate_task\`. Again only after an error or a user-named provider change. Settings go in \`target.options\`. Provider or model unavailable: say so. Never switch unasked or fall back to native tools, Workflow or CLIs. Never make a child's checkout in the shell or in \`task\`.
 - Every new delegate review or re-check is a new \`delegate_task\` (brief, findings, objections), never a \`t3_thread_send\`. Fix small review findings yourself; start no delegate for them. When told to proceed without a delegate, or to run fewer, \`task_cancel\` the extras. Start no replacement.
 - Follow a running delegate's \`next\`. Don't poll it (\`task_status\`, \`sleep\`, watchers, Monitor, ScheduleWakeup). Stop a delegate run you replace or no longer need with \`task_cancel\`, never \`t3_thread_interrupt\` on a \`childThreadId\`.
@@ -75,7 +75,7 @@ export interface T3AcpInstructionState {
   readonly includeMcpFallback?: boolean;
 }
 
-/** ACP agents only know Plan and Default; mattr's Goal runs in the agent's Default mode. */
+/** ACP agents only know Plan and Default; Matter's Goal runs in the agent's Default mode. */
 export const acpEffectiveInteractionMode = (mode: ProviderInteractionMode): "plan" | "default" =>
   mode === "plan" ? "plan" : "default";
 
@@ -197,21 +197,21 @@ export function t3OrchestrationSystemPrompt(
   return hasT3Mcp ? orchestrationInstructions(hasDeviceTools) : undefined;
 }
 
-// mattr: providers without a native `/goal` get Goal mode as a block after the user's words, so
+// Matter: providers without a native `/goal` get Goal mode as a block after the user's words, so
 // compaction cannot drop it. Plan, and Goal on native-goal providers, add nothing to the prompt.
-const MATTR_GOAL_MODE_INSTRUCTIONS = `Treat this request as a goal to finish end to end, not a single step.
+const MATTER_GOAL_MODE_INSTRUCTIONS = `Treat this request as a goal to finish end to end, not a single step.
 - Break it into milestones and keep a \`- [ ]\` checklist current as you work.
 - Keep going through implementation, edge cases, tests, verification and a self-review. Don't stop for check-ins you can resolve yourself.
 - Run independent pieces in parallel with subagents when that is faster.
 - Stop only when the goal is verified complete or you are blocked on a user decision, secret or credential. Then say what is done and what is left.`;
 
-/** Appends mattr's fallback Goal block for a provider without native `/goal`; anything else passes through. */
-export function withMattrGoalModeInstructions(
+/** Appends Matter's fallback Goal block for a provider without native `/goal`; anything else passes through. */
+export function withMatterGoalModeInstructions(
   text: string,
   mode: ProviderInteractionMode,
   nativeGoals: boolean,
 ): string {
   return mode !== "goal" || nativeGoals || text.trim() === ""
     ? text
-    : `${text}\n\n<mattr_goal_mode>\n${MATTR_GOAL_MODE_INSTRUCTIONS}\n</mattr_goal_mode>`;
+    : `${text}\n\n<matter_goal_mode>\n${MATTER_GOAL_MODE_INSTRUCTIONS}\n</matter_goal_mode>`;
 }

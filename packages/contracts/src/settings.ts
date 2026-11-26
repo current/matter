@@ -162,7 +162,7 @@ export const ShellGrain = Schema.Int.check(
 export type ShellGrain = typeof ShellGrain.Type;
 const DEFAULT_SHELL_GRAIN: ShellGrain = 0;
 
-// mattr: how see-through the frame is for non-solid materials, the Blur material's native blur
+// Matter: how see-through the frame is for non-solid materials, the Blur material's native blur
 // radius, the Liquid Glass style, and an Arc-style frame color (null keeps the theme's frame).
 export const MIN_SHELL_TRANSPARENCY = 0;
 export const MAX_SHELL_TRANSPARENCY = 100;
@@ -1535,15 +1535,15 @@ export const ServerSettings = Schema.Struct({
   fallbackToAvailableAccounts: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
-  /** mattr: instances automatic account switching never moves work onto. */
+  /** Matter: instances automatic account switching never moves work onto. */
   fallbackExcludedInstanceIds: Schema.Array(ProviderInstanceId).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
-  /** mattr: agents spread delegated subagents across every enabled subscription by usage left. */
+  /** Matter: agents spread delegated subagents across every enabled subscription by usage left. */
   mattrMultiProviderDelegation: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
-  /** mattr: instances agents never delegate to; picking one by hand still works. */
+  /** Matter: instances agents never delegate to; picking one by hand still works. */
   mattrDelegationExcludedInstanceIds: Schema.Array(ProviderInstanceId).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
@@ -1606,7 +1606,7 @@ export const ServerSettings = Schema.Struct({
   workflowSkippedRunsKept: WorkflowSkippedRunsKept.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_WORKFLOW_SKIPPED_RUNS_KEPT)),
   ),
-  /** Predicts the next prompt after completed turns. mattr: on by default, served by its own predictor for every provider. */
+  /** Predicts the next prompt after completed turns. Matter: on by default, served by its own predictor for every provider. */
   promptSuggestionsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   sidebarAutoSettleKeepPullRequests: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),

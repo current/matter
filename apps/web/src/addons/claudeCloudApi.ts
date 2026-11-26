@@ -14,17 +14,17 @@ import type {
 } from "@t3tools/contracts";
 import { useSyncExternalStore } from "react";
 
-import { type MattrApiConfig, mattrApiRequest } from "./mattrApi";
+import { type MatterApiConfig, matterApiRequest } from "./matterApi";
 
 /** Client for `/api/mattr/claude-cloud/*`, plus the state of the global Claude Cloud dialog. */
 
 const BASE = "/api/mattr/claude-cloud";
 
 export function fetchClaudeCloudStatus(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   options: { readonly refresh?: boolean; readonly signal?: AbortSignal } = {},
 ): Promise<ClaudeCloudStatus> {
-  return mattrApiRequest<ClaudeCloudStatus>(
+  return matterApiRequest<ClaudeCloudStatus>(
     config,
     `${BASE}/status${options.refresh ? "?refresh=1" : ""}`,
     options.signal ? { signal: options.signal } : {},
@@ -32,10 +32,10 @@ export function fetchClaudeCloudStatus(
 }
 
 export async function updateClaudeCloudSettings(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   patch: ClaudeCloudSettingsPatch,
 ): Promise<ClaudeCloudAddonSettings> {
-  const response = await mattrApiRequest<{ readonly settings: ClaudeCloudAddonSettings }>(
+  const response = await matterApiRequest<{ readonly settings: ClaudeCloudAddonSettings }>(
     config,
     `${BASE}/settings`,
     { method: "POST", body: patch },
@@ -44,38 +44,38 @@ export async function updateClaudeCloudSettings(
 }
 
 export function checkClaudeCloudEligibility(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   request: ClaudeCloudEligibilityRequest,
 ): Promise<ClaudeCloudEligibility> {
-  return mattrApiRequest(config, `${BASE}/eligibility`, { method: "POST", body: request });
+  return matterApiRequest(config, `${BASE}/eligibility`, { method: "POST", body: request });
 }
 
 export function launchClaudeCloudSession(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   request: ClaudeCloudLaunchRequest,
 ): Promise<ClaudeCloudLaunchResult> {
-  return mattrApiRequest(config, `${BASE}/launch`, { method: "POST", body: request });
+  return matterApiRequest(config, `${BASE}/launch`, { method: "POST", body: request });
 }
 
 export function sendClaudeCloudFollowUp(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   request: ClaudeCloudFollowUpRequest,
 ): Promise<ClaudeCloudFollowUpResult> {
-  return mattrApiRequest(config, `${BASE}/followup`, { method: "POST", body: request });
+  return matterApiRequest(config, `${BASE}/followup`, { method: "POST", body: request });
 }
 
 export function teleportClaudeCloudSession(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   request: ClaudeCloudTeleportRequest,
 ): Promise<ClaudeCloudTeleportResult> {
-  return mattrApiRequest(config, `${BASE}/teleport`, { method: "POST", body: request });
+  return matterApiRequest(config, `${BASE}/teleport`, { method: "POST", body: request });
 }
 
 export async function forgetClaudeCloudSession(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   sessionId: string,
 ): Promise<void> {
-  await mattrApiRequest(config, `${BASE}/sessions/${encodeURIComponent(sessionId)}`, {
+  await matterApiRequest(config, `${BASE}/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
   });
 }

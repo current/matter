@@ -16,7 +16,11 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 /** The final-choice composer's attach control: a plus, where upstream draws a paperclip. */
-export function MattrComposerAttachButton({ onOpenPicker }: { readonly onOpenPicker: () => void }) {
+export function MatterComposerAttachButton({
+  onOpenPicker,
+}: {
+  readonly onOpenPicker: () => void;
+}) {
   const gt = useGT();
   return (
     <Tooltip>
@@ -26,7 +30,7 @@ export function MattrComposerAttachButton({ onOpenPicker }: { readonly onOpenPic
             type="button"
             variant="ghost"
             size="icon-sm"
-            data-mattr-composer-attach=""
+            data-matter-composer-attach=""
             onPointerDown={(event) => event.preventDefault()}
             onClick={onOpenPicker}
             aria-label={gt("Attach files")}
@@ -43,11 +47,11 @@ export function MattrComposerAttachButton({ onOpenPicker }: { readonly onOpenPic
 }
 
 /** The project name leading the composer's under-tray. */
-export function MattrComposerProjectLabel({ title }: { readonly title: string }) {
+export function MatterComposerProjectLabel({ title }: { readonly title: string }) {
   return (
-    <span data-mattr-composer-project="">
+    <span data-matter-composer-project="">
       <FolderIcon aria-hidden="true" />
-      <span data-mattr-composer-project-name="">{title}</span>
+      <span data-matter-composer-project-name="">{title}</span>
     </span>
   );
 }
@@ -56,7 +60,7 @@ export function MattrComposerProjectLabel({ title }: { readonly title: string })
  * Unifies the under-tray across new-chat drafts and active threads for real projects, while
  * collapsing the outer cradle cleanly when a thread has no project (or in scratch active threads).
  */
-export function shouldShowMattrComposerContextStrip(input: {
+export function shouldShowMatterComposerContextStrip(input: {
   readonly embedded: boolean;
   readonly hasActiveProject: boolean;
   readonly isScratchProject: boolean;
@@ -77,7 +81,7 @@ export function shouldShowMattrComposerContextStrip(input: {
 }
 
 /** Solid macOS-grade microphone glyph sized optically for the 28px composer controls. */
-export function MattrDictateIcon({ className }: { readonly className?: string }) {
+export function MatterDictateIcon({ className }: { readonly className?: string }) {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -85,7 +89,7 @@ export function MattrDictateIcon({ className }: { readonly className?: string })
       height="15"
       fill="none"
       aria-hidden="true"
-      data-mattr-icon="dictate"
+      data-matter-icon="dictate"
       className={className}
     >
       <rect x="5.75" y="1.75" width="4.5" height="7.5" rx="2.25" fill="currentColor" />
@@ -106,7 +110,7 @@ export function MattrDictateIcon({ className }: { readonly className?: string })
 }
 
 /** Crisp 5-bar solid waveform glyph for Voice Mode, avoiding thin-stroke crowding at 15px. */
-export function MattrVoiceModeIcon({ className }: { readonly className?: string }) {
+export function MatterVoiceModeIcon({ className }: { readonly className?: string }) {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -114,7 +118,7 @@ export function MattrVoiceModeIcon({ className }: { readonly className?: string 
       height="15"
       fill="none"
       aria-hidden="true"
-      data-mattr-icon="voice-mode"
+      data-matter-icon="voice-mode"
       className={className}
     >
       <rect x="1.675" y="6" width="1.65" height="4" rx="0.825" fill="currentColor" />
@@ -126,7 +130,7 @@ export function MattrVoiceModeIcon({ className }: { readonly className?: string 
   );
 }
 
-export interface MattrGooeySendAction {
+export interface MatterGooeySendAction {
   readonly id: "dictate" | "voice-mode";
   readonly label: string;
   readonly shortcut?: string | null | undefined;
@@ -162,13 +166,13 @@ function prefersReducedMotion(): boolean {
  * an SVG metaball silhouette layer behind crisp DOM buttons, mounted only while active
  * so the idle Send button carries zero SVG filter or GPU cost.
  */
-export function MattrGooeySendAnchor({
+export function MatterGooeySendAnchor({
   children,
   actions,
   anchorActive,
 }: {
   readonly children: ReactNode;
-  readonly actions: ReadonlyArray<MattrGooeySendAction>;
+  readonly actions: ReadonlyArray<MatterGooeySendAction>;
   readonly anchorActive: boolean;
 }) {
   const gt = useGT();
@@ -176,7 +180,7 @@ export function MattrGooeySendAnchor({
   const [reducedMotion, setReducedMotion] = useState(false);
   const anchorRef = useRef<HTMLSpanElement>(null);
   const rawFilterId = useId();
-  const filterId = `mattr-gooey-${rawFilterId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const filterId = `matter-gooey-${rawFilterId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   if (actions.length === 0 && phase !== "closed") {
     setPhase("closed");
@@ -265,13 +269,13 @@ export function MattrGooeySendAnchor({
   return (
     <span
       ref={anchorRef}
-      data-mattr-gooey-anchor=""
-      data-mattr-gooey-state={phase}
+      data-matter-gooey-anchor=""
+      data-matter-gooey-state={phase}
       onContextMenu={handleContextMenu}
     >
       {showOverlay ? (
         <span
-          data-mattr-gooey-stage=""
+          data-matter-gooey-stage=""
           data-state={phase}
           data-reduced-motion={reducedMotion ? "true" : undefined}
         >
@@ -279,7 +283,7 @@ export function MattrGooeySendAnchor({
             <svg
               aria-hidden="true"
               focusable="false"
-              data-mattr-gooey-svg=""
+              data-matter-gooey-svg=""
               width={GOOEY_SVG_WIDTH}
               height={GOOEY_SVG_HEIGHT}
               viewBox={`0 0 ${GOOEY_SVG_WIDTH} ${GOOEY_SVG_HEIGHT}`}
@@ -304,7 +308,7 @@ export function MattrGooeySendAnchor({
                   cx={GOOEY_ANCHOR_CX}
                   cy={GOOEY_ANCHOR_CY}
                   r={GOOEY_CIRCLE_RADIUS}
-                  data-mattr-gooey-blob="anchor"
+                  data-matter-gooey-blob="anchor"
                   data-active={anchorActive ? "true" : "false"}
                 />
                 {actions.map((action, index) => {
@@ -323,7 +327,7 @@ export function MattrGooeySendAnchor({
                       cx={GOOEY_ANCHOR_CX}
                       cy={GOOEY_ANCHOR_CY}
                       r={GOOEY_CIRCLE_RADIUS}
-                      data-mattr-gooey-blob="satellite"
+                      data-matter-gooey-blob="satellite"
                       style={blobStyle}
                     />
                   );
@@ -332,7 +336,7 @@ export function MattrGooeySendAnchor({
             </svg>
           ) : null}
 
-          <div role="group" aria-label={gt("Voice actions")} data-mattr-gooey-actions="">
+          <div role="group" aria-label={gt("Voice actions")} data-matter-gooey-actions="">
             {actions.map((action, index) => {
               const offsetY = -(index + 1) * GOOEY_STEP_PX;
               const delayMs =
@@ -349,7 +353,7 @@ export function MattrGooeySendAnchor({
                   key={action.id}
                   type="button"
                   className="rounded-full"
-                  data-mattr-gooey-action={action.id}
+                  data-matter-gooey-action={action.id}
                   aria-label={action.label}
                   disabled={action.disabled || phase === "closing"}
                   tabIndex={phase === "closing" ? -1 : 0}
@@ -363,7 +367,7 @@ export function MattrGooeySendAnchor({
                   }}
                 >
                   {action.icon}
-                  <span data-mattr-gooey-label="" aria-hidden="true">
+                  <span data-matter-gooey-label="" aria-hidden="true">
                     {fullLabel}
                   </span>
                 </button>
@@ -372,7 +376,7 @@ export function MattrGooeySendAnchor({
           </div>
         </span>
       ) : null}
-      <span data-mattr-gooey-primary="" onClickCapture={handlePrimaryClickCapture}>
+      <span data-matter-gooey-primary="" onClickCapture={handlePrimaryClickCapture}>
         {children}
       </span>
     </span>

@@ -4,11 +4,11 @@ import { useSyncExternalStore } from "react";
 import { getAddonStoreState, subscribeAddonStore } from "./addonStore";
 
 /**
- * Operations add-ons expose to the rest of mattr (native UI, the voice assistant, MCP tools).
+ * Operations add-ons expose to the rest of Matter (native UI, the voice assistant, MCP tools).
  * A capability exists only while an add-on that provides it is enabled, so a disabled Grok Bot
  * contributes nothing the voice assistant could call.
  */
-export type MattrCapabilityId =
+export type MatterCapabilityId =
   | "bots.discover"
   | "bots.read"
   | "bots.message"
@@ -17,7 +17,7 @@ export type MattrCapabilityId =
   | "voice.briefings";
 
 interface CapabilityDefinition {
-  readonly id: MattrCapabilityId;
+  readonly id: MatterCapabilityId;
   readonly providedBy: (entry: AddonEntry) => boolean;
 }
 
@@ -34,12 +34,14 @@ const CAPABILITIES: ReadonlyArray<CapabilityDefinition> = [
   { id: "voice.briefings", providedBy: isVoiceAssistant },
 ];
 
-interface MattrCapability {
-  readonly id: MattrCapabilityId;
+interface MatterCapability {
+  readonly id: MatterCapabilityId;
   readonly addonIds: ReadonlyArray<string>;
 }
 
-function availableCapabilities(entries: ReadonlyArray<AddonEntry>): ReadonlyArray<MattrCapability> {
+function availableCapabilities(
+  entries: ReadonlyArray<AddonEntry>,
+): ReadonlyArray<MatterCapability> {
   const enabled = entries.filter((entry) => entry.state.enabled);
   return CAPABILITIES.flatMap((capability) => {
     const addonIds = enabled.filter(capability.providedBy).map((entry) => entry.manifest.id);
@@ -47,11 +49,11 @@ function availableCapabilities(entries: ReadonlyArray<AddonEntry>): ReadonlyArra
   });
 }
 
-function hasCapability(id: MattrCapabilityId): boolean {
+function hasCapability(id: MatterCapabilityId): boolean {
   return availableCapabilities(getAddonStoreState().entries).some((entry) => entry.id === id);
 }
 
-export function useHasCapability(id: MattrCapabilityId): boolean {
+export function useHasCapability(id: MatterCapabilityId): boolean {
   return useSyncExternalStore(
     subscribeAddonStore,
     () => hasCapability(id),

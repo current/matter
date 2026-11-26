@@ -44,7 +44,7 @@ import {
   type VoiceActivityConfig,
 } from "./voiceAudioLogic";
 
-const KEEP_AWAKE_TAG = "mattr-voice-mode";
+const KEEP_AWAKE_TAG = "matter-voice-mode";
 const METERING_INTERVAL_MS = 60;
 // A recorder that is still not running this long after record() was stopped by the system
 // (a phone call, Siri, another app taking the microphone).
@@ -221,7 +221,7 @@ export class NativeVoiceAudio {
       if (this.opened) return;
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
-        throw new Error(m(msg("Microphone access is turned off for mattr.")));
+        throw new Error(m(msg("Microphone access is turned off for Matter.")));
       }
       const token = acquireAudioSession("recording");
       this.token = token;
@@ -497,7 +497,7 @@ export class NativeVoiceAudio {
   async prepare(audio: SpokenAudio): Promise<PreparedClip & { start(): Promise<ActivePlayback> }> {
     const file = new File(
       Paths.cache,
-      `mattr-voice-${Date.now()}-${++this.fileSequence}.${audioExtensionForContentType(audio.contentType)}`,
+      `matter-voice-${Date.now()}-${++this.fileSequence}.${audioExtensionForContentType(audio.contentType)}`,
     );
     try {
       file.create({ overwrite: true });
@@ -629,7 +629,7 @@ export class NativeVoiceAudio {
         if (uri === null) {
           const file = new File(
             Paths.cache,
-            `mattr-voice-${Date.now()}-${++this.fileSequence}.wav`,
+            `matter-voice-${Date.now()}-${++this.fileSequence}.wav`,
           );
           file.create({ overwrite: true });
           await file.write(wav);

@@ -409,7 +409,7 @@ describe("isDoNotTrackSet", () => {
 });
 
 describe("isRelayTracingEnabled", () => {
-  it("always returns false in mattr regardless of environment overrides", () => {
+  it("always returns false in Matter regardless of environment overrides", () => {
     assert.isFalse(OtelEnvironment.isRelayTracingEnabled({}));
     assert.isFalse(OtelEnvironment.isRelayTracingEnabled({ DO_NOT_TRACK: "0" }));
     assert.isFalse(OtelEnvironment.isRelayTracingEnabled({ T3CODE_TELEMETRY_ENABLED: "true" }));

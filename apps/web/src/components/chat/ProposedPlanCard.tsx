@@ -39,10 +39,13 @@ import { projectEnvironment } from "~/state/projects";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
-import { MattrPlanOverviewCard, type MattrPlanApproveResult } from "./MattrPlanOverviewCard.mattr";
+import {
+  MatterPlanOverviewCard,
+  type MatterPlanApproveResult,
+} from "./MatterPlanOverviewCard.matter";
 
-// mattr: tests keep upstream's card, which they assert against.
-const MATTR_PLAN_OVERVIEW = import.meta.env.MODE !== "test";
+// Matter: tests keep upstream's card, which they assert against.
+const MATTER_PLAN_OVERVIEW = import.meta.env.MODE !== "test";
 
 export const ProposedPlanCard = memo(function ProposedPlanCard({
   planId,
@@ -52,12 +55,12 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
   cwd,
   workspaceRoot,
   findActive = false,
-  mattrApprove = null,
-  mattrAutoApproveEligible = true,
+  matterApprove = null,
+  matterAutoApproveEligible = true,
 }: {
   planId?: PlanId;
-  mattrApprove?: ((planMarkdown: string) => Promise<MattrPlanApproveResult>) | null;
-  mattrAutoApproveEligible?: boolean;
+  matterApprove?: ((planMarkdown: string) => Promise<MatterPlanApproveResult>) | null;
+  matterAutoApproveEligible?: boolean;
   planMarkdown: string;
   environmentId: EnvironmentId;
   threadRef?: ScopedThreadRef | undefined;
@@ -200,9 +203,9 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
     </Dialog>
   );
 
-  if (MATTR_PLAN_OVERVIEW) {
+  if (MATTER_PLAN_OVERVIEW) {
     return (
-      <MattrPlanOverviewCard
+      <MatterPlanOverviewCard
         planId={planId}
         planMarkdown={planMarkdown}
         fallbackTitle={gt("Proposed plan")}
@@ -214,11 +217,11 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
         onDownload={handleDownload}
         onCopy={handleCopyPlan}
         onSaveToWorkspace={canWriteFiles && workspaceRoot ? openSaveDialog : null}
-        onApprove={mattrApprove}
-        autoApproveEligible={mattrAutoApproveEligible}
+        onApprove={matterApprove}
+        autoApproveEligible={matterAutoApproveEligible}
       >
         {saveDialog}
-      </MattrPlanOverviewCard>
+      </MatterPlanOverviewCard>
     );
   }
 

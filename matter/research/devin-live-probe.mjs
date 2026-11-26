@@ -139,7 +139,7 @@ async function main() {
   if (opts.help) {
     console.log(
       [
-        "Usage: node antimatter/research/devin-live-probe.mjs [--from-devin-cli] [--base-url URL] [--first N]",
+        "Usage: node matter/research/devin-live-probe.mjs [--from-devin-cli] [--base-url URL] [--first N]",
         "Env:   DEVIN_API_KEY (required unless --from-devin-cli), DEVIN_ORG_ID (optional; auto-discovered via /v3/self)",
         "Mode:  Strictly read-only HTTP GET. Redacts all secrets, IDs, titles, prompts, and repo names.",
       ].join("\n"),

@@ -2,7 +2,7 @@ import type {
   VoiceAssistantClientAction,
   VoiceAssistantToolResult,
   VoiceAssistantTurnResponse,
-} from "../../../../../antimatter/voice-assistant/types";
+} from "../../../../../matter/voice-assistant/types";
 import type { SpokenAudio } from "./voiceAssistantApi";
 
 /** One line of the server's `/turn-stream` NDJSON, mirrored from `apps/server/src/voiceAssistant`. */

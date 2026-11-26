@@ -11,7 +11,7 @@ import {
   type ShellGlassTint,
   shellBlurRadius,
   shellGlassTint,
-} from "../../../../antimatter/shellTint.ts";
+} from "../../../../matter/shellTint.ts";
 
 // Native seam (tests swap it). Blur uses SkyLight's CGSSetWindowBackgroundBlurRadius, as iTerm2
 // and Ghostty do: NSVisualEffectView materials have a fixed blur no slider can move. Liquid Glass
@@ -86,18 +86,18 @@ function getWindowState(window: Electron.BrowserWindow): WindowMaterialState {
 function loadMacShellNative(): Promise<MacShellNative | null> {
   return (macNativePromise ??= import("ffi-rs")
     .then(({ DataType, load, open }) => {
-      const objc = "mattr-objc-shell-material";
+      const objc = "matter-objc-shell-material";
       open({ library: objc, path: "/usr/lib/libobjc.A.dylib" });
       open({
-        library: "mattr-appkit-shell-material",
+        library: "matter-appkit-shell-material",
         path: "/System/Library/Frameworks/AppKit.framework/AppKit",
       });
-      const coreFoundation = "mattr-corefoundation-shell-material";
+      const coreFoundation = "matter-corefoundation-shell-material";
       open({
         library: coreFoundation,
         path: "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
       });
-      let skyLight: string | null = "mattr-skylight-shell-material";
+      let skyLight: string | null = "matter-skylight-shell-material";
       try {
         open({
           library: skyLight,

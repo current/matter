@@ -3,7 +3,7 @@ import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
 import { useState, type CSSProperties } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
-import shellCss from "../../../../../antimatter/shell.css?inline";
+import shellCss from "../../../../../matter/shell.css?inline";
 import indexCss from "../../index.css?inline";
 import { act, render } from "../../../test/render";
 import { usePanelPresence } from "../../panelAnimations";

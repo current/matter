@@ -1,20 +1,20 @@
 import { msg, useGT, useMessages } from "gt-react";
 import { ArrowUpIcon, GitBranchIcon, PlusIcon } from "lucide-react";
-import { SHELL_COLOR_PRESETS } from "../../../../../antimatter/shellTint";
+import { SHELL_COLOR_PRESETS } from "../../../../../matter/shellTint";
 import {
   composerMaterialHasBlurControl,
   composerMaterialIsTranslucent,
-  DEFAULT_MATTR_COMPOSER_APPEARANCE,
-  MATTR_COMPOSER_MATERIALS,
-  MATTR_COMPOSER_SHAPES,
+  DEFAULT_MATTER_COMPOSER_APPEARANCE,
+  MATTER_COMPOSER_MATERIALS,
+  MATTER_COMPOSER_SHAPES,
   MAX_COMPOSER_BLUR,
   MAX_COMPOSER_TRANSPARENCY,
   MIN_COMPOSER_BLUR,
   MIN_COMPOSER_TRANSPARENCY,
-  type MattrComposerMaterial,
-  type MattrComposerShape,
-  useMattrComposerAppearance,
-} from "../../mattrComposerAppearance";
+  type MatterComposerMaterial,
+  type MatterComposerShape,
+  useMatterComposerAppearance,
+} from "../../matterComposerAppearance";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import {
@@ -22,12 +22,12 @@ import {
   ColorSwatch,
   CustomColorSwatch,
   SHELL_COLOR_LABELS,
-} from "./MattrAppearanceControls";
+} from "./MatterAppearanceControls";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
 import { useScopedSettings } from "./useScopedSettings";
 
-const MATERIAL_LABELS: Record<MattrComposerMaterial, string> = {
+const MATERIAL_LABELS: Record<MatterComposerMaterial, string> = {
   solid: msg("Solid", { $context: "chat composer material" }),
   frosted: msg("Frosted", { $context: "chat composer material" }),
   glass: msg("Glass", { $context: "chat composer material" }),
@@ -35,7 +35,7 @@ const MATERIAL_LABELS: Record<MattrComposerMaterial, string> = {
   minimal: msg("Minimal", { $context: "chat composer material" }),
 };
 
-const SHAPE_LABELS: Record<MattrComposerShape, string> = {
+const SHAPE_LABELS: Record<MatterComposerShape, string> = {
   shelf: msg("Shelf", { $context: "chat composer style" }),
   floating: msg("Floating", { $context: "chat composer style" }),
   compact: msg("Compact", { $context: "chat composer style" }),
@@ -50,12 +50,12 @@ const PREVIEW_DIFF = [
   { code: '+ emit("reconnected");', className: "bg-info/10 px-3 text-info" },
 ] as const;
 
-function isMaterial(value: unknown): value is MattrComposerMaterial {
-  return MATTR_COMPOSER_MATERIALS.includes(value as MattrComposerMaterial);
+function isMaterial(value: unknown): value is MatterComposerMaterial {
+  return MATTER_COMPOSER_MATERIALS.includes(value as MatterComposerMaterial);
 }
 
-function isShape(value: unknown): value is MattrComposerShape {
-  return MATTR_COMPOSER_SHAPES.includes(value as MattrComposerShape);
+function isShape(value: unknown): value is MatterComposerShape {
+  return MATTER_COMPOSER_SHAPES.includes(value as MatterComposerShape);
 }
 
 /**
@@ -67,7 +67,7 @@ function ComposerPreview() {
   return (
     <div
       aria-hidden
-      data-mattr-composer-preview=""
+      data-matter-composer-preview=""
       className="pointer-events-none relative mt-3 h-56 overflow-hidden rounded-xl border border-border/60 bg-background select-none"
     >
       <div className="space-y-2.5 px-6 pt-4 text-sm leading-5 text-foreground/80">
@@ -82,7 +82,7 @@ function ComposerPreview() {
         <p className="text-muted-foreground">{gt("Ran the suite: 214 passed.")}</p>
       </div>
       <div className="absolute inset-x-4 bottom-3 mx-auto max-w-md">
-        <div data-mattr-composer="" data-context-row="" className="relative isolate">
+        <div data-matter-composer="" data-context-row="" className="relative isolate">
           <div
             data-slot="composer-host"
             className="relative z-10 after:pointer-events-none after:absolute after:inset-0 after:z-1 after:rounded-[inherit] after:border"
@@ -99,7 +99,7 @@ function ComposerPreview() {
             </div>
           </div>
           <div data-slot="composer-context-strip" className="flex items-center">
-            <span className="ps-1.5 font-medium text-(--mc-text)">mattr</span>
+            <span className="ps-1.5 font-medium text-(--mc-text)">Matter</span>
             <span className="ps-2">{gt("Local")}</span>
             <span className="ms-auto inline-flex items-center gap-1.5 pe-1.5">
               <GitBranchIcon className="size-3" />
@@ -112,13 +112,13 @@ function ComposerPreview() {
   );
 }
 
-export function MattrComposerAppearanceSettings() {
+export function MatterComposerAppearanceSettings() {
   const gt = useGT();
   const m = useMessages();
   const searchableSetting = useSearchableSetting();
   const shellColor = useScopedSettings().shellColor;
-  const [appearance, update] = useMattrComposerAppearance();
-  const defaults = DEFAULT_MATTR_COMPOSER_APPEARANCE;
+  const [appearance, update] = useMatterComposerAppearance();
+  const defaults = DEFAULT_MATTER_COMPOSER_APPEARANCE;
   const { material, color } = appearance;
   const isPresetColor = SHELL_COLOR_PRESETS.some((preset) => preset.color === color);
   const isCustomColor = color !== null && color !== "shell" && !isPresetColor;
@@ -127,7 +127,7 @@ export function MattrComposerAppearanceSettings() {
   return (
     <>
       <SettingsRow
-        {...searchableSetting("mattr-scroll-fade")}
+        {...searchableSetting("matter-scroll-fade")}
         description={gt("Soften chat and pages as they scroll under the top edge.")}
         devicePreference
         resetAction={
@@ -148,7 +148,7 @@ export function MattrComposerAppearanceSettings() {
       />
 
       <SettingsRow
-        {...searchableSetting("mattr-composer-material")}
+        {...searchableSetting("matter-composer-material")}
         description={gt("How the chat composer is painted over the conversation behind it.")}
         devicePreference
         resetAction={
@@ -189,7 +189,7 @@ export function MattrComposerAppearanceSettings() {
       </SettingsRow>
 
       <SettingsRow
-        {...searchableSetting("mattr-composer-shape")}
+        {...searchableSetting("matter-composer-shape")}
         description={gt("The composer's shape, from the default shelf to a soft pill.")}
         devicePreference
         resetAction={
@@ -224,7 +224,7 @@ export function MattrComposerAppearanceSettings() {
 
       {composerMaterialIsTranslucent(material) ? (
         <SettingsRow
-          {...searchableSetting("setting-mattr-composer-transparency")}
+          {...searchableSetting("setting-matter-composer-transparency")}
           description={gt("How much of the conversation shows through the composer.")}
           devicePreference
           resetAction={
@@ -237,7 +237,7 @@ export function MattrComposerAppearanceSettings() {
           }
           control={
             <AppearanceSlider
-              id="mattr-composer-transparency"
+              id="matter-composer-transparency"
               label={gt("Composer transparency")}
               value={appearance.transparency}
               min={MIN_COMPOSER_TRANSPARENCY}
@@ -251,7 +251,7 @@ export function MattrComposerAppearanceSettings() {
 
       {composerMaterialHasBlurControl(material) ? (
         <SettingsRow
-          {...searchableSetting("setting-mattr-composer-blur")}
+          {...searchableSetting("setting-matter-composer-blur")}
           description={gt("How strongly the conversation behind the composer is blurred.")}
           devicePreference
           resetAction={
@@ -264,7 +264,7 @@ export function MattrComposerAppearanceSettings() {
           }
           control={
             <AppearanceSlider
-              id="mattr-composer-blur"
+              id="matter-composer-blur"
               label={gt("Composer blur")}
               value={appearance.blur}
               min={MIN_COMPOSER_BLUR}
@@ -279,7 +279,7 @@ export function MattrComposerAppearanceSettings() {
 
       {material !== "minimal" ? (
         <SettingsRow
-          {...searchableSetting("mattr-composer-color")}
+          {...searchableSetting("matter-composer-color")}
           description={gt(
             "Tint the composer. Colors adapt to light and dark so the prompt stays readable.",
           )}

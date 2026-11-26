@@ -1,11 +1,11 @@
-/* mattr Topbar Ribbon + Detached Whisper Pill (Doop "whisper pill" frames): the thread's chips in
+/* Matter Topbar Ribbon + Detached Whisper Pill (Doop "whisper pill" frames): the thread's chips in
    the 38pt shell topbar and a 28px pill above the composer, in place of the docked Thread Details
    card. Unlayered and scoped by data attributes, so it wins over the reused upstream controls'
    Tailwind utilities without restyling their markup. Popups only exist while open, so the frosted
    blur costs nothing at rest. */
-[data-mattr-ribbon],
-[data-mattr-whisper-pill-row],
-[data-mattr-frosted] {
+[data-matter-ribbon],
+[data-matter-whisper-pill-row],
+[data-matter-frosted] {
   --mr-chip: color-mix(in srgb, var(--foreground) 3.5%, transparent);
   --mr-chip-hover: color-mix(in srgb, var(--foreground) 7%, transparent);
   --mr-chip-strong: color-mix(in srgb, var(--foreground) 6%, transparent);
@@ -23,7 +23,7 @@
   --mw-stop-hover: #d93d42;
 }
 
-.dark :is([data-mattr-ribbon], [data-mattr-frosted]) {
+.dark :is([data-matter-ribbon], [data-matter-frosted]) {
   --mw-bg: #1a1b1e;
   --mw-line: rgb(255 255 255 / 8%);
   --mw-shadow: none;
@@ -32,39 +32,39 @@
 /* The pill wears the composer's own surface (composer.css): the card's fill and shadow, and the
    shelf's hairline in dark so it sits as one family with the composer below it. Settings →
    Appearance → Composer restyles it too (composer-appearance.css). */
-[data-mattr-whisper-pill-row] {
+[data-matter-whisper-pill-row] {
   --mw-line: rgb(0 0 0 / 7.5%);
   --mw-shadow: 0 1px 2px rgb(20 22 30 / 5%);
   --mw-radius: 10px;
 }
 
-.dark [data-mattr-whisper-pill-row] {
+.dark [data-matter-whisper-pill-row] {
   --mw-bg: #1c1c1c;
   --mw-line: rgb(255 255 255 / 9%);
   --mw-shadow: none;
 }
 
-html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
+html[data-theme-id] :is([data-matter-whisper-pill-row], [data-matter-frosted]) {
   --mw-bg: var(--app-theme-surface-raised, var(--card));
   --mw-line: var(--app-theme-toolbar-border, var(--border));
 }
 
-:is([data-mattr-ribbon], [data-mattr-whisper-pill-row], [data-mattr-frosted]),
-:is([data-mattr-ribbon], [data-mattr-whisper-pill-row], [data-mattr-frosted]) * {
+:is([data-matter-ribbon], [data-matter-whisper-pill-row], [data-matter-frosted]),
+:is([data-matter-ribbon], [data-matter-whisper-pill-row], [data-matter-frosted]) * {
   font-style: normal;
 }
 
 /* The title keeps the room the old reserved padding gave the window controls. */
-[data-chat-header] > :has(+ [data-mattr-ribbon]) {
+[data-chat-header] > :has(+ [data-matter-ribbon]) {
   padding-inline-end: 8px;
 }
 
-[data-mattr-ribbon] {
+[data-matter-ribbon] {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 6px;
-  margin-inline-end: var(--mattr-ribbon-controls-inset, 0px);
+  margin-inline-end: var(--matter-ribbon-controls-inset, 0px);
   font-size: 12px;
   line-height: 16px;
   color: var(--mr-text);
@@ -72,7 +72,7 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
 }
 
 /* The subtle divider before the terminal and panel toggles. */
-[data-mattr-ribbon]:not([data-right-panel-open])::after {
+[data-matter-ribbon]:not([data-right-panel-open])::after {
   content: "";
   width: 1px;
   height: 16px;
@@ -80,19 +80,19 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
   background-color: var(--mr-line);
 }
 
-[data-mattr-ribbon-slot] {
+[data-matter-ribbon-slot] {
   display: flex;
   align-items: center;
   min-width: 0;
 }
 
-[data-mattr-ribbon-slot]:empty {
+[data-matter-ribbon-slot]:empty {
   display: none;
 }
 
 /* Every chip: the reused control's group (split button) or lone button becomes one 26px chip. */
-[data-mattr-ribbon-slot] > :is([role="group"], button),
-[data-mattr-ribbon-chip] {
+[data-matter-ribbon-slot] > :is([role="group"], button),
+[data-matter-ribbon-chip] {
   display: inline-flex;
   align-items: center;
   height: 26px;
@@ -112,30 +112,30 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
     translate 120ms ease;
 }
 
-[data-mattr-ribbon-slot] > :is([role="group"], button):hover,
-[data-mattr-ribbon-chip]:hover,
-[data-mattr-ribbon-chip][data-popup-open] {
+[data-matter-ribbon-slot] > :is([role="group"], button):hover,
+[data-matter-ribbon-chip]:hover,
+[data-matter-ribbon-chip][data-popup-open] {
   border-color: var(--mr-line-hover);
 }
 
-[data-mattr-ribbon-slot] > button:hover,
-[data-mattr-ribbon-chip]:hover,
-[data-mattr-ribbon-chip][data-popup-open] {
+[data-matter-ribbon-slot] > button:hover,
+[data-matter-ribbon-chip]:hover,
+[data-matter-ribbon-chip][data-popup-open] {
   background-color: var(--mr-chip-hover);
 }
 
-[data-mattr-ribbon-slot="git"] > :is([role="group"], button) {
+[data-matter-ribbon-slot="git"] > :is([role="group"], button) {
   background-color: var(--mr-chip-strong);
 }
 
-[data-mattr-ribbon-slot] :is(button, [role="group"])::before {
+[data-matter-ribbon-slot] :is(button, [role="group"])::before {
   display: none;
 }
 
 /* The buttons inside a split chip lose their own frame and share the chip's. */
-[data-mattr-ribbon-slot] > [role="group"] > :is(button, [data-slot]):not([data-slot="separator"]),
-[data-mattr-ribbon-slot] > button,
-[data-mattr-ribbon-chip] {
+[data-matter-ribbon-slot] > [role="group"] > :is(button, [data-slot]):not([data-slot="separator"]),
+[data-matter-ribbon-slot] > button,
+[data-matter-ribbon-chip] {
   gap: 5px;
   height: 100%;
   min-height: 0;
@@ -151,68 +151,70 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
   cursor: pointer;
 }
 
-[data-mattr-ribbon-slot] > [role="group"] > :is(button, [data-slot]):not([data-slot="separator"]) {
+[data-matter-ribbon-slot] > [role="group"] > :is(button, [data-slot]):not([data-slot="separator"]) {
   border: 0;
   background-color: transparent;
   color: inherit;
 }
 
-[data-mattr-ribbon-slot] > button,
-[data-mattr-ribbon-chip] {
+[data-matter-ribbon-slot] > button,
+[data-matter-ribbon-chip] {
   border-radius: 7px;
 }
 
-[data-mattr-ribbon-slot]
+[data-matter-ribbon-slot]
   > [role="group"]
   > :is(button, [data-slot]):not([data-slot="separator"]):hover,
-[data-mattr-ribbon-slot] > [role="group"] > [data-popup-open] {
+[data-matter-ribbon-slot] > [role="group"] > [data-popup-open] {
   background-color: var(--mr-chip-hover);
 }
 
 /* The chevron half sits tight against the label, as one chip. */
-[data-mattr-ribbon-slot] > [role="group"] > :is(button, [data-slot]):last-child:not(:first-child) {
+[data-matter-ribbon-slot] > [role="group"] > :is(button, [data-slot]):last-child:not(:first-child) {
   padding-inline: 2px 6px;
 }
 
-[data-mattr-ribbon-slot] > [role="group"] > :is([data-slot="separator"], span[aria-hidden="true"]) {
+[data-matter-ribbon-slot]
+  > [role="group"]
+  > :is([data-slot="separator"], span[aria-hidden="true"]) {
   display: none;
 }
 
-[data-mattr-ribbon] svg {
+[data-matter-ribbon] svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
 }
 
-[data-mattr-ribbon-slot] > [role="group"] > :last-child:not(:first-child) svg,
-[data-mattr-ribbon-slot] svg[data-mattr-chevron] {
+[data-matter-ribbon-slot] > [role="group"] > :last-child:not(:first-child) svg,
+[data-matter-ribbon-slot] svg[data-matter-chevron] {
   width: 12px;
   height: 12px;
   color: var(--mr-muted);
 }
 
-[data-mattr-ribbon-num] {
+[data-matter-ribbon-num] {
   font-variant-numeric: tabular-nums;
 }
 
-[data-mattr-ribbon-chip] [data-mattr-ribbon-icon] {
+[data-matter-ribbon-chip] [data-matter-ribbon-icon] {
   color: var(--mr-muted);
 }
 
-[data-mattr-ribbon-chip="more"] {
+[data-matter-ribbon-chip="more"] {
   width: 26px;
   justify-content: center;
   padding-inline: 0;
 }
 
 /* The diff chip: only the +X -Y counts. */
-[data-mattr-ribbon-slot="diff"] > button > svg,
-[data-mattr-ribbon-slot="diff"] > button > span > :not(:last-child) {
+[data-matter-ribbon-slot="diff"] > button > svg,
+[data-matter-ribbon-slot="diff"] > button > span > :not(:last-child) {
   display: none;
 }
 
-[data-mattr-ribbon-slot="diff"] > button > span,
-[data-mattr-ribbon-slot="diff"] > button > span > :last-child {
+[data-matter-ribbon-slot="diff"] > button > span,
+[data-matter-ribbon-slot="diff"] > button > span > :last-child {
   flex: none;
   gap: 4px;
   margin: 0;
@@ -222,8 +224,8 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
 }
 
 /* Git drops to its icon when the header gets narrow. */
-[data-mattr-ribbon][data-density="minimal"]
-  [data-mattr-ribbon-slot="git"]
+[data-matter-ribbon][data-density="minimal"]
+  [data-matter-ribbon-slot="git"]
   [role="group"]
   > button:first-child:not([aria-labelledby])
   > span {
@@ -231,20 +233,20 @@ html[data-theme-id] :is([data-mattr-whisper-pill-row], [data-mattr-frosted]) {
 }
 
 /* Base UI sizes the git menu to its anchor; the Ribbon's chip is narrower than the card's row.
-   MattrThreadRibbon flags the open menu on <html>, since a document-wide :has() restyles the page. */
-html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="menu-popup"] {
+   MatterThreadRibbon flags the open menu on <html>, since a document-wide :has() restyles the page. */
+html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="menu-popup"] {
   min-width: 15rem;
 }
 
 /* Detached Whisper Pill: 8px above the composer card, aligned with its edge (shelf 4px + 1px). */
-[data-mattr-whisper-pill-row] {
+[data-matter-whisper-pill-row] {
   display: flex;
   padding-block-end: 8px;
   padding-inline-start: 5px;
   pointer-events: none;
 }
 
-[data-mattr-whisper-pill] {
+[data-matter-whisper-pill] {
   --mw-fill: var(--mw-paint, var(--mw-bg));
   --mw-edge: var(--mw-line);
   display: inline-flex;
@@ -266,24 +268,24 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
     border-color 120ms ease;
 }
 
-[data-mattr-whisper-pill]:hover,
-[data-mattr-whisper-pill][data-popup-open] {
+[data-matter-whisper-pill]:hover,
+[data-matter-whisper-pill][data-popup-open] {
   --mw-fill: color-mix(in srgb, var(--mw-paint, var(--mw-bg)) 94%, var(--foreground));
   --mw-edge: var(--mr-line-hover);
 }
 
-[data-mattr-whisper-pill]:focus-visible {
+[data-matter-whisper-pill]:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
-[data-mattr-whisper-avatars] {
+[data-matter-whisper-avatars] {
   display: inline-flex;
   align-items: center;
   padding-inline-start: 2px;
 }
 
-[data-mattr-whisper-avatar] {
+[data-matter-whisper-avatar] {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -295,17 +297,17 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   box-shadow: 0 0 0 1.5px var(--mw-bg);
 }
 
-[data-mattr-whisper-avatar] + [data-mattr-whisper-avatar] {
+[data-matter-whisper-avatar] + [data-matter-whisper-avatar] {
   margin-inline-start: -5px;
 }
 
-[data-mattr-whisper-avatar] svg {
+[data-matter-whisper-avatar] svg {
   width: 14px;
   height: 14px;
 }
 
 /* Status dots sit top right, ringed in the pill's own color, so none is covered by its neighbor. */
-:is([data-mattr-whisper-avatar], [data-mattr-lineage-row])
+:is([data-matter-whisper-avatar], [data-matter-lineage-row])
   span[aria-hidden="true"].rounded-full:empty {
   top: -2px;
   right: -2px;
@@ -316,17 +318,17 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   border-color: var(--mw-bg);
 }
 
-[data-mattr-whisper-label] {
+[data-matter-whisper-label] {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-[data-mattr-whisper-timer] {
+[data-matter-whisper-timer] {
   color: var(--mr-muted);
   font-variant-numeric: tabular-nums;
 }
 
-[data-mattr-whisper-server] {
+[data-matter-whisper-server] {
   display: inline-flex;
   align-items: center;
   height: 18px;
@@ -339,19 +341,19 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   font-variant-numeric: tabular-nums;
 }
 
-[data-mattr-whisper-chevron] {
+[data-matter-whisper-chevron] {
   width: 12px;
   height: 12px;
   color: var(--mr-muted);
   transition: rotate 160ms var(--mr-ease);
 }
 
-[data-mattr-whisper-pill][data-popup-open] [data-mattr-whisper-chevron] {
+[data-matter-whisper-pill][data-popup-open] [data-matter-whisper-chevron] {
   rotate: 180deg;
 }
 
 /* Frosted popovers and menus: the blur exists only while a popup is mounted. */
-[data-mattr-frosted] {
+[data-matter-frosted] {
   border-radius: 12px;
   background: color-mix(in srgb, var(--popover) 78%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
@@ -361,46 +363,46 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   transition-timing-function: var(--mr-ease);
 }
 
-[data-mattr-frosted]::before {
+[data-matter-frosted]::before {
   border-radius: 11px;
 }
 
-[data-mattr-frosted]:is([data-starting-style], [data-ending-style]) {
+[data-matter-frosted]:is([data-starting-style], [data-ending-style]) {
   opacity: 0;
   scale: 0.97;
 }
 
-[data-mattr-frosted][data-side="top"]:is([data-starting-style], [data-ending-style]) {
+[data-matter-frosted][data-side="top"]:is([data-starting-style], [data-ending-style]) {
   translate: 0 4px;
 }
 
-[data-mattr-frosted][data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
+[data-matter-frosted][data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
   translate: 0 -4px;
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  [data-mattr-frosted] {
+  [data-matter-frosted] {
     background: var(--popover);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-mattr-frosted],
-  [data-mattr-whisper-chevron],
-  [data-mattr-whisper-pill],
-  [data-mattr-ribbon-slot] > :is([role="group"], button),
-  [data-mattr-ribbon-chip] {
+  [data-matter-frosted],
+  [data-matter-whisper-chevron],
+  [data-matter-whisper-pill],
+  [data-matter-ribbon-slot] > :is([role="group"], button),
+  [data-matter-ribbon-chip] {
     transition: none;
   }
 
-  [data-mattr-frosted]:is([data-starting-style], [data-ending-style]) {
+  [data-matter-frosted]:is([data-starting-style], [data-ending-style]) {
     scale: 1;
     translate: none;
   }
 }
 
 /* Lineage popover body. */
-[data-mattr-lineage] {
+[data-matter-lineage] {
   display: flex;
   flex-direction: column;
   width: min(340px, calc(100vw - 2rem));
@@ -410,7 +412,7 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   line-height: 18px;
 }
 
-[data-mattr-lineage-header] {
+[data-matter-lineage-header] {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -419,13 +421,13 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   padding: 2px 4px 4px 10px;
 }
 
-[data-mattr-lineage-title] {
+[data-matter-lineage-title] {
   color: var(--mr-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-:is([data-mattr-lineage-stop-all], [data-mattr-lineage-back]) {
+:is([data-matter-lineage-stop-all], [data-matter-lineage-back]) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -438,22 +440,22 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   transition: background-color 120ms ease;
 }
 
-:is([data-mattr-lineage-stop-all], [data-mattr-lineage-back]):hover:not(:disabled) {
+:is([data-matter-lineage-stop-all], [data-matter-lineage-back]):hover:not(:disabled) {
   background-color: var(--mr-row-hover);
 }
 
-:is([data-mattr-lineage-stop-all], [data-mattr-lineage-back]):disabled {
+:is([data-matter-lineage-stop-all], [data-matter-lineage-back]):disabled {
   cursor: default;
   opacity: 0.5;
 }
 
-[data-mattr-lineage-stop-all]:hover:not(:disabled) {
+[data-matter-lineage-stop-all]:hover:not(:disabled) {
   background-color: color-mix(in srgb, var(--mw-stop) 14%, transparent);
 }
 
 /* Stop glyphs are DOM, not icons, so the icon pack can never swap them for an outline. Same
    signal-red circle and solid white square as the composer's Stop (composer.css). */
-[data-mattr-lineage-stop-all] [data-mattr-stop-glyph] {
+[data-matter-lineage-stop-all] [data-matter-stop-glyph] {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -466,7 +468,7 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   transition: background-color 120ms ease;
 }
 
-[data-mattr-lineage-stop-all] [data-mattr-stop-glyph]::after {
+[data-matter-lineage-stop-all] [data-matter-stop-glyph]::after {
   content: "";
   width: 5.5px;
   height: 5.5px;
@@ -474,21 +476,21 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   background-color: #ffffff;
 }
 
-[data-mattr-lineage-stop-all]:hover:not(:disabled) [data-mattr-stop-glyph] {
+[data-matter-lineage-stop-all]:hover:not(:disabled) [data-matter-stop-glyph] {
   background-color: var(--mw-stop-hover);
 }
 
-[data-mattr-lineage-back] {
+[data-matter-lineage-back] {
   margin-inline-start: -6px;
   color: var(--mr-muted);
 }
 
-[data-mattr-lineage-back] svg {
+[data-matter-lineage-back] svg {
   width: 14px;
   height: 14px;
 }
 
-[data-mattr-lineage-rows] {
+[data-matter-lineage-rows] {
   display: flex;
   flex-direction: column;
   max-height: min(60dvh, 15.5rem);
@@ -498,7 +500,7 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   list-style: none;
 }
 
-[data-mattr-lineage-row] {
+[data-matter-lineage-row] {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -508,11 +510,11 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   transition: background-color 120ms ease;
 }
 
-[data-mattr-lineage-row]:is(:hover, :focus-within) {
+[data-matter-lineage-row]:is(:hover, :focus-within) {
   background-color: var(--mr-row-hover);
 }
 
-[data-mattr-lineage-row-open] {
+[data-matter-lineage-row-open] {
   display: flex;
   flex: 1;
   align-items: center;
@@ -526,28 +528,28 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   cursor: pointer;
 }
 
-[data-mattr-lineage-row-open]:disabled {
+[data-matter-lineage-row-open]:disabled {
   cursor: default;
 }
 
-[data-mattr-lineage-row-open]:focus-visible,
-[data-mattr-lineage-row-stop]:focus-visible,
-[data-mattr-lineage-link]:focus-visible {
+[data-matter-lineage-row-open]:focus-visible,
+[data-matter-lineage-row-stop]:focus-visible,
+[data-matter-lineage-link]:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
 
-[data-mattr-lineage-row-glyph] {
+[data-matter-lineage-row-glyph] {
   width: 16px;
   height: 16px;
   color: var(--mr-muted);
 }
 
-[data-mattr-lineage-row] span[aria-hidden="true"].rounded-full:empty {
+[data-matter-lineage-row] span[aria-hidden="true"].rounded-full:empty {
   border-color: color-mix(in srgb, var(--popover) 90%, var(--foreground));
 }
 
-[data-mattr-lineage-row-title] {
+[data-matter-lineage-row-title] {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -555,21 +557,21 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   white-space: nowrap;
 }
 
-:is([data-mattr-lineage-row-time], [data-mattr-lineage-row-meta]) {
+:is([data-matter-lineage-row-time], [data-matter-lineage-row-meta]) {
   flex-shrink: 0;
   color: var(--mr-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-[data-mattr-lineage-row-meta] {
+[data-matter-lineage-row-meta] {
   max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-[data-mattr-lineage-row-stop] {
+[data-matter-lineage-row-stop] {
   display: none;
   align-items: center;
   justify-content: center;
@@ -585,47 +587,47 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
     background-color 120ms ease;
 }
 
-[data-mattr-lineage-row-stop] [data-mattr-stop-glyph] {
+[data-matter-lineage-row-stop] [data-matter-stop-glyph] {
   width: 7px;
   height: 7px;
   border-radius: 1.5px;
   background-color: #ffffff;
 }
 
-[data-mattr-lineage-row-stop]:hover:not(:disabled) {
+[data-matter-lineage-row-stop]:hover:not(:disabled) {
   background-color: var(--mw-stop-hover);
 }
 
-[data-mattr-lineage-row-stop]:disabled {
+[data-matter-lineage-row-stop]:disabled {
   cursor: default;
   opacity: 0.45;
 }
 
-[data-mattr-lineage-row]:is(:hover, :focus-within) [data-mattr-lineage-row-stop],
-[data-mattr-lineage-row-stop][data-stopping] {
+[data-matter-lineage-row]:is(:hover, :focus-within) [data-matter-lineage-row-stop],
+[data-matter-lineage-row-stop][data-stopping] {
   display: inline-flex;
 }
 
 @starting-style {
-  [data-mattr-lineage-row]:is(:hover, :focus-within) [data-mattr-lineage-row-stop] {
+  [data-matter-lineage-row]:is(:hover, :focus-within) [data-matter-lineage-row-stop] {
     opacity: 0;
   }
 }
 
 @media (hover: none) {
-  [data-mattr-lineage-row-stop] {
+  [data-matter-lineage-row-stop] {
     display: inline-flex;
   }
 }
 
-[data-mattr-lineage-empty] {
+[data-matter-lineage-empty] {
   margin: 0;
   padding: 6px 10px 8px;
   color: var(--mr-muted);
   font-size: 12px;
 }
 
-[data-mattr-lineage-footer] {
+[data-matter-lineage-footer] {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -636,7 +638,7 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
   border-top: 1px solid var(--mr-line);
 }
 
-[data-mattr-lineage-link] {
+[data-matter-lineage-link] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -651,36 +653,36 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
     color 120ms ease;
 }
 
-[data-mattr-lineage-link]:hover {
+[data-matter-lineage-link]:hover {
   background-color: var(--mr-row-hover);
   color: var(--mr-text);
 }
 
-[data-mattr-lineage-link] svg {
+[data-matter-lineage-link] svg {
   width: 13px;
   height: 13px;
 }
 
-[data-mattr-lineage-link-label] {
+[data-matter-lineage-link-label] {
   color: var(--mr-text);
 }
 
-[data-mattr-lineage-link-count] {
+[data-matter-lineage-link-count] {
   font-variant-numeric: tabular-nums;
 }
 
-[data-mattr-lineage-link-chevron] {
+[data-matter-lineage-link-chevron] {
   width: 12px;
   height: 12px;
 }
 
-[data-mattr-lineage-drilldown] {
+[data-matter-lineage-drilldown] {
   max-height: min(60dvh, 26rem);
   overflow-y: auto;
 }
 
 /* The Ribbon's PR / issues popover reuses the details card's own rows. */
-[data-mattr-ribbon-panel] {
+[data-matter-ribbon-panel] {
   display: flex;
   flex-direction: column;
   width: min(340px, calc(100vw - 2rem));
@@ -690,7 +692,7 @@ html[data-mattr-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="men
 }
 
 /* Reused controls tint their labels differently; in the Ribbon every label reads the same. */
-[data-mattr-ribbon-slot] button > span:not([aria-hidden="true"]) {
+[data-matter-ribbon-slot] button > span:not([aria-hidden="true"]) {
   color: var(--mr-text);
   font-weight: 500;
 }

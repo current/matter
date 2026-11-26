@@ -1870,7 +1870,7 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
-  // mattr: Claude Cloud add-on; its API lives on the primary environment.
+  // Matter: Claude Cloud add-on; its API lives on the primary environment.
   if (claudeCloudEnabled) {
     const cloudProjectId =
       currentProjectEnvironmentId === primaryEnvironmentId ? currentProjectId : null;

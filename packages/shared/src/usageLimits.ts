@@ -117,7 +117,7 @@ export function availableAccountSelection(
   if (!input.exhausted && !exhaustedUsageWindow(provider, input.now, input.selection.model)) {
     return null;
   }
-  // mattr: never switches onto an instance the user excluded; picking it by hand still works.
+  // Matter: never switches onto an instance the user excluded; picking it by hand still works.
   const excluded = new Set<string>(input.settings.fallbackExcludedInstanceIds);
   return (
     automaticFallbackSelections(input.selection, provider, input.providers, input.now).find(

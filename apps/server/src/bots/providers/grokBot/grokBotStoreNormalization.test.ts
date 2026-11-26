@@ -58,7 +58,7 @@ interface TranscriptState {
 }
 
 /**
- * Grok Bot 1.3.0's renderer as mattr sees it: a React root whose fibers read the app's store
+ * Grok Bot 1.3.0's renderer as Matter sees it: a React root whose fibers read the app's store
  * registry from context. Shapes follow a live capture from Grok Bot 1.3.0.
  */
 function makeGrokRenderer(options: {

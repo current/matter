@@ -45,7 +45,7 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
-import { MattrGoalModeGlyph } from "./MattrComposerModeControl.mattr";
+import { MatterGoalModeGlyph } from "./MatterComposerModeControl.matter";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 interface ChatHeaderProps {
@@ -374,7 +374,7 @@ export const ChatHeader = memo(function ChatHeader({
               <h2 className="min-w-0" dir={textDirection(activeThreadTitle)}>
                 <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
               </h2>
-              <MattrGoalModeGlyph mode={activeThreadInteractionMode} />
+              <MatterGoalModeGlyph mode={activeThreadInteractionMode} />
               <ChevronDownIcon
                 aria-hidden
                 data-thread-title-chevron

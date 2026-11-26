@@ -1,11 +1,11 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mtk-*` classes come from the fork stylesheet antimatter/tasks.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mtk-*` classes come from the fork stylesheet matter/tasks.css, which loads outside Tailwind. */
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import {
-  MATTR_TASK_STATUSES,
-  MATTR_TASK_TITLE_MAX_LENGTH,
-  type MattrTask,
-  type MattrTaskCreateRequest,
-  type MattrTaskStatus,
+  MATTER_TASK_STATUSES,
+  MATTER_TASK_TITLE_MAX_LENGTH,
+  type MatterTask,
+  type MatterTaskCreateRequest,
+  type MatterTaskStatus,
 } from "@t3tools/contracts";
 import { useGT } from "gt-react";
 import { CheckIcon, PlusIcon } from "lucide-react";
@@ -14,7 +14,7 @@ import { flushSync } from "react-dom";
 
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useProjects } from "../../state/entities";
-import { MattrInsetPage } from "../MattrInsetPage";
+import { MatterInsetPage } from "../MatterInsetPage";
 import { toastManager } from "../ui/toast";
 import { WorkspaceBreadcrumbText } from "../WorkspaceBreadcrumb";
 import {
@@ -24,8 +24,12 @@ import {
   listViewTasks,
   openTaskCount,
   planTaskMove,
-} from "./mattrTasks.logic";
-import { createMattrTasksActions, type MattrTasksActions, useMattrTasks } from "./mattrTasksStore";
+} from "./matterTasks.logic";
+import {
+  createMatterTasksActions,
+  type MatterTasksActions,
+  useMatterTasks,
+} from "./matterTasksStore";
 import { TaskInspector, usePriorityLabel } from "./TaskInspector";
 import { useTaskStatusLabel } from "./TaskStatusLabel";
 import { TaskThreadChip, useOpenTaskThread } from "./TaskThreadChip";
@@ -51,7 +55,7 @@ function writeView(view: TasksView) {
 
 export function TasksPage() {
   const gt = useGT();
-  const { config, tasks, loaded, error } = useMattrTasks();
+  const { config, tasks, loaded, error } = useMatterTasks();
   const environmentId = usePrimaryEnvironmentId();
   const projects = useProjects().filter(
     (project) =>
@@ -60,7 +64,7 @@ export function TasksPage() {
   const [view, setView] = useState<TasksView>(readView);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const startRef = useRef<HTMLButtonElement>(null);
-  const actions = config ? createMattrTasksActions(config) : null;
+  const actions = config ? createMatterTasksActions(config) : null;
   const selected = tasks.find((task) => task.id === selectedId) ?? null;
   const remaining = openTaskCount(tasks);
 
@@ -69,13 +73,13 @@ export function TasksPage() {
     writeView(next);
   };
 
-  const selectAndHandOff = (task: MattrTask) => {
+  const selectAndHandOff = (task: MatterTask) => {
     flushSync(() => setSelectedId(task.id));
     startRef.current?.focus();
   };
 
   return (
-    <MattrInsetPage
+    <MatterInsetPage
       label={gt("Tasks")}
       breadcrumb={
         <WorkspaceBreadcrumbText className="mtk-crumb">
@@ -156,13 +160,13 @@ export function TasksPage() {
           />
         ) : null}
       </div>
-    </MattrInsetPage>
+    </MatterInsetPage>
   );
 }
 
-function useCreateTask(actions: MattrTasksActions) {
+function useCreateTask(actions: MatterTasksActions) {
   const gt = useGT();
-  return async (input: MattrTaskCreateRequest) => {
+  return async (input: MatterTaskCreateRequest) => {
     try {
       return await actions.create(input);
     } catch {
@@ -183,15 +187,15 @@ function TaskListView({
   onSelect,
   onHandOff,
 }: {
-  readonly tasks: ReadonlyArray<MattrTask>;
+  readonly tasks: ReadonlyArray<MatterTask>;
   readonly loaded: boolean;
   readonly error: string | null;
   readonly remaining: number;
   readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly actions: MattrTasksActions;
+  readonly actions: MatterTasksActions;
   readonly selectedId: string | null;
   readonly onSelect: (id: string | null) => void;
-  readonly onHandOff: (task: MattrTask) => void;
+  readonly onHandOff: (task: MatterTask) => void;
 }) {
   const gt = useGT();
   const [showCompleted, setShowCompleted] = useState(false);
@@ -261,8 +265,8 @@ function TaskCheck({
   task,
   actions,
 }: {
-  readonly task: MattrTask;
-  readonly actions: MattrTasksActions;
+  readonly task: MatterTask;
+  readonly actions: MatterTasksActions;
 }) {
   const gt = useGT();
   const done = task.status === "done";
@@ -290,7 +294,7 @@ function TaskMeta({
   task,
   projects,
 }: {
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly projects: ReadonlyArray<EnvironmentProject>;
 }) {
   const gt = useGT();
@@ -337,9 +341,9 @@ function TaskRow({
   selected,
   onSelect,
 }: {
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly actions: MattrTasksActions;
+  readonly actions: MatterTasksActions;
   readonly selected: boolean;
   readonly onSelect: (id: string | null) => void;
 }) {
@@ -371,10 +375,10 @@ function TaskQuickAdd({
   autoFocus = false,
   onDismiss,
 }: {
-  readonly actions: MattrTasksActions;
-  readonly status: MattrTaskStatus;
+  readonly actions: MatterTasksActions;
+  readonly status: MatterTaskStatus;
   readonly placeholder: string;
-  readonly onHandOff: (task: MattrTask) => void;
+  readonly onHandOff: (task: MatterTask) => void;
   readonly autoFocus?: boolean;
   readonly onDismiss?: () => void;
 }) {
@@ -413,7 +417,7 @@ function TaskQuickAdd({
         aria-label={gt("New task")}
         placeholder={placeholder}
         value={title}
-        maxLength={MATTR_TASK_TITLE_MAX_LENGTH}
+        maxLength={MATTER_TASK_TITLE_MAX_LENGTH}
         autoFocus={autoFocus}
         aria-busy={busy}
         onChange={(event) => setTitle(event.target.value)}
@@ -427,7 +431,7 @@ function TaskQuickAdd({
 }
 
 interface DropTarget {
-  readonly status: MattrTaskStatus;
+  readonly status: MatterTaskStatus;
   readonly beforeId: string | null;
 }
 
@@ -439,21 +443,21 @@ function TaskBoardView({
   onSelect,
   onHandOff,
 }: {
-  readonly tasks: ReadonlyArray<MattrTask>;
+  readonly tasks: ReadonlyArray<MatterTask>;
   readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly actions: MattrTasksActions;
+  readonly actions: MatterTasksActions;
   readonly selectedId: string | null;
   readonly onSelect: (id: string | null) => void;
-  readonly onHandOff: (task: MattrTask) => void;
+  readonly onHandOff: (task: MatterTask) => void;
 }) {
   const gt = useGT();
   const statusLabel = useTaskStatusLabel();
   const columns = groupTasksByStatus(tasks);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  const [addingTo, setAddingTo] = useState<MattrTaskStatus | null>(null);
+  const [addingTo, setAddingTo] = useState<MatterTaskStatus | null>(null);
 
-  const move = (taskId: string, status: MattrTaskStatus, beforeId: string | null) => {
+  const move = (taskId: string, status: MatterTaskStatus, beforeId: string | null) => {
     const planned = planTaskMove(tasks, taskId, status, beforeId);
     if (!planned) return;
     void actions
@@ -463,7 +467,7 @@ function TaskBoardView({
 
   const targetFromPointer = (
     event: DragEvent<HTMLElement>,
-    status: MattrTaskStatus,
+    status: MatterTaskStatus,
   ): DropTarget => {
     const cards = [...event.currentTarget.querySelectorAll<HTMLElement>("[data-task-id]")].filter(
       (card) => card.dataset.taskId !== dragId,
@@ -475,20 +479,20 @@ function TaskBoardView({
     return { status, beforeId: before?.dataset.taskId ?? null };
   };
 
-  const moveByKeyboard = (event: KeyboardEvent<HTMLElement>, task: MattrTask) => {
+  const moveByKeyboard = (event: KeyboardEvent<HTMLElement>, task: MatterTask) => {
     if (!event.altKey) return;
     const column = columns[task.status];
     const index = column.findIndex((candidate) => candidate.id === task.id);
-    const statusIndex = MATTR_TASK_STATUSES.indexOf(task.status);
+    const statusIndex = MATTER_TASK_STATUSES.indexOf(task.status);
     let target: DropTarget | null = null;
     if (event.key === "ArrowUp" && index > 0) {
       target = { status: task.status, beforeId: column[index - 1]?.id ?? null };
     } else if (event.key === "ArrowDown" && index < column.length - 1) {
       target = { status: task.status, beforeId: column[index + 2]?.id ?? null };
     } else if (event.key === "ArrowLeft" && statusIndex > 0) {
-      target = { status: MATTR_TASK_STATUSES[statusIndex - 1] ?? task.status, beforeId: null };
-    } else if (event.key === "ArrowRight" && statusIndex < MATTR_TASK_STATUSES.length - 1) {
-      target = { status: MATTR_TASK_STATUSES[statusIndex + 1] ?? task.status, beforeId: null };
+      target = { status: MATTER_TASK_STATUSES[statusIndex - 1] ?? task.status, beforeId: null };
+    } else if (event.key === "ArrowRight" && statusIndex < MATTER_TASK_STATUSES.length - 1) {
+      target = { status: MATTER_TASK_STATUSES[statusIndex + 1] ?? task.status, beforeId: null };
     }
     if (!target) return;
     event.preventDefault();
@@ -504,7 +508,7 @@ function TaskBoardView({
 
   return (
     <div className="mtk-board" aria-label={gt("Task board")}>
-      {MATTR_TASK_STATUSES.map((status) => {
+      {MATTER_TASK_STATUSES.map((status) => {
         const column = columns[status];
         const isTarget = dragId !== null && dropTarget?.status === status;
         return (
@@ -607,9 +611,9 @@ function TaskCard({
   onDragStart,
   onDragEnd,
 }: {
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly actions: MattrTasksActions;
+  readonly actions: MatterTasksActions;
   readonly selected: boolean;
   readonly dragging: boolean;
   readonly onSelect: (id: string | null) => void;

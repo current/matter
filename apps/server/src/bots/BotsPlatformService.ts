@@ -70,7 +70,7 @@ export class BotsPlatformService extends Context.Service<
     readonly addonStatus: (addonId: string) => Effect.Effect<AddonRuntimeStatus | null>;
     /**
      * Restarts a running provider now and waits briefly for its first settled status. Only
-     * reconnects mattr's side; it never launches or restarts the provider's app.
+     * reconnects Matter's side; it never launches or restarts the provider's app.
      */
     readonly reconnect: (addonId: string) => Effect.Effect<AddonRuntimeStatus | null>;
     readonly listProviders: Effect.Effect<ReadonlyArray<BotProviderDescriptor>>;

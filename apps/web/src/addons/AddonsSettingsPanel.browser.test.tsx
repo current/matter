@@ -1,7 +1,7 @@
 import { render } from "../../test/render";
 import {
   CLAUDE_CLOUD_DEFAULT_SETTINGS,
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   ProviderInstanceId,
   type AddonEntry,
   type AddonRuntimeStatus,
@@ -15,9 +15,9 @@ import { resetAddonStoreForTests } from "./addonStore";
 
 const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} }));
 
-vi.mock(import("./mattrApi"), async (original) => ({
+vi.mock(import("./matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
 import { AddonsSettingsPanel } from "./AddonsSettingsPanel";
@@ -28,7 +28,7 @@ let grokStatus: AddonRuntimeStatus = {
 };
 
 function entries(enabled: Record<string, boolean>): ReadonlyArray<AddonEntry> {
-  return MATTR_ADDON_MANIFESTS.map((manifest) => {
+  return MATTER_ADDON_MANIFESTS.map((manifest) => {
     const on = enabled[manifest.id] ?? false;
     return {
       manifest,
@@ -187,7 +187,7 @@ describe("AddonsSettingsPanel", () => {
       .element(page.getByRole("switch", { name: "Enable Voice Assistant" }))
       .not.toBeChecked();
     expect(screen.container.querySelectorAll("[data-addon-status]")).toHaveLength(
-      MATTR_ADDON_MANIFESTS.length,
+      MATTER_ADDON_MANIFESTS.length,
     );
   });
 
@@ -214,7 +214,7 @@ describe("AddonsSettingsPanel", () => {
     await userEvent.click(page.getByRole("switch", { name: "Enable Voice Assistant" }));
     await expect
       .element(page.getByRole("link", { name: "Configure" }))
-      .toHaveAttribute("href", "/settings/general#mattr-voice-assistant");
+      .toHaveAttribute("href", "/settings/general#matter-voice-assistant");
 
     await userEvent.click(page.getByRole("switch", { name: "Enable Grok Bot" }));
     await expect.element(page.getByRole("switch", { name: "Enable Grok Bot" })).not.toBeChecked();

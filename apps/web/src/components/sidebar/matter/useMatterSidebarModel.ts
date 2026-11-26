@@ -30,22 +30,22 @@ import { buildThreadRouteParams } from "../../../threadRoutes";
 import { filterSidebarV2VisibleThreads } from "../../Sidebar.logic";
 import { stackedThreadToast, toastManager } from "../../ui/toast";
 import { useSidebar } from "../../ui/sidebar";
-import { attachListedAncestors, type MattrChildItem } from "./mattrFinalSidebar.logic";
+import { attachListedAncestors, type MatterChildItem } from "./matterFinalSidebar.logic";
 import {
-  toMattrThreadItem,
+  toMatterThreadItem,
   withDescendantWork,
   withNativeSubagentWork,
   workingDescendantSince,
   workingNativeSubagentKeys,
-  type MattrProjectRef,
-  type MattrThreadItem,
-} from "./mattrSidebar.logic";
+  type MatterProjectRef,
+  type MatterThreadItem,
+} from "./matterSidebar.logic";
 
-export interface MattrSidebarProject extends MattrProjectRef {
+export interface MatterSidebarProject extends MatterProjectRef {
   readonly group: SidebarProjectSnapshot;
 }
 
-export type MattrThreadMenuAction =
+export type MatterThreadMenuAction =
   | "open"
   | "pin"
   | "unpin"
@@ -55,31 +55,31 @@ export type MattrThreadMenuAction =
   | "archive"
   | "copy-link";
 
-export interface MattrSidebarActions {
-  readonly openThread: (item: MattrThreadItem) => void;
+export interface MatterSidebarActions {
+  readonly openThread: (item: MatterThreadItem) => void;
   readonly newThread: (projectKey: string | null) => void;
   readonly openThreadMenu: (
-    item: MattrThreadItem,
+    item: MatterThreadItem,
     position: { x: number; y: number },
     source: ContextMenuSource,
   ) => void;
   /** Runs one thread menu action directly (used by Web/PWA popover menus when no native menu exists). */
-  readonly runThreadAction?: (item: MattrThreadItem, action: MattrThreadMenuAction) => void;
+  readonly runThreadAction?: (item: MatterThreadItem, action: MatterThreadMenuAction) => void;
 }
 
-export interface MattrSidebarModel {
-  readonly items: ReadonlyArray<MattrThreadItem>;
+export interface MatterSidebarModel {
+  readonly items: ReadonlyArray<MatterThreadItem>;
   /** Subagents and delegated tasks, which the rail nests under their listed ancestor. */
-  readonly children: ReadonlyArray<MattrChildItem>;
-  readonly projects: ReadonlyArray<MattrSidebarProject>;
+  readonly children: ReadonlyArray<MatterChildItem>;
+  readonly projects: ReadonlyArray<MatterSidebarProject>;
   readonly activeThreadKey: string | null;
   readonly nowMs: number;
   readonly keybindings: ResolvedKeybindingsConfig;
-  readonly actions: MattrSidebarActions;
+  readonly actions: MatterSidebarActions;
 }
 
 /** Everything the custom sidebars read, derived from the same stores the classic sidebar uses. */
-export function useMattrSidebarModel(): MattrSidebarModel {
+export function useMatterSidebarModel(): MatterSidebarModel {
   const gt = useGT();
   const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -98,12 +98,12 @@ export function useMattrSidebarModel(): MattrSidebarModel {
   const nowMs = Date.parse(`${nowMinute}:00Z`);
   const nowIso = new Date(nowMs).toISOString();
 
-  const projects: MattrSidebarProject[] = pickableProjectGroups(projectGroups).map((group) => ({
+  const projects: MatterSidebarProject[] = pickableProjectGroups(projectGroups).map((group) => ({
     key: group.projectKey,
     name: group.displayName,
     group,
   }));
-  const projectByMemberKey = new Map<string, MattrSidebarProject>();
+  const projectByMemberKey = new Map<string, MatterSidebarProject>();
   for (const project of projects) {
     for (const ref of project.group.memberProjectRefs) {
       projectByMemberKey.set(`${ref.environmentId}:${ref.projectId}`, project);
@@ -116,7 +116,7 @@ export function useMattrSidebarModel(): MattrSidebarModel {
     }
   }
   const toItem = (thread: (typeof threads)[number]) =>
-    toMattrThreadItem(
+    toMatterThreadItem(
       thread,
       projectByMemberKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null,
       nowIso,
@@ -153,7 +153,7 @@ export function useMattrSidebarModel(): MattrSidebarModel {
     if (isMobile) setOpenMobile(false);
   };
 
-  const openThread = (item: MattrThreadItem) => {
+  const openThread = (item: MatterThreadItem) => {
     closeMobile();
     void router.navigate({
       to: "/$environmentId/$threadId",
@@ -179,7 +179,7 @@ export function useMattrSidebarModel(): MattrSidebarModel {
     );
   };
 
-  const runThreadAction = (item: MattrThreadItem, action: MattrThreadMenuAction) => {
+  const runThreadAction = (item: MatterThreadItem, action: MatterThreadMenuAction) => {
     void (async () => {
       switch (action) {
         case "open":
@@ -212,12 +212,12 @@ export function useMattrSidebarModel(): MattrSidebarModel {
     })();
   };
 
-  const openThreadMenu: MattrSidebarActions["openThreadMenu"] = (item, position, source) => {
+  const openThreadMenu: MatterSidebarActions["openThreadMenu"] = (item, position, source) => {
     void (async () => {
       const api = readLocalApi();
       if (!api) return;
       const clicked = await settlePromise(() =>
-        api.contextMenu.show<MattrThreadMenuAction>(
+        api.contextMenu.show<MatterThreadMenuAction>(
           [
             { id: "open", label: gt("Open thread") },
             item.pinned

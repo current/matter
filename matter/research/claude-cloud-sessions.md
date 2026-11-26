@@ -1,7 +1,7 @@
-# Feasibility Probe: Native Claude Cloud Sessions in `mattr`
+# Feasibility Probe: Native Claude Cloud Sessions in `Matter`
 
 **Date:** 2026-11-25  
-**Probe environment:** macOS arm64 · Installed CLI `/Users/christopher/.local/bin/claude` → `/opt/homebrew/bin/claude` (**v2.1.332**) · `@anthropic-ai/claude-agent-sdk` **v0.3.321** · `mattr` commit `94e059316b`  
+**Probe environment:** macOS arm64 · Installed CLI `/Users/christopher/.local/bin/claude` → `/opt/homebrew/bin/claude` (**v2.1.332**) · `@anthropic-ai/claude-agent-sdk` **v0.3.321** · `Matter` commit `94e059316b`  
 **Scope:** Read-only CLI, SDK, codebase, and documentation feasibility probe. No production code changed; no cloud sessions or PRs created.
 
 ---
@@ -10,11 +10,11 @@
 
 **Feasible with a clear split between what works cleanly today vs. what is blocked by CLI/API limits.**
 
-1. **Pulling a cloud session into a local `mattr` worktree (`--teleport`) is a clean, first-class fit.** Contrary to common assumption, `claude --teleport <id>` **does** accept `-p --input-format stream-json --output-format stream-json --verbose` on v2.1.332—the exact wire protocol `ClaudeAdapterV2` uses—and works identically for both default `~/.claude` and `claude-alt` (`CLAUDE_CONFIG_DIR`). Pairing it with `mattr`'s automatic clean worktree creation solves the dirty-tree blocker automatically.
+1. **Pulling a cloud session into a local `Matter` worktree (`--teleport`) is a clean, first-class fit.** Contrary to common assumption, `claude --teleport <id>` **does** accept `-p --input-format stream-json --output-format stream-json --verbose` on v2.1.332—the exact wire protocol `ClaudeAdapterV2` uses—and works identically for both default `~/.claude` and `claude-alt` (`CLAUDE_CONFIG_DIR`). Pairing it with `Matter`'s automatic clean worktree creation solves the dirty-tree blocker automatically.
 2. **Creating and streaming a brand-new cloud session purely through `ClaudeAdapterV2` (`query()`) is NOT supported by the CLI today.** v2.1.332 explicitly rejects `claude --cloud -p` ("interactive only") and rejects `--output-format stream-json` on both `--cloud <id>` and `--environment <id>`. There is also **no** CLI subcommand or public SDK call to list cloud sessions or cloud environments.
-3. **Two viable integration paths exist for `mattr`:**
-   - **Recommended v1 (Official CLI, low risk, ~3–5 days):** Gate behind a `claude-cloud` add-on in `packages/contracts/src/mattrAddons.ts`. Support: (a) **"Send to Claude Cloud"** via a short-lived `node-pty` wrapper around `claude --cloud` that captures the `claude.ai/code/<id>` URL/session ID and tracks it in a local registry; (b) **"Send follow-up"** via `claude -p "<msg>" --cloud <id> --output-format json`; (c) **"Pull to local worktree (`--teleport`)"** converting any cloud session into a native `mattr` Claude thread.
-   - **Optional v2 (Experimental, high reward, higher maintenance risk):** `@anthropic-ai/claude-agent-sdk/browser` (already bundled in `apps/server/node_modules`) ships a **zero-DOM** Node-compatible CCR v2 SSE transport (`GET .../v1/code/sessions/{id}/events/stream` + `POST .../v1/code/sessions/{id}/events`) that returns the exact `Query` / `SDKMessage` stream `ClaudeAdapterV2` already speaks. If a 1-day live spike confirms it attaches to Anthropic-managed cloud VMs using the local OAuth token, `mattr` could render full live cloud transcripts, approvals, and interrupts inline—at the cost of depending on an `@alpha`/internal API + local OAuth token extraction.
+3. **Two viable integration paths exist for `Matter`:**
+   - **Recommended v1 (Official CLI, low risk, ~3–5 days):** Gate behind a `claude-cloud` add-on in `packages/contracts/src/matterAddons.ts`. Support: (a) **"Send to Claude Cloud"** via a short-lived `node-pty` wrapper around `claude --cloud` that captures the `claude.ai/code/<id>` URL/session ID and tracks it in a local registry; (b) **"Send follow-up"** via `claude -p "<msg>" --cloud <id> --output-format json`; (c) **"Pull to local worktree (`--teleport`)"** converting any cloud session into a native `Matter` Claude thread.
+   - **Optional v2 (Experimental, high reward, higher maintenance risk):** `@anthropic-ai/claude-agent-sdk/browser` (already bundled in `apps/server/node_modules`) ships a **zero-DOM** Node-compatible CCR v2 SSE transport (`GET .../v1/code/sessions/{id}/events/stream` + `POST .../v1/code/sessions/{id}/events`) that returns the exact `Query` / `SDKMessage` stream `ClaudeAdapterV2` already speaks. If a 1-day live spike confirms it attaches to Anthropic-managed cloud VMs using the local OAuth token, `Matter` could render full live cloud transcripts, approvals, and interrupts inline—at the cost of depending on an `@alpha`/internal API + local OAuth token extraction.
 
 ---
 
@@ -130,7 +130,7 @@ Deliberately not executed during this read-only probe to avoid creating throwawa
 
 1. **PTY output of `claude --cloud -n "<title>" "<prompt>"`:** When spawned in a PTY (`node-pty`) inside a trusted GitHub-backed repo, does `claude --cloud "<task>"` print the `https://claude.ai/code/<id>` URL and exit immediately, or stay attached in an interactive TUI waiting for Ctrl+C?
 2. **Blocking vs. fire-and-forget semantics of `claude -p "<msg>" --cloud <real_id> --output-format json`:** Does it return immediately upon enqueueing (`{"ok":true,"session_id":"..."}`), or block until the remote turn finishes and return the assistant reply?
-3. **Live `--teleport <real_id>` with `stream-json`:** When `claude --teleport <real_id> -p --output-format stream-json --input-format stream-json --verbose` runs in a clean `mattr` worktree:
+3. **Live `--teleport <real_id>` with `stream-json`:** When `claude --teleport <real_id> -p --output-format stream-json --input-format stream-json --verbose` runs in a clean `Matter` worktree:
    - Does it automatically `git fetch` and switch to the cloud session's branch without interactive confirmation?
    - Does it write a standard local `.jsonl` transcript under `$CLAUDE_CONFIG_DIR/projects/<slug>/<uuid>.jsonl` and emit a local UUID `session_id` that `ClaudeAdapterV2` can immediately `--resume` on subsequent turns?
    - Does it conflict with `--session-id` (which `makeClaudeQueryOptions` passes on non-resume turns in `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts:2591`)?
@@ -138,7 +138,7 @@ Deliberately not executed during this read-only probe to avoid creating throwawa
 
 ---
 
-## 4. `mattr` Codebase Integration Points
+## 4. `Matter` Codebase Integration Points
 
 Relevant architecture checked in this repo:
 
@@ -150,26 +150,26 @@ Relevant architecture checked in this repo:
 - **Workspace modes (`local` vs. `worktree`):**
   - `packages/contracts/src/environment.ts:56` defines `ThreadEnvMode = Schema.Literals(["local", "worktree"])` and `packages/contracts/src/orchestrationV2.ts:782` defines `OrchestrationV2ThreadLaunchWorkspaceStrategy` (`root | existing_worktree | worktree`).
   - `ThreadEnvMode` is wired through ~15 busy upstream files (`settings.ts`, `project.ts`, `t3ProjectFile.ts`, `BranchToolbar.tsx`, `useComposerSelection.ts`, `useComposerSend.ts`, `ProjectDefaultsSettings.tsx`, `ThreadLaunchService.ts`).
-  - **Fork-discipline takeaway (`antimatter/CONTEXT.md`):** Do **NOT** add `"cloud"` to upstream `ThreadEnvMode` in v1. It would create high-frequency nightly merge conflicts and leak a Claude-only concept into every provider (Codex, Cursor, Antigravity, Grok, etc.).
-- **Add-on Registry (`packages/contracts/src/mattrAddons.ts` + `apps/server/src/bots/AddonConfigService.ts` + `apps/web/src/addons/`):**
+  - **Fork-discipline takeaway (`matter/CONTEXT.md`):** Do **NOT** add `"cloud"` to upstream `ThreadEnvMode` in v1. It would create high-frequency nightly merge conflicts and leak a Claude-only concept into every provider (Codex, Cursor, Antigravity, Grok, etc.).
+- **Add-on Registry (`packages/contracts/src/matterAddons.ts` + `apps/server/src/bots/AddonConfigService.ts` + `apps/web/src/addons/`):**
   - Already provides persisted off-by-default enablement (`<stateDir>/mattr-addons.json`), non-secret config validation (`ADDON_SECRET_CONFIG_KEY_PATTERN`), runtime status reporting, Settings → Add-ons UI, and `useIsAddonEnabled` gating.
-  - Note: Coding sessions remain `mattr` **threads**, not Bots (consistent with `antimatter/research/bot-provider-capability-matrix.md` §10). The Add-on Registry is the right gating/config container without turning Claude Cloud into a Bot provider.
+  - Note: Coding sessions remain `Matter` **threads**, not Bots (consistent with `matter/research/bot-provider-capability-matrix.md` §10). The Add-on Registry is the right gating/config container without turning Claude Cloud into a Bot provider.
 
 ---
 
-## 5. Recommended Minimal v1 Architecture for `mattr`
+## 5. Recommended Minimal v1 Architecture for `Matter`
 
 ### 5.1 Design Principle: Start with Clean Fork-Isolated CLI Integration, Expand Only After Live Spike
 
-Gate the entire feature behind a new add-on manifest **`claude-cloud`** in `packages/contracts/src/mattrAddons.ts` (`defaultEnabled: false`, `experimental: true` initially, `contributions: ["settings", "commands", "network"]`, `surfaces: ["desktop", "web", "mobile"]`). When off: zero UI, zero background probes, zero upstream conflicts.
+Gate the entire feature behind a new add-on manifest **`claude-cloud`** in `packages/contracts/src/matterAddons.ts` (`defaultEnabled: false`, `experimental: true` initially, `contributions: ["settings", "commands", "network"]`, `surfaces: ["desktop", "web", "mobile"]`). When off: zero UI, zero background probes, zero upstream conflicts.
 
 ### 5.2 UX Entry Points (All Gated by `useIsAddonEnabled("claude-cloud")`)
 
 1. **Pull from Cloud (`--teleport`) — Flagship v1 Feature:**
    - **Command Palette** (`Teleport Claude Cloud session…`) + **Project header / New thread menu** action.
    - Modal accepts a `claude.ai/code/...` URL or `cse_…` / `session_…` ID + lets user pick which `claude.ai`-authenticated Claude instance (`Claude`, `Claude Alt`) owns the session.
-   - Server spins up a fresh clean worktree via `mattr`'s existing `TaskFolders` / `GitWorkflowService.createWorktree`, runs the teleport import, and opens a **normal `mattr` Claude thread** bound to that worktree and imported session ID.
-   - From that point on, every `mattr` surface works natively: streaming timeline, diffs, PR panel, approvals, terminal, Voice Mode, Island, mobile/Tailscale PWA.
+   - Server spins up a fresh clean worktree via `Matter`'s existing `TaskFolders` / `GitWorkflowService.createWorktree`, runs the teleport import, and opens a **normal `Matter` Claude thread** bound to that worktree and imported session ID.
+   - From that point on, every `Matter` surface works natively: streaming timeline, diffs, PR panel, approvals, terminal, Voice Mode, Island, mobile/Tailscale PWA.
 2. **Send to Claude Cloud (`--cloud`) — Lightweight Offload:**
    - Composer action / Command Palette (`Send to Claude Cloud…`) shown only when:
      - `claude-cloud` add-on is enabled
@@ -180,7 +180,7 @@ Gate the entire feature behind a new add-on manifest **`claude-cloud`** in `pack
    - Shows a compact **Cloud Session Drawer / Card** (and linked badge on any thread created from it) with:
      - Deep link to open in `claude.ai/code/<id>` (or Claude Desktop/mobile)
      - **Send follow-up** input (executes `claude -p "<msg>" --cloud <id> --output-format json`)
-     - **Pull to local worktree (`--teleport`)** one-click button (promotes to a full local `mattr` worktree thread).
+     - **Pull to local worktree (`--teleport`)** one-click button (promotes to a full local `Matter` worktree thread).
 3. **Settings → Add-ons → Claude Cloud:**
    - Shows readiness per configured `claudeAgent` instance (`claudeAgent` / `claude-alt`) using `claude auth status --json` (`planTier`, `email`, warning if `ANTHROPIC_API_KEY` is set in instance env).
    - Non-secret config: default Claude instance ID for cloud sessions, auto-push prompt preference.
@@ -198,14 +198,14 @@ Build as a standard Effect service (`Effect.fn("ClaudeCloudService.*")`) with th
   - `launchCloudSession({ instanceId, projectId, cwd, title, prompt })`: spawns `claude --cloud -n <title> <prompt>` via `node-pty` (only after verifying folder trust or handling the launch lifecycle confirmed in the Phase 0 spike), parses the emitted `https://claude.ai/code/<id>` URL / `cse_…` ID, persists to `<stateDir>/claude-cloud-sessions.json`, and terminates the local PTY cleanly once the remote session is created.
   - `sendCloudFollowUp({ instanceId, cloudSessionId, prompt })`: runs `claude -p <prompt> --cloud <cloudSessionId> --output-format json` (no PTY needed), parses JSON response, updates `lastMessageAt`.
   - `teleportToWorktree({ instanceId, projectId, cloudSessionId, initialPrompt? })`:
-    1. Creates a clean `mattr` worktree via `GitWorkflowService.createWorktree` (avoiding any dirty working tree on the main checkout).
-    2. Runs the teleport step in that clean worktree using the chosen instance's `CLAUDE_CONFIG_DIR` (exact invocation finalized after Phase 0 spike: either one-shot `claude --teleport <id> -p --output-format stream-json` to pull branch + local `.jsonl` session UUID, then creating a `mattr` thread whose `nativeThreadId` resumes that UUID; or handing off directly to `ClaudeAdapterV2`).
+    1. Creates a clean `Matter` worktree via `GitWorkflowService.createWorktree` (avoiding any dirty working tree on the main checkout).
+    2. Runs the teleport step in that clean worktree using the chosen instance's `CLAUDE_CONFIG_DIR` (exact invocation finalized after Phase 0 spike: either one-shot `claude --teleport <id> -p --output-format stream-json` to pull branch + local `.jsonl` session UUID, then creating a `Matter` thread whose `nativeThreadId` resumes that UUID; or handing off directly to `ClaudeAdapterV2`).
     3. Records `teleportedThreadId` in the local registry so there is a clear two-way link (reverse state / visibility).
   - `listTrackedSessions(projectId?)` / `forgetTrackedSession(cloudSessionId)`: manages `<stateDir>/claude-cloud-sessions.json`.
 
 ### 5.4 Security, Quota & Remote-Surface Notes
 
-- **Credentials stay server-side:** Web, Desktop, and Mobile/Tailscale PWA clients call `mattr` RPC/HTTP endpoints; OAuth tokens and `CLAUDE_CONFIG_DIR` never leave the server.
+- **Credentials stay server-side:** Web, Desktop, and Mobile/Tailscale PWA clients call `Matter` RPC/HTTP endpoints; OAuth tokens and `CLAUDE_CONFIG_DIR` never leave the server.
 - **Zero extra compute cost; multi-account quota spread:** Cloud VM compute is free under the user's existing Claude Ultra (`max_20x`) plans; letting the user choose `claudeAgent` vs. `claude-alt` per cloud launch spreads token quota across both subscriptions cleanly.
 - **No secret leakage into `mattr-addons.json`:** Add-on config holds only `defaultInstanceId` and booleans; session metadata holds only public session IDs/URLs/titles.
 - **No accidental API-key billing:** Stripping `ANTHROPIC_API_KEY` prevents both cloud auth failure and accidental pay-as-you-go billing on fallback.

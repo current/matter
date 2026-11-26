@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Serves this checkout's web UI to the installed mattr with hot reload. Chats keep running in the
-// app's backend; only the window's UI comes from here. Reload mattr (Cmd+R) after starting to
-// switch to it, and again after stopping to go back to the bundled UI. See antimatter/liveUi.ts.
-// Usage: node antimatter/live-ui.mjs [--port 5799]
+// Serves this checkout's web UI to the installed Matter with hot reload. Chats keep running in the
+// app's backend; only the window's UI comes from here. Reload Matter (Cmd+R) after starting to
+// switch to it, and again after stopping to go back to the bundled UI. See matter/liveUi.ts.
+// Usage: node matter/live-ui.mjs [--port 5799]
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -18,8 +18,12 @@ const { values } = NodeUtil.parseArgs({
 
 const repoRoot = NodePath.resolve(import.meta.dirname, "..");
 const NODE = "node@26.13.1";
-const APP_PLIST = "/Applications/mattr.app/Contents/Info.plist";
-// Keep in sync with MATTR_LIVE_UI_FILE in liveUi.ts.
+// Installs updated through the update button keep the bundle's old file name.
+const APP_PLIST =
+  ["/Applications/Matter.app", "/Applications/mattr.app"]
+    .map((app) => `${app}/Contents/Info.plist`)
+    .find((plist) => NodeFS.existsSync(plist)) ?? "/Applications/Matter.app/Contents/Info.plist";
+// Keep in sync with MATTER_LIVE_UI_FILE in liveUi.ts.
 const liveUiFile = NodePath.join(NodeOS.homedir(), ".antimatter", "live-ui.json");
 const url = `http://127.0.0.1:${values.port}/`;
 
@@ -82,8 +86,8 @@ const removeLiveUiFile = () => {
   } catch {}
 };
 
-console.log(`\nmattr live UI ${appVersion} → ${url}`);
-console.log("Reload mattr (Cmd+R) to use it. Ctrl+C stops it; reload again to go back.\n");
+console.log(`\nMatter live UI ${appVersion} → ${url}`);
+console.log("Reload Matter (Cmd+R) to use it. Ctrl+C stops it; reload again to go back.\n");
 
 child.on("exit", (code, signal) => {
   removeLiveUiFile();

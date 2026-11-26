@@ -20,7 +20,7 @@ import * as Orchestrator from "../../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import { forkParked } from "../../serverActivation.ts";
 import * as ServerSettings from "../../serverSettings.ts";
-import * as MattrPredictionRunner from "./MattrPredictionRunner.ts";
+import * as MatterPredictionRunner from "./MatterPredictionRunner.ts";
 import {
   ACTIVE_RUN_STATUSES,
   predictionCacheKey,
@@ -48,22 +48,22 @@ interface PendingPrediction {
 }
 
 /**
- * mattr's next-message predictor. After a top-level run's turn ends (even while its background
+ * Matter's next-message predictor. After a top-level run's turn ends (even while its background
  * subagents keep working) it asks a small stateless model call for the user's likely next message
  * and serves it through upstream's prompt suggestion subscription, so every client shows it.
  */
-export class MattrComposerPredictions extends Context.Service<
-  MattrComposerPredictions,
+export class MatterComposerPredictions extends Context.Service<
+  MatterComposerPredictions,
   {
     readonly observe: (event: OrchestrationV2DomainEvent) => Effect.Effect<void>;
     readonly subscribe: (threadId: ThreadId) => Stream.Stream<OrchestrationV2PromptSuggestion>;
   }
->()("t3/mattr/composerPredictions/MattrComposerPredictions") {}
+>()("t3/matter/composerPredictions/MatterComposerPredictions") {}
 
 const make = Effect.gen(function* () {
   const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
   const settingsService = yield* ServerSettings.ServerSettingsService;
-  const runner = yield* MattrPredictionRunner.MattrPredictionRunner;
+  const runner = yield* MatterPredictionRunner.MatterPredictionRunner;
   const scope = yield* Effect.scope;
   const store = yield* SubscriptionRef.make<ReadonlyMap<ThreadId, StoredSuggestion>>(new Map());
   const cache = new PredictionLru<string | null>(CACHE_ENTRIES);
@@ -120,7 +120,7 @@ const make = Effect.gen(function* () {
         Effect.raceFirst(attempt, Effect.delay(attempt, Duration.millis(hedgeAfterMs)));
   };
 
-  const generate = Effect.fn("MattrComposerPredictions.generate")(function* (
+  const generate = Effect.fn("MatterComposerPredictions.generate")(function* (
     routes: ReadonlyArray<PredictionRoute>,
     threadId: ThreadId,
     transcript: string,
@@ -132,7 +132,7 @@ const make = Effect.gen(function* () {
     return null;
   });
 
-  const predict = Effect.fn("MattrComposerPredictions.predict")(function* (
+  const predict = Effect.fn("MatterComposerPredictions.predict")(function* (
     threadId: ThreadId,
     runId: RunId,
     threadInstanceId: ProviderInstanceId | null,
@@ -149,12 +149,12 @@ const make = Effect.gen(function* () {
     if (Option.isNone(snapshot)) return;
     const readiness = predictionReadiness(snapshot.value.projection, runId);
     if (!readiness.ready) {
-      return yield* Effect.annotateCurrentSpan("mattr.prediction.outcome", readiness.reason);
+      return yield* Effect.annotateCurrentSpan("matter.prediction.outcome", readiness.reason);
     }
     const routes = yield* runner.routes({ threadInstanceId });
     const primary = routes[0];
     if (primary === undefined) {
-      return yield* Effect.annotateCurrentSpan("mattr.prediction.outcome", "no-route");
+      return yield* Effect.annotateCurrentSpan("matter.prediction.outcome", "no-route");
     }
     const key = predictionCacheKey(threadId, runId, primary.model);
     const text = cache.has(key)
@@ -166,7 +166,7 @@ const make = Effect.gen(function* () {
         );
     // Records why nothing showed: the predictor often answers null on purpose.
     yield* Effect.annotateCurrentSpan(
-      "mattr.prediction.outcome",
+      "matter.prediction.outcome",
       text === null ? "empty" : "offered",
     );
     if (text !== null) yield* publish(threadId, { runId, text });
@@ -196,7 +196,7 @@ const make = Effect.gen(function* () {
             Effect.catchCause((cause) =>
               Cause.hasInterruptsOnly(cause)
                 ? Effect.void
-                : Effect.logDebug("mattr composer prediction failed", cause),
+                : Effect.logDebug("Matter composer prediction failed", cause),
             ),
             Effect.ensuring(
               Effect.sync(() => {
@@ -215,7 +215,7 @@ const make = Effect.gen(function* () {
       );
     });
 
-  const observe = Effect.fn("MattrComposerPredictions.observe")(function* (
+  const observe = Effect.fn("MatterComposerPredictions.observe")(function* (
     event: OrchestrationV2DomainEvent,
   ) {
     switch (event.type) {
@@ -275,19 +275,19 @@ const make = Effect.gen(function* () {
       Stream.changes,
     );
 
-  return MattrComposerPredictions.of({ observe, subscribe });
+  return MatterComposerPredictions.of({ observe, subscribe });
 });
 
-export const layerCoordinator = Layer.effect(MattrComposerPredictions, make);
+export const layerCoordinator = Layer.effect(MatterComposerPredictions, make);
 
 const layerEventFeed = Layer.effectDiscard(
   Effect.gen(function* () {
-    const predictions = yield* MattrComposerPredictions;
+    const predictions = yield* MatterComposerPredictions;
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     yield* forkParked(
       Stream.runForEach(orchestrator.streamDomainEvents, predictions.observe).pipe(
         Effect.catchCause((cause) =>
-          Effect.logWarning("mattr composer predictions stopped following runs", cause),
+          Effect.logWarning("Matter composer predictions stopped following runs", cause),
         ),
       ),
     );
@@ -296,5 +296,5 @@ const layerEventFeed = Layer.effectDiscard(
 
 export const layer = layerEventFeed.pipe(
   Layer.provideMerge(layerCoordinator),
-  Layer.provide(MattrPredictionRunner.layer),
+  Layer.provide(MatterPredictionRunner.layer),
 );

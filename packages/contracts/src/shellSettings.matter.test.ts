@@ -6,7 +6,7 @@ import { ClientSettingsPatch, ClientSettingsSchema, DEFAULT_CLIENT_SETTINGS } fr
 const decodeClientSettings = Schema.decodeUnknownSync(ClientSettingsSchema);
 const decodePatch = Schema.decodeUnknownSync(ClientSettingsPatch);
 
-describe("mattr shell settings", () => {
+describe("Matter shell settings", () => {
   it("fills defaults for settings files written before the shell controls existed", () => {
     const decoded = decodeClientSettings({ shellMaterial: "blur", shellGrain: 20 });
     expect(decoded.shellMaterial).toBe("blur");

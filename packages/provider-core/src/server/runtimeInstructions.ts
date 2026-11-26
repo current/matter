@@ -15,7 +15,7 @@ Link each PR you create, take over, or push to: link_pull_request, or link_pull_
 If available, call link_issue for each issue you take on or file, even via CLI; skip issues you only read.
 </pull_request_linking>`;
 
-// mattr: fork add-ons contribute session instructions here. Each returns "" while off.
+// Matter: fork add-ons contribute session instructions here. Each returns "" while off.
 const addonInstructionSources = new Map<string, () => string>();
 
 /** Registers (or with null, removes) an add-on's instructions for sessions that start later. */

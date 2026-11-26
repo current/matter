@@ -3,27 +3,27 @@ import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  canStopMattrSubagent,
-  closeMattrLineagePopover,
-  countMattrPreviousAgents,
-  deriveMattrWhisperRows,
-  isMattrWhisperActive,
-  mattrRibbonOverflows,
-  oldestMattrWhisperStart,
-  openMattrLineagePopover,
-  readMattrLineagePopover,
-  resolveMattrRibbonDensity,
-  setMattrLineageView,
-  stackMattrWhisperAvatars,
-  toggleMattrLineagePopover,
-} from "./mattrThreadRibbon.logic";
+  canStopMatterSubagent,
+  closeMatterLineagePopover,
+  countMatterPreviousAgents,
+  deriveMatterWhisperRows,
+  isMatterWhisperActive,
+  matterRibbonOverflows,
+  oldestMatterWhisperStart,
+  openMatterLineagePopover,
+  readMatterLineagePopover,
+  resolveMatterRibbonDensity,
+  setMatterLineageView,
+  stackMatterWhisperAvatars,
+  toggleMatterLineagePopover,
+} from "./matterThreadRibbon.logic";
 
 const PARENT = ThreadId.make("parent");
 
 function subagent(
   id: string,
-  overrides: Partial<Parameters<typeof canStopMattrSubagent>[0]> = {},
-): Parameters<typeof canStopMattrSubagent>[0] {
+  overrides: Partial<Parameters<typeof canStopMatterSubagent>[0]> = {},
+): Parameters<typeof canStopMatterSubagent>[0] {
   return {
     id: NodeId.make(id),
     threadId: PARENT,
@@ -40,9 +40,9 @@ function subagent(
   };
 }
 
-describe("deriveMattrWhisperRows", () => {
+describe("deriveMatterWhisperRows", () => {
   it("lists active subagents newest first and leaves finished ones out", () => {
-    const rows = deriveMattrWhisperRows({
+    const rows = deriveMatterWhisperRows({
       subagents: [
         subagent("old", { startedAt: DateTime.makeUnsafe("2026-11-26T09:00:00.000Z") }),
         subagent("new", { startedAt: DateTime.makeUnsafe("2026-11-26T10:30:00.000Z") }),
@@ -64,7 +64,7 @@ describe("deriveMattrWhisperRows", () => {
       { taskId: "t1", kind: "subagent", childThreadId: ThreadId.make("child-a") } as never,
       { taskId: "t2", kind: "command", description: "vp run dev\n--port 5173" } as never,
     ];
-    const rows = deriveMattrWhisperRows({
+    const rows = deriveMatterWhisperRows({
       subagents: [subagent("a")],
       backgroundTasks: tasks,
       fallbackTitle: "Subagent",
@@ -94,7 +94,7 @@ describe("deriveMattrWhisperRows", () => {
         description: "Distinct background subagent",
       } as never,
     ];
-    const rows = deriveMattrWhisperRows({
+    const rows = deriveMatterWhisperRows({
       subagents: [
         subagent("native-a", {
           origin: "provider_native",
@@ -118,13 +118,13 @@ describe("deriveMattrWhisperRows", () => {
   });
 
   it("stops only agents the lineage panel could stop", () => {
-    expect(canStopMattrSubagent(subagent("app"))).toBe(true);
-    expect(canStopMattrSubagent(subagent("unstarted", { startedAt: null }))).toBe(false);
+    expect(canStopMatterSubagent(subagent("app"))).toBe(true);
+    expect(canStopMatterSubagent(subagent("unstarted", { startedAt: null }))).toBe(false);
     expect(
-      canStopMattrSubagent(subagent("native", { origin: "provider_native", runId: null })),
+      canStopMatterSubagent(subagent("native", { origin: "provider_native", runId: null })),
     ).toBe(false);
     expect(
-      canStopMattrSubagent(
+      canStopMatterSubagent(
         subagent("strong", {
           origin: "provider_native",
           runId: "run" as never,
@@ -136,7 +136,7 @@ describe("deriveMattrWhisperRows", () => {
 });
 
 describe("pill summary", () => {
-  const rows = deriveMattrWhisperRows({
+  const rows = deriveMatterWhisperRows({
     subagents: ["a", "b", "c", "d"].map((id, index) =>
       subagent(id, { startedAt: DateTime.makeUnsafe(`2026-11-26T1${index}:00:00.000Z`) }),
     ),
@@ -145,27 +145,27 @@ describe("pill summary", () => {
   });
 
   it("times the pill from the oldest start", () => {
-    expect(oldestMattrWhisperStart(rows)).toBe(Date.parse("2026-11-26T10:00:00.000Z"));
-    expect(oldestMattrWhisperStart([])).toBeNull();
+    expect(oldestMatterWhisperStart(rows)).toBe(Date.parse("2026-11-26T10:00:00.000Z"));
+    expect(oldestMatterWhisperStart([])).toBeNull();
   });
 
   it("stacks at most three avatars, earlier ones drawn on top", () => {
-    const avatars = stackMattrWhisperAvatars(rows);
+    const avatars = stackMatterWhisperAvatars(rows);
     expect(avatars.map(({ zIndex }) => zIndex)).toEqual([3, 2, 1]);
   });
 
   it("is idle with nothing running", () => {
-    expect(isMattrWhisperActive({ rowCount: 0, serverCount: 0, runningAutomationCount: 0 })).toBe(
+    expect(isMatterWhisperActive({ rowCount: 0, serverCount: 0, runningAutomationCount: 0 })).toBe(
       false,
     );
-    expect(isMattrWhisperActive({ rowCount: 0, serverCount: 1, runningAutomationCount: 0 })).toBe(
+    expect(isMatterWhisperActive({ rowCount: 0, serverCount: 1, runningAutomationCount: 0 })).toBe(
       true,
     );
   });
 
   it("counts finished agents as previous", () => {
     expect(
-      countMattrPreviousAgents([
+      countMatterPreviousAgents([
         { status: "completed" },
         { status: "failed" },
         { status: "running" },
@@ -177,33 +177,33 @@ describe("pill summary", () => {
 
 describe("ribbon density", () => {
   it("collapses primary chips as the available header content width narrows", () => {
-    expect(resolveMattrRibbonDensity(560)).toBe("full");
-    expect(resolveMattrRibbonDensity(559)).toBe("condensed");
-    expect(resolveMattrRibbonDensity(420)).toBe("condensed");
-    expect(resolveMattrRibbonDensity(419)).toBe("minimal");
+    expect(resolveMatterRibbonDensity(560)).toBe("full");
+    expect(resolveMatterRibbonDensity(559)).toBe("condensed");
+    expect(resolveMatterRibbonDensity(420)).toBe("condensed");
+    expect(resolveMatterRibbonDensity(419)).toBe("minimal");
   });
 
   it("moves PR into More before the diff", () => {
-    expect(mattrRibbonOverflows("full", "pr")).toBe(false);
-    expect(mattrRibbonOverflows("full", "diff")).toBe(false);
-    expect(mattrRibbonOverflows("condensed", "pr")).toBe(true);
-    expect(mattrRibbonOverflows("condensed", "diff")).toBe(false);
-    expect(mattrRibbonOverflows("minimal", "pr")).toBe(true);
-    expect(mattrRibbonOverflows("minimal", "diff")).toBe(true);
+    expect(matterRibbonOverflows("full", "pr")).toBe(false);
+    expect(matterRibbonOverflows("full", "diff")).toBe(false);
+    expect(matterRibbonOverflows("condensed", "pr")).toBe(true);
+    expect(matterRibbonOverflows("condensed", "diff")).toBe(false);
+    expect(matterRibbonOverflows("minimal", "pr")).toBe(true);
+    expect(matterRibbonOverflows("minimal", "diff")).toBe(true);
   });
 });
 
 describe("lineage popover store", () => {
   it("toggles per thread and anchors to the pill only while it shows", () => {
-    toggleMattrLineagePopover("env:thread", false);
-    expect(readMattrLineagePopover()).toMatchObject({ threadKey: "env:thread", anchor: "ribbon" });
-    setMattrLineageView("previous");
-    expect(readMattrLineagePopover().view).toBe("previous");
-    toggleMattrLineagePopover("env:thread", true);
-    expect(readMattrLineagePopover().threadKey).toBeNull();
-    openMattrLineagePopover("env:thread", "pill");
-    expect(readMattrLineagePopover()).toMatchObject({ anchor: "pill", view: "main" });
-    closeMattrLineagePopover();
-    expect(readMattrLineagePopover().threadKey).toBeNull();
+    toggleMatterLineagePopover("env:thread", false);
+    expect(readMatterLineagePopover()).toMatchObject({ threadKey: "env:thread", anchor: "ribbon" });
+    setMatterLineageView("previous");
+    expect(readMatterLineagePopover().view).toBe("previous");
+    toggleMatterLineagePopover("env:thread", true);
+    expect(readMatterLineagePopover().threadKey).toBeNull();
+    openMatterLineagePopover("env:thread", "pill");
+    expect(readMatterLineagePopover()).toMatchObject({ anchor: "pill", view: "main" });
+    closeMatterLineagePopover();
+    expect(readMatterLineagePopover().threadKey).toBeNull();
   });
 });

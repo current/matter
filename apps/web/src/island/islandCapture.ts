@@ -1,4 +1,4 @@
-import type { IslandDroppedFile } from "../../../../antimatter/island/types";
+import type { IslandDroppedFile } from "../../../../matter/island/types";
 
 const TASK_TITLE_MAX = 120;
 

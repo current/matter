@@ -17,7 +17,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
-import type { VoiceWorkspaceContext } from "../../../../antimatter/voice-assistant/types.ts";
+import type { VoiceWorkspaceContext } from "../../../../matter/voice-assistant/types.ts";
 import type { ActiveThreadListEntry } from "../orchestration-v2/ProjectionStore.ts";
 import {
   hydrateVoiceWorkspaceContext,
@@ -153,7 +153,7 @@ describe("voiceWorkspaceHydrator", () => {
     () =>
       Effect.gen(function* () {
         const now = BASE_NOW_MS;
-        const project = makeProject({ id: "proj-mattr", title: "mattr" });
+        const project = makeProject({ id: "proj-matter", title: "Matter" });
         const archivedProject = makeProject({
           id: "proj-old",
           title: "Archived Repo",
@@ -162,8 +162,8 @@ describe("voiceWorkspaceHydrator", () => {
 
         const parentShell = makeShell({
           id: "thread-main",
-          projectId: "proj-mattr",
-          title: "Antimatter setup check",
+          projectId: "proj-matter",
+          title: "Matter setup check",
           status: "running",
           updatedAtMs: now - 5_000,
           branch: "feat/voice-brain",
@@ -176,7 +176,7 @@ describe("voiceWorkspaceHydrator", () => {
         });
         const childA = makeShell({
           id: "thread-child-a",
-          projectId: "proj-mattr",
+          projectId: "proj-matter",
           title: "Claude Cloud",
           status: "running",
           updatedAtMs: now - 1_000,
@@ -186,7 +186,7 @@ describe("voiceWorkspaceHydrator", () => {
         });
         const childB = makeShell({
           id: "thread-child-b",
-          projectId: "proj-mattr",
+          projectId: "proj-matter",
           title: "Devin Bot",
           status: "waiting",
           updatedAtMs: now - 2_000,
@@ -249,7 +249,7 @@ describe("voiceWorkspaceHydrator", () => {
         // Non-archived projects only
         assert.deepStrictEqual(
           hydrated.projects.map((p) => p.id),
-          ["proj-mattr"],
+          ["proj-matter"],
         );
 
         const main = hydrated.threads.find((t) => t.threadId === "thread-main");
@@ -265,13 +265,13 @@ describe("voiceWorkspaceHydrator", () => {
 
         assert.isDefined(subA);
         assert.strictEqual(subA?.parentThreadId, "thread-main");
-        assert.strictEqual(subA?.parentThreadTitle, "Antimatter setup check");
+        assert.strictEqual(subA?.parentThreadTitle, "Matter setup check");
         assert.strictEqual(subA?.relationshipToParent, "subagent");
         assert.strictEqual(subA?.model, "claude-opus-4-6");
 
         assert.isDefined(subB);
         assert.strictEqual(subB?.parentThreadId, "thread-main");
-        assert.strictEqual(subB?.parentThreadTitle, "Antimatter setup check");
+        assert.strictEqual(subB?.parentThreadTitle, "Matter setup check");
         assert.strictEqual(subB?.relationshipToParent, "subagent");
         assert.strictEqual(subB?.providerInstanceId, "codex");
       }),
@@ -282,7 +282,7 @@ describe("voiceWorkspaceHydrator", () => {
     () =>
       Effect.gen(function* () {
         const now = BASE_NOW_MS;
-        const project = makeProject({ id: "proj-1", title: "mattr" });
+        const project = makeProject({ id: "proj-1", title: "Matter" });
 
         const questionShell = makeShell({
           id: "thread-q",
@@ -505,7 +505,7 @@ describe("voiceWorkspaceHydrator", () => {
   it.effect("guarantees parent threads are never orphaned even with >40 threads", () =>
     Effect.gen(function* () {
       const now = BASE_NOW_MS;
-      const project = makeProject({ id: "proj-1", title: "mattr" });
+      const project = makeProject({ id: "proj-1", title: "Matter" });
 
       // Old parent thread + 45 newer unrelated top-level threads + 1 live subagent of the old parent
       const oldParent = makeShell({

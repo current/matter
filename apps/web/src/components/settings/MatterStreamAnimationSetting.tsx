@@ -4,21 +4,21 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useGT, useMessages } from "gt-react";
 import * as Schema from "effect/Schema";
 
-import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "../chat/mattrStreamHast";
+import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "../chat/matterStreamHast";
 import {
-  DEFAULT_MATTR_STREAM_ANIMATION,
-  MATTR_STREAM_ANIMATIONS,
-  MattrStreamAnimation,
+  DEFAULT_MATTER_STREAM_ANIMATION,
+  MATTER_STREAM_ANIMATIONS,
+  MatterStreamAnimation,
   useBurstPacedText,
   usePacedText,
-  useMattrStreamAnimationSetting,
+  useMatterStreamAnimationSetting,
   wholeWordEnds,
-} from "../../mattrStreamAnimation";
+} from "../../matterStreamAnimation";
 import { Button } from "../ui/button";
 import { RadioGroup } from "../ui/radio-group";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 
-const isMattrStreamAnimation = Schema.is(MattrStreamAnimation);
+const isMatterStreamAnimation = Schema.is(MatterStreamAnimation);
 
 const PREVIEW_TOKEN_PATTERN = /`[^`]*`|\s+|[^\s`]+/g;
 
@@ -65,7 +65,7 @@ function StreamPreview({
   sample,
   reducedMotion,
 }: {
-  readonly animation: MattrStreamAnimation;
+  readonly animation: MatterStreamAnimation;
   readonly sample: string;
   readonly reducedMotion: boolean;
 }) {
@@ -108,7 +108,7 @@ function StreamPreview({
       <p aria-hidden className="invisible col-start-1 row-start-1 m-0">
         {renderTokens(sample, false)}
       </p>
-      <p className="col-start-1 row-start-1 m-0" data-mattr-stream={live ? animation : undefined}>
+      <p className="col-start-1 row-start-1 m-0" data-matter-stream={live ? animation : undefined}>
         {renderTokens(visible, live)}
         {caret ? <span aria-hidden className={STREAM_CARET_CLASS} /> : null}
       </p>
@@ -137,10 +137,10 @@ function renderTokens(text: string, live: boolean) {
 }
 
 /** Settings → Appearance: how assistant text arrives while it streams, saved on this device. */
-export function MattrStreamAnimationSetting() {
+export function MatterStreamAnimationSetting() {
   const gt = useGT();
   const m = useMessages();
-  const [animation, setAnimation] = useMattrStreamAnimationSetting();
+  const [animation, setAnimation] = useMatterStreamAnimationSetting();
   const [replay, setReplay] = useState(0);
   const reducedMotion = useSyncExternalStore(
     subscribeReducedMotion,
@@ -153,17 +153,17 @@ export function MattrStreamAnimationSetting() {
 
   return (
     <SettingsRow
-      id="mattr-stream-animation"
+      id="matter-stream-animation"
       title={gt("Streaming text")}
       description={gt(
         "How new words appear while an assistant replies. Finished messages always render plain. Reduced motion shows text instantly.",
       )}
       devicePreference
       resetAction={
-        animation !== DEFAULT_MATTR_STREAM_ANIMATION ? (
+        animation !== DEFAULT_MATTER_STREAM_ANIMATION ? (
           <SettingResetButton
             ariaLabel={gt("Reset streaming text to default")}
-            onClick={() => setAnimation(DEFAULT_MATTR_STREAM_ANIMATION)}
+            onClick={() => setAnimation(DEFAULT_MATTER_STREAM_ANIMATION)}
           />
         ) : null
       }
@@ -192,15 +192,15 @@ export function MattrStreamAnimationSetting() {
           aria-label={gt("Streaming text")}
           value={animation}
           onValueChange={(value) => {
-            if (isMattrStreamAnimation(value)) setAnimation(value);
+            if (isMatterStreamAnimation(value)) setAnimation(value);
           }}
           className="grid grid-cols-1 @min-[32rem]/settings-row:grid-cols-2 @min-[48rem]/settings-row:grid-cols-3"
         >
-          {MATTR_STREAM_ANIMATIONS.map((definition) => (
+          {MATTER_STREAM_ANIMATIONS.map((definition) => (
             <RadioPrimitive.Root
               key={definition.id}
               value={definition.id}
-              data-mattr-stream-option={definition.id}
+              data-matter-stream-option={definition.id}
               className="flex min-w-0 cursor-pointer items-start gap-2 rounded-lg bg-card px-3 py-2.5 text-left outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
             >
               <span className="min-w-0 flex-1">

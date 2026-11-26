@@ -1,6 +1,6 @@
 import type { OrchestrationV2ThreadProjection, OrchestrationV2TurnItem } from "@t3tools/contracts";
 
-import type { IslandActivity, IslandPlanProgress } from "../../../../antimatter/island/types";
+import type { IslandActivity, IslandPlanProgress } from "../../../../matter/island/types";
 
 const MAX_RECENT_ACTIVITIES = 3;
 const MAX_LABEL_LENGTH = 72;

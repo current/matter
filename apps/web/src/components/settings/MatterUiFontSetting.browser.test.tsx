@@ -5,14 +5,14 @@ import { page, userEvent } from "vite-plus/test/browser";
 import "../../index.css";
 import { isFontFamilyAvailable } from "../../appearanceFonts";
 import {
-  applyMattrUiFont,
-  DEFAULT_MATTR_UI_FONT,
-  MATTR_UI_FONT_STORAGE_KEY,
-  MATTR_UI_FONTS,
-  mattrUiFontDefinition,
-  readMattrUiFont,
-  startMattrUiFont,
-} from "../../mattrUiFont";
+  applyMatterUiFont,
+  DEFAULT_MATTER_UI_FONT,
+  MATTER_UI_FONT_STORAGE_KEY,
+  MATTER_UI_FONTS,
+  matterUiFontDefinition,
+  readMatterUiFont,
+  startMatterUiFont,
+} from "../../matterUiFont";
 
 vi.mock(import("./settingsLayout"), async (original) => ({
   ...(await original()),
@@ -24,21 +24,21 @@ vi.mock(import("./settingsLayout"), async (original) => ({
   ),
 }));
 
-import { MattrUiFontSetting } from "./MattrUiFontSetting";
+import { MatterUiFontSetting } from "./MatterUiFontSetting";
 
-describe("MattrUiFontSetting", () => {
+describe("MatterUiFontSetting", () => {
   it("previews each face in itself and applies a pick across the app at once", async () => {
-    const stop = startMattrUiFont();
+    const stop = startMatterUiFont();
     using _font = {
       [Symbol.dispose]: () => {
         stop();
-        localStorage.removeItem(MATTR_UI_FONT_STORAGE_KEY);
-        applyMattrUiFont(document.documentElement, DEFAULT_MATTR_UI_FONT);
+        localStorage.removeItem(MATTER_UI_FONT_STORAGE_KEY);
+        applyMatterUiFont(document.documentElement, DEFAULT_MATTER_UI_FONT);
       },
     };
-    await using _screen = await render(<MattrUiFontSetting />, { router: false });
+    await using _screen = await render(<MatterUiFontSetting />, { router: false });
     const options = page.getByRole("radio");
-    await expect.poll(() => options.elements().length).toBe(MATTR_UI_FONTS.length);
+    await expect.poll(() => options.elements().length).toBe(MATTER_UI_FONTS.length);
     await expect.element(page.getByRole("radio", { name: /^SF Pro \/ system-ui/ })).toBeChecked();
 
     const geist = page.getByRole("radio", { name: /^Geist/ });
@@ -51,12 +51,12 @@ describe("MattrUiFontSetting", () => {
 
     await userEvent.click(geist);
     await expect.element(geist).toBeChecked();
-    expect(readMattrUiFont()).toBe("geist");
-    expect(document.documentElement.dataset.mattrUiFont).toBe("geist");
+    expect(readMatterUiFont()).toBe("geist");
+    expect(document.documentElement.dataset.matterUiFont).toBe("geist");
 
     await userEvent.click(page.getByRole("button", { name: "Reset UI font to default" }));
-    expect(readMattrUiFont()).toBe(DEFAULT_MATTR_UI_FONT);
-    expect(document.documentElement.dataset.mattrUiFont).toBeUndefined();
+    expect(readMatterUiFont()).toBe(DEFAULT_MATTER_UI_FONT);
+    expect(document.documentElement.dataset.matterUiFont).toBeUndefined();
   });
 
   // Regression: the app font must change on click even when no entry hook subscribed to storage.
@@ -69,8 +69,8 @@ describe("MattrUiFontSetting", () => {
     async (id, family) => {
       using _font = {
         [Symbol.dispose]: () => {
-          localStorage.removeItem(MATTR_UI_FONT_STORAGE_KEY);
-          applyMattrUiFont(document.documentElement, DEFAULT_MATTR_UI_FONT);
+          localStorage.removeItem(MATTER_UI_FONT_STORAGE_KEY);
+          applyMatterUiFont(document.documentElement, DEFAULT_MATTER_UI_FONT);
         },
       };
       const sample = document.body.appendChild(document.createElement("span"));
@@ -79,16 +79,16 @@ describe("MattrUiFontSetting", () => {
       await document.fonts.ready;
       const defaultWidth = sample.getBoundingClientRect().width;
 
-      await using _screen = await render(<MattrUiFontSetting />, { router: false });
+      await using _screen = await render(<MatterUiFontSetting />, { router: false });
       const option = page.getByRole("radio", {
-        name: new RegExp(`^${mattrUiFontDefinition(id).name}`),
+        name: new RegExp(`^${matterUiFontDefinition(id).name}`),
       });
       await userEvent.click(option);
       await expect.element(option).toBeChecked();
 
-      expect(readMattrUiFont()).toBe(id);
+      expect(readMatterUiFont()).toBe(id);
       expect(getComputedStyle(document.body).fontFamily).toContain(
-        mattrUiFontDefinition(id).stack.split(",")[0]!.replaceAll('"', ""),
+        matterUiFontDefinition(id).stack.split(",")[0]!.replaceAll('"', ""),
       );
       await expect
         .poll(() =>
@@ -101,16 +101,16 @@ describe("MattrUiFontSetting", () => {
       await expect.poll(() => sample.getBoundingClientRect().width).not.toBe(defaultWidth);
 
       // A reload drops the injected rule; the saved pick brings it back before first render.
-      document.getElementById("mattr-ui-font")?.remove();
-      delete document.documentElement.dataset.mattrUiFont;
-      startMattrUiFont()();
-      expect(document.documentElement.dataset.mattrUiFont).toBe(id);
+      document.getElementById("matter-ui-font")?.remove();
+      delete document.documentElement.dataset.matterUiFont;
+      startMatterUiFont()();
+      expect(document.documentElement.dataset.matterUiFont).toBe(id);
       expect(getComputedStyle(document.body).fontFamily).toContain(family);
     },
   );
 
   it("can't pick SF Pro Text while it isn't installed, since it would render as the default", async () => {
-    await using _screen = await render(<MattrUiFontSetting />, { router: false });
+    await using _screen = await render(<MatterUiFontSetting />, { router: false });
     const sfPro = page.getByRole("radio", { name: /^SF Pro Text/ });
     await expect.element(sfPro).toBeVisible();
     if (isFontFamilyAvailable("SF Pro Text")) {

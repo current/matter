@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { T, useGT } from "gt-react";
 
-import { useHasCapability } from "../addons/mattrCapabilities";
+import { useHasCapability } from "../addons/matterCapabilities";
 import { BotConversationView } from "../components/bots/BotConversationView";
 import { Button } from "../components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty";

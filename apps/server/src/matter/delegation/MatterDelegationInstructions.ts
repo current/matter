@@ -9,24 +9,27 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import { ProviderRegistry } from "../../provider/ProviderRegistry.ts";
 import { forkParked } from "../../serverActivation.ts";
 import * as ServerSettings from "../../serverSettings.ts";
-import { buildMattrDelegationInstructions, mattrDelegationPool } from "./mattrDelegationPolicy.ts";
+import {
+  buildMatterDelegationInstructions,
+  matterDelegationPool,
+} from "./matterDelegationPolicy.ts";
 
-const MATTR_DELEGATION_INSTRUCTIONS_ID = "mattr-delegation";
+const MATTER_DELEGATION_INSTRUCTIONS_ID = "matter-delegation";
 
 /**
- * Keeps the `<mattr_delegation>` session block in step with settings and the provider inventory.
+ * Keeps the `<matter_delegation>` session block in step with settings and the provider inventory.
  * Sessions read it synchronously when they start, so the text is kept current here.
  */
-export class MattrDelegationInstructions extends Context.Service<
-  MattrDelegationInstructions,
+export class MatterDelegationInstructions extends Context.Service<
+  MatterDelegationInstructions,
   {
     /** The block new sessions get; "" while delegation is off or has fewer than two instances. */
     readonly changes: Stream.Stream<string>;
   }
->()("t3/mattr/delegation/MattrDelegationInstructions") {}
+>()("t3/matter/delegation/MatterDelegationInstructions") {}
 
 export const layer = Layer.effect(
-  MattrDelegationInstructions,
+  MatterDelegationInstructions,
   Effect.gen(function* () {
     const settingsService = yield* ServerSettings.ServerSettingsService;
     const registry = yield* ProviderRegistry;
@@ -35,13 +38,13 @@ export const layer = Layer.effect(
     let text = "";
     const ref = yield* SubscriptionRef.make(text);
     const recompute = Effect.suspend(() => {
-      text = buildMattrDelegationInstructions(settings, mattrDelegationPool(providers, settings));
+      text = buildMatterDelegationInstructions(settings, matterDelegationPool(providers, settings));
       return SubscriptionRef.set(ref, text);
     });
 
     yield* Effect.acquireRelease(
-      Effect.sync(() => setAddonRuntimeInstructions(MATTR_DELEGATION_INSTRUCTIONS_ID, () => text)),
-      () => Effect.sync(() => setAddonRuntimeInstructions(MATTR_DELEGATION_INSTRUCTIONS_ID, null)),
+      Effect.sync(() => setAddonRuntimeInstructions(MATTER_DELEGATION_INSTRUCTIONS_ID, () => text)),
+      () => Effect.sync(() => setAddonRuntimeInstructions(MATTER_DELEGATION_INSTRUCTIONS_ID, null)),
     );
 
     const settingsChanges = yield* settingsService.subscribeChanges;
@@ -71,7 +74,7 @@ export const layer = Layer.effect(
       ),
     );
 
-    return MattrDelegationInstructions.of({
+    return MatterDelegationInstructions.of({
       changes: SubscriptionRef.changes(ref).pipe(Stream.changes),
     });
   }),

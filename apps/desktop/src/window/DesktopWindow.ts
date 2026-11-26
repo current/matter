@@ -57,7 +57,7 @@ import {
   pickShellAppearance,
   type ShellAppearanceSettings,
   shellMaterialOptions,
-} from "./MattrShellMaterial.ts";
+} from "./MatterShellMaterial.ts";
 import { installMainWindowRemoteRequestHeaderPolicy } from "./RemoteRequestHeaders.ts";
 
 const TITLEBAR_HEIGHT = 40;
@@ -70,7 +70,7 @@ class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyE
     return "Could not copy the context-menu image.";
   }
 }
-// Match the titlebar row in antimatter/shell.css; native macOS buttons stay 14 points at any zoom.
+// Match the titlebar row in matter/shell.css; native macOS buttons stay 14 points at any zoom.
 const MACOS_WORKSPACE_TOPBAR_HEIGHT = 38;
 const MACOS_WINDOW_BUTTON_X = 20;
 const MACOS_WINDOW_BUTTON_RADIUS = 7;

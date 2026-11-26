@@ -691,7 +691,7 @@ export const OrchestratorMcpProviderCapability = Schema.Struct({
   canRunChildTask: Schema.Boolean,
   canRunCrossProviderChildTask: Schema.Boolean,
   constraints: Schema.Array(Schema.String),
-  /** mattr: the user keeps this instance out of delegate_task. */
+  /** Matter: the user keeps this instance out of delegate_task. */
   excludedFromDelegation: Schema.optional(Schema.Boolean),
 });
 export type OrchestratorMcpProviderCapability = typeof OrchestratorMcpProviderCapability.Type;

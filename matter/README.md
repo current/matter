@@ -1,17 +1,17 @@
-# Antimatter
+# Matter
 
-Antimatter is a personal fork of [T3 Code](https://github.com/pingdotgg/t3code) that tracks its nightly channel.
+Matter is a personal fork of [T3 Code](https://github.com/pingdotgg/t3code) that tracks its nightly channel.
 
 ## How updates work
 
-`.github/workflows/antimatter-nightly.yml` checks for a new T3 Code nightly every 30 minutes, and also runs on every push to `main`. When either one has changed, it:
+`.github/workflows/matter-nightly.yml` checks for a new T3 Code nightly every 30 minutes, and also runs on every push to `main`. When either one has changed, it:
 
 1. merges the newest upstream nightly tag into `main` (in CI only, nothing is pushed back);
 2. builds the macOS arm64 app;
-3. re-signs the app with the fork's self-signed certificate (`antimatter/sign-mac-release.mjs`);
+3. re-signs the app with the fork's self-signed certificate (`matter/sign-mac-release.mjs`);
 4. publishes a prerelease with upstream's release notes. The app's update button reads these prereleases.
 
-Antimatter versions are upstream's version with two extra digits on the run number. For example, upstream `0.1.12-nightly.20261124.5209` becomes `...520901`, and the next rebuild of the same upstream nightly becomes `...520902`.
+Matter versions are upstream's version with two extra digits on the run number. For example, upstream `0.1.12-nightly.20261124.5209` becomes `...520901`, and the next rebuild of the same upstream nightly becomes `...520902`.
 
 If upstream changes conflict with yours, that build fails and the workflow opens an issue. To fix it, run `git fetch upstream --tags`, then `git merge <tag>`, resolve the conflicts and push.
 
@@ -19,13 +19,13 @@ If upstream changes conflict with yours, that build fails and the workflow opens
 
 Edit on `main` and push. Keep the changes small and in their own files where possible, so upstream merges stay clean.
 
-Agents read `antimatter/CONTEXT.md` (linked from the top of `AGENTS.md`) for the fork's rules, branding, testing and parallel-work conventions. Keep it current.
+Agents read `matter/CONTEXT.md` (linked from the top of `AGENTS.md`) for the fork's rules, branding, testing and parallel-work conventions. Keep it current.
 
 Fork-only files:
 
-- `antimatter/` (including `rebrand.ts`, the build-time "T3 Code" → "mattr" rename)
-- `.github/workflows/antimatter-nightly.yml`
-- the branding in `assets/nightly/*` and the files listed under Branding in `antimatter/CONTEXT.md`
+- `matter/` (including `rebrand.ts`, the build-time "T3 Code" → "Matter" rename)
+- `.github/workflows/matter-nightly.yml`
+- the branding in `assets/nightly/*` and the files listed under Branding in `matter/CONTEXT.md`
 - the separate data folders in `apps/desktop/src/app/DesktopStatePaths.ts` and `DesktopUserData.ts`
 - one line at the top of `AGENTS.md`
 

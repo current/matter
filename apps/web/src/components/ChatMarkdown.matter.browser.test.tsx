@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import { render } from "../../test/render";
 import "../index.css";
-import "../../../../antimatter/stream-animation.css";
+import "../../../../matter/stream-animation.css";
 
-import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "./chat/mattrStreamHast";
+import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "./chat/matterStreamHast";
 import { setLocalStorageItem } from "../hooks/useLocalStorage";
-import { MATTR_STREAM_ANIMATION_STORAGE_KEY, MattrStreamAnimation } from "../mattrStreamAnimation";
+import {
+  MATTER_STREAM_ANIMATION_STORAGE_KEY,
+  MatterStreamAnimation,
+} from "../matterStreamAnimation";
 
 import ChatMarkdown from "./ChatMarkdown";
 
@@ -29,9 +32,9 @@ const entrances = (root: HTMLElement) =>
         ),
     );
 
-function streamMode(mode: MattrStreamAnimation): Disposable {
-  setLocalStorageItem(MATTR_STREAM_ANIMATION_STORAGE_KEY, mode, MattrStreamAnimation);
-  return { [Symbol.dispose]: () => localStorage.removeItem(MATTR_STREAM_ANIMATION_STORAGE_KEY) };
+function streamMode(mode: MatterStreamAnimation): Disposable {
+  setLocalStorageItem(MATTER_STREAM_ANIMATION_STORAGE_KEY, mode, MatterStreamAnimation);
+  return { [Symbol.dispose]: () => localStorage.removeItem(MATTER_STREAM_ANIMATION_STORAGE_KEY) };
 }
 
 function reduceMotion(matches: boolean): Disposable {
@@ -54,7 +57,7 @@ describe("ChatMarkdown streaming text animation", () => {
     using _mode = streamMode("blur");
     await using screen = await render(message("The quick brown", true));
     const { container, rerender } = screen;
-    expect(markdownRoot(container).dataset.mattrStream).toBe("blur");
+    expect(markdownRoot(container).dataset.matterStream).toBe("blur");
     const settled = words(container);
     expect(settled.map((node) => node.textContent)).toEqual(["The", "quick", "brown"]);
     expect(caret(container)).not.toBeNull();
@@ -64,7 +67,7 @@ describe("ChatMarkdown streaming text animation", () => {
     expect(next.map((node) => node.textContent)).toEqual(["The", "quick", "brown", "fox", "jumps"]);
     // Same DOM nodes: their animation already ran and does not start again.
     settled.forEach((node, index) => expect(next[index]).toBe(node));
-    expect(getComputedStyle(next[4]!).animationName).toBe("mattr-stream-blur");
+    expect(getComputedStyle(next[4]!).animationName).toBe("matter-stream-blur");
 
     await rerender(message("The quick brown fox jumps.\n\nA second paragraph", true));
     words(container)
@@ -116,7 +119,7 @@ describe("ChatMarkdown streaming text animation", () => {
     );
     const { container } = screen;
     expect(container.querySelector("strong")?.textContent).toBe("bold words");
-    expect(container.querySelector("strong .mattr-sw")).not.toBeNull();
+    expect(container.querySelector("strong .matter-sw")).not.toBeNull();
     expect(container.querySelector("code")?.classList.contains(STREAM_WORD_CLASS)).toBe(true);
     expect(container.querySelectorAll("li")).toHaveLength(2);
     // Soft Fade has no caret.
@@ -131,7 +134,7 @@ describe("ChatMarkdown streaming text animation", () => {
     await rerender(message("Done streaming now", false));
     expect(words(container)).toHaveLength(0);
     expect(caret(container)).toBeNull();
-    expect(markdownRoot(container).dataset.mattrStream).toBeUndefined();
+    expect(markdownRoot(container).dataset.matterStream).toBeUndefined();
     expect(container.textContent).toContain("Done streaming now");
   });
 
@@ -139,7 +142,7 @@ describe("ChatMarkdown streaming text animation", () => {
     await using screen = await render(message("Plain streaming text", true));
     expect(words(screen.container)).toHaveLength(0);
     expect(caret(screen.container)).toBeNull();
-    expect(markdownRoot(screen.container).dataset.mattrStream).toBeUndefined();
+    expect(markdownRoot(screen.container).dataset.matterStream).toBeUndefined();
   });
 
   it("plays Instant while the system asks for reduced motion", async () => {
@@ -147,7 +150,7 @@ describe("ChatMarkdown streaming text animation", () => {
     using _motion = reduceMotion(true);
     await using screen = await render(message("Calm streaming text", true));
     expect(words(screen.container)).toHaveLength(0);
-    expect(markdownRoot(screen.container).dataset.mattrStream).toBeUndefined();
+    expect(markdownRoot(screen.container).dataset.matterStream).toBeUndefined();
   });
 
   it("Smooth Pace trails a burst, then snaps to the full text when the stream ends", async () => {
@@ -189,19 +192,19 @@ describe("ChatMarkdown streaming text animation", () => {
 
   describe("RareUI", () => {
     const dots = (container: HTMLElement) =>
-      container.querySelectorAll<HTMLElement>(".mattr-stream-dot");
+      container.querySelectorAll<HTMLElement>(".matter-stream-dot");
 
     it("lands words in bursts with no dot or caret, keeping settled words mounted", async () => {
       using _mode = streamMode("rareui");
       await using screen = await render(message("The quick brown ", true));
       const { container, rerender } = screen;
-      expect(markdownRoot(container).dataset.mattrStream).toBe("rareui");
+      expect(markdownRoot(container).dataset.matterStream).toBe("rareui");
       const settled = words(container);
       expect(settled.map((node) => node.textContent)).toEqual(["The", "quick", "brown"]);
       expect(dots(container)).toHaveLength(0);
       expect(caret(container)).toBeNull();
       const names = getComputedStyle(settled[0]!).animationName;
-      expect(names).toBe("mattr-stream-sharpen, mattr-stream-fade");
+      expect(names).toBe("matter-stream-sharpen, matter-stream-fade");
 
       await rerender(message("The quick brown fox jumps over the lazy dog and keeps going ", true));
       // Words arrive paced, not all at once.
@@ -215,7 +218,7 @@ describe("ChatMarkdown streaming text animation", () => {
       await rerender(message("The quick brown fox jumps over the lazy dog and keeps going", false));
       expect(words(container)).toHaveLength(0);
       expect(dots(container)).toHaveLength(0);
-      expect(markdownRoot(container).dataset.mattrStream).toBeUndefined();
+      expect(markdownRoot(container).dataset.matterStream).toBeUndefined();
     });
 
     it("never shows half a word, then snaps to the full text when the stream ends", async () => {
@@ -258,7 +261,7 @@ describe("ChatMarkdown streaming text animation", () => {
       await using screen = await render(message("Finished reply, nothing moving.", false));
       expect(words(screen.container)).toHaveLength(0);
       expect(dots(screen.container)).toHaveLength(0);
-      expect(markdownRoot(screen.container).dataset.mattrStream).toBeUndefined();
+      expect(markdownRoot(screen.container).dataset.matterStream).toBeUndefined();
     });
   });
 });

@@ -38,7 +38,7 @@ const layerTracingTo = (fetchFn: typeof fetch) =>
     },
   ).pipe(Layer.provide(layerRemoteHttpClient(fetchFn)));
 
-it("always disables resolveTracingConfig and connectionTracesEnabled in mattr", () => {
+it("always disables resolveTracingConfig and connectionTracesEnabled in Matter", () => {
   expect(Tracing.resolveTracingConfig()).toBeNull();
   expect(connectionTracesEnabled()).toBe(false);
   setConnectionTracesEnabled(true);

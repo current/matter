@@ -11,7 +11,7 @@ import { captureAssistantMessageOpening } from "~/lib/assistantTextSelection";
 import { responseContextRecord } from "~/lib/composerContextRecords";
 import { Button } from "../ui/button";
 import { ProposedPlanCard } from "./ProposedPlanCard";
-import { useMattrProposedPlanApprove } from "./useMattrPlanApproval.mattr";
+import { useMatterProposedPlanApprove } from "./useMatterPlanApproval.matter";
 import { HtmlRenderFrame } from "./HtmlRenderFrame";
 import { McpAppFrame } from "./McpAppFrame";
 import { readResponseSubagents, useAssistantMessageText } from "../../state/entities";
@@ -345,7 +345,7 @@ function ProposedPlanTimelineRowBody({
   row: Extract<TimelineRow, { kind: "proposed-plan" }>;
 }) {
   const ctx = use(TimelineRowCtx);
-  const { approve: mattrApprove, autoApproveEligible } = useMattrProposedPlanApprove(
+  const { approve: matterApprove, autoApproveEligible } = useMatterProposedPlanApprove(
     row.proposedPlan,
   );
 
@@ -354,8 +354,8 @@ function ProposedPlanTimelineRowBody({
       <ProposedPlanCard
         key={row.proposedPlan.id}
         planId={row.proposedPlan.id}
-        mattrApprove={mattrApprove}
-        mattrAutoApproveEligible={autoApproveEligible}
+        matterApprove={matterApprove}
+        matterAutoApproveEligible={autoApproveEligible}
         planMarkdown={row.proposedPlan.planMarkdown}
         environmentId={ctx.activeThreadEnvironmentId}
         threadRef={ctx.threadRef ?? undefined}

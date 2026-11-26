@@ -19,10 +19,10 @@ import { captureAssistantMessageOpening } from "~/lib/assistantTextSelection";
 import { isResponseContextRecord, responseContextRecord } from "~/lib/composerContextRecords";
 import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
 
-export type MattrReplyRole = "user" | "assistant";
+export type MatterReplyRole = "user" | "assistant";
 
-export const MATTR_REPLY_EXCERPT_MAX_CHARS = 180;
-const MATTR_REPLY_HIGHLIGHT_DURATION_MS = 1_600;
+export const MATTER_REPLY_EXCERPT_MAX_CHARS = 180;
+const MATTER_REPLY_HIGHLIGHT_DURATION_MS = 1_600;
 
 function stripMarkdownToPlainText(input: string): string {
   // Replace inline composer context references first: drop nested reply refs, keep other labels.
@@ -68,7 +68,7 @@ function stripMarkdownToPlainText(input: string): string {
  */
 export function extractReplyExcerpt(
   rawText: string,
-  maxChars: number = MATTR_REPLY_EXCERPT_MAX_CHARS,
+  maxChars: number = MATTER_REPLY_EXCERPT_MAX_CHARS,
 ): string {
   const plain = stripMarkdownToPlainText(rawText);
   if (plain.length === 0) return "";
@@ -85,7 +85,7 @@ export function extractReplyExcerpt(
   return `${sliced || plain.slice(0, end)}…`;
 }
 
-export function resolveReplyRole(record: ResponseContextRecord): MattrReplyRole {
+export function resolveReplyRole(record: ResponseContextRecord): MatterReplyRole {
   return record.role === "user" ? "user" : "assistant";
 }
 
@@ -152,26 +152,26 @@ export function buildUserMessageReplyRecord(input: {
   });
 }
 
-export interface MattrMessageRevealRequest {
+export interface MatterMessageRevealRequest {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly messageId: MessageId;
   readonly nonce: number;
 }
 
-type RevealListener = (request: MattrMessageRevealRequest) => void;
+type RevealListener = (request: MatterMessageRevealRequest) => void;
 
 let revealNonce = 0;
-let pendingReveal: MattrMessageRevealRequest | null = null;
+let pendingReveal: MatterMessageRevealRequest | null = null;
 const revealListeners = new Set<RevealListener>();
 
-export function requestMattrMessageReveal(target: {
+export function requestMatterMessageReveal(target: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly messageId: MessageId;
-}): MattrMessageRevealRequest {
+}): MatterMessageRevealRequest {
   revealNonce += 1;
-  const request: MattrMessageRevealRequest = {
+  const request: MatterMessageRevealRequest = {
     environmentId: target.environmentId,
     threadId: target.threadId,
     messageId: target.messageId,
@@ -184,11 +184,11 @@ export function requestMattrMessageReveal(target: {
   return request;
 }
 
-export function clearPendingMattrMessageRevealForTests(): void {
+export function clearPendingMatterMessageRevealForTests(): void {
   pendingReveal = null;
 }
 
-function subscribeMattrMessageReveal(listener: RevealListener): () => void {
+function subscribeMatterMessageReveal(listener: RevealListener): () => void {
   revealListeners.add(listener);
   return () => {
     revealListeners.delete(listener);
@@ -216,11 +216,11 @@ function findMessageRowElement(
 }
 
 /**
- * Listens for mattr message-reveal requests targeting the current thread, scrolls LegendList
+ * Listens for Matter message-reveal requests targeting the current thread, scrolls LegendList
  * smoothly to the referenced message (paging older history when needed), and flashes a finite
  * DOM highlight attribute directly on the row with zero React row re-renders.
  */
-export function useMattrMessageReveal(input: {
+export function useMatterMessageReveal(input: {
   readonly threadRef: ScopedThreadRef | null;
   readonly rows: ReadonlyArray<MessagesTimelineRow>;
   readonly listRef: React.RefObject<LegendListRef | null>;
@@ -233,7 +233,7 @@ export function useMattrMessageReveal(input: {
     input;
   const environmentId = threadRef?.environmentId ?? null;
   const threadId = threadRef?.threadId ?? null;
-  const activeRequestRef = useRef<MattrMessageRevealRequest | null>(null);
+  const activeRequestRef = useRef<MatterMessageRevealRequest | null>(null);
   const requestedHistoryNonceRef = useRef<number | null>(null);
   const handledNonceRef = useRef<number | null>(null);
   const cleanupHighlightRef = useRef<(() => void) | null>(null);
@@ -301,7 +301,7 @@ export function useMattrMessageReveal(input: {
       observer?.disconnect();
       observer = null;
       if (highlightedElement) {
-        delete highlightedElement.dataset.mattrReplyHighlight;
+        delete highlightedElement.dataset.matterReplyHighlight;
         highlightedElement = null;
       }
     };
@@ -320,11 +320,11 @@ export function useMattrMessageReveal(input: {
         });
       }
       highlightedElement = element;
-      delete element.dataset.mattrReplyHighlight;
+      delete element.dataset.matterReplyHighlight;
       // Force reflow when re-highlighting the same message so the one-shot animation restarts.
       void element.offsetWidth;
-      element.dataset.mattrReplyHighlight = "true";
-      clearTimer = window.setTimeout(cleanup, MATTR_REPLY_HIGHLIGHT_DURATION_MS);
+      element.dataset.matterReplyHighlight = "true";
+      clearTimer = window.setTimeout(cleanup, MATTER_REPLY_HIGHLIGHT_DURATION_MS);
     };
 
     cleanupHighlightRef.current = cleanup;
@@ -358,7 +358,7 @@ export function useMattrMessageReveal(input: {
       activeRequestRef.current = pendingReveal;
       tryFulfillCurrentRows();
     }
-    const unsubscribe = subscribeMattrMessageReveal((request) => {
+    const unsubscribe = subscribeMatterMessageReveal((request) => {
       if (request.environmentId === environmentId && request.threadId === threadId) {
         activeRequestRef.current = request;
         tryFulfillCurrentRows();

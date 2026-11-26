@@ -2,8 +2,8 @@ import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type {
-  MattrTaskInteractionMode,
-  MattrTaskWorkspaceMode,
+  MatterTaskInteractionMode,
+  MatterTaskWorkspaceMode,
   ModelSelection,
   RuntimeMode,
   ScopedThreadRef,
@@ -23,8 +23,8 @@ export interface StartTaskThreadInput {
   readonly prompt: string;
   readonly modelSelection: ModelSelection;
   readonly runtimeMode: RuntimeMode;
-  readonly interactionMode: MattrTaskInteractionMode;
-  readonly workspaceMode: MattrTaskWorkspaceMode;
+  readonly interactionMode: MatterTaskInteractionMode;
+  readonly workspaceMode: MatterTaskWorkspaceMode;
 }
 
 /** Launches a real thread for a task: created, given its prompt and started in one command. */

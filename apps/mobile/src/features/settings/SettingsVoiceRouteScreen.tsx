@@ -382,7 +382,7 @@ export function SettingsVoiceRouteScreen() {
               <SettingsSwitchRow
                 label={gt("Voice Mode thinking pulse")}
                 subtitle={gt(
-                  "Play a single subtle muted pulse when your turn finishes and mattr starts thinking.",
+                  "Play a single subtle muted pulse when your turn finishes and Matter starts thinking.",
                 )}
                 value={thinkingCueEnabled}
                 disabled={!ready}

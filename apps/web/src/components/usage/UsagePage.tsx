@@ -66,7 +66,7 @@ import {
 } from "../ui/menu";
 import { ScrollArea } from "../ui/scroll-area";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { MattrInsetPage } from "../MattrInsetPage";
+import { MatterInsetPage } from "../MatterInsetPage";
 import { useCloseAppModal } from "../sidebar/mainAppLocation";
 import { Skeleton } from "../ui/skeleton";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
@@ -520,7 +520,7 @@ export function UsagePage() {
   );
 
   return (
-    <MattrInsetPage
+    <MatterInsetPage
       label={gt("Usage")}
       breadcrumb={
         <div className="@container/usage-header flex min-w-0 flex-1">{topbarContent}</div>
@@ -605,7 +605,7 @@ export function UsagePage() {
           }}
         />
       ) : null}
-    </MattrInsetPage>
+    </MatterInsetPage>
   );
 }
 

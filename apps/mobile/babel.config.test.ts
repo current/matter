@@ -1,7 +1,7 @@
 import * as NodeModule from "node:module";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
-import mattrMobileRebrand from "../../antimatter/mobile-rebrand-babel.cjs";
+import matterMobileRebrand from "../../matter/mobile-rebrand-babel.cjs";
 
 // @babel/core ships without types; only this call is needed.
 const { transformSync } = NodeModule.createRequire(import.meta.url)("@babel/core") as {
@@ -21,7 +21,7 @@ function transform(code: string, filename: string) {
     babelrc: false,
     configFile: false,
     parserOpts: { plugins: ["jsx", "typescript"] },
-    plugins: [mattrMobileRebrand],
+    plugins: [matterMobileRebrand],
   })?.code;
 }
 
@@ -37,9 +37,9 @@ it("rebrands copy in mobile sources without touching module paths", () => {
     "/repo/apps/mobile/src/features/About.tsx",
   );
   expect(output).toContain('import x from "./T3 Code";');
-  expect(output).toContain('"Open mattr"');
-  expect(output).toContain("`mattr Connect on ${host}`");
-  expect(output).toContain("About mattr");
+  expect(output).toContain('"Open Matter"');
+  expect(output).toContain("`Matter Connect on ${host}`");
+  expect(output).toContain("About Matter");
   expect(output).toContain('"T3 Code for GitHub"');
 });
 

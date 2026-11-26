@@ -12,8 +12,8 @@ import { SF_FILL_FOR_SYMBOL, SF_SYMBOL_FOR_LUCIDE } from "./sf-symbol-map";
 
 const ICONS_DIR = import.meta.dirname;
 const POINT_SIZE = 20;
-const VIRTUAL_ID = "\0mattr:lucide";
-const PACK_PREFIX = "virtual:mattr-icon-pack/";
+const VIRTUAL_ID = "\0matter:lucide";
+const PACK_PREFIX = "virtual:matter-icon-pack/";
 const CLIENT_SOURCE = /\/(apps\/web\/src|packages\/[^/]+\/src)\//;
 
 // The titlebar's history buttons are chevrons, as in a macOS browser toolbar; arrows elsewhere stay.
@@ -84,7 +84,7 @@ function loadGlyphs(cacheFile: string): Record<string, SfGlyph> | null {
     NodeFS.writeFileSync(cacheFile, JSON.stringify({ key, glyphs }));
     return glyphs;
   } catch (error) {
-    console.warn("[mattr] SF Symbols unavailable, the SF pack keeps lucide icons:", error);
+    console.warn("[Matter] SF Symbols unavailable, the SF pack keeps lucide icons:", error);
     return null;
   }
 }
@@ -149,12 +149,12 @@ function iconModule(
  * Swaps the app's lucide-react icons for the icon pack picked in Settings → Appearance (filled SF
  * Symbols by default, the icon set of the macOS browser the shell mimics). Switching needs no reload.
  */
-export function mattrIconsPlugin(): Plugin {
+export function matterIconsPlugin(): Plugin {
   let enabled = false;
   let glyphs: Record<string, SfGlyph> | null = null;
   let root = "";
   return {
-    name: "antimatter:icons",
+    name: "matter:icons",
     enforce: "pre",
     configResolved(config) {
       if (process.env.VITEST) return;

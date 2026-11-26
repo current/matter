@@ -5,7 +5,7 @@ import {
   normalizeShellColor,
   oklchToHex,
   type ShellScheme,
-} from "../../../antimatter/shellTint";
+} from "../../../matter/shellTint";
 import {
   readLocalStorageValue,
   subscribeLocalStorageKey,
@@ -13,24 +13,30 @@ import {
   writeLocalStorageValue,
 } from "./hooks/useLocalStorage";
 
-export const MATTR_COMPOSER_APPEARANCE_STORAGE_KEY = "mattr:composer-appearance:v1";
+export const MATTER_COMPOSER_APPEARANCE_STORAGE_KEY = "mattr:composer-appearance:v1";
 
-export const MATTR_COMPOSER_MATERIALS = ["solid", "frosted", "glass", "tinted", "minimal"] as const;
-export type MattrComposerMaterial = (typeof MATTR_COMPOSER_MATERIALS)[number];
+export const MATTER_COMPOSER_MATERIALS = [
+  "solid",
+  "frosted",
+  "glass",
+  "tinted",
+  "minimal",
+] as const;
+export type MatterComposerMaterial = (typeof MATTER_COMPOSER_MATERIALS)[number];
 
-export const MATTR_COMPOSER_SHAPES = ["shelf", "floating", "compact", "pill"] as const;
-export type MattrComposerShape = (typeof MATTR_COMPOSER_SHAPES)[number];
+export const MATTER_COMPOSER_SHAPES = ["shelf", "floating", "compact", "pill"] as const;
+export type MatterComposerShape = (typeof MATTER_COMPOSER_SHAPES)[number];
 
 /** `null` is the theme's own composer; `"shell"` follows the Shell color; else a `#rrggbb` seed. */
-export type MattrComposerColor = null | "shell" | string;
+export type MatterComposerColor = null | "shell" | string;
 
-export interface MattrComposerAppearance {
+export interface MatterComposerAppearance {
   readonly scrollFade: boolean;
-  readonly material: MattrComposerMaterial;
-  readonly shape: MattrComposerShape;
+  readonly material: MatterComposerMaterial;
+  readonly shape: MatterComposerShape;
   readonly transparency: number;
   readonly blur: number;
-  readonly color: MattrComposerColor;
+  readonly color: MatterComposerColor;
 }
 
 export const MIN_COMPOSER_TRANSPARENCY = 0;
@@ -42,7 +48,7 @@ const TINTED_BLUR = 16;
 /** A card on a shelf paints this share of the shelf's opacity, so the pair reads as the setting. */
 const CARD_LIFT = 0.5;
 
-export const DEFAULT_MATTR_COMPOSER_APPEARANCE: MattrComposerAppearance = {
+export const DEFAULT_MATTER_COMPOSER_APPEARANCE: MatterComposerAppearance = {
   scrollFade: true,
   material: "solid",
   shape: "shelf",
@@ -51,18 +57,18 @@ export const DEFAULT_MATTR_COMPOSER_APPEARANCE: MattrComposerAppearance = {
   color: null,
 };
 
-const TRANSLUCENT_MATERIALS: ReadonlySet<MattrComposerMaterial> = new Set([
+const TRANSLUCENT_MATERIALS: ReadonlySet<MatterComposerMaterial> = new Set([
   "frosted",
   "glass",
   "tinted",
 ]);
-const BLURRED_MATERIALS: ReadonlySet<MattrComposerMaterial> = new Set(["frosted", "glass"]);
+const BLURRED_MATERIALS: ReadonlySet<MatterComposerMaterial> = new Set(["frosted", "glass"]);
 
-export function composerMaterialIsTranslucent(material: MattrComposerMaterial): boolean {
+export function composerMaterialIsTranslucent(material: MatterComposerMaterial): boolean {
   return TRANSLUCENT_MATERIALS.has(material);
 }
 
-export function composerMaterialHasBlurControl(material: MattrComposerMaterial): boolean {
+export function composerMaterialHasBlurControl(material: MatterComposerMaterial): boolean {
   return BLURRED_MATERIALS.has(material);
 }
 
@@ -76,10 +82,10 @@ function oneOf<T extends string>(values: readonly T[], value: unknown, fallback:
 }
 
 /** Any stored value (older, partial, hand-edited) as a complete, in-range appearance. */
-export function normalizeMattrComposerAppearance(value: unknown): MattrComposerAppearance {
+export function normalizeMatterComposerAppearance(value: unknown): MatterComposerAppearance {
   const input =
     typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
-  const defaults = DEFAULT_MATTR_COMPOSER_APPEARANCE;
+  const defaults = DEFAULT_MATTER_COMPOSER_APPEARANCE;
   const color =
     input.color === "shell"
       ? "shell"
@@ -88,8 +94,8 @@ export function normalizeMattrComposerAppearance(value: unknown): MattrComposerA
         : null;
   return {
     scrollFade: typeof input.scrollFade === "boolean" ? input.scrollFade : defaults.scrollFade,
-    material: oneOf(MATTR_COMPOSER_MATERIALS, input.material, defaults.material),
-    shape: oneOf(MATTR_COMPOSER_SHAPES, input.shape, defaults.shape),
+    material: oneOf(MATTER_COMPOSER_MATERIALS, input.material, defaults.material),
+    shape: oneOf(MATTER_COMPOSER_SHAPES, input.shape, defaults.shape),
     transparency: clampStep(
       input.transparency,
       MIN_COMPOSER_TRANSPARENCY,
@@ -117,13 +123,13 @@ const TINT_WINDOWS: Record<
   },
 };
 
-export type MattrComposerTintStrength = keyof typeof TINT_WINDOWS;
+export type MatterComposerTintStrength = keyof typeof TINT_WINDOWS;
 
 /** The card color for `color` under `scheme`, clamped so composer text stays readable. */
 export function adaptComposerTint(
   color: string,
   scheme: ShellScheme,
-  strength: MattrComposerTintStrength,
+  strength: MatterComposerTintStrength,
 ): string {
   const window = TINT_WINDOWS[strength][scheme];
   const { l, c, h } = hexToOklch(color);
@@ -135,13 +141,13 @@ export function adaptComposerTint(
 }
 
 /** Tinted with no color of its own follows the Shell color. */
-export function effectiveComposerColor(appearance: MattrComposerAppearance): MattrComposerColor {
+export function effectiveComposerColor(appearance: MatterComposerAppearance): MatterComposerColor {
   if (appearance.material === "minimal") return null;
   if (appearance.material === "tinted" && appearance.color === null) return "shell";
   return appearance.color;
 }
 
-export function composerBlurRadius(appearance: MattrComposerAppearance): number {
+export function composerBlurRadius(appearance: MatterComposerAppearance): number {
   if (composerMaterialHasBlurControl(appearance.material)) return appearance.blur;
   if (appearance.material === "tinted" && appearance.transparency > 0) return TINTED_BLUR;
   return 0;
@@ -156,27 +162,27 @@ const CSS_VARS = [
 ] as const;
 
 /**
- * Root attributes and variables read by antimatter/composer-appearance.css. Defaults leave no
+ * Root attributes and variables read by matter/composer-appearance.css. Defaults leave no
  * attribute behind, and the backdrop blur attribute only appears when a blur is actually painted,
  * so Solid and Minimal never create a backdrop layer.
  */
-export function applyMattrComposerAppearance(
+export function applyMatterComposerAppearance(
   root: HTMLElement,
-  appearance: MattrComposerAppearance,
+  appearance: MatterComposerAppearance,
 ): void {
   const { dataset, style } = root;
-  if (appearance.scrollFade) delete dataset.mattrScrollFade;
-  else dataset.mattrScrollFade = "off";
+  if (appearance.scrollFade) delete dataset.matterScrollFade;
+  else dataset.matterScrollFade = "off";
 
-  if (appearance.material === "solid") delete dataset.mattrComposerMaterial;
-  else dataset.mattrComposerMaterial = appearance.material;
+  if (appearance.material === "solid") delete dataset.matterComposerMaterial;
+  else dataset.matterComposerMaterial = appearance.material;
 
-  if (appearance.shape === "shelf") delete dataset.mattrComposerShape;
-  else dataset.mattrComposerShape = appearance.shape;
+  if (appearance.shape === "shelf") delete dataset.matterComposerShape;
+  else dataset.matterComposerShape = appearance.shape;
 
   for (const name of CSS_VARS) style.removeProperty(name);
-  delete dataset.mattrComposerBlur;
-  delete dataset.mattrComposerTint;
+  delete dataset.matterComposerBlur;
+  delete dataset.matterComposerTint;
 
   if (composerMaterialIsTranslucent(appearance.material)) {
     style.setProperty("--mca-opacity", `${100 - appearance.transparency}%`);
@@ -186,17 +192,17 @@ export function applyMattrComposerAppearance(
     );
     const blur = composerBlurRadius(appearance);
     if (blur > 0) {
-      dataset.mattrComposerBlur = "on";
+      dataset.matterComposerBlur = "on";
       style.setProperty("--mca-blur", `${blur}px`);
     }
   }
 
   const color = effectiveComposerColor(appearance);
   if (color === "shell") {
-    dataset.mattrComposerTint = "shell";
+    dataset.matterComposerTint = "shell";
   } else if (color !== null) {
     const strength = appearance.material === "tinted" ? "rich" : "subtle";
-    dataset.mattrComposerTint = "custom";
+    dataset.matterComposerTint = "custom";
     style.setProperty("--mca-tint-light", adaptComposerTint(color, "light", strength));
     style.setProperty("--mca-tint-dark", adaptComposerTint(color, "dark", strength));
   }
@@ -204,40 +210,43 @@ export function applyMattrComposerAppearance(
 
 const StoredAppearance = Schema.Unknown;
 
-export function readMattrComposerAppearance(): MattrComposerAppearance {
-  return normalizeMattrComposerAppearance(
-    readLocalStorageValue(MATTR_COMPOSER_APPEARANCE_STORAGE_KEY, null, StoredAppearance),
+export function readMatterComposerAppearance(): MatterComposerAppearance {
+  return normalizeMatterComposerAppearance(
+    readLocalStorageValue(MATTER_COMPOSER_APPEARANCE_STORAGE_KEY, null, StoredAppearance),
   );
 }
 
-export function writeMattrComposerAppearance(patch: Partial<MattrComposerAppearance>): void {
+export function writeMatterComposerAppearance(patch: Partial<MatterComposerAppearance>): void {
   writeLocalStorageValue<unknown, unknown>(
-    MATTR_COMPOSER_APPEARANCE_STORAGE_KEY,
+    MATTER_COMPOSER_APPEARANCE_STORAGE_KEY,
     (current: unknown) =>
-      normalizeMattrComposerAppearance({ ...normalizeMattrComposerAppearance(current), ...patch }),
+      normalizeMatterComposerAppearance({
+        ...normalizeMatterComposerAppearance(current),
+        ...patch,
+      }),
     null,
     StoredAppearance,
   );
 }
 
 /** Applies the saved appearance before the first render and follows changes from any window. */
-export function startMattrComposerAppearance(
+export function startMatterComposerAppearance(
   root: HTMLElement = document.documentElement,
 ): () => void {
-  applyMattrComposerAppearance(root, readMattrComposerAppearance());
-  return subscribeLocalStorageKey(MATTR_COMPOSER_APPEARANCE_STORAGE_KEY, () =>
-    applyMattrComposerAppearance(root, readMattrComposerAppearance()),
+  applyMatterComposerAppearance(root, readMatterComposerAppearance());
+  return subscribeLocalStorageKey(MATTER_COMPOSER_APPEARANCE_STORAGE_KEY, () =>
+    applyMatterComposerAppearance(root, readMatterComposerAppearance()),
   );
 }
 
-export function useMattrComposerAppearance(): readonly [
-  MattrComposerAppearance,
-  (patch: Partial<MattrComposerAppearance>) => void,
+export function useMatterComposerAppearance(): readonly [
+  MatterComposerAppearance,
+  (patch: Partial<MatterComposerAppearance>) => void,
 ] {
   const [stored] = useLocalStorage<unknown, unknown>(
-    MATTR_COMPOSER_APPEARANCE_STORAGE_KEY,
+    MATTER_COMPOSER_APPEARANCE_STORAGE_KEY,
     null,
     StoredAppearance,
   );
-  return [normalizeMattrComposerAppearance(stored), writeMattrComposerAppearance];
+  return [normalizeMatterComposerAppearance(stored), writeMatterComposerAppearance];
 }

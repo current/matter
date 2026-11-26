@@ -1,7 +1,7 @@
 import { BRAND_ASSET_PATHS } from "../scripts/lib/brand-assets.ts";
 import { BUILD_ENV } from "./build-env.mjs";
 
-// Fork-only mobile config: mattr branding and free Apple ID ("Personal Team") signing, applied
+// Fork-only mobile config: Matter branding and free Apple ID ("Personal Team") signing, applied
 // on top of upstream's app.config.ts so upstream merges stay a three-line conflict at most.
 
 type AppVariant = "development" | "preview" | "production";
@@ -19,11 +19,11 @@ interface MobileConfigShape {
 
 const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
 
-const MATTR_APP_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng);
-const MATTR_IOS_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIconComposerProject);
+const MATTER_APP_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng);
+const MATTER_IOS_ICON = fromRepoRoot(BRAND_ASSET_PATHS.nightlyIconComposerProject);
 
 // Chris's free Apple ID Personal Team OU; `T3CODE_IOS_APPLE_TEAM_ID` signs with another one.
-const MATTR_PERSONAL_TEAM_ID = "5PS35RR9RY";
+const MATTER_PERSONAL_TEAM_ID = "5PS35RR9RY";
 const PERSONAL_TEAM_CAPABILITIES_PLUGIN = "./plugins/withoutIosPersonalTeamCapabilities.cjs";
 
 const PERSONAL_TEAM_BUNDLE_IDENTIFIERS: Record<AppVariant, string> = {
@@ -32,20 +32,20 @@ const PERSONAL_TEAM_BUNDLE_IDENTIFIERS: Record<AppVariant, string> = {
   production: "com.current.antimatter.mobile",
 };
 
-export function resolveMattrPersonalTeamBundleIdentifier(env: Env, appVariant: AppVariant) {
+export function resolveMatterPersonalTeamBundleIdentifier(env: Env, appVariant: AppVariant) {
   return (
     env.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID?.trim() || PERSONAL_TEAM_BUNDLE_IDENTIFIERS[appVariant]
   );
 }
 
-export function rebrandMattrMobileText(text: string): string {
+export function rebrandMatterMobileText(text: string): string {
   return text
-    .replace(/\bT3(\s+)Connect\b/g, "mattr$1Connect")
-    .replace(/\bT3(\s+)Code(?! for GitHub)/g, "mattr");
+    .replace(/\bT3(\s+)Connect\b/g, "Matter$1Connect")
+    .replace(/\bT3(\s+)Code(?! for GitHub)/g, "Matter");
 }
 
 function rebrandDeep<T>(value: T): T {
-  if (typeof value === "string") return rebrandMattrMobileText(value) as T;
+  if (typeof value === "string") return rebrandMatterMobileText(value) as T;
   if (Array.isArray(value)) return value.map(rebrandDeep) as T;
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
@@ -55,7 +55,7 @@ function rebrandDeep<T>(value: T): T {
   return value;
 }
 
-export function withMattrMobileConfig<Config extends MobileConfigShape>(
+export function withMatterMobileConfig<Config extends MobileConfigShape>(
   config: Config,
   options: {
     readonly env: Env;
@@ -141,21 +141,21 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
   > & {
     entitlements?: object;
   };
-  const personalTeamId = options.env.T3CODE_IOS_APPLE_TEAM_ID?.trim() || MATTR_PERSONAL_TEAM_ID;
+  const personalTeamId = options.env.T3CODE_IOS_APPLE_TEAM_ID?.trim() || MATTER_PERSONAL_TEAM_ID;
   const infoPlist = (ios.infoPlist ?? {}) as Record<string, unknown>;
 
   return {
     ...branded,
-    icon: MATTR_APP_ICON,
+    icon: MATTER_APP_ICON,
     plugins,
     ios: {
       ...ios,
-      icon: MATTR_IOS_ICON,
+      icon: MATTER_IOS_ICON,
       infoPlist: {
         ...infoPlist,
         // On-device Apple Speech is Voice Mode's fallback when the server has no Deepgram key.
         NSSpeechRecognitionUsageDescription:
-          "Allow mattr to transcribe your voice on this device when your server can't.",
+          "Allow Matter to transcribe your voice on this device when your server can't.",
       },
       entitlements: {
         ...ios.entitlements,
@@ -165,8 +165,8 @@ export function withMattrMobileConfig<Config extends MobileConfigShape>(
         ? { appleTeamId: personalTeamId }
         : { appleTeamId, associatedDomains }),
     },
-    android: { ...branded.android, icon: MATTR_APP_ICON },
-    web: { ...branded.web, favicon: MATTR_APP_ICON },
+    android: { ...branded.android, icon: MATTER_APP_ICON },
+    web: { ...branded.web, favicon: MATTER_APP_ICON },
     // Local Personal Team builds must never fetch upstream's OTA bundles.
     ...(options.isIosPersonalTeamBuild ? { updates: { ...branded.updates, enabled: false } } : {}),
   } as unknown as Config;

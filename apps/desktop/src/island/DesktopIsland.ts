@@ -12,12 +12,12 @@ import {
   type MacModifierEvent,
   type MacMonitorEvent,
   type MacSingleTapModifier,
-} from "../../../../antimatter/island/MacControlTapMonitor.ts";
-import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
+} from "../../../../matter/island/MacControlTapMonitor.ts";
+import { buildIslandHtml } from "../../../../matter/island/islandHtml.ts";
 import {
   islandModel,
   type IslandModifierGestureState,
-} from "../../../../antimatter/island/islandModel.ts";
+} from "../../../../matter/island/islandModel.ts";
 import {
   ISLAND_DROP_ARM_HEIGHT,
   ISLAND_DROP_ARM_SLOP,
@@ -27,8 +27,8 @@ import {
   NOTCHED_DISPLAY_NOTCH_WIDTH,
   computeIslandPlacement,
   type ComputedIslandPlacement,
-} from "../../../../antimatter/island/islandPlacement.ts";
-import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
+} from "../../../../matter/island/islandPlacement.ts";
+import { shouldKeepIslandWindowAlive } from "../../../../matter/island/islandVisibility.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
   ISLAND_ACTION_CHANNEL,
@@ -46,7 +46,7 @@ import {
   type IslandSettings,
   type IslandSnapshot,
   type IslandWindowCommand,
-} from "../../../../antimatter/island/types.ts";
+} from "../../../../matter/island/types.ts";
 import { focusIslandWithoutActivating } from "./IslandMacPanel.ts";
 
 const ISLAND_FALLBACK_SHORTCUT = "CommandOrControl+Shift+Space";

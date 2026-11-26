@@ -10,11 +10,11 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import {
-  approveMattrPlan,
+  approveMatterPlan,
   isLatestActiveProposedPlan,
   isRecentProposedPlan,
-  MATTR_PLAN_AUTO_APPROVE_FRESHNESS_MS,
-} from "./useMattrPlanApproval.mattr";
+  MATTER_PLAN_AUTO_APPROVE_FRESHNESS_MS,
+} from "./useMatterPlanApproval.matter";
 
 function proposedPlanArtifact(
   id: string,
@@ -65,7 +65,7 @@ describe("isRecentProposedPlan", () => {
   it("accepts plans updated within the freshness window and rejects historical ones", () => {
     const now = Date.parse("2026-11-26T12:00:00.000Z");
     const fresh = new Date(now - 5_000).toISOString();
-    const stale = new Date(now - MATTR_PLAN_AUTO_APPROVE_FRESHNESS_MS - 1_000).toISOString();
+    const stale = new Date(now - MATTER_PLAN_AUTO_APPROVE_FRESHNESS_MS - 1_000).toISOString();
 
     expect(isRecentProposedPlan({ createdAt: stale, updatedAt: fresh }, now)).toBe(true);
     expect(isRecentProposedPlan({ createdAt: stale, updatedAt: stale }, now)).toBe(false);
@@ -74,7 +74,7 @@ describe("isRecentProposedPlan", () => {
   });
 });
 
-describe("approveMattrPlan", () => {
+describe("approveMatterPlan", () => {
   it("leaves Plan, drops a stale composer Plan pick and cites the plan", async () => {
     const threadRef = {
       environmentId: EnvironmentId.make("env-approve"),
@@ -83,7 +83,7 @@ describe("approveMattrPlan", () => {
     useComposerDraftStore.getState().setInteractionMode(threadRef, "plan");
     const commands: Array<{ readonly kind: string; readonly value: unknown }> = [];
     const ok = AsyncResult.success(undefined);
-    await approveMattrPlan({
+    await approveMatterPlan({
       threadRef,
       planId: PlanId.make("plan-approve"),
       planMarkdown: "# Plan",

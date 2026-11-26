@@ -207,9 +207,9 @@
       "types": "./src/voice-input/index.ts",
       "default": "./src/voice-input/index.ts"
     },
-    "./mattr-voice-http": {
-      "types": "./src/mattrVoiceHttp.ts",
-      "default": "./src/mattrVoiceHttp.ts"
+    "./matter-voice-http": {
+      "types": "./src/matterVoiceHttp.ts",
+      "default": "./src/matterVoiceHttp.ts"
     },
     "./t3ToolSummary": {
       "types": "./src/t3ToolSummary.ts",

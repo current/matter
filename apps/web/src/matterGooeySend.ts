@@ -6,26 +6,26 @@ import {
   writeLocalStorageValue,
 } from "./hooks/useLocalStorage";
 
-export const MATTR_GOOEY_SEND_STORAGE_KEY = "mattr:composer:gooey-send:v1";
-export const DEFAULT_MATTR_GOOEY_SEND = true;
+export const MATTER_GOOEY_SEND_STORAGE_KEY = "mattr:composer:gooey-send:v1";
+export const DEFAULT_MATTER_GOOEY_SEND = true;
 
-export function readMattrGooeySend(): boolean {
+export function readMatterGooeySend(): boolean {
   return readLocalStorageValue(
-    MATTR_GOOEY_SEND_STORAGE_KEY,
-    DEFAULT_MATTR_GOOEY_SEND,
+    MATTER_GOOEY_SEND_STORAGE_KEY,
+    DEFAULT_MATTER_GOOEY_SEND,
     Schema.Boolean,
   );
 }
 
-export function writeMattrGooeySend(enabled: boolean): void {
+export function writeMatterGooeySend(enabled: boolean): void {
   writeLocalStorageValue(
-    MATTR_GOOEY_SEND_STORAGE_KEY,
+    MATTER_GOOEY_SEND_STORAGE_KEY,
     enabled,
-    DEFAULT_MATTR_GOOEY_SEND,
+    DEFAULT_MATTER_GOOEY_SEND,
     Schema.Boolean,
   );
 }
 
-export function useMattrGooeySendSetting() {
-  return useLocalStorage(MATTR_GOOEY_SEND_STORAGE_KEY, DEFAULT_MATTR_GOOEY_SEND, Schema.Boolean);
+export function useMatterGooeySendSetting() {
+  return useLocalStorage(MATTER_GOOEY_SEND_STORAGE_KEY, DEFAULT_MATTER_GOOEY_SEND, Schema.Boolean);
 }

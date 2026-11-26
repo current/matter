@@ -25,21 +25,21 @@ import {
   subagentStatus,
   summarizeProjects,
   threadRowStatus,
-} from "./mattrFinalSidebar.logic";
-import { toMattrThreadItem } from "./mattrSidebar.logic";
+} from "./matterFinalSidebar.logic";
+import { toMatterThreadItem } from "./matterSidebar.logic";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
 const NOW_MS = Date.parse(NOW_ISO);
 const env = EnvironmentId.make("local");
-const MATTR = { key: "local:mattr", name: "mattr" };
+const MATTER = { key: "local:matter", name: "Matter" };
 const LILT = { key: "local:lilt", name: "Lilt" };
 
 function item(
   id: string,
   overrides: ThreadFixtureOverrides = {},
-  project: { key: string; name: string } | null = MATTR,
+  project: { key: string; name: string } | null = MATTER,
 ) {
-  return toMattrThreadItem(
+  return toMatterThreadItem(
     makeThreadFixture({
       environmentId: env,
       id: ThreadId.make(id),
@@ -77,9 +77,9 @@ const pullRequest = (number: number, state: "open" | "merged" | null, isDraft = 
   pullRequests: [
     {
       host: "github.com",
-      repository: "current/mattr",
+      repository: "current/matter",
       number,
-      url: `https://github.com/current/mattr/pull/${number}`,
+      url: `https://github.com/current/matter/pull/${number}`,
       source: "manual" as const,
       linkedAt: "2026-03-10T10:00:00.000Z",
       stack: null,
@@ -153,17 +153,17 @@ describe("buildThreadGroups", () => {
   ];
 
   it("groups by project in project order with pinned first and orphans last", () => {
-    const groups = buildThreadGroups(items, [LILT, MATTR], {
+    const groups = buildThreadGroups(items, [LILT, MATTER], {
       sort: "project",
       projectFilter: null,
       filter: "all",
     });
-    expect(groups.map((group) => group.name)).toEqual(["Lilt", "mattr", null]);
+    expect(groups.map((group) => group.name)).toEqual(["Lilt", "Matter", null]);
     expect(groups[1]!.items.map((entry) => entry.title)).toEqual(["pinned", "newer", "older"]);
   });
 
   it("flattens to one recency list", () => {
-    const groups = buildThreadGroups(items, [MATTR, LILT], {
+    const groups = buildThreadGroups(items, [MATTER, LILT], {
       sort: "recent",
       projectFilter: null,
       filter: "all",
@@ -173,7 +173,7 @@ describe("buildThreadGroups", () => {
   });
 
   it("narrows to Needs you and to one project", () => {
-    const needs = buildThreadGroups(items, [MATTR, LILT], {
+    const needs = buildThreadGroups(items, [MATTER, LILT], {
       sort: "project",
       projectFilter: null,
       filter: "needs",
@@ -181,7 +181,7 @@ describe("buildThreadGroups", () => {
     expect(needs.flatMap((group) => group.items.map((entry) => entry.title))).toEqual([
       "lilt-blocked",
     ]);
-    const lilt = buildThreadGroups(items, [MATTR, LILT], {
+    const lilt = buildThreadGroups(items, [MATTER, LILT], {
       sort: "project",
       projectFilter: LILT.key,
       filter: "all",
@@ -281,14 +281,14 @@ describe("subagent trees", () => {
     expect([...needsChildParents].toSorted()).toEqual(["local:archived", parent.key, settled.key]);
     expect(countNeedsYou([parent, settled], children)).toBe(2);
 
-    const needs = buildThreadGroups([parent, settled, item("quiet")], [MATTR], {
+    const needs = buildThreadGroups([parent, settled, item("quiet")], [MATTER], {
       sort: "recent",
       projectFilter: null,
       filter: "needs",
       needsChildParents,
     });
     expect(needs[0]!.items.map((entry) => entry.title).toSorted()).toEqual(["parent", "settled"]);
-    const all = buildThreadGroups([parent, settled], [MATTR], {
+    const all = buildThreadGroups([parent, settled], [MATTER], {
       sort: "recent",
       projectFilter: null,
       filter: "all",

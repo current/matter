@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
-import shellCss from "../../../antimatter/shell.css?inline";
-import { adaptShellColor, hexToRgb } from "../../../antimatter/shellTint";
-import { applyMattrShellAppearance, type MattrShellAppearance } from "./mattrShellAppearance";
+import shellCss from "../../../matter/shell.css?inline";
+import { adaptShellColor, hexToRgb } from "../../../matter/shellTint";
+import { applyMatterShellAppearance, type MatterShellAppearance } from "./matterShellAppearance";
 
 const SIDEBAR = "#f0f1f3";
 
@@ -34,8 +34,8 @@ async function mountShell() {
     wrapper,
     inner: document.querySelector<HTMLElement>('[data-slot="sidebar-inner"]')!,
     rail: document.querySelector<HTMLElement>(".mfs")!,
-    apply(settings: Partial<MattrShellAppearance>) {
-      applyMattrShellAppearance(root, {
+    apply(settings: Partial<MatterShellAppearance>) {
+      applyMatterShellAppearance(root, {
         shellMaterial: "solid",
         shellGrain: 0,
         shellTransparency: 50,
@@ -49,17 +49,17 @@ async function mountShell() {
       style.remove();
       root.classList.remove("dark");
       root.style.removeProperty("--sidebar");
-      root.style.removeProperty("--mattr-shell-opacity");
-      root.style.removeProperty("--mattr-shell-tint-light");
-      root.style.removeProperty("--mattr-shell-tint-dark");
-      for (const key of ["mattrShellMaterial", "mattrShellTint", "mattrShellGrain"]) {
+      root.style.removeProperty("--matter-shell-opacity");
+      root.style.removeProperty("--matter-shell-tint-light");
+      root.style.removeProperty("--matter-shell-tint-dark");
+      for (const key of ["matterShellMaterial", "matterShellTint", "matterShellGrain"]) {
         delete root.dataset[key];
       }
     },
   };
 }
 
-describe("mattr shell stylesheet", () => {
+describe("Matter shell stylesheet", () => {
   it("keeps the sidebar rail and inner container clear so the frame shows through", async () => {
     using shell = await mountShell();
     shell.apply({ shellMaterial: "blur" });

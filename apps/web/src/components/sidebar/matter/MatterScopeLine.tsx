@@ -10,15 +10,15 @@ import {
   MenuRadioItem,
   MenuTrigger,
 } from "../../ui/menu";
-import { useMattrSidebarLayout } from "./mattrSidebarStore";
+import { useMatterSidebarLayout } from "./matterSidebarStore";
 
 /**
  * One quiet line that names the rail's layout and opens a menu to switch it, in place of a
- * permanent switcher pill. Spaces uses it; the default rail switches from its mattr menu.
+ * permanent switcher pill. Spaces uses it; the default rail switches from its Matter menu.
  */
-export function MattrScopeLine() {
+export function MatterScopeLine() {
   const gt = useGT();
-  const [layout, setLayout] = useMattrSidebarLayout();
+  const [layout, setLayout] = useMatterSidebarLayout();
   const isDefault = layout !== "spaces";
 
   return (

@@ -27,9 +27,9 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as ClaudeCloudRunner from "./ClaudeCloudRunner.ts";
 import * as ClaudeCloudService from "./ClaudeCloudService.ts";
 
-const ROOT = "/repo/mattr";
+const ROOT = "/repo/matter";
 const WORKTREE = "/repo/worktrees/claude-cloud-1";
-const PROJECT = ProjectId.make("project:mattr");
+const PROJECT = ProjectId.make("project:matter");
 const CLOUD_ID = "cse_01ABCDEFGH1234";
 const LOCAL_SESSION = "0d6c7a0e-1b2c-4d5e-8f90-123456789abc";
 const IMPORTED_THREAD = ThreadId.make(`import:claude-alt:${LOCAL_SESSION}`);
@@ -61,7 +61,7 @@ beforeEach(() => {
   scenario = {
     calls: [],
     loggedIn: true,
-    remote: "git@github.com:current/mattr.git",
+    remote: "git@github.com:current/matter.git",
     upstream: true,
     ahead: 0,
     dirty: false,
@@ -371,7 +371,7 @@ describe("ClaudeCloudService", () => {
         scenario.calls.find((call) => call.args.join(" ") === "push -u origin HEAD"),
       );
 
-      scenario.remote = "https://gitlab.com/current/mattr.git";
+      scenario.remote = "https://gitlab.com/current/matter.git";
       assert.strictEqual((yield* failureOf(launch(true))).code, "not_eligible");
     }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
   );

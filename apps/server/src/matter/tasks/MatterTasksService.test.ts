@@ -7,10 +7,10 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 
 import * as ServerConfig from "../../config.ts";
-import * as MattrTasksService from "./MattrTasksService.ts";
+import * as MatterTasksService from "./MatterTasksService.ts";
 
-const configLayer = ServerConfig.layerTest(process.cwd(), { prefix: "t3-mattr-tasks-" });
-const layer = MattrTasksService.layer.pipe(
+const configLayer = ServerConfig.layerTest(process.cwd(), { prefix: "t3-matter-tasks-" });
+const layer = MatterTasksService.layer.pipe(
   Layer.provideMerge(configLayer),
   Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
 );
@@ -18,22 +18,22 @@ const layer = MattrTasksService.layer.pipe(
 const tasksFilePath = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const path = yield* Path.Path;
-  return path.join(config.stateDir, MattrTasksService.TASKS_FILENAME);
+  return path.join(config.stateDir, MatterTasksService.TASKS_FILENAME);
 });
 
 /** A fresh service over the same state dir, as after a server restart. */
-const restarted = MattrTasksService.make;
+const restarted = MatterTasksService.make;
 
-const errorReason = <A>(effect: Effect.Effect<A, MattrTasksService.MattrTasksError>) =>
+const errorReason = <A>(effect: Effect.Effect<A, MatterTasksService.MatterTasksError>) =>
   effect.pipe(
     Effect.flip,
     Effect.map((error) => error.reason),
   );
 
-describe("MattrTasksService", () => {
+describe("MatterTasksService", () => {
   it.effect("starts empty without touching disk", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const fileSystem = yield* FileSystem.FileSystem;
       assert.deepStrictEqual(yield* service.list, []);
       assert.isFalse(yield* fileSystem.exists(yield* tasksFilePath));
@@ -42,7 +42,7 @@ describe("MattrTasksService", () => {
 
   it.effect("fills defaults and appends each new task to the end of its column", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const first = yield* service.create({ title: "First" });
       assert.deepInclude(first, {
         title: "First",
@@ -76,7 +76,7 @@ describe("MattrTasksService", () => {
 
   it.effect("writes atomically and privately, and reads back after a restart", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const fileSystem = yield* FileSystem.FileSystem;
       const config = yield* ServerConfig.ServerConfig;
       const task = yield* service.create({ title: "Keep me", priority: "high" });
@@ -92,7 +92,7 @@ describe("MattrTasksService", () => {
 
   it.effect("merges updates and bumps updatedAt", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const task = yield* service.create({ title: "Draft", note: "keep" });
       const updated = yield* service.update(task.id, {
         title: "Final",
@@ -113,7 +113,7 @@ describe("MattrTasksService", () => {
     "stamps completedAt on done, clears it when reopened, and appends to the new column",
     () =>
       Effect.gen(function* () {
-        const service = yield* MattrTasksService.MattrTasksService;
+        const service = yield* MatterTasksService.MatterTasksService;
         yield* service.create({ title: "Already done", status: "done" });
         const task = yield* service.create({ title: "Work" });
         const done = yield* service.update(task.id, { status: "done" });
@@ -129,7 +129,7 @@ describe("MattrTasksService", () => {
 
   it.effect("applies a reorder across columns in one write", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const a = yield* service.create({ title: "A" });
       const b = yield* service.create({ title: "B" });
       const c = yield* service.create({ title: "C", status: "done" });
@@ -156,7 +156,7 @@ describe("MattrTasksService", () => {
 
   it.effect("reports unknown ids as not_found and leaves the file unchanged", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const fileSystem = yield* FileSystem.FileSystem;
       const task = yield* service.create({ title: "Only" });
       const before = yield* fileSystem.readFileString(yield* tasksFilePath);
@@ -183,7 +183,7 @@ describe("MattrTasksService", () => {
 
   it.effect("removes a task", () =>
     Effect.gen(function* () {
-      const service = yield* MattrTasksService.MattrTasksService;
+      const service = yield* MatterTasksService.MatterTasksService;
       const task = yield* service.create({ title: "Gone" });
       yield* service.remove(task.id);
       assert.deepStrictEqual(yield* (yield* restarted).list, []);
@@ -199,7 +199,7 @@ describe("MattrTasksService", () => {
       const service = yield* restarted;
       assert.deepStrictEqual(yield* service.list, []);
       const backups = (yield* fileSystem.readDirectory(config.stateDir)).filter((name) =>
-        name.startsWith(`${MattrTasksService.TASKS_FILENAME}.corrupt-`),
+        name.startsWith(`${MatterTasksService.TASKS_FILENAME}.corrupt-`),
       );
       assert.strictEqual(backups.length, 1);
       const path = yield* Path.Path;

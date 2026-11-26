@@ -2,7 +2,7 @@ import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { ThreadRouteView } from "../components/ThreadRouteView";
 import { GlobalVoiceInputIndicator } from "../components/chat/GlobalVoiceInputIndicator";
-import { MattrIslandHost } from "../island/MattrIslandHost";
+import { MatterIslandHost } from "../island/MatterIslandHost";
 import { ClaudeCloudModalHost } from "../components/cloud/ClaudeCloudModal";
 import { isAppModalPage } from "../components/sidebar/mainAppLocation";
 import { resolveThreadRouteTarget } from "../threadRoutes";
@@ -13,7 +13,7 @@ import { useShownThreadRouteTarget } from "../hooks/useShownThreadRouteTarget";
 function ChatRouteLayout() {
   // Render both routes here so draft promotion keeps the same ChatView mounted.
   const { shownTarget, modalOpen } = useShownThreadRouteTarget();
-  // mattr: Settings and Usage are pages in the shell card, so the thread under them stays
+  // Matter: Settings and Usage are pages in the shell card, so the thread under them stays
   // mounted but hidden.
   return (
     <>
@@ -27,7 +27,7 @@ function ChatRouteLayout() {
       )}
       {modalOpen ? <Outlet /> : null}
       <GlobalVoiceInputIndicator hidden={modalOpen} />
-      <MattrIslandHost />
+      <MatterIslandHost />
       <ClaudeCloudModalHost />
     </>
   );

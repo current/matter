@@ -36,7 +36,7 @@ vi.mock(import("../../hooks/useSettings"), async (original) => ({
 }));
 
 import { appAtomRegistry } from "../../rpc/atomRegistry";
-import { MattrDelegationWelcome } from "./MattrDelegationWelcome";
+import { MatterDelegationWelcome } from "./MatterDelegationWelcome";
 
 const environmentId = EnvironmentId.make("primary");
 
@@ -74,13 +74,13 @@ async function mount(providers: ReadonlyArray<ServerProvider>) {
   });
   return render(
     <RegistryContext.Provider value={appAtomRegistry}>
-      <MattrDelegationWelcome environmentId={environmentId} />
+      <MatterDelegationWelcome environmentId={environmentId} />
     </RegistryContext.Provider>,
     { router: false },
   );
 }
 
-describe("MattrDelegationWelcome", () => {
+describe("MatterDelegationWelcome", () => {
   it("stays hidden with fewer than two signed-in subscriptions", async () => {
     await using _screen = await mount([claude, signedOutCursor]);
     expect(document.body.textContent).not.toContain("Multi-provider delegation");

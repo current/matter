@@ -1,7 +1,7 @@
 import { render } from "../../../../test/render";
 import {
   EnvironmentId,
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   ProjectId,
   ProviderInstanceId,
   RunId,
@@ -16,8 +16,8 @@ import { page } from "vite-plus/test/browser";
 
 import "../../../index.css";
 // The rail's look, and the hit areas its rows click through, live in the fork stylesheets.
-import "../../../../../../antimatter/sidebar.css";
-import "../../../../../../antimatter/timeline-sidebar.css";
+import "../../../../../../matter/sidebar.css";
+import "../../../../../../matter/timeline-sidebar.css";
 import { resetAddonStoreForTests } from "../../../addons/addonStore";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
@@ -29,9 +29,9 @@ const harness = vi.hoisted(() => ({
   providers: [] as ReadonlyArray<unknown>,
 }));
 
-vi.mock(import("../../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => harness.config,
+  useMatterApiConfig: () => harness.config,
 }));
 
 vi.mock(import("../../../state/environments"), async (original) => ({
@@ -41,17 +41,17 @@ vi.mock(import("../../../state/environments"), async (original) => ({
     new Map([[EnvironmentId.make("local"), harness.providers]])) as never,
 }));
 
-import { MattrBrandMenu } from "./MattrDefaultSidebarParts";
-import type { MattrChildItem } from "./mattrFinalSidebar.logic";
-import { toMattrThreadItem } from "./mattrSidebar.logic";
-import { MattrSidebarLayoutSetting } from "./MattrSidebarLayoutSetting";
+import { MatterBrandMenu } from "./MatterDefaultSidebarParts";
+import type { MatterChildItem } from "./matterFinalSidebar.logic";
+import { toMatterThreadItem } from "./matterSidebar.logic";
+import { MatterSidebarLayoutSetting } from "./MatterSidebarLayoutSetting";
 import {
-  MATTR_SIDEBAR_LAYOUT_STORAGE_KEY,
-  MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY,
-} from "./mattrSidebarStore";
-import { MattrTimelineSidebar } from "./MattrTimelineSidebar";
+  MATTER_SIDEBAR_LAYOUT_STORAGE_KEY,
+  MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY,
+} from "./matterSidebarStore";
+import { MatterTimelineSidebar } from "./MatterTimelineSidebar";
 import type { SidebarRouteReveal } from "../routeReveal";
-import type { MattrSidebarModel, MattrSidebarProject } from "./useMattrSidebarModel";
+import type { MatterSidebarModel, MatterSidebarProject } from "./useMatterSidebarModel";
 
 const TIMELINE_SORT_STORAGE_KEY = "mattr:sidebar:timeline-sort:v1";
 
@@ -62,7 +62,7 @@ const NOW_ISO = local(10, 12);
 const NOW_MS = Date.parse(NOW_ISO);
 const environmentId = EnvironmentId.make("local");
 
-function project(id: string, name: string): MattrSidebarProject {
+function project(id: string, name: string): MatterSidebarProject {
   const group = {
     environmentId,
     id: ProjectId.make(id),
@@ -74,15 +74,15 @@ function project(id: string, name: string): MattrSidebarProject {
   return { key: `${environmentId}:${id}`, name, group };
 }
 
-const MATTR = project("mattr", "mattr");
+const MATTER = project("Matter", "Matter");
 const LILT = project("lilt", "Lilt");
 
 function thread(
   title: string,
   overrides: ThreadFixtureOverrides = {},
-  owner: MattrSidebarProject | null = MATTR,
+  owner: MatterSidebarProject | null = MATTER,
 ) {
-  return toMattrThreadItem(
+  return toMatterThreadItem(
     makeThreadFixture({
       environmentId,
       id: ThreadId.make(title),
@@ -108,16 +108,16 @@ const runtime = (status: "running" | "completed" | "failed") => ({
 
 const pullRequest = (number: number, state: "open" | "merged"): ThreadPullRequestLink => ({
   host: "github.com",
-  repository: "current/mattr",
+  repository: "current/matter",
   number,
-  url: `https://github.com/current/mattr/pull/${number}`,
+  url: `https://github.com/current/matter/pull/${number}`,
   source: "manual",
   linkedAt: local(10, 8),
   stack: null,
   snapshot: {
     state,
     title: `PR ${number}`,
-    headBranch: "mattr/feature-x",
+    headBranch: "matter/feature-x",
     baseBranch: "main",
     isDraft: false,
     updatedAt: null,
@@ -126,8 +126,8 @@ const pullRequest = (number: number, state: "open" | "merged"): ThreadPullReques
 });
 
 const today = thread("Timeline rail", {
-  branch: "mattr/feature-x",
-  worktreePath: "/worktrees/mattr/feature-x",
+  branch: "matter/feature-x",
+  worktreePath: "/worktrees/matter/feature-x",
   pullRequests: [pullRequest(1271, "open")],
 });
 const yesterday = thread("Yesterday notes", {
@@ -137,7 +137,7 @@ const yesterday = thread("Yesterday notes", {
 const older = thread("Old audit", { latestUserMessageAt: local(1, 10) });
 const items = [today, yesterday, older];
 
-const subagent = (title: string, overrides: ThreadFixtureOverrides = {}): MattrChildItem => ({
+const subagent = (title: string, overrides: ThreadFixtureOverrides = {}): MatterChildItem => ({
   ...thread(title, {
     lineage: {
       rootThreadId: ThreadId.make(today.title),
@@ -156,11 +156,11 @@ const children = [
   subagent("Ask about signing", { hasPendingApprovals: true }),
 ];
 
-function model(overrides: Partial<MattrSidebarModel> = {}): MattrSidebarModel {
+function model(overrides: Partial<MatterSidebarModel> = {}): MatterSidebarModel {
   return {
     items,
     children,
-    projects: [MATTR],
+    projects: [MATTER],
     activeThreadKey: today.key,
     nowMs: NOW_MS,
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
@@ -177,7 +177,7 @@ function model(overrides: Partial<MattrSidebarModel> = {}): MattrSidebarModel {
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
 
-const addons: ReadonlyArray<AddonEntry> = MATTR_ADDON_MANIFESTS.map((manifest) => ({
+const addons: ReadonlyArray<AddonEntry> = MATTER_ADDON_MANIFESTS.map((manifest) => ({
   manifest,
   state: {
     id: manifest.id,
@@ -219,17 +219,17 @@ function useServer(
   };
 }
 
-const renderTimeline = (current: MattrSidebarModel = model(), routeReveal?: SidebarRouteReveal) =>
+const renderTimeline = (current: MatterSidebarModel = model(), routeReveal?: SidebarRouteReveal) =>
   render(
     <SidebarProvider>
-      <MattrTimelineSidebar model={current} routeReveal={routeReveal} />
+      <MatterTimelineSidebar model={current} routeReveal={routeReveal} />
     </SidebarProvider>,
   );
 
 const row = (container: HTMLElement, item: { key: string }) =>
-  container.querySelector<HTMLElement>(`[data-mattr-timeline-row="${item.key}"]`);
+  container.querySelector<HTMLElement>(`[data-matter-timeline-row="${item.key}"]`);
 
-describe("MattrTimelineSidebar", () => {
+describe("MatterTimelineSidebar", () => {
   it("buckets threads by local day and folds Earlier", async () => {
     using _server = useServer();
     await using screen = await renderTimeline();
@@ -261,7 +261,7 @@ describe("MattrTimelineSidebar", () => {
     const group = page.getByRole("group", { name: "Subagents of Timeline rail" });
     await expect.element(group).toBeVisible();
     const subs = [
-      ...screen.container.querySelectorAll<HTMLElement>("[data-mattr-timeline-subagent]"),
+      ...screen.container.querySelectorAll<HTMLElement>("[data-matter-timeline-subagent]"),
     ];
     expect(subs.map((sub) => sub.querySelector(".mts-st")?.textContent)).toEqual([
       "Ask about signing",
@@ -291,7 +291,7 @@ describe("MattrTimelineSidebar", () => {
       .toBeVisible();
     const parent = row(screen.container, today)!;
     const subs = [
-      ...screen.container.querySelectorAll<HTMLElement>("[data-mattr-timeline-subagent]"),
+      ...screen.container.querySelectorAll<HTMLElement>("[data-matter-timeline-subagent]"),
     ];
     expect(subs).toHaveLength(3);
 
@@ -339,10 +339,10 @@ describe("MattrTimelineSidebar", () => {
   });
 
   it("hides every subagent while Show active subagents is off", async () => {
-    using _server = useServer({ storage: { [MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY]: false } });
+    using _server = useServer({ storage: { [MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY]: false } });
     await using screen = await renderTimeline();
     await expect.element(page.getByRole("button", { name: "Timeline rail" })).toBeVisible();
-    expect(screen.container.querySelector("[data-mattr-timeline-subagent]")).toBeNull();
+    expect(screen.container.querySelector("[data-matter-timeline-subagent]")).toBeNull();
     expect(screen.container.textContent).not.toContain("Audit adapters");
   });
 
@@ -352,9 +352,9 @@ describe("MattrTimelineSidebar", () => {
     await expect.element(page.getByRole("button", { name: "Yesterday notes" })).toBeVisible();
     const todayRow = row(screen.container, today)!;
     const yesterdayRow = row(screen.container, yesterday)!;
-    expect(todayRow.querySelector('[data-mattr-workspace="worktree"]')).not.toBeNull();
-    expect(yesterdayRow.querySelector('[data-mattr-workspace="local"]')).not.toBeNull();
-    expect(todayRow.querySelector(".mts-br")?.textContent).toBe("mattr/feature-x");
+    expect(todayRow.querySelector('[data-matter-workspace="worktree"]')).not.toBeNull();
+    expect(yesterdayRow.querySelector('[data-matter-workspace="local"]')).not.toBeNull();
+    expect(todayRow.querySelector(".mts-br")?.textContent).toBe("matter/feature-x");
     expect(yesterdayRow.querySelector(".mts-br")).toBeNull();
 
     const openPr = todayRow.querySelector('.mts-pr[data-state="open"]');
@@ -430,17 +430,17 @@ describe("MattrTimelineSidebar", () => {
       LILT,
     );
     await using screen = await renderTimeline(
-      model({ items: [today, scratch, liltThread], children: [], projects: [MATTR, LILT] }),
+      model({ items: [today, scratch, liltThread], children: [], projects: [MATTER, LILT] }),
     );
     const scratchRow = row(screen.container, scratch)!;
-    expect(scratchRow.querySelector("[data-mattr-workspace]")).toBeNull();
+    expect(scratchRow.querySelector("[data-matter-workspace]")).toBeNull();
     expect(scratchRow.querySelector(".mts-proj")?.textContent).toBe("No project");
 
     await page.getByRole("button", { name: "Activity scope: All activity" }).click();
     await page.getByRole("menuitemradio", { name: /^Lilt/ }).click();
     const filteredRow = row(screen.container, liltThread)!;
     expect(filteredRow.querySelector(".mts-proj")).toBeNull();
-    expect(filteredRow.querySelector('[data-mattr-workspace="worktree"]')).not.toBeNull();
+    expect(filteredRow.querySelector('[data-matter-workspace="worktree"]')).not.toBeNull();
     expect(filteredRow.querySelector(".mts-br")?.textContent).toBe("lilt/fix");
   });
 
@@ -574,14 +574,14 @@ describe("MattrTimelineSidebar", () => {
     harness.providers = [];
     await screen.rerender(
       <SidebarProvider>
-        <MattrTimelineSidebar model={model({ nowMs: NOW_MS + 1 })} />
+        <MatterTimelineSidebar model={model({ nowMs: NOW_MS + 1 })} />
       </SidebarProvider>,
     );
     await expect.element(meters).not.toBeInTheDocument();
     expect(screen.container.querySelector(".mts-use")).toBeNull();
   });
 
-  it("tracks top/bottom scroll fade and respects data-mattr-scroll-fade=off", async () => {
+  it("tracks top/bottom scroll fade and respects data-matter-scroll-fade=off", async () => {
     using _server = useServer();
     const many = Array.from({ length: 18 }, (_, index) =>
       thread(`Thread ${index + 1}`, { latestUserMessageAt: local(10, 9, index) }),
@@ -589,7 +589,7 @@ describe("MattrTimelineSidebar", () => {
     await using screen = await render(
       <div style={{ height: "260px", display: "flex", flexDirection: "column" }}>
         <SidebarProvider>
-          <MattrTimelineSidebar model={model({ items: many, children: [] })} />
+          <MatterTimelineSidebar model={model({ items: many, children: [] })} />
         </SidebarProvider>
       </div>,
     );
@@ -602,11 +602,11 @@ describe("MattrTimelineSidebar", () => {
     expect(list.hasAttribute("data-scrolled-top")).toBe(true);
     expect(getComputedStyle(list).maskImage).not.toBe("none");
 
-    document.documentElement.setAttribute("data-mattr-scroll-fade", "off");
+    document.documentElement.setAttribute("data-matter-scroll-fade", "off");
     try {
       expect(getComputedStyle(list).maskImage).toBe("none");
     } finally {
-      document.documentElement.removeAttribute("data-mattr-scroll-fade");
+      document.documentElement.removeAttribute("data-matter-scroll-fade");
     }
   });
 
@@ -623,7 +623,7 @@ describe("MattrTimelineSidebar", () => {
 
       await screen.rerender(
         <SidebarProvider>
-          <MattrTimelineSidebar
+          <MatterTimelineSidebar
             model={model({ activeThreadKey: yesterday.key })}
             routeReveal={reveal}
           />
@@ -639,24 +639,24 @@ describe("MattrTimelineSidebar", () => {
 describe("Timeline layout choice", () => {
   it("offers Show active subagents in the brand menu only for Timeline", async () => {
     using _server = useServer();
-    await using _screen = await render(<MattrBrandMenu onNavigate={() => {}} />);
-    const trigger = page.getByRole("button", { name: "mattr menu" });
+    await using _screen = await render(<MatterBrandMenu onNavigate={() => {}} />);
+    const trigger = page.getByRole("button", { name: "Matter menu" });
     const checkbox = page.getByRole("menuitemcheckbox", { name: "Show active subagents" });
 
     await trigger.click();
     await expect.element(page.getByRole("menuitemradio", { name: "Timeline" })).toBeVisible();
     await expect.element(checkbox).not.toBeInTheDocument();
     await page.getByRole("menuitemradio", { name: "Timeline" }).click();
-    expect(window.localStorage.getItem(MATTR_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"timeline"');
+    expect(window.localStorage.getItem(MATTER_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"timeline"');
 
     await trigger.click();
     await expect.element(checkbox).toHaveAttribute("aria-checked", "true");
     await checkbox.click();
-    expect(window.localStorage.getItem(MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY)).toBe("false");
+    expect(window.localStorage.getItem(MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY)).toBe("false");
 
     // Checkbox items keep the menu open.
     await page.getByRole("menuitemradio", { name: "Default" }).click();
-    expect(window.localStorage.getItem(MATTR_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"inbox"');
+    expect(window.localStorage.getItem(MATTER_SIDEBAR_LAYOUT_STORAGE_KEY)).toBe('"inbox"');
     await trigger.click();
     await expect.element(page.getByRole("menuitemradio", { name: "Default" })).toBeVisible();
     await expect.element(checkbox).not.toBeInTheDocument();
@@ -666,8 +666,8 @@ describe("Timeline layout choice", () => {
     ["timeline", true],
     ["inbox", false],
   ] as const)("settings with layout %s shows the subagents switch: %s", async (layout, shown) => {
-    using _server = useServer({ storage: { [MATTR_SIDEBAR_LAYOUT_STORAGE_KEY]: layout } });
-    await using _screen = await render(<MattrSidebarLayoutSetting />);
+    using _server = useServer({ storage: { [MATTER_SIDEBAR_LAYOUT_STORAGE_KEY]: layout } });
+    await using _screen = await render(<MatterSidebarLayoutSetting />);
     await expect.element(page.getByRole("group", { name: "Sidebar layout" })).toBeVisible();
     const toggle = page.getByRole("switch", { name: "Show active subagents" });
     if (shown) await expect.element(toggle).toBeChecked();

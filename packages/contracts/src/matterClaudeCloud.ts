@@ -1,11 +1,11 @@
 import * as Schema from "effect/Schema";
 
 import { ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
-import type { AddonConfig } from "./mattrAddons.ts";
+import type { AddonConfig } from "./matterAddons.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 /**
- * mattr's Claude Cloud add-on: start Anthropic-managed cloud sessions with the user's own
+ * Matter's Claude Cloud add-on: start Anthropic-managed cloud sessions with the user's own
  * claude.ai subscription, message them, and teleport them into local worktree threads.
  * Settings live in the add-on's non-secret config; tracked sessions in `claude-cloud-sessions.json`.
  */
@@ -139,7 +139,7 @@ export type ClaudeCloudAccountStatus = typeof ClaudeCloudAccountStatus.Type;
 export const ClaudeCloudCreatedBy = Schema.Literals(["user", "agent"]);
 export type ClaudeCloudCreatedBy = typeof ClaudeCloudCreatedBy.Type;
 
-/** What mattr remembers about a cloud session. Public ids, links and titles only. */
+/** What Matter remembers about a cloud session. Public ids, links and titles only. */
 export const TrackedClaudeCloudSession = Schema.Struct({
   id: ClaudeCloudSessionId,
   url: Schema.String,
@@ -261,7 +261,7 @@ export const ClaudeCloudTeleportResult = Schema.Struct({
   sessionId: ClaudeCloudSessionId,
   worktreePath: Schema.String,
   branch: Schema.NullOr(Schema.String),
-  /** The mattr thread holding the teleported session, once imported. */
+  /** The Matter thread holding the teleported session, once imported. */
   threadId: Schema.NullOr(ThreadId),
 });
 export type ClaudeCloudTeleportResult = typeof ClaudeCloudTeleportResult.Type;

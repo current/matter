@@ -22,7 +22,7 @@ import {
   json,
   readJson,
   readQuery,
-} from "../bots/mattrHttp.ts";
+} from "../bots/matterHttp.ts";
 import * as ClaudeCloudService from "./ClaudeCloudService.ts";
 
 const decodeEligibility = Schema.decodeUnknownEffect(ClaudeCloudEligibilityRequest);

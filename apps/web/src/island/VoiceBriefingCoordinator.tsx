@@ -33,7 +33,7 @@ import type {
   VoiceAssistantSettings,
   VoiceBriefingKind,
   VoiceBriefingRequest,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 import { getIslandSettings, useIslandSettings } from "./islandSettingsStore";
 import { submitQuickBriefing, useVoiceAssistantState } from "./voiceAssistantStore";
 

@@ -6,23 +6,23 @@ Tiers: **[O]** official docs or source, **[C]** community, **[U]** unverified. N
 
 ## Integration kinds (the distinction that matters)
 
-| Kind | Meaning | Fit for "connect the agent the user already has" |
-|---|---|---|
-| **A. Existing personal agent** | The user's own long-lived agent: memory, history and tools live with the provider. We attach to it | Primary target |
-| **B. API-managed agent** | Agents created and owned through an API. Persistent, but usually made *for* an app | Good when the user already created agents there |
-| **C. Model API** | Stateless inference | Out of scope for Bots |
-| **D. Coding session** | One-off task or session runs (Devin sessions, Muse Code, Codex) | Already covered by mattr's provider/thread model, not Bots |
+| Kind                           | Meaning                                                                                            | Fit for "connect the agent the user already has"            |
+| ------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **A. Existing personal agent** | The user's own long-lived agent: memory, history and tools live with the provider. We attach to it | Primary target                                              |
+| **B. API-managed agent**       | Agents created and owned through an API. Persistent, but usually made _for_ an app                 | Good when the user already created agents there             |
+| **C. Model API**               | Stateless inference                                                                                | Out of scope for Bots                                       |
+| **D. Coding session**          | One-off task or session runs (Devin sessions, Muse Code, Codex)                                    | Already covered by Matter's provider/thread model, not Bots |
 
 ## Summary
 
-| Provider | Kind | Official surface | Feasibility |
-|---|---|---|---|
-| **OpenClaw** | A, self-hosted | Gateway WebSocket protocol (documented, typed schemas) | **High**: best-documented, built for third-party operator clients |
-| **Hermes Agent** | A, self-hosted | TUI gateway JSON-RPC (WS), ACP, OpenAI-compatible API server | **High**: rich session protocol, approvals as server→client requests |
-| **Zo Computer** | A, hosted | `POST /zo/ask` (+SSE), MCP server | **Medium**: send and stream only. No conversation list or history API |
-| **Letta** | B (and A for Letta-app users) | REST + SDKs (agents, conversations, messages, streams) | **High** technically, but agents are usually app-created |
-| **Manus** | A/B hybrid, hosted | REST v2 (tasks, agents, webhooks, OAuth2 Open Apps) | **Medium-high**: task-oriented, polling or webhooks, no streaming |
-| **Muse** | A, hosted | Gadget Link API only (device channel) | **Low-medium**: see the Muse report |
+| Provider         | Kind                          | Official surface                                             | Feasibility                                                           |
+| ---------------- | ----------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| **OpenClaw**     | A, self-hosted                | Gateway WebSocket protocol (documented, typed schemas)       | **High**: best-documented, built for third-party operator clients     |
+| **Hermes Agent** | A, self-hosted                | TUI gateway JSON-RPC (WS), ACP, OpenAI-compatible API server | **High**: rich session protocol, approvals as server→client requests  |
+| **Zo Computer**  | A, hosted                     | `POST /zo/ask` (+SSE), MCP server                            | **Medium**: send and stream only. No conversation list or history API |
+| **Letta**        | B (and A for Letta-app users) | REST + SDKs (agents, conversations, messages, streams)       | **High** technically, but agents are usually app-created              |
+| **Manus**        | A/B hybrid, hosted            | REST v2 (tasks, agents, webhooks, OAuth2 Open Apps)          | **Medium-high**: task-oriented, polling or webhooks, no streaming     |
+| **Muse**         | A, hosted                     | Gadget Link API only (device channel)                        | **Low-medium**: see the Muse report                                   |
 
 ## OpenClaw
 
@@ -32,12 +32,12 @@ Tiers: **[O]** official docs or source, **[C]** community, **[U]** unverified. N
 - **History / messaging / streaming:** `chat.history` (with a `deltaCursor` catch-up), `chat.send` (attachments included), `chat.abort`, `chat.steerNow`. Live `session.message` events, and `session.approval` lifecycle events for exec approvals. Files go through `sessions.files.*`. [O]
 - **Auth:** gateway token or password (`gateway.auth.mode`), then **device pairing** that returns a scoped `deviceToken` (rotate and revoke supported). One-paste setup links carry a single-use bootstrap token and a TLS pin. Tailscale identity is optional. [O] [auth](https://docs.openclaw.ai/gateway/protocol/auth), [pairing](https://docs.openclaw.ai/gateway/pairing), [tailscale](https://docs.openclaw.ai/gateway/tailscale)
 - **Execution:** the user's machine or server. **Billing:** the user's own model keys or subscriptions. No OpenClaw billing.
-- **Feasibility:** high. mattr would be an `operator` client. Matching remote modes (loopback, tailnet) mirror mattr's own. Main risk: a fast-moving protocol, so pin to the versioning window.
+- **Feasibility:** high. Matter would be an `operator` client. Matching remote modes (loopback, tailnet) mirror Matter's own. Main risk: a fast-moving protocol, so pin to the versioning window.
 
 ## Hermes Agent (Nous Research)
 
 - **What:** open-source self-improving personal agent with a gateway for messaging platforms, profiles and subagents. [O] [docs](https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration)
-- **API, three wire formats on one core:** (1) **ACP** over stdio (mattr already speaks ACP, but that is a session-per-process model). (2) **TUI gateway JSON-RPC** over stdio, its own WS, or the shared gateway `/api/ws` (`hermes-gateway-v1`). (3) **OpenAI-compatible API server** (`:8642/v1`: chat completions, responses, `/v1/runs` with events, approval and steer, `/api/sessions/{id}/chat/stream`). [O]
+- **API, three wire formats on one core:** (1) **ACP** over stdio (Matter already speaks ACP, but that is a session-per-process model). (2) **TUI gateway JSON-RPC** over stdio, its own WS, or the shared gateway `/api/ws` (`hermes-gateway-v1`). (3) **OpenAI-compatible API server** (`:8642/v1`: chat completions, responses, `/v1/runs` with events, approval and steer, `/api/sessions/{id}/chat/stream`). [O]
 - **Discovery / history:** `session.list` (with stored scope, query and cursor), `session.resume` (multiple subscribers allowed), `session.history` / `session.transcript` (paged), `profiles.list`, `subagent.list`. `agents.list` is refused. [O]
 - **Streaming / interaction:** `prompt.submit`, `session.steer/interrupt`, `prompt.cancel`. Events `message.delta/complete`, `tool.start/complete`, with `inflight` to rebuild on reconnect. **Approvals, clarify and secret requests come as server→client JSON-RPC requests** (opt-in via `client.capabilities {server_requests:true}`). Open requests are replayed on reconnect. [O]
 - **Auth:** a single-use ticket per connection from `hermes gateway attach --json`. The API server uses a bearer key. [O]
@@ -82,4 +82,4 @@ Tiers: **[O]** official docs or source, **[C]** community, **[U]** unverified. N
 2. Conversation discovery is missing for Muse and Zo, so the platform needs a **local known-conversations registry**.
 3. Streaming varies: WS events (OpenClaw, Hermes, Muse Link), SSE (Zo, Letta), poll/webhook only (Manus). The provider transport must normalize to one event stream with a polling fallback.
 4. Approvals and questions are first-class in Hermes, OpenClaw and Manus. Design the interaction capability around server-initiated requests that survive reconnects.
-5. None of these reuses mattr's coding-provider runtime. Keep Bots a separate platform. Coding sessions (kind D) stay as threads.
+5. None of these reuses Matter's coding-provider runtime. Keep Bots a separate platform. Coding sessions (kind D) stay as threads.

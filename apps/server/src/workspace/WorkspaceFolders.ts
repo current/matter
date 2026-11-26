@@ -26,7 +26,7 @@ import * as Schema from "effect/Schema";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import { isWithinRoot } from "./KnownWorkspaces.ts";
 import * as TaskFolderStore from "./TaskFolderStore.ts";
-import { readProjectFileString } from "../project/MattrProjectFile.ts";
+import { readProjectFileString } from "../project/MatterProjectFile.ts";
 
 /** A tracked folder a thread works in, besides its own cwd. */
 export interface ThreadFolder {

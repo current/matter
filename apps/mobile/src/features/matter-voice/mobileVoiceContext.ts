@@ -18,7 +18,7 @@ import { msg } from "gt-react-native";
 import type {
   VoiceAssistantClientAction,
   VoiceWorkspaceContext,
-} from "../../../../../antimatter/voice-assistant/types";
+} from "../../../../../matter/voice-assistant/types";
 import { m } from "../../i18n/messages";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { environmentProjects } from "../../state/projects";
@@ -117,7 +117,7 @@ export function readVoiceWorkspaceContext(
     activeEnvironmentId: scope?.environmentId ?? newest?.environmentId ?? null,
     activeThreadId: scope?.threadId ?? null,
     activeThreadFallbackTitle: scope?.title ?? null,
-    activeRoute: "MattrVoiceMode",
+    activeRoute: "MatterVoiceMode",
     projects: appAtomRegistry.get(environmentProjects.projectsAtom).map((project) => ({
       id: project.id,
       title: project.title,

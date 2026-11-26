@@ -7,9 +7,9 @@ import "../index.css";
 
 const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} }));
 
-vi.mock(import("./mattrApi"), async (original) => ({
+vi.mock(import("./matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
 import { DevinBotAddonSettings } from "./DevinBotAddonSettings";
@@ -62,7 +62,7 @@ describe("DevinBotAddonSettings", () => {
       .toBeVisible();
     await expect.element(page.getByRole("button", { name: "Copy command" })).toBeVisible();
     await expect
-      .element(page.getByText("mattr never opens, quits or restarts Devin", { exact: false }))
+      .element(page.getByText("Matter never opens, quits or restarts Devin", { exact: false }))
       .toBeVisible();
     await expect
       .element(page.getByText("any app running as your user on this Mac", { exact: false }))

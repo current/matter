@@ -3,7 +3,7 @@ import * as NodePath from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
 import { rebrandCopy, rebrandSource, rebrandTerminologyText } from "./rebrand";
-import { rebrandTimelineServerText } from "../apps/web/src/components/chat/mattrRebrandTimelineText";
+import { rebrandTimelineServerText } from "../apps/web/src/components/chat/matterRebrandTimelineText";
 
 const REPO_ROOT = NodePath.resolve(import.meta.dirname, "..");
 
@@ -23,25 +23,25 @@ function walkSourceFiles(dir: string): string[] {
   return results;
 }
 
-describe("antimatter/rebrand", () => {
+describe("matter/rebrand", () => {
   it("rebrands product and project file names without breaking ids or GitHub App name", () => {
-    expect(rebrandCopy("Open T3 Code and T3 Connect")).toBe("Open mattr and mattr Connect");
+    expect(rebrandCopy("Open T3 Code and T3 Connect")).toBe("Open Matter and Matter Connect");
     expect(rebrandCopy("Install T3 Code for GitHub")).toBe("Install T3 Code for GitHub");
     expect(rebrandCopy("Link T3 Chat Pro")).toBe("Link T3 Chat Pro");
     expect(rebrandCopy("Listing T3 threads and Reading a T3 thread")).toBe(
-      "Listing mattr threads and Reading a mattr thread",
+      "Listing Matter threads and Reading a Matter thread",
     );
     expect(rebrandCopy("Use T3 desktop, T3 server, T3 Server, T3 home, T3 process, T3 tool")).toBe(
-      "Use mattr desktop, mattr server, mattr Server, mattr home, mattr process, mattr tool",
+      "Use Matter desktop, Matter server, Matter Server, Matter home, Matter process, Matter tool",
     );
     expect(rebrandCopy("https://poke.com/integrations/new?name=T3%20Code&url=x")).toBe(
-      "https://poke.com/integrations/new?name=mattr&url=x",
+      "https://poke.com/integrations/new?name=Matter&url=x",
     );
     expect(rebrandCopy("T3 requests zero data retention; T3 could not ask")).toBe(
-      "mattr requests zero data retention; mattr could not ask",
+      "Matter requests zero data retention; Matter could not ask",
     );
     expect(rebrandCopy('Read t3.json and label: "t3.json"')).toBe(
-      'Read mattr.json and label: "mattr.json"',
+      'Read matter.json and label: "matter.json"',
     );
     expect(rebrandCopy('const id = "t3.json";')).toBe('const id = "t3.json";');
   });
@@ -137,7 +137,7 @@ describe("antimatter/rebrand", () => {
 
     const streamAnimations = rebrandSource(
       `name: msg("Rise & Settle", { $context: "streaming text animation" }),\ndescription: msg("New words settle in from a soft blur, with a caret", { $context: "streaming text animation" }),`,
-      "/repo/apps/web/src/mattrStreamAnimation.ts",
+      "/repo/apps/web/src/matterStreamAnimation.ts",
     );
     expect(streamAnimations).toContain('msg("Rise & Settle"');
     expect(streamAnimations).toContain('msg("New words settle in from a soft blur, with a caret"');
@@ -145,19 +145,21 @@ describe("antimatter/rebrand", () => {
 
   it("rebrands server-emitted timeline summaries, notices, and errors at display time", () => {
     expect(rebrandTimelineServerText("T3 Code restarted and resumed this turn")).toBe(
-      "mattr restarted and resumed this turn",
+      "Matter restarted and resumed this turn",
     );
     expect(rebrandTimelineServerText("T3 Code restarted and stopped background work")).toBe(
-      "mattr restarted and stopped background work",
+      "Matter restarted and stopped background work",
     );
     expect(
       rebrandTimelineServerText(
         "T3 Code stopped watching pull request #12 because the T3 Code server cannot use the host.",
       ),
-    ).toBe("mattr stopped watching pull request #12 because the mattr server cannot use the host.");
+    ).toBe(
+      "Matter stopped watching pull request #12 because the Matter server cannot use the host.",
+    );
     expect(
       rebrandTimelineServerText("T3 Code could not start this turn. Install T3 Code for GitHub."),
-    ).toBe("mattr could not start this turn. Install T3 Code for GitHub.");
+    ).toBe("Matter could not start this turn. Install T3 Code for GitHub.");
     expect(rebrandTimelineServerText("The agent runtime exited and stopped background work")).toBe(
       "The agent runtime exited and stopped background work",
     );
@@ -170,10 +172,10 @@ describe("antimatter/rebrand", () => {
     );
     const source = NodeFS.readFileSync(translatablePath, "utf8");
     const transformed = rebrandSource(source, translatablePath);
-    expect(transformed).toContain("function __mattrRebrandServerError");
-    expect(transformed).toContain("? __mattrRebrandServerError(error.message)");
+    expect(transformed).toContain("function __matterRebrandServerError");
+    expect(transformed).toContain("? __matterRebrandServerError(error.message)");
     expect(transformed).toContain(
-      "return text === undefined ? __mattrRebrandServerError(error.message) : resolveMarkedText(text, resolve);",
+      "return text === undefined ? __matterRebrandServerError(error.message) : resolveMarkedText(text, resolve);",
     );
   });
 
@@ -190,7 +192,7 @@ describe("antimatter/rebrand", () => {
     for (const root of roots) {
       for (const file of walkSourceFiles(root)) {
         // Streaming text animation copy uses "Rise & Settle" / "settle in", not thread settlement.
-        if (/\/(mattrStreamAnimation\.ts|MattrStreamAnimationSetting\.tsx)$/.test(file)) {
+        if (/\/(matterStreamAnimation\.ts|MatterStreamAnimationSetting\.tsx)$/.test(file)) {
           continue;
         }
         const raw = NodeFS.readFileSync(file, "utf8");

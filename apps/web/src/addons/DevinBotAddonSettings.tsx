@@ -14,7 +14,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { getAddonConfig, updateAddonConfig } from "./addonStore";
-import { useMattrApiConfig } from "./mattrApi";
+import { useMatterApiConfig } from "./matterApi";
 
 const parsePort = (raw: string) => {
   const port = Number(raw.trim());
@@ -23,7 +23,7 @@ const parsePort = (raw: string) => {
 
 /**
  * Devin Bot's connection card in Settings → Add-ons: the loopback debug port, the command that
- * reopens Devin with it, and a connection test. mattr never launches or restarts Devin.
+ * reopens Devin with it, and a connection test. Matter never launches or restarts Devin.
  */
 export function DevinBotAddonSettings({
   status,
@@ -37,7 +37,7 @@ export function DevinBotAddonSettings({
   onReconnect: () => Promise<void>;
 }) {
   const gt = useGT();
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const [savedPort, setSavedPort] = useState(DEVIN_BOT_DEFAULT_CDP_PORT);
   const [draft, setDraft] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -152,8 +152,8 @@ export function DevinBotAddonSettings({
       ) : null}
       <p className="text-xs text-muted-foreground">
         <T>
-          mattr never opens, quits or restarts Devin. It only connects to the debug port on this Mac
-          while Devin is running, and uses Devin's own signed-in session.
+          Matter never opens, quits or restarts Devin. It only connects to the debug port on this
+          Mac while Devin is running, and uses Devin's own signed-in session.
         </T>
       </p>
       <Alert variant="warning" data-devin-bot-warning="">

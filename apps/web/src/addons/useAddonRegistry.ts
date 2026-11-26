@@ -11,11 +11,11 @@ import {
   subscribeAddonStore,
   useAddonStore,
 } from "./addonStore";
-import { useMattrApiConfig } from "./mattrApi";
+import { useMatterApiConfig } from "./matterApi";
 
 /** Loads the registry from the primary environment once its connection is ready. */
 function useAddonRegistryLoader() {
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- fetches the server's add-on registry when the primary connection becomes available or changes
   useEffect(() => {
     if (config === null) return;

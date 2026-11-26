@@ -255,7 +255,7 @@
       ]
     },
     {
-      "name": "Phosphor Icons (mattr icon pack)",
+      "name": "Phosphor Icons (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "MIT",
       "sourceUrl": "https://github.com/phosphor-icons/core",
@@ -267,7 +267,7 @@
       ]
     },
     {
-      "name": "Heroicons (mattr icon pack)",
+      "name": "Heroicons (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "MIT",
       "sourceUrl": "https://github.com/tailwindlabs/heroicons",
@@ -279,21 +279,21 @@
       ]
     },
     {
-      "name": "Remix Icon (mattr icon pack)",
+      "name": "Remix Icon (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "Remix Icon License 1.0",
       "sourceUrl": "https://github.com/Remix-Design/RemixIcon",
-      "noticeFile": "antimatter/icons/LICENSE.remixicon"
+      "noticeFile": "matter/icons/LICENSE.remixicon"
     },
     {
-      "name": "Solar Icon Set (mattr icon pack)",
+      "name": "Solar Icon Set (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "CC-BY-4.0",
       "sourceUrl": "https://www.figma.com/community/file/1166831539721848736",
-      "noticeFile": "antimatter/icons/LICENSE.solar"
+      "noticeFile": "matter/icons/LICENSE.solar"
     },
     {
-      "name": "MingCute Icon (mattr icon pack)",
+      "name": "MingCute Icon (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "Apache-2.0",
       "sourceUrl": "https://github.com/Richard9394/MingCute",
@@ -305,7 +305,7 @@
       ]
     },
     {
-      "name": "Fluent UI System Icons (mattr icon pack)",
+      "name": "Fluent UI System Icons (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "MIT",
       "sourceUrl": "https://github.com/microsoft/fluentui-system-icons",
@@ -317,7 +317,7 @@
       ]
     },
     {
-      "name": "Ionicons (mattr icon pack)",
+      "name": "Ionicons (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "MIT",
       "sourceUrl": "https://github.com/ionic-team/ionicons",
@@ -329,7 +329,7 @@
       ]
     },
     {
-      "name": "Material Symbols (mattr icon pack)",
+      "name": "Material Symbols (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "Apache-2.0",
       "sourceUrl": "https://github.com/google/material-design-icons",
@@ -341,7 +341,7 @@
       ]
     },
     {
-      "name": "Tabler Icons (mattr icon pack)",
+      "name": "Tabler Icons (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "MIT",
       "sourceUrl": "https://github.com/tabler/tabler-icons",
@@ -353,7 +353,7 @@
       ]
     },
     {
-      "name": "Hugeicons (mattr icon pack)",
+      "name": "Hugeicons (Matter icon pack)",
       "bundles": ["desktop", "web"],
       "license": "MIT",
       "sourceUrl": "https://github.com/hugeicons/hugeicons-react",

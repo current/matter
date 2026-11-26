@@ -3,13 +3,13 @@ import {
   DEFAULT_ISLAND_SETTINGS,
   type IslandSettings,
   type IslandShortcutMode,
-} from "../../../../antimatter/island/types";
+} from "../../../../matter/island/types";
 import {
   DEFAULT_VOICE_ASSISTANT_SETTINGS,
   ELEVENLABS_TTS_MODELS,
   type VoiceAssistantSettings,
   type VoiceTtsProvider,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 
 const STORAGE_KEY = "mattr:island:settings:v1";
 

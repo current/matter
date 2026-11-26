@@ -29,7 +29,7 @@ import {
   settle,
   updateClaudeCloudSettings,
 } from "./claudeCloudApi";
-import { useMattrApiConfig } from "./mattrApi";
+import { useMatterApiConfig } from "./matterApi";
 
 const AUTOMATIC_ACCOUNT = "__automatic__";
 
@@ -41,7 +41,7 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
  */
 export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
   const gt = useGT();
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const [status, setStatus] = useState<ClaudeCloudStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);

@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import type * as Path from "effect/Path";
 
-import type { VoiceWorkspaceProjectSummary } from "../../../../antimatter/voice-assistant/types.ts";
+import type { VoiceWorkspaceProjectSummary } from "../../../../matter/voice-assistant/types.ts";
 import type * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 
 const SKIPPED_DIRECTORY_NAMES = new Set([
@@ -193,8 +193,8 @@ function extractBoundedExcerpt(content: string, offset: number, maxChars: number
 
 function pathPriorityBonus(relativePath: string): number {
   const lower = relativePath.toLowerCase().replaceAll("\\", "/");
-  if (lower.startsWith("antimatter/research/") || lower.startsWith("docs/")) return 18;
-  if (lower.startsWith("antimatter/")) return 12;
+  if (lower.startsWith("matter/research/") || lower.startsWith("docs/")) return 18;
+  if (lower.startsWith("matter/")) return 12;
   if (lower.endsWith("readme.md") || lower.endsWith("context.md")) return 15;
   if (lower.endsWith(".md") || lower.endsWith(".mdx")) return 8;
   return 0;
@@ -340,7 +340,7 @@ const collectSearchableFiles = Effect.fn("voiceWorkspaceSearch.collectSearchable
     ];
 
     // Prefer documentation and fork-specific folders first so quick searches hit them early.
-    const preferredDirs = ["antimatter/research", "antimatter", "docs"];
+    const preferredDirs = ["matter/research", "matter", "docs"];
     for (const rel of preferredDirs) {
       const candidate = path.join(realRoot, rel);
       const exists = yield* input.fileSystem

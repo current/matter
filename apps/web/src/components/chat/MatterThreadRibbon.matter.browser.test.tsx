@@ -24,7 +24,7 @@ vi.mock(import("~/state/entities"), async (importOriginal) => ({
       : {
           id: "project",
           environmentId: "environment",
-          title: "mattr",
+          title: "Matter",
           workspaceRoot: "/repo",
           scripts: [],
         }) as never,
@@ -80,9 +80,9 @@ vi.mock(import("~/state/vcs"), async (importOriginal) => {
     vcsEnvironment: { ...actual.vcsEnvironment, status: (() => repoWithChanges) as never },
   };
 });
-vi.mock(import("./MattrWhisperPill.mattr"), async (importOriginal) => ({
+vi.mock(import("./MatterWhisperPill.matter"), async (importOriginal) => ({
   ...(await importOriginal()),
-  useMattrThreadAutomationCounts: (() => ({ bound: 0, running: 0 })) as never,
+  useMatterThreadAutomationCounts: (() => ({ bound: 0, running: 0 })) as never,
 }));
 // The drilldowns reuse the details card's own panel; its behavior has its own tests.
 vi.mock(import("./ThreadRelationshipsControl"), () => ({
@@ -92,16 +92,16 @@ vi.mock(import("./ThreadRelationshipsControl"), () => ({
 }));
 
 import { useRef, useState, type CSSProperties } from "react";
-import shellCss from "../../../../../antimatter/shell.css?inline";
+import shellCss from "../../../../../matter/shell.css?inline";
 import indexCss from "../../index.css?inline";
 import { act, render } from "../../../test/render";
 import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
 import { PopoverCreateHandle } from "../ui/popover";
 import { createChatCanvasStore } from "./canvasStore";
 import { ChatCanvas } from "./ChatCanvas";
-import { MattrThreadRibbon } from "./MattrThreadRibbon.mattr";
+import { MatterThreadRibbon } from "./MatterThreadRibbon.matter";
 import { ThreadDetailsCard } from "./ThreadDetailsCard";
-import { closeMattrLineagePopover, writeMattrThreadRibbon } from "./mattrThreadRibbon.logic";
+import { closeMatterLineagePopover, writeMatterThreadRibbon } from "./matterThreadRibbon.logic";
 
 const ENVIRONMENT = EnvironmentId.make("environment");
 const THREAD = ThreadId.make("thread");
@@ -153,8 +153,8 @@ function withStyles() {
   return {
     [Symbol.dispose]: () => {
       style.remove();
-      closeMattrLineagePopover();
-      writeMattrThreadRibbon(false);
+      closeMatterLineagePopover();
+      writeMatterThreadRibbon(false);
       state.pullRequests = [];
       state.subagents = [];
       useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
@@ -204,15 +204,15 @@ function Ribbon({
           paddingLeft,
         }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>Verify Shipped mattr</div>
-        <MattrThreadRibbon
+        <div style={{ flex: 1, minWidth: 0 }}>Verify Shipped Matter</div>
+        <MatterThreadRibbon
           environmentId={ENVIRONMENT}
           threadId={THREAD}
           projectId={ProjectId.make("project")}
           worktreePath={null}
           isServerThread
           composerDraftTarget={{ environmentId: ENVIRONMENT, threadId: THREAD }}
-          activeProjectName="mattr"
+          activeProjectName="Matter"
           activeProjectScripts={[devScript]}
           preferredScriptId={null}
           keybindings={[]}
@@ -260,14 +260,14 @@ function DesktopCanvasHarness() {
         style={{ display: "flex", alignItems: "center", width: 1440, height: 38, flexShrink: 0 }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>Wide desktop thread</div>
-        <MattrThreadRibbon
+        <MatterThreadRibbon
           environmentId={ENVIRONMENT}
           threadId={THREAD}
           projectId={ProjectId.make("project")}
           worktreePath={null}
           isServerThread
           composerDraftTarget={{ environmentId: ENVIRONMENT, threadId: THREAD }}
-          activeProjectName="mattr"
+          activeProjectName="Matter"
           activeProjectScripts={[devScript]}
           preferredScriptId={null}
           keybindings={[]}
@@ -308,13 +308,13 @@ function DesktopCanvasHarness() {
   );
 }
 
-describe("MattrThreadRibbon", () => {
+describe("MatterThreadRibbon", () => {
   it("shows only primary diff, git and More chips on the topbar, hiding Open, Actions and finished agents", async () => {
     using _styles = withStyles();
     state.subagents = [finishedAgent("a"), finishedAgent("b"), finishedAgent("c")];
     const onToggleChanges = vi.fn();
     await using screen = await render(<Ribbon width={1200} onToggleChanges={onToggleChanges} />);
-    const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
+    const ribbon = screen.container.querySelector<HTMLElement>("[data-matter-ribbon]")!;
     await expect.element(page.getByRole("group", { name: /Git actions/ })).toBeVisible();
     await expect.element(page.getByRole("button", { name: "More thread actions" })).toBeVisible();
     await expect
@@ -323,18 +323,18 @@ describe("MattrThreadRibbon", () => {
     await expect
       .element(page.getByRole("group", { name: "Project scripts" }))
       .not.toBeInTheDocument();
-    expect(ribbon.querySelector("[data-mattr-ribbon-slot='agents']")).toBeNull();
-    expect(ribbon.querySelector("[data-mattr-ribbon-chip='agents']")).toBeNull();
+    expect(ribbon.querySelector("[data-matter-ribbon-slot='agents']")).toBeNull();
+    expect(ribbon.querySelector("[data-matter-ribbon-chip='agents']")).toBeNull();
     expect(ribbon.dataset.density).toBe("full");
 
-    const diff = ribbon.querySelector<HTMLElement>("[data-mattr-ribbon-slot='diff'] > button")!;
+    const diff = ribbon.querySelector<HTMLElement>("[data-matter-ribbon-slot='diff'] > button")!;
     expect(diff.textContent).toContain("+5");
     expect(diff.getBoundingClientRect().height).toBe(26);
     diff.click();
     expect(onToggleChanges).toHaveBeenCalledTimes(1);
 
     const git = ribbon.querySelector<HTMLElement>(
-      "[data-mattr-ribbon-slot='git'] > [role='group']",
+      "[data-matter-ribbon-slot='git'] > [role='group']",
     )!;
     expect(git.getBoundingClientRect().height).toBe(26);
     expect(getComputedStyle(git).borderRadius).toBe("7px");
@@ -348,9 +348,9 @@ describe("MattrThreadRibbon", () => {
     const chip = page.getByRole("button", { name: "Pull request #142" });
     await expect.element(chip).toBeVisible();
     await chip.click();
-    const popup = document.querySelector<HTMLElement>("[data-mattr-ribbon-popup='pr']")!;
+    const popup = document.querySelector<HTMLElement>("[data-matter-ribbon-popup='pr']")!;
     await expect.element(page.getByText(/#142/).last()).toBeVisible();
-    expect(popup.hasAttribute("data-mattr-frosted")).toBe(true);
+    expect(popup.hasAttribute("data-matter-frosted")).toBe(true);
   });
 
   it("keeps Open in, project actions and Previous agents accessible inside More", async () => {
@@ -375,7 +375,7 @@ describe("MattrThreadRibbon", () => {
     // Clicking Previous agents opens the Lineage popover anchored to the ribbon on the previous view.
     await page.getByRole("button", { name: "More thread actions" }).click();
     await page.getByRole("menuitem", { name: /Previous agents/ }).click();
-    const popup = document.querySelector<HTMLElement>("[data-mattr-lineage-popup='ribbon']");
+    const popup = document.querySelector<HTMLElement>("[data-matter-lineage-popup='ribbon']");
     expect(popup).not.toBeNull();
     await expect.element(page.getByText("Lineage panel")).toBeVisible();
     await expect.element(page.getByRole("button", { name: "Back to lineage" })).toBeVisible();
@@ -414,12 +414,12 @@ describe("MattrThreadRibbon", () => {
     using _styles = withStyles();
     state.pullRequests = [linkedPullRequest];
     await using screen = await render(<Ribbon width={500} onToggleChanges={() => {}} />);
-    const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
+    const ribbon = screen.container.querySelector<HTMLElement>("[data-matter-ribbon]")!;
     await expect.poll(() => ribbon.dataset.density).toBe("condensed");
     await expect
       .element(page.getByRole("button", { name: "Pull request #142" }))
       .not.toBeInTheDocument();
-    expect(ribbon.querySelector("[data-mattr-ribbon-slot='diff']")).not.toBeNull();
+    expect(ribbon.querySelector("[data-matter-ribbon-slot='diff']")).not.toBeNull();
     await expect.element(page.getByRole("group", { name: /Git actions/ })).toBeVisible();
     await page.getByRole("button", { name: "More thread actions" }).click();
     await expect.element(page.getByRole("menuitem", { name: /Pull request #142/ })).toBeVisible();
@@ -427,7 +427,7 @@ describe("MattrThreadRibbon", () => {
 
     await screen.rerender(<Ribbon width={400} onToggleChanges={() => {}} />);
     await expect.poll(() => ribbon.dataset.density).toBe("minimal");
-    expect(ribbon.querySelector("[data-mattr-ribbon-slot='diff']")).toBeNull();
+    expect(ribbon.querySelector("[data-matter-ribbon-slot='diff']")).toBeNull();
   });
 
   it("stays upright in dark mode", async () => {
@@ -435,7 +435,9 @@ describe("MattrThreadRibbon", () => {
     document.documentElement.classList.add("dark");
     await using screen = await render(<Ribbon width={1200} />);
     await expect.element(page.getByRole("group", { name: /Git actions/ })).toBeVisible();
-    for (const element of screen.container.querySelectorAll<HTMLElement>("[data-mattr-ribbon] *")) {
+    for (const element of screen.container.querySelectorAll<HTMLElement>(
+      "[data-matter-ribbon] *",
+    )) {
       expect(getComputedStyle(element).fontStyle).toBe("normal");
     }
   });
@@ -443,7 +445,7 @@ describe("MattrThreadRibbon", () => {
   it("suppresses the docked inline card on wide desktop viewports and opens All thread details as a popover", async () => {
     using _styles = withStyles();
     await page.viewport(1440, 900);
-    writeMattrThreadRibbon(true);
+    writeMatterThreadRibbon(true);
     await using screen = await render(<DesktopCanvasHarness />);
 
     await expect.element(page.getByRole("button", { name: "More thread actions" })).toBeVisible();
@@ -468,7 +470,7 @@ describe("MattrThreadRibbon", () => {
       .element(page.getByRole("menuitem", { name: "All thread details" }))
       .not.toBeInTheDocument();
 
-    const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
+    const ribbon = screen.container.querySelector<HTMLElement>("[data-matter-ribbon]")!;
     ribbon.dispatchEvent(
       new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 600, clientY: 20 }),
     );
@@ -483,10 +485,10 @@ describe("MattrThreadRibbon", () => {
     await using screen = await render(
       <Ribbon width={840} paddingLeft={204} controlsWidth={100} rightPanelOpen={false} />,
     );
-    const ribbon = screen.container.querySelector<HTMLElement>("[data-mattr-ribbon]")!;
+    const ribbon = screen.container.querySelector<HTMLElement>("[data-matter-ribbon]")!;
     // 840 - 204 - (100 + 8) = 528px available -> condensed (not full).
     await expect.poll(() => ribbon.dataset.density).toBe("condensed");
-    expect(ribbon.style.getPropertyValue("--mattr-ribbon-controls-inset")).toBe("108px");
+    expect(ribbon.style.getPropertyValue("--matter-ribbon-controls-inset")).toBe("108px");
 
     // Resizing the controls updates the inset and available width without a header resize.
     const controls = screen.container.querySelector<HTMLElement>(
@@ -494,7 +496,7 @@ describe("MattrThreadRibbon", () => {
     )!;
     controls.style.width = "180px";
     await expect
-      .poll(() => ribbon.style.getPropertyValue("--mattr-ribbon-controls-inset"))
+      .poll(() => ribbon.style.getPropertyValue("--matter-ribbon-controls-inset"))
       .toBe("188px");
     // 840 - 204 - (180 + 8) = 448px available -> still condensed.
     await expect.poll(() => ribbon.dataset.density).toBe("condensed");
@@ -504,7 +506,7 @@ describe("MattrThreadRibbon", () => {
       <Ribbon width={840} paddingLeft={204} controlsWidth={180} rightPanelOpen />,
     );
     await expect
-      .poll(() => ribbon.style.getPropertyValue("--mattr-ribbon-controls-inset"))
+      .poll(() => ribbon.style.getPropertyValue("--matter-ribbon-controls-inset"))
       .toBe("0px");
     // 840 - 204 = 636px available -> full.
     await expect.poll(() => ribbon.dataset.density).toBe("full");

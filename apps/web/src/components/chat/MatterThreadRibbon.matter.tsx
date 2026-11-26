@@ -44,23 +44,23 @@ import { ThreadDetailsItemsMenuItems } from "./ThreadDetailsItemsMenu";
 import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
 import { resolveThreadDetailsVisibility } from "./threadDetailsItems";
 import {
-  MattrLineagePopoverContent,
-  type MattrBackgroundWork,
-  useMattrLineageModel,
-  useMattrThreadAutomationCounts,
-} from "./MattrWhisperPill.mattr";
+  MatterLineagePopoverContent,
+  type MatterBackgroundWork,
+  useMatterLineageModel,
+  useMatterThreadAutomationCounts,
+} from "./MatterWhisperPill.matter";
 import {
-  closeMattrLineagePopover,
-  type MattrRibbonDensity,
-  mattrRibbonOverflows,
-  openMattrLineagePopover,
-  resolveMattrRibbonDensity,
-  useMattrLineagePopover,
-  writeMattrThreadRibbon,
-} from "./mattrThreadRibbon.logic";
+  closeMatterLineagePopover,
+  type MatterRibbonDensity,
+  matterRibbonOverflows,
+  openMatterLineagePopover,
+  resolveMatterRibbonDensity,
+  useMatterLineagePopover,
+  writeMatterThreadRibbon,
+} from "./matterThreadRibbon.logic";
 import { useThreadDiscoveredPorts } from "../../portDiscoveryState";
 
-export type MattrThreadRibbonProps = Pick<
+export type MatterThreadRibbonProps = Pick<
   ThreadDetailsPanelProps,
   | "environmentId"
   | "threadId"
@@ -86,7 +86,7 @@ export type MattrThreadRibbonProps = Pick<
 > & {
   /** Toggles the Diff / Review panel; absent where there is no diff to show. */
   readonly onToggleChanges?: (() => void) | undefined;
-  readonly backgroundWork: MattrBackgroundWork;
+  readonly backgroundWork: MatterBackgroundWork;
   /** The inline right panel covers the header's right side, so the window controls sit over it. */
   readonly rightPanelOpen: boolean;
 };
@@ -97,14 +97,14 @@ function flagOpenGitMenu(slot: HTMLDivElement | null) {
   const root = slot.ownerDocument.documentElement;
   const sync = () =>
     root.toggleAttribute(
-      "data-mattr-ribbon-git-menu",
+      "data-matter-ribbon-git-menu",
       slot.querySelector("[data-popup-open]") !== null,
     );
   const observer = new MutationObserver(sync);
   observer.observe(slot, { subtree: true, attributeFilter: ["data-popup-open"] });
   return () => {
     observer.disconnect();
-    root.removeAttribute("data-mattr-ribbon-git-menu");
+    root.removeAttribute("data-matter-ribbon-git-menu");
   };
 }
 
@@ -114,12 +114,12 @@ function flagOpenGitMenu(slot: HTMLDivElement | null) {
  * lineage and the full card stay one click away in the More menu, and PR / diff fold into More as
  * the header narrows.
  */
-export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
+export function MatterThreadRibbon(props: MatterThreadRibbonProps) {
   const gt = useGT();
   const visible = useClientSettings(resolveThreadDetailsVisibility);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const moreSlotRef = useRef<HTMLDivElement | null>(null);
-  const [density, setDensity] = useState<MattrRibbonDensity>("full");
+  const [density, setDensity] = useState<MatterRibbonDensity>("full");
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const threadRef = { environmentId: props.environmentId, threadId: props.threadId };
@@ -131,13 +131,13 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
   const serverConfig = useServerConfigs().get(props.environmentId);
   const thread = useQuietThreadShell(threadRef);
   const displayedPr = useThreadDisplayedPullRequest(props.environmentId, thread ?? null);
-  const lineage = useMattrLineageModel({
+  const lineage = useMatterLineageModel({
     environmentId: props.environmentId,
     threadId: props.threadId,
     backgroundWork: props.backgroundWork,
   });
   const servers = useThreadDiscoveredPorts(threadRef);
-  const automations = useMattrThreadAutomationCounts(props.environmentId, props.threadId);
+  const automations = useMatterThreadAutomationCounts(props.environmentId, props.threadId);
   const tracksFolders = (project?.trackedFolders?.length ?? 0) > 0;
   const taskFolderQuery = useEnvironmentQuery(
     props.isServerThread && props.worktreePath !== null
@@ -186,12 +186,12 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
       const headerRect = header.getBoundingClientRect();
       const contentRight = headerRect.right - paddingRight;
       const controlsInset = controlsVisible ? Math.max(0, contentRight - controlsRect.left + 8) : 0;
-      root.style.setProperty("--mattr-ribbon-controls-inset", `${controlsInset}px`);
+      root.style.setProperty("--matter-ribbon-controls-inset", `${controlsInset}px`);
       const availableWidth = Math.max(
         0,
         header.clientWidth - paddingLeft - paddingRight - controlsInset,
       );
-      setDensity(resolveMattrRibbonDensity(availableWidth));
+      setDensity(resolveMatterRibbonDensity(availableWidth));
     };
     measure();
     const observed: Element[] = controls ? [header, controls] : [header];
@@ -208,7 +208,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
     !props.draftId &&
     (visible.lineage || visible.sideChats) &&
     (lineage.previousCount > 0 || lineage.sideChatCount > 0 || lineage.rows.length > 0);
-  const lineagePopover = useMattrLineagePopover();
+  const lineagePopover = useMatterLineagePopover();
   const ribbonLineageOpen =
     showAgents &&
     lineagePopover.threadKey === lineage.threadKey &&
@@ -220,11 +220,11 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
       lineagePopover.threadKey === lineage.threadKey &&
       lineagePopover.anchor === "ribbon"
     ) {
-      closeMattrLineagePopover();
+      closeMatterLineagePopover();
     }
   }, [showAgents, lineagePopover.threadKey, lineagePopover.anchor, lineage.threadKey]);
-  const overflowPr = showPr && mattrRibbonOverflows(density, "pr");
-  const overflowDiff = showDiff && mattrRibbonOverflows(density, "diff");
+  const overflowPr = showPr && matterRibbonOverflows(density, "pr");
+  const overflowDiff = showDiff && matterRibbonOverflows(density, "diff");
   const hasMoreTopSection =
     (overflowDiff && props.onToggleChanges !== undefined) ||
     overflowPr ||
@@ -242,14 +242,14 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
 
   const prPopup = (
     <PopoverPopup
-      data-mattr-frosted=""
-      data-mattr-ribbon-popup="pr"
+      data-matter-frosted=""
+      data-matter-ribbon-popup="pr"
       side="bottom"
       align="end"
       sideOffset={6}
       padding="none"
     >
-      <div data-mattr-ribbon-panel>
+      <div data-matter-ribbon-panel>
         <ThreadDetailsThreadPrRows
           threadRef={threadRef}
           project={project}
@@ -266,13 +266,13 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
       ref={rootRef}
       role="toolbar"
       aria-label={gt("Thread actions")}
-      data-mattr-ribbon=""
+      data-matter-ribbon=""
       data-density={density}
       data-right-panel-open={props.rightPanelOpen || undefined}
       onContextMenu={openContextMenu}
     >
       {showDiff && !overflowDiff && props.gitCwd ? (
-        <div data-mattr-ribbon-slot="diff">
+        <div data-matter-ribbon-slot="diff">
           <GitActionsControl
             showActions={false}
             showChanges
@@ -287,7 +287,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
       ) : null}
 
       {showPr && !overflowPr ? (
-        <div data-mattr-ribbon-slot="pr">
+        <div data-matter-ribbon-slot="pr">
           <Popover>
             <Tooltip>
               <TooltipTrigger
@@ -296,7 +296,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
                     render={
                       <button
                         type="button"
-                        data-mattr-ribbon-chip="pr"
+                        data-matter-ribbon-chip="pr"
                         aria-label={
                           displayedPr.number !== undefined
                             ? gt("Pull request #{number}", { number: displayedPr.number })
@@ -309,20 +309,20 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
               >
                 {displayedPr.number !== undefined ? (
                   <>
-                    <PullRequestGlyph.pullRequest aria-hidden data-mattr-ribbon-icon />
-                    <span data-mattr-ribbon-num>#{displayedPr.number}</span>
+                    <PullRequestGlyph.pullRequest aria-hidden data-matter-ribbon-icon />
+                    <span data-matter-ribbon-num>#{displayedPr.number}</span>
                     {PrStatusIcon ? (
                       <PrStatusIcon
                         aria-hidden
-                        data-mattr-ribbon-status
+                        data-matter-ribbon-status
                         className={displayedPr.status?.colorClass}
                       />
                     ) : null}
                   </>
                 ) : (
                   <>
-                    <CircleDotIcon aria-hidden data-mattr-ribbon-icon />
-                    <span data-mattr-ribbon-num>{issues.length}</span>
+                    <CircleDotIcon aria-hidden data-matter-ribbon-icon />
+                    <span data-matter-ribbon-num>{issues.length}</span>
                   </>
                 )}
               </TooltipTrigger>
@@ -336,7 +336,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
       ) : null}
 
       {showGitActions && props.gitCwd ? (
-        <div data-mattr-ribbon-slot="git" ref={flagOpenGitMenu}>
+        <div data-matter-ribbon-slot="git" ref={flagOpenGitMenu}>
           <GitActionsControl
             showActions
             showChanges={false}
@@ -350,7 +350,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
         </div>
       ) : null}
 
-      <div data-mattr-ribbon-slot="more" ref={moreSlotRef}>
+      <div data-matter-ribbon-slot="more" ref={moreSlotRef}>
         <Menu open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
           <Tooltip>
             <TooltipTrigger
@@ -359,20 +359,20 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
                   render={
                     <button
                       type="button"
-                      data-mattr-ribbon-chip="more"
+                      data-matter-ribbon-chip="more"
                       aria-label={gt("More thread actions")}
                     />
                   }
                 />
               }
             >
-              <EllipsisIcon aria-hidden data-mattr-ribbon-icon />
+              <EllipsisIcon aria-hidden data-matter-ribbon-icon />
             </TooltipTrigger>
             <TooltipPopup side="bottom">
               <T>More thread actions</T>
             </TooltipPopup>
           </Tooltip>
-          <MenuPopup align="end" data-mattr-frosted="" keepMounted={showScripts}>
+          <MenuPopup align="end" data-matter-frosted="" keepMounted={showScripts}>
             {overflowDiff && props.onToggleChanges ? (
               <MenuItem onClick={props.onToggleChanges}>
                 <FileDiffIcon aria-hidden />
@@ -424,7 +424,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
             {showAgents ? (
               <MenuItem
                 onClick={() =>
-                  openMattrLineagePopover(
+                  openMatterLineagePopover(
                     lineage.threadKey,
                     "ribbon",
                     lineage.previousCount > 0 ? "previous" : "main",
@@ -467,7 +467,7 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
               </MenuSubPopup>
             </MenuSub>
             <MenuSeparator />
-            <MenuItem onClick={() => writeMattrThreadRibbon(false)}>
+            <MenuItem onClick={() => writeMatterThreadRibbon(false)}>
               <MenuItemLabel>
                 <T>Use the classic details card</T>
               </MenuItemLabel>
@@ -477,20 +477,20 @@ export function MattrThreadRibbon(props: MattrThreadRibbonProps) {
         <Popover
           open={ribbonLineageOpen}
           onOpenChange={(next) => {
-            if (!next) closeMattrLineagePopover();
+            if (!next) closeMatterLineagePopover();
           }}
         >
           <PopoverPopup
             anchor={moreSlotRef}
-            data-mattr-frosted=""
-            data-mattr-lineage-popup="ribbon"
+            data-matter-frosted=""
+            data-matter-lineage-popup="ribbon"
             side="bottom"
             align="end"
             sideOffset={6}
             padding="none"
           >
             {ribbonLineageOpen ? (
-              <MattrLineagePopoverContent
+              <MatterLineagePopoverContent
                 environmentId={props.environmentId}
                 threadId={props.threadId}
                 backgroundWork={props.backgroundWork}

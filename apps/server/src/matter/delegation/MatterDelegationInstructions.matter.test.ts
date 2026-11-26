@@ -15,12 +15,12 @@ import * as Stream from "effect/Stream";
 
 import * as ProviderRegistry from "../../provider/ProviderRegistry.ts";
 import * as ServerSettings from "../../serverSettings.ts";
-import * as MattrDelegationInstructions from "./MattrDelegationInstructions.ts";
+import * as MatterDelegationInstructions from "./MatterDelegationInstructions.ts";
 import {
-  buildMattrDelegationInstructions,
-  mattrDelegationPool,
-  mattrDelegationExcludes,
-} from "./mattrDelegationPolicy.ts";
+  buildMatterDelegationInstructions,
+  matterDelegationPool,
+  matterDelegationExcludes,
+} from "./matterDelegationPolicy.ts";
 
 const claudeMain = ProviderInstanceId.make("claudeAgent");
 const claudeAlt = ProviderInstanceId.make("claude-alt");
@@ -46,9 +46,9 @@ const provider = (
 
 const on = { mattrMultiProviderDelegation: true };
 
-describe("mattr delegation policy", () => {
+describe("Matter delegation policy", () => {
   it("lists ready instances in the pool and keeps excluded ones out", () => {
-    const pool = mattrDelegationPool(
+    const pool = matterDelegationPool(
       [
         provider(claudeMain),
         provider(claudeAlt),
@@ -64,12 +64,12 @@ describe("mattr delegation policy", () => {
   });
 
   it("writes a short block naming the pool and the excluded instances", () => {
-    const text = buildMattrDelegationInstructions(on, {
+    const text = buildMatterDelegationInstructions(on, {
       pool: [claudeMain, antigravity],
       excluded: [claudeAlt],
     });
-    assert.match(text, /^<mattr_delegation>\n/);
-    assert.match(text, /\n<\/mattr_delegation>$/);
+    assert.match(text, /^<matter_delegation>\n/);
+    assert.match(text, /\n<\/matter_delegation>$/);
     assert.include(text, "`orchestrator_capabilities` first");
     assert.include(text, "`delegate_task`");
     assert.include(text, "leftPercent");
@@ -80,7 +80,7 @@ describe("mattr delegation policy", () => {
   });
 
   it("leaves out the never line when nothing is excluded", () => {
-    const text = buildMattrDelegationInstructions(on, {
+    const text = buildMatterDelegationInstructions(on, {
       pool: [claudeMain, antigravity],
       excluded: [],
     });
@@ -89,13 +89,13 @@ describe("mattr delegation policy", () => {
 
   it("costs nothing while off or with fewer than two instances", () => {
     assert.equal(
-      buildMattrDelegationInstructions(
+      buildMatterDelegationInstructions(
         { mattrMultiProviderDelegation: false },
         { pool: [claudeMain, antigravity], excluded: [] },
       ),
       "",
     );
-    assert.equal(buildMattrDelegationInstructions(on, { pool: [claudeMain], excluded: [] }), "");
+    assert.equal(buildMatterDelegationInstructions(on, { pool: [claudeMain], excluded: [] }), "");
   });
 
   it("applies exclusions only while delegation is on", () => {
@@ -103,17 +103,17 @@ describe("mattr delegation policy", () => {
       ...DEFAULT_SERVER_SETTINGS,
       mattrDelegationExcludedInstanceIds: [claudeAlt],
     };
-    assert.isTrue(mattrDelegationExcludes(settings, claudeAlt));
+    assert.isTrue(matterDelegationExcludes(settings, claudeAlt));
     assert.isFalse(
-      mattrDelegationExcludes({ ...settings, mattrMultiProviderDelegation: false }, claudeAlt),
+      matterDelegationExcludes({ ...settings, mattrMultiProviderDelegation: false }, claudeAlt),
     );
   });
 });
 
-describe("MattrDelegationInstructions", () => {
+describe("MatterDelegationInstructions", () => {
   const firstMatching = (predicate: (text: string) => boolean) =>
     Effect.gen(function* () {
-      const service = yield* MattrDelegationInstructions.MattrDelegationInstructions;
+      const service = yield* MatterDelegationInstructions.MatterDelegationInstructions;
       const text = yield* service.changes.pipe(Stream.filter(predicate), Stream.runHead);
       return Option.getOrThrow(text);
     });
@@ -136,7 +136,7 @@ describe("MattrDelegationInstructions", () => {
       yield* Effect.gen(function* () {
         const session = () => buildRuntimeInstructions({ harness: "Claude Code" });
         yield* firstMatching((text) => text === "");
-        assert.notInclude(session(), "<mattr_delegation>");
+        assert.notInclude(session(), "<matter_delegation>");
 
         yield* Queue.offer(providerChanges, [
           provider(claudeMain),
@@ -157,10 +157,13 @@ describe("MattrDelegationInstructions", () => {
 
         yield* Queue.offer(settingsChanges, { ...excluding, mattrMultiProviderDelegation: false });
         yield* firstMatching((text) => text === "");
-        assert.notInclude(session(), "<mattr_delegation>");
-      }).pipe(Effect.provide(MattrDelegationInstructions.layer.pipe(Layer.provide(dependencies))));
+        assert.notInclude(session(), "<matter_delegation>");
+      }).pipe(Effect.provide(MatterDelegationInstructions.layer.pipe(Layer.provide(dependencies))));
 
-      assert.notInclude(buildRuntimeInstructions({ harness: "Claude Code" }), "<mattr_delegation>");
+      assert.notInclude(
+        buildRuntimeInstructions({ harness: "Claude Code" }),
+        "<matter_delegation>",
+      );
     }),
   );
 });

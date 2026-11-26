@@ -4,24 +4,24 @@ import { useEffect, useState } from "react";
 import { useGT, useMessages } from "gt-react";
 import * as Schema from "effect/Schema";
 
-import { MattrAiStatus } from "../chat/MattrAiStatusIndicator";
+import { MatterAiStatus } from "../chat/MatterAiStatusIndicator";
 import {
-  DEFAULT_MATTR_AI_STATUS_STYLE,
-  MATTR_AI_STATUS_PHASES,
-  MATTR_AI_STATUS_STYLES,
-  MattrAiStatusStyle,
-  type MattrAiStatusPhase,
-  useMattrAiStatusStyle,
-} from "../../mattrAiStatus";
+  DEFAULT_MATTER_AI_STATUS_STYLE,
+  MATTER_AI_STATUS_PHASES,
+  MATTER_AI_STATUS_STYLES,
+  MatterAiStatusStyle,
+  type MatterAiStatusPhase,
+  useMatterAiStatusStyle,
+} from "../../matterAiStatus";
 import { Button } from "../ui/button";
 import { RadioGroup } from "../ui/radio-group";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 
-const isMattrAiStatusStyle = Schema.is(MattrAiStatusStyle);
+const isMatterAiStatusStyle = Schema.is(MatterAiStatusStyle);
 
 /** One sample turn, about nine seconds: it ends finished, so nothing loops in Settings. */
 export const AI_STATUS_PREVIEW_STEPS: ReadonlyArray<{
-  readonly phase: MattrAiStatusPhase;
+  readonly phase: MatterAiStatusPhase;
   readonly ms: number;
 }> = [
   { phase: "thinking", ms: 1800 },
@@ -32,7 +32,7 @@ export const AI_STATUS_PREVIEW_STEPS: ReadonlyArray<{
 ];
 
 /** Plays the sample turn once on mount; the parent remounts it to replay. */
-function AiStatusPreview({ style }: { readonly style: MattrAiStatusStyle }) {
+function AiStatusPreview({ style }: { readonly style: MatterAiStatusStyle }) {
   const gt = useGT();
   const m = useMessages();
   const [step, setStep] = useState(0);
@@ -60,7 +60,7 @@ function AiStatusPreview({ style }: { readonly style: MattrAiStatusStyle }) {
     const label = current ? gt("Working for {time}", { time }) : gt("Worked for {time}", { time });
     return (
       <span
-        data-mattr-ai-status-preview="default"
+        data-matter-ai-status-preview="default"
         className="flex h-6 w-fit items-center whitespace-nowrap px-1 text-sm leading-relaxed text-muted-foreground tabular-nums"
       >
         {label}
@@ -68,34 +68,39 @@ function AiStatusPreview({ style }: { readonly style: MattrAiStatusStyle }) {
     );
   }
   if (!current) {
-    return <MattrAiStatus icon="done" label={gt("Worked for {time}", { time })} active={false} />;
+    return <MatterAiStatus icon="done" label={gt("Worked for {time}", { time })} active={false} />;
   }
-  const config = MATTR_AI_STATUS_PHASES[current.phase];
+  const config = MATTER_AI_STATUS_PHASES[current.phase];
   return (
-    <MattrAiStatus icon={config.icon} label={m(config.label)} active={config.active} timer={time} />
+    <MatterAiStatus
+      icon={config.icon}
+      label={m(config.label)}
+      active={config.active}
+      timer={time}
+    />
   );
 }
 
 /** Settings → Appearance: how the live working row shows what the agent is doing, per device. */
-export function MattrAiStatusSetting() {
+export function MatterAiStatusSetting() {
   const gt = useGT();
   const m = useMessages();
-  const [style, setStyle] = useMattrAiStatusStyle();
+  const [style, setStyle] = useMatterAiStatusStyle();
   const [replay, setReplay] = useState(0);
 
   return (
     <SettingsRow
-      id="mattr-ai-status"
+      id="matter-ai-status"
       title={gt("AI status")}
       description={gt(
         "How the status above a running reply shows what the agent is doing. It disappears when the turn ends.",
       )}
       devicePreference
       resetAction={
-        style !== DEFAULT_MATTR_AI_STATUS_STYLE ? (
+        style !== DEFAULT_MATTER_AI_STATUS_STYLE ? (
           <SettingResetButton
             ariaLabel={gt("Reset AI status to default")}
-            onClick={() => setStyle(DEFAULT_MATTR_AI_STATUS_STYLE)}
+            onClick={() => setStyle(DEFAULT_MATTER_AI_STATUS_STYLE)}
           />
         ) : null
       }
@@ -119,15 +124,15 @@ export function MattrAiStatusSetting() {
           aria-label={gt("AI status")}
           value={style}
           onValueChange={(value) => {
-            if (isMattrAiStatusStyle(value)) setStyle(value);
+            if (isMatterAiStatusStyle(value)) setStyle(value);
           }}
           className="grid grid-cols-1 @min-[32rem]/settings-row:grid-cols-2"
         >
-          {MATTR_AI_STATUS_STYLES.map((definition) => (
+          {MATTER_AI_STATUS_STYLES.map((definition) => (
             <RadioPrimitive.Root
               key={definition.id}
               value={definition.id}
-              data-mattr-ai-status-option={definition.id}
+              data-matter-ai-status-option={definition.id}
               className="flex min-w-0 cursor-pointer items-start gap-2 rounded-lg bg-card px-3 py-2.5 text-left outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
             >
               <span className="min-w-0 flex-1">

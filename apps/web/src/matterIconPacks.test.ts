@@ -2,16 +2,16 @@
 import * as Lucide from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { ICON_FAMILIES, PACK_ICON_NAMES } from "../../../antimatter/icons/icon-pack-map";
+import { ICON_FAMILIES, PACK_ICON_NAMES } from "../../../matter/icons/icon-pack-map";
 import {
   ICONIFY_PACKS,
   hasIconifyIcon,
   packGlyphs,
   packIconName,
   readIconifySet,
-} from "../../../antimatter/icons/iconify-packs";
-import type { IconPackSource } from "../../../antimatter/icons/iconPack";
-import { SF_SYMBOL_FOR_LUCIDE } from "../../../antimatter/icons/sf-symbol-map";
+} from "../../../matter/icons/iconify-packs";
+import type { IconPackSource } from "../../../matter/icons/iconPack";
+import { SF_SYMBOL_FOR_LUCIDE } from "../../../matter/icons/sf-symbol-map";
 import { createMemoryStorage } from "./lib/storage";
 
 const WEB_ROOT = `${import.meta.dirname}/..`;
@@ -75,7 +75,7 @@ describe("icon pack store", () => {
 
   it("keeps the last pack on screen until a lazy pack loads, then switches", async () => {
     vi.resetModules();
-    const store = await import("../../../antimatter/icons/iconPack");
+    const store = await import("../../../matter/icons/iconPack");
     expect(store.getIconPackState()).toMatchObject({
       requested: "sf-symbols-fill",
       shown: "sf-symbols-fill",
@@ -117,7 +117,7 @@ describe("icon pack store", () => {
   it("draws lucide when a pack fails to load", async () => {
     localStorage.setItem("mattr:icon-pack:v1", "tabler-filled");
     vi.resetModules();
-    const store = await import("../../../antimatter/icons/iconPack");
+    const store = await import("../../../matter/icons/iconPack");
     expect(store.getIconPackState()).toMatchObject({ requested: "tabler-filled", shown: null });
 
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -133,7 +133,7 @@ describe("icon pack store", () => {
   it("starts on the default pack when a saved pack no longer exists", async () => {
     localStorage.setItem("mattr:icon-pack:v1", "iconoir");
     vi.resetModules();
-    const store = await import("../../../antimatter/icons/iconPack");
+    const store = await import("../../../matter/icons/iconPack");
     expect(store.getIconPack()).toBe("sf-symbols-fill");
   });
 });

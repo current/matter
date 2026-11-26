@@ -7,7 +7,7 @@ import { render } from "../../test/render";
 import { useCommitOnBlur } from "../hooks/useCommitOnBlur";
 import { startMainAppLocationTracking } from "./sidebar/mainAppLocation";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./ui/menu";
-import { MattrInsetPage } from "./MattrInsetPage";
+import { MatterInsetPage } from "./MatterInsetPage";
 
 vi.mock("./chat/GlobalVoiceInputIndicator", () => ({ GlobalVoiceInputIndicator: () => null }));
 
@@ -20,9 +20,9 @@ function CommitOnBlurField({ onCommit }: { onCommit: (next: string) => void }) {
 function SettingsRoute({ children }: { children?: React.ReactNode }) {
   const pathname = useLocation({ select: (location) => location.pathname });
   return pathname.startsWith("/settings") ? (
-    <MattrInsetPage label="Settings" breadcrumb={<span>General</span>}>
+    <MatterInsetPage label="Settings" breadcrumb={<span>General</span>}>
       {children}
-    </MattrInsetPage>
+    </MatterInsetPage>
   ) : (
     <p>Thread view</p>
   );
@@ -50,7 +50,7 @@ async function openFromThread(children?: React.ReactNode) {
   };
 }
 
-describe("MattrInsetPage", () => {
+describe("MatterInsetPage", () => {
   it("renders inline in the shell card, not in a dialog", async () => {
     await using _settings = await openFromThread();
 

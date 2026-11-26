@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * mattr add-on registry: the source of truth for optional features. Enablement (persisted, the
+ * Matter add-on registry: the source of truth for optional features. Enablement (persisted, the
  * user's choice) is separate from runtime status (whether an enabled add-on is actually usable).
  */
 
@@ -158,11 +158,11 @@ export type AddonReconnectRequest = typeof AddonReconnectRequest.Type;
 export const ADDON_SECRET_CONFIG_KEY_PATTERN =
   /(token|secret|password|passwd|api[-_]?key|cookie|credential|bearer|session|private[-_]?key)/i;
 
-export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
+export const MATTER_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
   {
     id: "grok-bot",
     displayName: "Grok Bot",
-    description: "Talk to your existing Grok Bot teammates from the mattr sidebar.",
+    description: "Talk to your existing Grok Bot teammates from the Matter sidebar.",
     icon: "bot",
     category: "bots",
     platformRequirements: {
@@ -184,7 +184,7 @@ export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
   {
     id: "devin-bot",
     displayName: "Devin Bot",
-    description: "Talk to your Devin Bots and answer what they need from the mattr sidebar.",
+    description: "Talk to your Devin Bots and answer what they need from the Matter sidebar.",
     icon: "bot",
     category: "bots",
     platformRequirements: {
@@ -220,7 +220,7 @@ export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
       enableLabel: "Enable Voice Assistant",
       skipLabel: "Skip",
     },
-    settingsRoute: "/settings/general#mattr-voice-assistant",
+    settingsRoute: "/settings/general#matter-voice-assistant",
     contributions: ["settings", "commands", "overlay", "microphone", "network"],
     experimental: false,
   },
@@ -247,7 +247,7 @@ export const MATTR_ADDON_MANIFESTS: ReadonlyArray<AddonManifest> = [
 ];
 
 export function findAddonManifest(id: string): AddonManifest | undefined {
-  return MATTR_ADDON_MANIFESTS.find((manifest) => manifest.id === id);
+  return MATTER_ADDON_MANIFESTS.find((manifest) => manifest.id === id);
 }
 
 /** Grok Bot's loopback debug port lives in its non-secret add-on config under this key. */
@@ -267,7 +267,7 @@ export function grokBotCdpPortFromConfig(config: AddonConfig): number {
   return portFromConfig(config, GROK_BOT_CDP_PORT_CONFIG_KEY, GROK_BOT_DEFAULT_CDP_PORT);
 }
 
-/** The command a user runs to reopen Grok Bot with its debug port; mattr never runs it. */
+/** The command a user runs to reopen Grok Bot with its debug port; Matter never runs it. */
 export function grokBotLaunchCommand(port: number = GROK_BOT_DEFAULT_CDP_PORT): string {
   return `open -a "Grok Bot" --args --remote-debugging-port=${isValidPort(port) ? port : GROK_BOT_DEFAULT_CDP_PORT}`;
 }
@@ -280,7 +280,7 @@ export function devinBotCdpPortFromConfig(config: AddonConfig): number {
   return portFromConfig(config, DEVIN_BOT_CDP_PORT_CONFIG_KEY, DEVIN_BOT_DEFAULT_CDP_PORT);
 }
 
-/** The command a user runs to reopen Devin with a loopback-only debug port; mattr never runs it. */
+/** The command a user runs to reopen Devin with a loopback-only debug port; Matter never runs it. */
 export function devinBotLaunchCommand(port: number = DEVIN_BOT_DEFAULT_CDP_PORT): string {
   const safePort = isValidPort(port) ? port : DEVIN_BOT_DEFAULT_CDP_PORT;
   return `open -a "Devin" --args --remote-debugging-port=${safePort} --remote-debugging-address=127.0.0.1`;

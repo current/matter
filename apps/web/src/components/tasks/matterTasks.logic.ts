@@ -1,13 +1,13 @@
-import { type MattrTask, type MattrTaskMove, type MattrTaskStatus } from "@t3tools/contracts";
+import { type MatterTask, type MatterTaskMove, type MatterTaskStatus } from "@t3tools/contracts";
 
-const STATUS_RANK: Record<MattrTaskStatus, number> = {
+const STATUS_RANK: Record<MatterTaskStatus, number> = {
   todo: 0,
   in_progress: 1,
   in_review: 2,
   done: 3,
 };
 
-export function sortTasks(tasks: ReadonlyArray<MattrTask>): MattrTask[] {
+export function sortTasks(tasks: ReadonlyArray<MatterTask>): MatterTask[] {
   return tasks.toSorted(
     (a, b) =>
       STATUS_RANK[a.status] - STATUS_RANK[b.status] ||
@@ -17,9 +17,9 @@ export function sortTasks(tasks: ReadonlyArray<MattrTask>): MattrTask[] {
 }
 
 export function groupTasksByStatus(
-  tasks: ReadonlyArray<MattrTask>,
-): Record<MattrTaskStatus, MattrTask[]> {
-  const groups: Record<MattrTaskStatus, MattrTask[]> = {
+  tasks: ReadonlyArray<MatterTask>,
+): Record<MatterTaskStatus, MatterTask[]> {
+  const groups: Record<MatterTaskStatus, MatterTask[]> = {
     todo: [],
     in_progress: [],
     in_review: [],
@@ -30,7 +30,7 @@ export function groupTasksByStatus(
 }
 
 /** The list view: every open task first, then finished ones, each in board order. */
-export function listViewTasks(tasks: ReadonlyArray<MattrTask>, showCompleted: boolean) {
+export function listViewTasks(tasks: ReadonlyArray<MatterTask>, showCompleted: boolean) {
   const sorted = sortTasks(tasks);
   return {
     open: sorted.filter((task) => task.status !== "done"),
@@ -43,7 +43,7 @@ export function listViewTasks(tasks: ReadonlyArray<MattrTask>, showCompleted: bo
   };
 }
 
-export function openTaskCount(tasks: ReadonlyArray<MattrTask>): number {
+export function openTaskCount(tasks: ReadonlyArray<MatterTask>): number {
   return tasks.filter((task) => task.status !== "done").length;
 }
 
@@ -52,11 +52,11 @@ export function openTaskCount(tasks: ReadonlyArray<MattrTask>): number {
  * new neighbours so only the moved task changes. Returns null when nothing would move.
  */
 export function planTaskMove(
-  tasks: ReadonlyArray<MattrTask>,
+  tasks: ReadonlyArray<MatterTask>,
   taskId: string,
-  status: MattrTaskStatus,
+  status: MatterTaskStatus,
   beforeId: string | null,
-): MattrTaskMove | null {
+): MatterTaskMove | null {
   const task = tasks.find((candidate) => candidate.id === taskId);
   if (!task || beforeId === taskId) return null;
   const column = groupTasksByStatus(tasks)[status].filter((candidate) => candidate.id !== taskId);
@@ -88,10 +88,10 @@ export function planTaskMove(
 
 /** Applies moves the way the server does, so a drag shows its result before the reply. */
 export function applyTaskMoves(
-  tasks: ReadonlyArray<MattrTask>,
-  moves: ReadonlyArray<MattrTaskMove>,
+  tasks: ReadonlyArray<MatterTask>,
+  moves: ReadonlyArray<MatterTaskMove>,
   now: string,
-): MattrTask[] {
+): MatterTask[] {
   const byId = new Map(moves.map((move) => [move.id, move]));
   return tasks.map((task) => {
     const move = byId.get(task.id);
@@ -108,12 +108,12 @@ export function applyTaskMoves(
 }
 
 /** The opening prompt a task hands its agent: the title, then the note when there is one. */
-export function taskPrompt(task: Pick<MattrTask, "title" | "note">): string {
+export function taskPrompt(task: Pick<MatterTask, "title" | "note">): string {
   const note = task.note.trim();
   return note.length === 0 ? task.title : `${task.title}\n\n${note}`;
 }
 
-export type MattrTaskThreadState = "running" | "needs" | "done" | "failed" | "idle";
+export type MatterTaskThreadState = "running" | "needs" | "done" | "failed" | "idle";
 
 /** Days from today (-1, 0, 1) when the date is that close, else null, plus a short label. */
 export function describeTaskDueDate(
@@ -137,7 +137,7 @@ export function localIsoDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function isTaskOverdue(task: Pick<MattrTask, "dueDate" | "status">, today: Date) {
+export function isTaskOverdue(task: Pick<MatterTask, "dueDate" | "status">, today: Date) {
   if (task.dueDate === null || task.status === "done") return false;
   return task.dueDate < localIsoDate(today);
 }

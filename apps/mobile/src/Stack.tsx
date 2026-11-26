@@ -50,7 +50,7 @@ import {
 } from "./components/RenderErrorBoundary";
 import { ArchivedThreadsRouteScreen } from "./features/archive/ArchivedThreadsRouteScreen";
 import { ConnectOnboardingRouteScreen } from "./features/cloud/ConnectOnboardingRouteScreen";
-import { MattrVoiceModeScreen } from "./features/mattr-voice/MattrVoiceModeScreen";
+import { MatterVoiceModeScreen } from "./features/matter-voice/MatterVoiceModeScreen";
 import { AttachmentFileScreen } from "./features/files/AttachmentFileScreen";
 import { ThreadFilesTreeScreen, ThreadFileScreen } from "./features/files/ThreadFilesRouteScreen";
 import { AdaptiveWorkspaceLayout } from "./features/layout/AdaptiveWorkspaceLayout";
@@ -167,7 +167,7 @@ const { title: _compactBrandTitle, ...compactBrandHeaderOptions } = getCompactBr
 // Resolved in the rendered Navigator's screenOptions so each header title follows the UI language;
 // route options stay plain objects because registerPresentedRoutes reads them at load.
 const ROUTE_TITLES: Readonly<Record<string, string>> = {
-  MattrVoiceMode: msg("Voice mode"),
+  MatterVoiceMode: msg("Voice mode"),
   Settings: msg("Settings"),
   SettingsEnvironments: msg("Environments"),
   SettingsEnvironmentDetail: msg("Environment"),
@@ -751,8 +751,8 @@ const RootStackConfig = createWorkspaceStackNavigator({
       linking: "environments/:environmentId/local-preview",
       options: immersiveRoute({ fullWidth: true }),
     }),
-    MattrVoiceMode: createNativeStackScreen({
-      screen: MattrVoiceModeScreen,
+    MatterVoiceMode: createNativeStackScreen({
+      screen: MatterVoiceModeScreen,
       options: immersiveRoute(),
     }),
     ThreadReview: createNativeStackScreen({

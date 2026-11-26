@@ -30,11 +30,11 @@ import {
 
 import { ADDON_STATUS_LABELS } from "../../addons/addonRegistry";
 import {
-  MattrApiError,
-  mattrApiRequest,
-  useMattrApiConfig,
-  type MattrApiConfig,
-} from "../../addons/mattrApi";
+  MatterApiError,
+  matterApiRequest,
+  useMatterApiConfig,
+  type MatterApiConfig,
+} from "../../addons/matterApi";
 import { isElectron } from "../../env";
 import { useRenderedAppearance } from "../../hooks/useTheme";
 import { formatBytes } from "../../lib/formatBytes";
@@ -84,7 +84,7 @@ import {
 
 const PAGE_SIZE = 50;
 
-const isMattrApiError = Schema.is(MattrApiError);
+const isMatterApiError = Schema.is(MatterApiError);
 
 const messagesQuery = (providerId: string, conversationId: string) =>
   `providerId=${encodeURIComponent(providerId)}&conversationId=${encodeURIComponent(conversationId)}&limit=${PAGE_SIZE}`;
@@ -109,7 +109,7 @@ function workingStatusCopy(bot: BotIdentity, gt: ReturnType<typeof useGT>): stri
 type ProviderReconnect = ReturnType<typeof useProviderReconnect>;
 
 function useProviderReconnect(
-  config: MattrApiConfig | null,
+  config: MatterApiConfig | null,
   provider: BotProviderDescriptor | undefined,
 ) {
   const [busy, setBusy] = useState(false);
@@ -126,10 +126,10 @@ function useProviderReconnect(
   return { busy, unreachable, reconnect };
 }
 
-/** A Bot's conversation in mattr's own page card: shared by every Bots provider. */
+/** A Bot's conversation in Matter's own page card: shared by every Bots provider. */
 export function BotConversationView({ providerId, botId }: { providerId: string; botId: string }) {
   const gt = useGT();
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const bots = useBotsState();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the Bots event stream open while the page is shown
   useEffect(() => {
@@ -187,7 +187,7 @@ export function BotConversationView({ providerId, botId }: { providerId: string;
         />
       </WorkspacePageHeader>
 
-      {/* Single child under WorkspacePageHeader so mattr's shell.css wraps the entire body in its rounded inset card. */}
+      {/* Single child under WorkspacePageHeader so Matter's shell.css wraps the entire body in its rounded inset card. */}
       <div className="relative flex min-h-0 flex-1 flex-col bg-background">
         {!bots.loaded || config === null ? (
           <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -340,7 +340,7 @@ function ReconnectButton({
 }
 
 function useBotConversations(
-  config: MattrApiConfig | null,
+  config: MatterApiConfig | null,
   provider: BotProviderDescriptor | undefined,
   bot: BotIdentity | undefined,
 ): ReadonlyArray<BotConversation> {
@@ -352,7 +352,7 @@ function useBotConversations(
   useEffect(() => {
     if (config === null || providerId === null || botId === null) return;
     const controller = new AbortController();
-    void mattrApiRequest<BotConversationListResponse>(
+    void matterApiRequest<BotConversationListResponse>(
       config,
       `/api/mattr/bots/conversations?providerId=${encodeURIComponent(providerId)}&botId=${encodeURIComponent(botId)}`,
       { signal: controller.signal },
@@ -427,7 +427,7 @@ function BotConversationBody({
   pending,
   reconnect,
 }: {
-  config: MattrApiConfig;
+  config: MatterApiConfig;
   provider: BotProviderDescriptor;
   bot: BotIdentity;
   conversationId: string;
@@ -698,19 +698,19 @@ function BotEmptyConversation({
 }
 
 function fetchLatestPage(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   providerId: string,
   conversationId: string,
   signal?: AbortSignal,
 ) {
-  return mattrApiRequest<BotMessagesPage>(
+  return matterApiRequest<BotMessagesPage>(
     config,
     `/api/mattr/bots/messages?${messagesQuery(providerId, conversationId)}`,
     signal ? { signal } : {},
   );
 }
 
-function useBotConversation(config: MattrApiConfig, providerId: string, conversationId: string) {
+function useBotConversation(config: MatterApiConfig, providerId: string, conversationId: string) {
   const [messages, setMessages] = useState<ReadonlyArray<BotMessage>>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -768,7 +768,7 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
     if (!olderCursor) return;
     setLoadingOlder(true);
     try {
-      const page = await mattrApiRequest<BotMessagesPage>(
+      const page = await matterApiRequest<BotMessagesPage>(
         config,
         `/api/mattr/bots/messages?${messagesQuery(providerId, conversationId)}&cursor=${encodeURIComponent(olderCursor)}`,
       );
@@ -790,7 +790,7 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
     forgetFailure(clientNonce);
     setMessages((current) => upsertBotMessage(current, optimistic));
     try {
-      const { message } = await mattrApiRequest<{ readonly message: BotMessage }>(
+      const { message } = await matterApiRequest<{ readonly message: BotMessage }>(
         config,
         "/api/mattr/bots/messages",
         {
@@ -825,7 +825,7 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
         conversationId,
         providerId,
         role: "user",
-        attribution: "user-via-mattr",
+        attribution: "user-via-matter",
         authorBotId: null,
         markdown: text,
         parts: [{ type: "markdown", text }],
@@ -864,7 +864,7 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
     setStopping(true);
     setError(null);
     try {
-      await mattrApiRequest(config, "/api/mattr/bots/cancel", {
+      await matterApiRequest(config, "/api/mattr/bots/cancel", {
         method: "POST",
         body: { providerId, conversationId },
       });
@@ -894,7 +894,7 @@ function useBotConversation(config: MattrApiConfig, providerId: string, conversa
 }
 
 function errorText(cause: unknown) {
-  if (isMattrApiError(cause)) return cause.detail ?? cause.code;
+  if (isMatterApiError(cause)) return cause.detail ?? cause.code;
   return cause instanceof Error ? cause.message : String(cause);
 }
 
@@ -1146,7 +1146,7 @@ function BotPendingRequestCard({
   officialAppUrl,
   appName,
 }: {
-  config: MattrApiConfig;
+  config: MatterApiConfig;
   request: BotPendingRequest;
   supported: boolean;
   officialAppUrl: string | null;
@@ -1156,7 +1156,7 @@ function BotPendingRequestCard({
   const [busy, setBusy] = useState(false);
   const respond = (response: unknown) => {
     setBusy(true);
-    return mattrApiRequest(config, "/api/mattr/bots/respond", {
+    return matterApiRequest(config, "/api/mattr/bots/respond", {
       method: "POST",
       body: { providerId: request.providerId, requestId: request.requestId, response },
     }).finally(() => setBusy(false));

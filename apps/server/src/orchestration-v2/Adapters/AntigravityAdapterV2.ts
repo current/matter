@@ -365,7 +365,7 @@ export function makeAntigravityAcpAdapterFlavor(
               rootSessionId: sessionId,
               toolCallIds: nativeTaskIds,
             }),
-          // Upstream's transcript reader projects child work; mattr's watcher only adds its idle proof.
+          // Upstream's transcript reader projects child work; Matter's watcher only adds its idle proof.
           watchNativeSubagent: (input) => {
             const watcher = watchAntigravityChildActivity({
               profileDirectory,

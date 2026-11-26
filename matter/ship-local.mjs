@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Builds and signs mattr like the nightly workflow, without GitHub; --install swaps it into /Applications.
+// Builds and signs Matter like the nightly workflow, without GitHub; --install swaps it into /Applications.
 // Default: the unpacked .app, signed in place. --dmg adds CI's DMG, zip and manifest; --no-upstream skips the merge.
-// Usage: node antimatter/ship-local.mjs [--install] [--ref main] [--no-upstream] [--dmg] [--build-root <dir>]
+// Usage: node matter/ship-local.mjs [--install] [--ref main] [--no-upstream] [--dmg] [--build-root <dir>]
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
@@ -29,11 +29,11 @@ const repoRoot = NodePath.resolve(import.meta.dirname, "..");
 // Kept between runs so installs and builds stay incremental: git clean below leaves ignored
 // files (dist, node_modules and their caches) in place.
 const buildRoot = NodePath.resolve(
-  values["build-root"] ?? NodePath.join(NodePath.dirname(repoRoot), "mattr-ship"),
+  values["build-root"] ?? NodePath.join(NodePath.dirname(repoRoot), "matter-ship"),
 );
 const signingDir = NodePath.join(NodeOS.homedir(), ".antimatter-signing");
 const UPSTREAM_URL = "https://github.com/pingdotgg/t3code.git";
-const FORK_URL = "https://github.com/current/mattr.git";
+const FORK_URL = "https://github.com/current/matter.git";
 const NODE = "node@26.13.1";
 const BUNDLE_ID = "com.current.antimatter";
 const LAUNCHD_LABEL = "com.current.antimatter.ship-install";
@@ -155,7 +155,7 @@ if (values.upstream) {
 }
 const version = resolveVersion(upstreamTag);
 console.log(
-  `${values.upstream ? `${upstreamTag} + ` : ""}${values.ref} ${mainSha.slice(0, 12)} → mattr ${version}${values.upstream ? "" : ` (no upstream merge; based on ${upstreamTag})`}`,
+  `${values.upstream ? `${upstreamTag} + ` : ""}${values.ref} ${mainSha.slice(0, 12)} → Matter ${version}${values.upstream ? "" : ` (no upstream merge; based on ${upstreamTag})`}`,
 );
 
 // The build checkout is reset and cleaned, so never point it at a checkout someone works in.
@@ -187,9 +187,9 @@ if (values.upstream) {
   try {
     git([
       "-c",
-      "user.name=mattr-ship",
+      "user.name=matter-ship",
       "-c",
-      "user.email=mattr-ship@localhost",
+      "user.email=matter-ship@localhost",
       "merge",
       "--quiet",
       "--no-edit",
@@ -226,7 +226,7 @@ const installInputs = read(
 const installKey = NodeCrypto.createHash("sha256")
   .update(`${NODE}\0${installInputs}`)
   .digest("hex");
-const installStamp = NodePath.join(buildRoot, "node_modules/.mattr-ship-install");
+const installStamp = NodePath.join(buildRoot, "node_modules/.matter-ship-install");
 const installed =
   NodeFS.existsSync(NodePath.join(buildRoot, "node_modules/.modules.yaml")) &&
   NodeFS.existsSync(installStamp) &&
@@ -287,8 +287,8 @@ if (!values.dmg) {
   );
 }
 
-step("Signing with the mattr certificate");
-const keychain = NodePath.join(NodeOS.tmpdir(), `mattr-ship-${process.pid}.keychain-db`);
+step("Signing with the Matter certificate");
+const keychain = NodePath.join(NodeOS.tmpdir(), `matter-ship-${process.pid}.keychain-db`);
 const keychainPassword = NodeCrypto.randomBytes(16).toString("hex");
 const searchList = read("security", ["list-keychains", "-d", "user"])
   .split("\n")
@@ -334,11 +334,11 @@ try {
   const identity = /\b([0-9A-F]{40})\b.*Antimatter/.exec(
     read("security", ["find-identity", "-p", "codesigning", keychain]),
   )?.[1];
-  if (!identity) throw new Error("The mattr signing identity did not import.");
+  if (!identity) throw new Error("The Matter signing identity did not import.");
   run(
     "node",
     [
-      NodePath.join(buildRoot, "antimatter/sign-mac-release.mjs"),
+      NodePath.join(buildRoot, "matter/sign-mac-release.mjs"),
       ...(builtApp ? ["--app-path", builtApp] : ["--release-dir", releaseDir]),
       "--identity",
       identity,
@@ -381,10 +381,10 @@ if (!values.install) process.exit(0);
 
 step("Handing off the install");
 // Copy into buildRoot and launch in a clean gui/<uid> launchd job so quitting the live app
-// does not tear down the installer or leak ELECTRON_RUN_AS_NODE / agent env vars into mattr.
+// does not tear down the installer or leak ELECTRON_RUN_AS_NODE / agent env vars into Matter.
 const log = NodePath.join(buildRoot, "ship-local-install.log");
 const runScriptPath = NodePath.join(buildRoot, "ship-local-install-run.sh");
-NodeFS.copyFileSync(NodePath.join(repoRoot, "antimatter/ship-local-install.sh"), runScriptPath);
+NodeFS.copyFileSync(NodePath.join(repoRoot, "matter/ship-local-install.sh"), runScriptPath);
 NodeFS.chmodSync(runScriptPath, 0o755);
 
 const plistPath = NodePath.join(buildRoot, `${LAUNCHD_LABEL}.plist`);
@@ -426,7 +426,7 @@ if (process.platform === "darwin") {
   if (bootstrap.status === 0) {
     launchedViaLaunchd = true;
     console.log(
-      `Scheduled via launchd (${domain}/${LAUNCHD_LABEL}): mattr quits in ${values["quit-delay"]}s, then reopens as /Applications/mattr.app. Log: ${log}`,
+      `Scheduled via launchd (${domain}/${LAUNCHD_LABEL}): Matter quits in ${values["quit-delay"]}s, then reopens as /Applications/Matter.app. Log: ${log}`,
     );
   } else {
     const detail =
@@ -452,6 +452,6 @@ if (!launchedViaLaunchd) {
     NodeFS.closeSync(logFd);
   }
   console.log(
-    `Scheduled via detached spawn: mattr quits in ${values["quit-delay"]}s, then reopens as /Applications/mattr.app. Log: ${log}`,
+    `Scheduled via detached spawn: Matter quits in ${values["quit-delay"]}s, then reopens as /Applications/Matter.app. Log: ${log}`,
   );
 }

@@ -205,7 +205,7 @@ const antigravityUsageCommandArgs = (logFile: string) => [
 ];
 
 /** Spawns `agy -p /usage`; the caller's scope owns the child, so closing it kills the CLI. */
-export const runAntigravityUsageCommand = Effect.fn("MattrAntigravityQuota.runUsageCommand")(
+export const runAntigravityUsageCommand = Effect.fn("MatterAntigravityQuota.runUsageCommand")(
   function* (input: {
     readonly command: string;
     readonly env: NodeJS.ProcessEnv | undefined;
@@ -243,7 +243,7 @@ type ProviderSnapshot = Pick<
   "getSnapshot" | "refresh" | "refreshUsage" | "applyUsageLimits"
 >;
 
-export interface MattrAntigravityQuota {
+export interface MatterAntigravityQuota {
   /** Adds the latest reading to a snapshot, so provider checks carry it instead of clearing it. */
   readonly attach: (snapshot: ServerProvider) => Effect.Effect<ServerProvider>;
   /** Schedules a read 30 seconds after the last of a burst of turns. */
@@ -255,7 +255,7 @@ export interface MattrAntigravityQuota {
   ) => Effect.Effect<S>;
 }
 
-export const makeMattrAntigravityQuota = Effect.fn("MattrAntigravityQuota.make")(function* <
+export const makeMatterAntigravityQuota = Effect.fn("MatterAntigravityQuota.make")(function* <
   E,
 >(input: {
   /** False for instances whose account /usage cannot speak for. */
@@ -297,7 +297,7 @@ export const makeMattrAntigravityQuota = Effect.fn("MattrAntigravityQuota.make")
       attach,
       afterTurn: Effect.void,
       start: (snapshot) => Effect.succeed(snapshot),
-    } satisfies MattrAntigravityQuota;
+    } satisfies MatterAntigravityQuota;
   }
 
   const semaphore = yield* Semaphore.make(1);
@@ -305,7 +305,7 @@ export const makeMattrAntigravityQuota = Effect.fn("MattrAntigravityQuota.make")
   const debounceRef = yield* Ref.make<Fiber.Fiber<void> | undefined>(undefined);
   const providerRef = yield* Ref.make<ProviderSnapshot | undefined>(undefined);
 
-  const read = Effect.fn("MattrAntigravityQuota.read")(function* (provider: ProviderSnapshot) {
+  const read = Effect.fn("MatterAntigravityQuota.read")(function* (provider: ProviderSnapshot) {
     // Timeouts, spawn failures and defects all count as a failed read.
     const exit = yield* input.readUsage.pipe(Effect.timeoutOption(READ_TIMEOUT), Effect.exit);
     const outcome =
@@ -338,7 +338,7 @@ export const makeMattrAntigravityQuota = Effect.fn("MattrAntigravityQuota.make")
     }
   });
 
-  const readIfReady = Effect.fn("MattrAntigravityQuota.readIfReady")(function* (
+  const readIfReady = Effect.fn("MatterAntigravityQuota.readIfReady")(function* (
     ready: (snapshot: ServerProvider) => boolean,
   ) {
     const provider = yield* Ref.get(providerRef);
@@ -366,7 +366,7 @@ export const makeMattrAntigravityQuota = Effect.fn("MattrAntigravityQuota.make")
     if (previous) yield* Fiber.interrupt(previous);
   });
 
-  const start = Effect.fn("MattrAntigravityQuota.start")(function* <S extends ProviderSnapshot>(
+  const start = Effect.fn("MatterAntigravityQuota.start")(function* <S extends ProviderSnapshot>(
     snapshot: S,
     options: { readonly canPoll: Effect.Effect<boolean> },
   ) {
@@ -389,5 +389,5 @@ export const makeMattrAntigravityQuota = Effect.fn("MattrAntigravityQuota.make")
     return started;
   });
 
-  return { attach, afterTurn, start } satisfies MattrAntigravityQuota;
+  return { attach, afterTurn, start } satisfies MatterAntigravityQuota;
 });

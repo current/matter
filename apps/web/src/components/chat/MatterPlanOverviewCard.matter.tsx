@@ -10,9 +10,9 @@ import { useGT } from "gt-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import {
-  MATTR_PLAN_AUTO_APPROVE_SECONDS,
-  useMattrPlanAutoApproveSetting,
-} from "../../mattrPlanAutoApprove";
+  MATTER_PLAN_AUTO_APPROVE_SECONDS,
+  useMatterPlanAutoApproveSetting,
+} from "../../matterPlanAutoApprove";
 import ChatMarkdown from "../ChatMarkdown";
 import { Button } from "../ui/button";
 import {
@@ -26,8 +26,8 @@ import {
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { findRevealRef } from "./markdownFindContext";
-import { mattrAnimatedHeightRef } from "./mattrCardMotion.mattr";
-import { parseMattrPlanOverview, type MattrPlanStep } from "./mattrPlanParser.mattr";
+import { matterAnimatedHeightRef } from "./matterCardMotion.matter";
+import { parseMatterPlanOverview, type MatterPlanStep } from "./matterPlanParser.matter";
 
 const COLLAPSED_STEP_COUNT = 3;
 const COUNTDOWN_TICK_MS = 250;
@@ -37,13 +37,13 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 // Persists across LegendList unmount/remount so scrolling never re-arms a disarmed plan.
 const disarmedAutoApprovePlanIds = new Set<string>();
 
-export function resetDisarmedMattrPlanAutoApproveForTests(): void {
+export function resetDisarmedMatterPlanAutoApproveForTests(): void {
   disarmedAutoApprovePlanIds.clear();
 }
 
-export type MattrPlanApproveResult = AtomCommandResult<unknown, unknown> | void;
+export type MatterPlanApproveResult = AtomCommandResult<unknown, unknown> | void;
 
-export interface MattrPlanOverviewCardProps {
+export interface MatterPlanOverviewCardProps {
   readonly planId?: PlanId | undefined;
   readonly planMarkdown: string;
   readonly fallbackTitle: string;
@@ -57,7 +57,7 @@ export interface MattrPlanOverviewCardProps {
   /** Null when this client cannot write to the workspace. */
   readonly onSaveToWorkspace: (() => void) | null;
   /** Null unless the plan is still waiting for approval and this client can start a turn. */
-  readonly onApprove: ((planMarkdown: string) => Promise<MattrPlanApproveResult>) | null;
+  readonly onApprove: ((planMarkdown: string) => Promise<MatterPlanApproveResult>) | null;
   /** False for older/superseded or historical plans so they never arm auto-approve. */
   readonly autoApproveEligible?: boolean;
   /** Overrides the per-device setting; tests pass it. */
@@ -66,8 +66,8 @@ export interface MattrPlanOverviewCardProps {
   readonly children?: ReactNode;
 }
 
-/** mattr: the Plan Overview card that replaces upstream's proposed plan card. */
-export function MattrPlanOverviewCard({
+/** Matter: the Plan Overview card that replaces upstream's proposed plan card. */
+export function MatterPlanOverviewCard({
   planId,
   planMarkdown,
   fallbackTitle,
@@ -83,9 +83,9 @@ export function MattrPlanOverviewCard({
   autoApproveEligible = true,
   autoApprove,
   children,
-}: MattrPlanOverviewCardProps) {
+}: MatterPlanOverviewCardProps) {
   const gt = useGT();
-  const [autoApproveSetting] = useMattrPlanAutoApproveSetting();
+  const [autoApproveSetting] = useMatterPlanAutoApproveSetting();
   const planKey = planId ? `${environmentId}:${threadRef?.threadId ?? ""}:${planId}` : null;
   const [stepsExpanded, setStepsExpanded] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -94,7 +94,7 @@ export function MattrPlanOverviewCard({
   const [autoApproveCancelled, setAutoApproveCancelled] = useState(
     () => planKey !== null && disarmedAutoApprovePlanIds.has(planKey),
   );
-  const overview = parseMattrPlanOverview(planMarkdown);
+  const overview = parseMatterPlanOverview(planMarkdown);
   const title = overview.title ?? fallbackTitle;
   const displayedPlanMarkdown = stripDisplayedPlanMarkdown(planMarkdown);
   const steps = overview.steps;
@@ -151,13 +151,13 @@ export function MattrPlanOverviewCard({
   };
 
   return (
-    <article data-mattr-plan="" aria-label={gt("Plan Overview")}>
-      <header data-mattr-qp-header="">
-        <span data-mattr-qp-glyph="plan" aria-hidden>
+    <article data-matter-plan="" aria-label={gt("Plan Overview")}>
+      <header data-matter-qp-header="">
+        <span data-matter-qp-glyph="plan" aria-hidden>
           <ListChecksIcon />
         </span>
-        <span data-mattr-qp-heading="">{gt("Plan Overview")}</span>
-        <span data-mattr-plan-tools="">
+        <span data-matter-qp-heading="">{gt("Plan Overview")}</span>
+        <span data-matter-plan-tools="">
           <PlanTool label={gt("Download as markdown")} onClick={onDownload}>
             <DownloadIcon aria-hidden />
           </PlanTool>
@@ -173,22 +173,22 @@ export function MattrPlanOverviewCard({
         </span>
       </header>
 
-      <h3 data-mattr-plan-title="" data-thread-find-text="true">
+      <h3 data-matter-plan-title="" data-thread-find-text="true">
         {title}
       </h3>
-      {overview.summary ? <p data-mattr-plan-summary="">{overview.summary}</p> : null}
+      {overview.summary ? <p data-matter-plan-summary="">{overview.summary}</p> : null}
 
       {steps.length > 0 || !planOpen ? (
-        <div data-mattr-plan-todos="">
+        <div data-matter-plan-todos="">
           {steps.length > 0 ? (
             <>
-              <div data-mattr-plan-todos-header="">
+              <div data-matter-plan-todos-header="">
                 <ListChecksIcon aria-hidden />
                 <span>{gt("To-dos")}</span>
-                <span data-mattr-plan-count="">{steps.length}</span>
+                <span data-matter-plan-count="">{steps.length}</span>
               </div>
-              <div data-mattr-height="" ref={mattrAnimatedHeightRef}>
-                <ul data-mattr-plan-steps="">
+              <div data-matter-height="" ref={matterAnimatedHeightRef}>
+                <ul data-matter-plan-steps="">
                   {keyedSteps(shownSteps).map(({ key, step }) => (
                     <PlanStepRow key={key} step={step} />
                   ))}
@@ -197,12 +197,12 @@ export function MattrPlanOverviewCard({
               {hiddenStepCount > 0 ? (
                 <button
                   type="button"
-                  data-mattr-plan-more=""
+                  data-matter-plan-more=""
                   data-scroll-anchor-ignore
                   aria-expanded={stepsExpanded}
                   onClick={() => setStepsExpanded((value) => !value)}
                 >
-                  <span data-mattr-plan-more-glyph={stepsExpanded ? "less" : "more"} aria-hidden />
+                  <span data-matter-plan-more-glyph={stepsExpanded ? "less" : "more"} aria-hidden />
                   {stepsExpanded
                     ? gt("Show less")
                     : gt("{count} more", {
@@ -213,7 +213,7 @@ export function MattrPlanOverviewCard({
               ) : null}
             </>
           ) : (
-            <div data-mattr-plan-preview="">
+            <div data-matter-plan-preview="">
               <ChatMarkdown
                 text={displayedPlanMarkdown}
                 cwd={cwd}
@@ -230,7 +230,7 @@ export function MattrPlanOverviewCard({
       {planOpen || findActive ? (
         <div
           ref={revealRef}
-          data-mattr-plan-full=""
+          data-matter-plan-full=""
           data-open={planOpen ? "" : undefined}
           data-thread-find-text="true"
           data-thread-find-fold={planOpen ? undefined : ""}
@@ -246,20 +246,20 @@ export function MattrPlanOverviewCard({
         </div>
       ) : null}
 
-      <footer data-mattr-qp-footer="">
+      <footer data-matter-qp-footer="">
         {autoApproveArmed ? (
           <AutoApproveCountdown
-            seconds={MATTR_PLAN_AUTO_APPROVE_SECONDS}
+            seconds={MATTER_PLAN_AUTO_APPROVE_SECONDS}
             onElapsed={approve}
             onCancel={disarmAutoApprove}
           />
         ) : (
           <span />
         )}
-        <div data-mattr-qp-actions="">
+        <div data-matter-qp-actions="">
           <button
             type="button"
-            data-mattr-qp-pill-button="secondary"
+            data-matter-qp-pill-button="secondary"
             data-scroll-anchor-ignore
             aria-expanded={planOpen}
             onClick={() => {
@@ -272,13 +272,13 @@ export function MattrPlanOverviewCard({
           {onApprove !== null ? (
             <button
               type="button"
-              data-mattr-qp-pill-button="primary"
+              data-matter-qp-pill-button="primary"
               data-ready={canApprove ? "" : undefined}
               disabled={!canApprove}
               onClick={approve}
             >
               {approving ? gt("Approving…") : gt("Approve", { $context: "approve a plan" })}
-              <span data-mattr-qp-enter="" aria-hidden>
+              <span data-matter-qp-enter="" aria-hidden>
                 ↵
               </span>
             </button>
@@ -329,7 +329,7 @@ export function MattrPlanOverviewCard({
 }
 
 /** Keys by text; a repeated step gets its occurrence number. */
-function keyedSteps(steps: ReadonlyArray<MattrPlanStep>) {
+function keyedSteps(steps: ReadonlyArray<MatterPlanStep>) {
   const seen = new Map<string, number>();
   return steps.map((step) => {
     const occurrence = (seen.get(step.text) ?? 0) + 1;
@@ -351,7 +351,7 @@ function PlanTool({
     <Tooltip>
       <TooltipTrigger
         render={
-          <button type="button" data-mattr-plan-tool="" aria-label={label} onClick={onClick} />
+          <button type="button" data-matter-plan-tool="" aria-label={label} onClick={onClick} />
         }
       >
         {children}
@@ -361,10 +361,10 @@ function PlanTool({
   );
 }
 
-function PlanStepRow({ step }: { step: MattrPlanStep }) {
+function PlanStepRow({ step }: { step: MatterPlanStep }) {
   return (
-    <li data-mattr-plan-step="" data-done={step.done ? "" : undefined}>
-      <span data-mattr-plan-step-mark="" aria-hidden>
+    <li data-matter-plan-step="" data-done={step.done ? "" : undefined}>
+      <span data-matter-plan-step-mark="" aria-hidden>
         {step.done ? (
           <svg viewBox="0 0 16 16">
             <circle cx="8" cy="8" r="7" />
@@ -376,7 +376,7 @@ function PlanStepRow({ step }: { step: MattrPlanStep }) {
           </svg>
         )}
       </span>
-      <span data-mattr-plan-step-text="">{step.text}</span>
+      <span data-matter-plan-step-text="">{step.text}</span>
     </li>
   );
 }
@@ -426,10 +426,10 @@ function AutoApproveCountdown({
   const secondsLeft = Math.ceil(remainingMs / 1000);
   const fraction = remainingMs / totalMs;
   return (
-    <div data-mattr-plan-auto="" role="timer" aria-live="off">
+    <div data-matter-plan-auto="" role="timer" aria-live="off">
       <button
         type="button"
-        data-mattr-plan-auto-ring=""
+        data-matter-plan-auto-ring=""
         data-paused={paused ? "" : undefined}
         aria-label={gt("Cancel auto-approve")}
         onMouseEnter={() => setHovered(true)}
@@ -449,12 +449,12 @@ function AutoApproveCountdown({
             strokeDashoffset={RING_CIRCUMFERENCE * (1 - fraction)}
           />
         </svg>
-        <XIcon data-mattr-plan-auto-cancel="" aria-hidden />
-        <span data-mattr-plan-auto-tip="" aria-hidden>
+        <XIcon data-matter-plan-auto-cancel="" aria-hidden />
+        <span data-matter-plan-auto-tip="" aria-hidden>
           {gt("Cancel", { $context: "cancel auto-approve" })}
         </span>
       </button>
-      <span data-mattr-plan-auto-label="">
+      <span data-matter-plan-auto-label="">
         {gt("Auto Approve in {seconds}s", { seconds: secondsLeft })}
       </span>
     </div>

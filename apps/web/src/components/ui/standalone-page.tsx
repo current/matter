@@ -23,9 +23,9 @@ export function StandalonePageHeader({
   return (
     <>
       <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
-        <span className="flex items-center gap-1.5" role="img" aria-label="mattr">
+        <span className="flex items-center gap-1.5" role="img" aria-label="Matter">
           <T3Wordmark className="size-4 shrink-0 text-foreground" aria-hidden />
-          <span className="text-lg font-semibold tracking-tight text-foreground">mattr</span>
+          <span className="text-lg font-semibold tracking-tight text-foreground">Matter</span>
         </span>
         {context ? <span className="text-sm">{context}</span> : null}
       </div>

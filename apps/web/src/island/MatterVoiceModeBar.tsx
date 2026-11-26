@@ -76,7 +76,7 @@ function ThreadLinks(props: {
  * Voice Mode in the chat: takes the composer's place while a session runs, so the thread stays
  * in view. `floating` is the fallback when no composer is on screen (Settings, pull requests).
  */
-export function MattrVoiceModeBar(props: {
+export function MatterVoiceModeBar(props: {
   readonly variant: "composer" | "floating";
   /** Thread whose composer hosts the bar; the scope label only shows when it differs. */
   readonly hostThreadKey?: string | null;
@@ -261,7 +261,7 @@ export function MattrVoiceModeBar(props: {
             <MenuItem
               onClick={() => {
                 setVoiceModeOpen(false);
-                void navigate({ to: "/settings/general", hash: "mattr-voice-assistant" });
+                void navigate({ to: "/settings/general", hash: "matter-voice-assistant" });
               }}
             >
               {gt("Voice settings…")}

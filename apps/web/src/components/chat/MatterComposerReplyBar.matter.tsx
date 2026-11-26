@@ -18,9 +18,9 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   buildUserMessageReplyRecord,
   extractReplyExcerpt,
-  requestMattrMessageReveal,
+  requestMatterMessageReveal,
   resolveReplyRole,
-} from "./mattrMessageReply.mattr";
+} from "./matterMessageReply.matter";
 
 function useJumpToRepliedMessage(currentThreadRef?: ScopedThreadRef | null) {
   const router = useRouter({ warn: false });
@@ -35,7 +35,7 @@ function useJumpToRepliedMessage(currentThreadRef?: ScopedThreadRef | null) {
       currentThreadRef.threadId === citation.threadId;
 
     if (role === "user") {
-      requestMattrMessageReveal({
+      requestMatterMessageReveal({
         environmentId: citation.environmentId,
         threadId: citation.threadId,
         messageId: citation.messageId,
@@ -58,7 +58,7 @@ function useJumpToRepliedMessage(currentThreadRef?: ScopedThreadRef | null) {
       void router.navigate(assistantCitationNavigation(citation, source));
       return;
     }
-    requestMattrMessageReveal({
+    requestMatterMessageReveal({
       environmentId: citation.environmentId,
       threadId: citation.threadId,
       messageId: citation.messageId,
@@ -67,11 +67,11 @@ function useJumpToRepliedMessage(currentThreadRef?: ScopedThreadRef | null) {
 }
 
 /**
- * Tactile in-card reply banner docked at the top of mattr's prompt card.
+ * Tactile in-card reply banner docked at the top of Matter's prompt card.
  * Shows who Chris is replying to, a clean 1-line truncated excerpt (clickable to jump to
  * the target message), and a crisp dismiss control.
  */
-export function MattrComposerReplyBar({
+export function MatterComposerReplyBar({
   replyTo,
   currentThreadRef,
   onJumpToMessage,
@@ -104,24 +104,24 @@ export function MattrComposerReplyBar({
 
   return (
     <div
-      data-mattr-reply-bar=""
-      data-mattr-reply-role={role}
-      data-mattr-reply-message-id={replyTo.citation.messageId}
+      data-matter-reply-bar=""
+      data-matter-reply-role={role}
+      data-matter-reply-message-id={replyTo.citation.messageId}
     >
-      <ReplyIcon aria-hidden="true" data-mattr-reply-bar-icon="" />
+      <ReplyIcon aria-hidden="true" data-matter-reply-bar-icon="" />
       <button
         type="button"
-        data-mattr-reply-bar-jump=""
+        data-matter-reply-bar-jump=""
         onClick={handleJump}
         aria-label={gt("Jump to replied message: {excerpt}", { excerpt })}
       >
-        <span data-mattr-reply-bar-heading="">{heading}</span>
+        <span data-matter-reply-bar-heading="">{heading}</span>
         {excerpt ? (
           <>
-            <span aria-hidden="true" data-mattr-reply-bar-sep="">
+            <span aria-hidden="true" data-matter-reply-bar-sep="">
               ·
             </span>
-            <span data-mattr-reply-bar-excerpt="">{excerpt}</span>
+            <span data-matter-reply-bar-excerpt="">{excerpt}</span>
           </>
         ) : null}
       </button>
@@ -130,7 +130,7 @@ export function MattrComposerReplyBar({
           render={
             <button
               type="button"
-              data-mattr-reply-bar-dismiss=""
+              data-matter-reply-bar-dismiss=""
               onClick={onDismiss}
               aria-label={gt("Cancel reply")}
             />
@@ -149,7 +149,7 @@ export function MattrComposerReplyBar({
 /**
  * Compact clickable reply reference header rendered right above a sent user message bubble.
  */
-export function MattrSentReplyHeader({
+export function MatterSentReplyHeader({
   record,
   currentThreadRef,
   onJumpToMessage,
@@ -181,9 +181,9 @@ export function MattrSentReplyHeader({
   return (
     <button
       type="button"
-      data-mattr-reply-header=""
-      data-mattr-reply-role={role}
-      data-mattr-reply-message-id={record.citation.messageId}
+      data-matter-reply-header=""
+      data-matter-reply-role={role}
+      data-matter-reply-message-id={record.citation.messageId}
       data-thread-find-ignore=""
       onClick={handleJump}
       aria-label={gt("Go to replied message from {author}: {excerpt}", {
@@ -191,14 +191,14 @@ export function MattrSentReplyHeader({
         excerpt,
       })}
     >
-      <ReplyIcon aria-hidden="true" data-mattr-reply-header-icon="" />
-      <span data-mattr-reply-header-author="">{authorLabel}</span>
+      <ReplyIcon aria-hidden="true" data-matter-reply-header-icon="" />
+      <span data-matter-reply-header-author="">{authorLabel}</span>
       {excerpt ? (
         <>
-          <span aria-hidden="true" data-mattr-reply-header-sep="">
+          <span aria-hidden="true" data-matter-reply-header-sep="">
             ·
           </span>
-          <span data-mattr-reply-header-excerpt="">{excerpt}</span>
+          <span data-matter-reply-header-excerpt="">{excerpt}</span>
         </>
       ) : null}
     </button>
@@ -208,7 +208,7 @@ export function MattrSentReplyHeader({
 /**
  * Reply action button rendered inside the hover action bar of user messages.
  */
-export function MattrUserReplyButton({
+export function MatterUserReplyButton({
   messageId,
   itemId,
   rawText,
@@ -265,7 +265,7 @@ export function MattrUserReplyButton({
  * In-bubble card for a reply-only or mid-message user reply reference (where the header
  * above the bubble does not replace the bubble body).
  */
-export function MattrInlineUserReplyCard({
+export function MatterInlineUserReplyCard({
   record,
   copyMarkdown,
   leading,

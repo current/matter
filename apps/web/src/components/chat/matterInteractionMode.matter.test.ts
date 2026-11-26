@@ -6,19 +6,19 @@ import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "../../proposedPlan";
 import { searchSlashCommandItems } from "./composerSlashCommandSearch";
 import {
   clearPersistedComposerInteractionMode,
-  deriveMattrComposerInteractionMode,
+  deriveMatterComposerInteractionMode,
   isGoalClearCommand,
   latestProposedPlan,
-  mattrInteractionModeSlashItems,
+  matterInteractionModeSlashItems,
   nextInteractionMode,
   providerHasNativeGoals,
   resolveComposerInteractionMode,
   resolveInteractionModeSend,
   prependKeepingGoalCommand,
-  resolveMattrModeSend,
+  resolveMatterModeSend,
   threadHasNativeGoal,
   withNativeGoalCommand,
-} from "./mattrInteractionMode.mattr";
+} from "./matterInteractionMode.matter";
 import { resolveMultipleModelTargets } from "./chatViewSend";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 
@@ -73,7 +73,7 @@ describe("providerHasNativeGoals", () => {
     expect(providerHasNativeGoals(opencode, [], "2.2.4")).toBe(false);
   });
 
-  it("leaves fallback providers (Cursor, Pi, Kiro, Grok, Muse, fx) to mattr's Goal block", () => {
+  it("leaves fallback providers (Cursor, Pi, Kiro, Grok, Muse, fx) to Matter's Goal block", () => {
     for (const driver of ["cursor", "pi", "kiro", "grok", "muse", "fx"]) {
       expect(providerHasNativeGoals(ProviderDriverKind.make(driver), [])).toBe(false);
     }
@@ -189,9 +189,9 @@ describe("resolveInteractionModeSend", () => {
   });
 });
 
-describe("resolveMattrModeSend", () => {
+describe("resolveMatterModeSend", () => {
   it("keeps the composer's mode for ordinary text", () => {
-    expect(resolveMattrModeSend({ ...baseSend, prompt: "hi", interactionMode: "goal" })).toEqual({
+    expect(resolveMatterModeSend({ ...baseSend, prompt: "hi", interactionMode: "goal" })).toEqual({
       ...noExtras,
       prompt: "hi",
       interactionMode: "goal",
@@ -205,7 +205,7 @@ describe("resolveMattrModeSend", () => {
       { bypass: true, editingQueuedMessage: false },
       { bypass: false, editingQueuedMessage: true },
     ]) {
-      expect(resolveMattrModeSend({ ...baseSend, ...bypass, prompt: "/plan x" })).toEqual({
+      expect(resolveMatterModeSend({ ...baseSend, ...bypass, prompt: "/plan x" })).toEqual({
         ...noExtras,
         prompt: "/plan x",
         interactionMode: "default",
@@ -215,7 +215,7 @@ describe("resolveMattrModeSend", () => {
   });
 
   it("reports a standalone command as a switch with nothing to send", () => {
-    expect(resolveMattrModeSend({ ...baseSend, prompt: "/goal" })).toEqual({
+    expect(resolveMatterModeSend({ ...baseSend, prompt: "/goal" })).toEqual({
       ...noExtras,
       prompt: null,
       interactionMode: "goal",
@@ -225,24 +225,26 @@ describe("resolveMattrModeSend", () => {
 
   it("starts a native goal only from the first Goal prompt", () => {
     const goal = { ...baseSend, interactionMode: "goal", nativeGoals: true } as const;
-    expect(resolveMattrModeSend({ ...goal, prompt: "ship it" }).startsNativeGoal).toBe(true);
-    expect(resolveMattrModeSend({ ...goal, prompt: "/goal ship it" }).startsNativeGoal).toBe(false);
+    expect(resolveMatterModeSend({ ...goal, prompt: "ship it" }).startsNativeGoal).toBe(true);
+    expect(resolveMatterModeSend({ ...goal, prompt: "/goal ship it" }).startsNativeGoal).toBe(
+      false,
+    );
     expect(
-      resolveMattrModeSend({ ...goal, nativeGoalStarted: true, prompt: "also docs" })
+      resolveMatterModeSend({ ...goal, nativeGoalStarted: true, prompt: "also docs" })
         .startsNativeGoal,
     ).toBe(false);
     expect(
-      resolveMattrModeSend({ ...goal, bypass: true, prompt: "ship it" }).startsNativeGoal,
+      resolveMatterModeSend({ ...goal, bypass: true, prompt: "ship it" }).startsNativeGoal,
     ).toBe(false);
     // `/goal <objective>` typed in Default on a native provider stays as typed.
     expect(
-      resolveMattrModeSend({ ...baseSend, nativeGoals: true, prompt: "/goal ship it" }),
+      resolveMatterModeSend({ ...baseSend, nativeGoals: true, prompt: "/goal ship it" }),
     ).toEqual({ ...noExtras, prompt: "/goal ship it", interactionMode: "goal", switchTo: "goal" });
   });
 
   it("leaves Goal when a native `/goal clear` is typed", () => {
     expect(
-      resolveMattrModeSend({
+      resolveMatterModeSend({
         ...baseSend,
         prompt: "/goal clear",
         nativeGoals: true,
@@ -264,7 +266,7 @@ describe("resolveMattrModeSend", () => {
       prompt: `${PLAN_IMPLEMENTATION_PROMPT_PREFIX}# Plan`,
     };
     expect(
-      resolveMattrModeSend({
+      resolveMatterModeSend({
         ...baseSend,
         prompt: "  ",
         interactionMode: "plan",
@@ -279,7 +281,7 @@ describe("resolveMattrModeSend", () => {
     });
     // Feedback refines the plan instead.
     expect(
-      resolveMattrModeSend({
+      resolveMatterModeSend({
         ...baseSend,
         prompt: "smaller steps",
         interactionMode: "plan",
@@ -287,7 +289,7 @@ describe("resolveMattrModeSend", () => {
       }),
     ).toEqual({ ...noExtras, prompt: "smaller steps", interactionMode: "plan", switchTo: null });
     expect(
-      resolveMattrModeSend({
+      resolveMatterModeSend({
         ...baseSend,
         prompt: "",
         interactionMode: "plan",
@@ -340,12 +342,12 @@ describe("latestProposedPlan", () => {
   });
 });
 
-describe("deriveMattrComposerInteractionMode", () => {
+describe("deriveMatterComposerInteractionMode", () => {
   const derive = (
-    overrides: Partial<Parameters<typeof deriveMattrComposerInteractionMode>[0]> = {},
+    overrides: Partial<Parameters<typeof deriveMatterComposerInteractionMode>[0]> = {},
   ) =>
-    deriveMattrComposerInteractionMode({
-      composerDraftTarget: DraftId.make("mattr-derive"),
+    deriveMatterComposerInteractionMode({
+      composerDraftTarget: DraftId.make("matter-derive"),
       composerMode: null,
       thread: undefined,
       isServerThread: true,
@@ -366,7 +368,7 @@ describe("deriveMattrComposerInteractionMode", () => {
     hasActionableProposedPlan: false,
     latestRun: null,
     runtime: null,
-  } as unknown as NonNullable<Parameters<typeof deriveMattrComposerInteractionMode>[0]["thread"]>;
+  } as unknown as NonNullable<Parameters<typeof deriveMatterComposerInteractionMode>[0]["thread"]>;
 
   it("never treats an unsent draft as running a native goal, whatever its draft thread says", () => {
     const draft = derive({ thread: goalThread, isServerThread: false, composerMode: "goal" });
@@ -404,7 +406,7 @@ describe("deriveMattrComposerInteractionMode", () => {
   });
 
   it("keeps the mode on a read-only or offline thread", () => {
-    const target = DraftId.make("mattr-derive-readonly");
+    const target = DraftId.make("matter-derive-readonly");
     derive({ composerDraftTarget: target, canChangeMode: false }).setMode("plan");
     expect(useComposerDraftStore.getState().getComposerDraft(target)?.interactionMode ?? null).toBe(
       null,
@@ -455,9 +457,9 @@ describe("resolveMultipleModelTargets", () => {
   });
 });
 
-describe("mattrInteractionModeSlashItems", () => {
+describe("matterInteractionModeSlashItems", () => {
   it("adds /plan, /goal and /default to the slash menu search", () => {
-    const items = mattrInteractionModeSlashItems(english as never, false);
+    const items = matterInteractionModeSlashItems(english as never, false);
     expect(items.map((item) => item.label)).toEqual(["/plan", "/goal", "/default"]);
     expect(searchSlashCommandItems(items, "pla").map((item) => item.label)[0]).toBe("/plan");
     expect(searchSlashCommandItems(items, "goal").map((item) => item.label)[0]).toBe("/goal");
@@ -466,7 +468,7 @@ describe("mattrInteractionModeSlashItems", () => {
 
 describe("composer draft store", () => {
   it("keeps Goal as a composer's interaction mode", () => {
-    const draftId = DraftId.make("mattr-goal-mode");
+    const draftId = DraftId.make("matter-goal-mode");
     const store = useComposerDraftStore.getState();
     store.setInteractionMode(draftId, "goal");
     expect(useComposerDraftStore.getState().getComposerDraft(draftId)?.interactionMode).toBe(
@@ -484,8 +486,8 @@ describe("composer draft store", () => {
 
   it("drops a pending mode once the server thread holds it, keeping a newer pick", () => {
     const threadRef = {
-      environmentId: EnvironmentId.make("env-mattr"),
-      threadId: ThreadId.make("thread-mattr-persisted"),
+      environmentId: EnvironmentId.make("env-matter"),
+      threadId: ThreadId.make("thread-matter-persisted"),
     };
     const store = useComposerDraftStore.getState();
     store.setInteractionMode(threadRef, "plan");

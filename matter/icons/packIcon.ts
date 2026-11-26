@@ -42,7 +42,7 @@ export interface PackIconSpec {
   readonly Sf: unknown;
 }
 
-const SPEC = Symbol.for("mattr.packIconSpec");
+const SPEC = Symbol.for("matter.packIconSpec");
 const baseClassNames = new Map<string, string>();
 
 /** The pack spec behind an icon from the lucide-react stand-in; null when icons aren't swapped. */
@@ -114,10 +114,10 @@ export function drawPackIcon(
 }
 /** A drop-in for a lucide-react icon that draws the icon pack chosen in Settings → Appearance. */
 export function createPackIcon(react: ReactRuntime, spec: PackIconSpec) {
-  function MattrIcon(props: Record<string, unknown>) {
+  function MatterIcon(props: Record<string, unknown>) {
     const state = react.useSyncExternalStore(subscribeIconPack, getIconPackState, getIconPackState);
     return drawPackIcon(react, spec, state.shown, state.sources, props);
   }
-  MattrIcon.displayName = spec.name;
-  return Object.assign(MattrIcon, { [SPEC]: spec });
+  MatterIcon.displayName = spec.name;
+  return Object.assign(MatterIcon, { [SPEC]: spec });
 }

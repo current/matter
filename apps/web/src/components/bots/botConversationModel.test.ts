@@ -43,7 +43,7 @@ describe("botConversationModel", () => {
     const optimistic = message({
       remoteId: "local-1",
       role: "user",
-      attribution: "user-via-mattr",
+      attribution: "user-via-matter",
       clientNonce: "n1",
       deliveryState: "pending",
     });
@@ -179,7 +179,7 @@ describe("scheduledTriggerDetail", () => {
       message({
         remoteId,
         role: "user",
-        attribution: "user-via-mattr",
+        attribution: "user-via-matter",
         authorBotId: null,
         markdown,
       });

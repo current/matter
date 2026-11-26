@@ -4,7 +4,7 @@ import { resetVoiceInputGlobalsForTests } from "../../../../packages/client-runt
 import type {
   VoiceAssistantTurnResponse,
   VoiceWorkspaceContext,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 
 const mocks = vi.hoisted(() => {
   const players: Array<{
@@ -72,20 +72,20 @@ import {
   isMobileAudioCueEnabled,
   playMobileAudioCue,
   resetMobileAudioCuesForTests,
-} from "./mattrAudioCues";
+} from "./matterAudioCues";
 import {
   createVoiceInputTarget,
   VoiceInputSession,
 } from "../features/voice-input/voiceInputSession";
-import { VoiceModeSession, type VoiceModeAudio } from "../features/mattr-voice/voiceModeSession";
+import { VoiceModeSession, type VoiceModeAudio } from "../features/matter-voice/voiceModeSession";
 import type {
   ActiveListening,
   ActivePlayback,
   ListenResult,
-} from "../features/mattr-voice/nativeVoiceAudio";
-import type { VoiceAssistantApi } from "../features/mattr-voice/voiceAssistantApi";
+} from "../features/matter-voice/nativeVoiceAudio";
+import type { VoiceAssistantApi } from "../features/matter-voice/voiceAssistantApi";
 
-describe("mobile mattrAudioCues", () => {
+describe("mobile matterAudioCues", () => {
   beforeEach(() => {
     resetMobileAudioCuesForTests();
     resetVoiceInputGlobalsForTests();
@@ -121,7 +121,7 @@ describe("mobile mattrAudioCues", () => {
     expect(header).toBe("RIFF");
 
     expect(mocks.createAudioPlayer).toHaveBeenCalledWith(
-      { uri: "file:///cache/mattr-audio-cue-v1-dictation-start.wav" },
+      { uri: "file:///cache/matter-audio-cue-v1-dictation-start.wav" },
       { updateInterval: 100, keepAudioSessionActive: true },
     );
     expect(mocks.players[0]!.play).toHaveBeenCalledTimes(1);

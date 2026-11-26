@@ -1,6 +1,6 @@
 #!/bin/bash
-# Started via launchd (or detached fallback) by ship-local.mjs --install: quits the live mattr app,
-# moves the old bundle to the Trash, installs /Applications/mattr.app, re-registers it, and verifies
+# Started via launchd (or detached fallback) by ship-local.mjs --install: quits the live Matter app,
+# moves the old bundle to the Trash, installs /Applications/Matter.app, re-registers it, and verifies
 # that the relaunched app and its local server come back healthy.
 # Usage: ship-local-install.sh <staged .app> <bundle id>
 set -u
@@ -21,8 +21,8 @@ done
 
 NEW_APP="$1"
 BUNDLE_ID="$2"
-DEST="/Applications/mattr.app"
-APP_PATTERN='^/Applications/(Antimatter|mattr)\.app/Contents/MacOS/'
+DEST="/Applications/Matter.app"
+APP_PATTERN='^/Applications/(Antimatter|mattr|Matter)\.app/Contents/MacOS/'
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 QUIT_DELAY_SECS="${QUIT_DELAY:-20}"
 VERIFY_URL="${VERIFY_URL-http://127.0.0.1:3773/.well-known/t3/environment}"
@@ -61,7 +61,7 @@ wait_for_healthy() {
       return 0
     fi
     if [ "$elapsed" -ge 15 ] && [ "$max_wait" -lt 35 ] && is_app_running; then
-      log "mattr process is alive; extending health check wait to 35s"
+      log "Matter process is alive; extending health check wait to 35s"
       max_wait=35
     fi
     sleep 1
@@ -94,7 +94,7 @@ run_launch_attempt() {
       log "attempt 3 exit=$status${output:+ output=$output}"
       ;;
     4)
-      local bin="$DEST/Contents/MacOS/mattr"
+      local bin="$DEST/Contents/MacOS/Matter"
       if [ ! -x "$bin" ]; then
         local exe_name
         exe_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$DEST/Contents/Info.plist" 2>/dev/null || true)"
@@ -144,7 +144,7 @@ if lsof -nP -iTCP:3773 -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 sleep 1
 
-for old in /Applications/Antimatter.app "$DEST"; do
+for old in /Applications/Antimatter.app /Applications/mattr.app "$DEST"; do
   if [ -d "$old" ]; then
     trash_target="$HOME/.Trash/$(basename "$old" .app)-$(date +%Y%m%d%H%M%S).app"
     log "moving $old to $trash_target"
@@ -171,19 +171,19 @@ log "re-registering $DEST with LaunchServices"
 
 for attempt in 1 2 3 4; do
   if [ "$attempt" -gt 1 ] && is_app_running; then
-    log "mattr process is still running after previous attempt; skipping duplicate launch"
+    log "Matter process is still running after previous attempt; skipping duplicate launch"
     break
   fi
   run_launch_attempt "$attempt"
   if wait_for_healthy; then
     pids="$(pgrep -f "$APP_PATTERN" | tr '\n' ',' | sed 's/,$//')"
-    log "mattr relaunched and healthy (pid ${pids}, 127.0.0.1:3773 ready)"
+    log "Matter relaunched and healthy (pid ${pids}, 127.0.0.1:3773 ready)"
     exit 0
   fi
   log "attempt $attempt did not reach healthy state"
 done
 
-log "ERROR: mattr failed to relaunch cleanly after all attempts"
+log "ERROR: Matter failed to relaunch cleanly after all attempts"
 log "diagnostics: pgrep -fl:"
 pgrep -fl "$APP_PATTERN" || log "  (no matching processes)"
 log "diagnostics: ls -ld \"$DEST\":"

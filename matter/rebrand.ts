@@ -7,34 +7,34 @@ const keepNewlines = (whitespace: string) => whitespace.replace(/[^\n]/g, "");
 const REPLACEMENTS: ReadonlyArray<
   readonly [RegExp, (match: string, whitespace: string, noun?: string) => string]
 > = [
-  [/\bT3(\s+)Connect\b/g, (_match, whitespace) => `mattr${whitespace}Connect`],
+  [/\bT3(\s+)Connect\b/g, (_match, whitespace) => `Matter${whitespace}Connect`],
   // No trailing \b so suffixed forms ("T3 Codes") match. The GitHub App keeps its real name.
-  [/\bT3(\s+)Code(?! for GitHub)/g, (_match, whitespace) => `mattr${keepNewlines(whitespace)}`],
-  [/\bT3%20Code\b/g, () => "mattr"],
-  [/\bT3(\s+)(threads?\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
-  [/\bT3(\s+)(desktop\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
-  [/\bT3(\s+)(home\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
-  [/\bT3(\s+)(process\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)Code(?! for GitHub)/g, (_match, whitespace) => `Matter${keepNewlines(whitespace)}`],
+  [/\bT3%20Code\b/g, () => "Matter"],
+  [/\bT3(\s+)(threads?\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(desktop\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(home\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(process\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
   [
     /\bT3(\s+)(system footprint\b)/g,
-    (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`,
+    (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`,
   ],
-  [/\bT3(\s+)(operations\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
-  [/\bT3(\s+)(tool\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
-  [/\bT3(\s+)(project file\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(operations\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(tool\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(project file\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
   [
     /\bT3(\s+)(requests zero data retention\b)/g,
-    (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`,
+    (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`,
   ],
-  [/\bT3(\s+)(could not\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun ?? ""}`],
+  [/\bT3(\s+)(could not\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun ?? ""}`],
 ];
 
 const SERVER_NAME_REPLACEMENT: readonly [
   RegExp,
   (match: string, whitespace: string, noun: string) => string,
-] = [/\bT3(\s+)([Ss]erver\b)/g, (_match, whitespace, noun) => `mattr${whitespace}${noun}`];
+] = [/\bT3(\s+)([Ss]erver\b)/g, (_match, whitespace, noun) => `Matter${whitespace}${noun}`];
 
-// The project file is mattr.json now. A string that is exactly "t3.json" is a settings-source id
+// The project file is matter.json now. A string that is exactly "t3.json" is a settings-source id
 // shared with the server (except the inheritance label), and the schema URL must stay upstream's.
 const PROJECT_FILE_COPY = /(?<!schema\/)\bt3\.json\b/g;
 const rebrandProjectFile = (text: string) =>
@@ -43,13 +43,13 @@ const rebrandProjectFile = (text: string) =>
       const before = whole[offset - 1];
       const isWholeString =
         before !== undefined && `"'\``.includes(before) && whole[offset + match.length] === before;
-      return isWholeString ? match : "mattr.json";
+      return isWholeString ? match : "matter.json";
     })
-    .replace(/\blabel: "t3\.json"/g, 'label: "mattr.json"');
+    .replace(/\blabel: "t3\.json"/g, 'label: "matter.json"');
 
 const CLIENT_SOURCE = /\/(apps\/web\/src|packages\/[^/]+\/src)\//;
 const ZIP_OR_PROJECT_FILE = /\/(components\/files\/|zip\/|ProjectSettingsPanel\.tsx$)/;
-const STREAM_ANIMATION_FILE = /\/(mattrStreamAnimation\.ts|MattrStreamAnimationSetting\.tsx)$/;
+const STREAM_ANIMATION_FILE = /\/(matterStreamAnimation\.ts|MatterStreamAnimationSetting\.tsx)$/;
 const PROJECT_ARCHIVE_PHRASE = /\b(?:un)?archiv(?:e|ed|ing)\s+projects?\b/i;
 
 const ARCHIVE_TO_HIDE: ReadonlyArray<readonly [RegExp, string]> = [
@@ -219,11 +219,11 @@ const PROJECT_CONTEXT = /^\s*,\s*\{[^}]*\$context\s*:\s*["'][^"']*project[^"']*[
 const SETTINGS_ARCHIVED_KEY = /"\/settings\/archived"\s*:\s*$/;
 
 const RUNTIME_SERVER_ERROR_HELPER = `
-function __mattrRebrandServerError(text: string): string {
+function __matterRebrandServerError(text: string): string {
   let result = text
-    .replace(/\\bT3(\\s+)Connect\\b/g, "mattr$1Connect")
-    .replace(/\\bT3\\s+Code(?! for GitHub)/g, "mattr")
-    .replace(/\\bT3(\\s+)(threads?|[Ss]erver|home)\\b/g, "mattr$1$2");
+    .replace(/\\bT3(\\s+)Connect\\b/g, "Matter$1Connect")
+    .replace(/\\bT3\\s+Code(?! for GitHub)/g, "Matter")
+    .replace(/\\bT3(\\s+)(threads?|[Ss]erver|home)\\b/g, "Matter$1$2");
   if (/\\bThread\\b.*\\barchiv/i.test(result)) {
     result = result
       .replace(/\\barchiving\\b/g, "hiding")
@@ -287,11 +287,11 @@ export function rebrandTerminologyInSource(code: string, filePath: string): stri
     const wrapped = next
       .replace(
         "? error.message\n    : null;",
-        "? __mattrRebrandServerError(error.message)\n    : null;",
+        "? __matterRebrandServerError(error.message)\n    : null;",
       )
       .replace(
         "return text === undefined ? error.message : resolveMarkedText(text, resolve);",
-        "return text === undefined ? __mattrRebrandServerError(error.message) : resolveMarkedText(text, resolve);",
+        "return text === undefined ? __matterRebrandServerError(error.message) : resolveMarkedText(text, resolve);",
       );
     if (wrapped !== next) {
       next = `${RUNTIME_SERVER_ERROR_HELPER}\n${wrapped}`;
@@ -319,9 +319,9 @@ export function rebrandSource(code: string, filePath: string): string {
   return /\.(ts|tsx)$/.test(filePath) ? rebrandTerminologyInSource(branded, filePath) : branded;
 }
 
-export function mattrRebrandPlugin(): Plugin {
+export function matterRebrandPlugin(): Plugin {
   return {
-    name: "antimatter:rebrand",
+    name: "matter:rebrand",
     enforce: "pre",
     transform(code, id) {
       // Tests assert upstream's English copy.
@@ -341,9 +341,9 @@ export function mattrRebrandPlugin(): Plugin {
 
 // The desktop main process also builds data paths and IDs from "T3 Code", so only its
 // translatable dialog copy (msg("…")) and desktop i18n catalogs are rewritten.
-export function mattrDesktopCopyPlugin() {
+export function matterDesktopCopyPlugin() {
   return {
-    name: "antimatter:rebrand-desktop-copy",
+    name: "matter:rebrand-desktop-copy",
     transform(code: string, id: string) {
       if (process.env.VITEST) return null;
       const path = id.split("?")[0] ?? id;

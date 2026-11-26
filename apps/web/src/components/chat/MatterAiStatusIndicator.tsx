@@ -1,4 +1,4 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mattr-ais*` classes come from the fork stylesheet antimatter/rareui-chat.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `matter-ais*` classes come from the fork stylesheet matter/rareui-chat.css, which loads outside Tailwind. */
 import { use, useEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 import { useGT, useMessages } from "gt-react";
 
@@ -7,14 +7,14 @@ import { tickTextContent } from "~/lib/tickTextContent";
 import { cn } from "~/lib/utils";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import {
-  MATTR_AI_STATUS_PHASES,
-  MattrAiStatusPhaseCtx,
-  MattrThinkingCoordinationCtx,
-  deriveMattrAiStatusPhase,
-  deriveMattrThinkingCoordination,
-  type MattrAiStatusIcon,
-  useMattrAiStatusStyle,
-} from "../../mattrAiStatus";
+  MATTER_AI_STATUS_PHASES,
+  MatterAiStatusPhaseCtx,
+  MatterThinkingCoordinationCtx,
+  deriveMatterAiStatusPhase,
+  deriveMatterThinkingCoordination,
+  type MatterAiStatusIcon,
+  useMatterAiStatusStyle,
+} from "../../matterAiStatus";
 import {
   TimelineRowActivityCtx,
   TimelineRowCtx,
@@ -26,18 +26,18 @@ import { ThinkingTimelineRow, WorkingTimelineRow } from "./TimelineWorkGroupRows
 import { formatWorkingTimerNow } from "./TimelineWorkGroupRows.logic";
 
 const AIS = {
-  root: "mattr-ais",
-  icon: "mattr-ais-icon",
-  iconIn: "mattr-ais-icon-in",
-  iconOut: "mattr-ais-icon-out",
-  row: "mattr-ais-row",
-  textIn: "mattr-ais-text-in",
-  textOut: "mattr-ais-text-out",
-  check: "mattr-ais-check",
+  root: "matter-ais",
+  icon: "matter-ais-icon",
+  iconIn: "matter-ais-icon-in",
+  iconOut: "matter-ais-icon-out",
+  row: "matter-ais-row",
+  textIn: "matter-ais-text-in",
+  textOut: "matter-ais-text-out",
+  check: "matter-ais-check",
 } as const;
 
 /** Upstream's activity provider plus the live turn's AI status phase, derived only while it runs. */
-export function MattrTimelineActivityProvider({
+export function MatterTimelineActivityProvider({
   value,
   rows,
   children,
@@ -48,13 +48,13 @@ export function MattrTimelineActivityProvider({
 }) {
   const phase =
     value.isWorking || value.awaitingUser
-      ? deriveMattrAiStatusPhase(rows, {
+      ? deriveMatterAiStatusPhase(rows, {
           awaitingUser: value.awaitingUser,
           compacting: value.isCompacting,
           preparingWorktree: value.isPreparingWorktree,
         })
       : "thinking";
-  const thinkingCoordination = deriveMattrThinkingCoordination(rows, {
+  const thinkingCoordination = deriveMatterThinkingCoordination(rows, {
     awaitingUser: value.awaitingUser,
     isPreparingWorktree: value.isPreparingWorktree,
     isCompacting: value.isCompacting,
@@ -65,24 +65,24 @@ export function MattrTimelineActivityProvider({
   });
   return (
     <TimelineRowActivityCtx value={value}>
-      <MattrAiStatusPhaseCtx value={phase}>
-        <MattrThinkingCoordinationCtx value={thinkingCoordination}>
+      <MatterAiStatusPhaseCtx value={phase}>
+        <MatterThinkingCoordinationCtx value={thinkingCoordination}>
           {children}
-        </MattrThinkingCoordinationCtx>
-      </MattrAiStatusPhaseCtx>
+        </MatterThinkingCoordinationCtx>
+      </MatterAiStatusPhaseCtx>
     </TimelineRowActivityCtx>
   );
 }
 
 /** The working row: upstream's timer, or RareUI's status when Settings picks it. */
-export function MattrWorkingTimelineRow({
+export function MatterWorkingTimelineRow({
   row,
 }: {
   row: Extract<TimelineRow, { kind: "working" }>;
 }) {
-  const [style] = useMattrAiStatusStyle();
+  const [style] = useMatterAiStatusStyle();
   const { backgroundWorktreeSetup } = use(TimelineRowActivityCtx);
-  const { thinkingRowOwnsStatus } = use(MattrThinkingCoordinationCtx);
+  const { thinkingRowOwnsStatus } = use(MatterThinkingCoordinationCtx);
   // Upstream's row keeps the background setup chip, and stays a calm elapsed timer when a lower
   // thinking row (e.g. below a reply or steer) already owns the live RareUI status.
   if (style === "default" || backgroundWorktreeSetup !== null || thinkingRowOwnsStatus) {
@@ -92,12 +92,12 @@ export function MattrWorkingTimelineRow({
 }
 
 /** The live thinking row: upstream's brain row in Default mode, or RareUI's animated status. */
-export function MattrThinkingTimelineRow({
+export function MatterThinkingTimelineRow({
   row,
 }: {
   row: Extract<TimelineRow, { kind: "thinking" }>;
 }) {
-  const [style] = useMattrAiStatusStyle();
+  const [style] = useMatterAiStatusStyle();
   const ctx = use(TimelineRowCtx);
   const gt = useGT();
   const m = useMessages();
@@ -108,7 +108,7 @@ export function MattrThinkingTimelineRow({
     providerStartingLabel,
     providerStarting,
   } = use(TimelineRowActivityCtx);
-  const { suppressPlainThinkingRow } = use(MattrThinkingCoordinationCtx);
+  const { suppressPlainThinkingRow } = use(MatterThinkingCoordinationCtx);
 
   if (style === "default" || isPreparingWorktree || isCompacting || providerStarting !== null) {
     return <ThinkingTimelineRow row={row} />;
@@ -130,8 +130,8 @@ export function MattrThinkingTimelineRow({
     row.label ??
     liveAnswerPreview ??
     gt("Thinking");
-  const icon: MattrAiStatusIcon = row.label !== undefined ? "analyzing" : "thinking";
-  const status = <MattrAiStatus icon={icon} label={label} active={live} />;
+  const icon: MatterAiStatusIcon = row.label !== undefined ? "analyzing" : "thinking";
+  const status = <MatterAiStatus icon={icon} label={label} active={live} />;
 
   const { groupId } = row;
   if (groupId === undefined) return status;
@@ -149,13 +149,13 @@ export function MattrThinkingTimelineRow({
 
 function RareUiWorkingRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
   const m = useMessages();
-  const phase = useHeldValue(use(MattrAiStatusPhaseCtx), PHASE_HOLD_MS);
+  const phase = useHeldValue(use(MatterAiStatusPhaseCtx), PHASE_HOLD_MS);
   const { activeThreadEnvironmentId } = use(TimelineRowCtx);
-  const config = MATTR_AI_STATUS_PHASES[row.compacting ? "compacting" : phase];
+  const config = MATTER_AI_STATUS_PHASES[row.compacting ? "compacting" : phase];
   const { createdAt } = row;
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
-      <MattrAiStatus
+      <MatterAiStatus
         icon={config.icon}
         label={m(config.label)}
         active={config.active}
@@ -225,14 +225,14 @@ function bindRowWidth(row: HTMLSpanElement | null) {
  * RareUI's Inline AI Status: an animated icon per state and a shimmering label, swapping with a
  * blur-and-lift; loops run only while `active`.
  */
-export function MattrAiStatus({
+export function MatterAiStatus({
   icon,
   label,
   active,
   timer,
   className,
 }: {
-  readonly icon: MattrAiStatusIcon;
+  readonly icon: MatterAiStatusIcon;
   readonly label: string;
   readonly active: boolean;
   readonly timer?: ReactNode;
@@ -243,7 +243,7 @@ export function MattrAiStatus({
   return (
     <div
       ref={active ? observeVisibleAnimation : undefined}
-      data-mattr-ai-status={icon}
+      data-matter-ai-status={icon}
       data-active={active || undefined}
       className={cn(
         AIS.root,
@@ -261,14 +261,14 @@ export function MattrAiStatus({
             className={cn(AIS.iconOut, "absolute inset-0 grid place-items-center")}
             onAnimationEnd={iconSwap.onLeft}
           >
-            <MattrAiStatusGlyph icon={iconSwap.leaving as MattrAiStatusIcon} active={false} />
+            <MatterAiStatusGlyph icon={iconSwap.leaving as MatterAiStatusIcon} active={false} />
           </span>
         ) : null}
         <span
           key={`in:${icon}`}
           className={cn("grid place-items-center", iconSwap.swapped && AIS.iconIn)}
         >
-          <MattrAiStatusGlyph icon={icon} active={active} />
+          <MatterAiStatusGlyph icon={icon} active={active} />
         </span>
       </span>
       <span ref={bindRowWidth} className={cn(AIS.row, "relative min-w-0 overflow-x-clip")}>
@@ -289,7 +289,7 @@ export function MattrAiStatus({
             ) : null}
             <span
               key={`in:${label}`}
-              data-slot="mattr-ai-status-label"
+              data-slot="matter-ai-status-label"
               className={cn(
                 "relative block overflow-hidden font-medium text-muted-foreground",
                 labelSwap.swapped && AIS.textIn,
@@ -302,7 +302,7 @@ export function MattrAiStatus({
           {active && timer ? (
             <span
               aria-hidden
-              data-slot="mattr-ai-status-timer"
+              data-slot="matter-ai-status-timer"
               className="font-medium text-muted-foreground/70 tabular-nums"
             >
               {timer}
@@ -329,26 +329,26 @@ const PEN_PATH =
   "M3.78181 16.3092L3 21L7.69086 20.2182C8.50544 20.0825 9.25725 19.6956 9.84119 19.1116L20.4198 8.53288C21.1934 7.75922 21.1934 6.5049 20.4197 5.73126L18.2687 3.58024C17.495 2.80658 16.2406 2.80659 15.4669 3.58027L4.88841 14.159C4.30447 14.7429 3.91757 15.4947 3.78181 16.3092Z";
 
 /** RareUI's state icons, drawn at 16px; `active` runs their loop. */
-function MattrAiStatusGlyph({
+function MatterAiStatusGlyph({
   icon,
   active,
 }: {
-  readonly icon: MattrAiStatusIcon;
+  readonly icon: MatterAiStatusIcon;
   readonly active: boolean;
 }) {
-  const loop = (name: string) => (active ? `${name} mattr-ais-loop` : name);
+  const loop = (name: string) => (active ? `${name} matter-ais-loop` : name);
   switch (icon) {
     case "thinking":
       return (
         <svg viewBox="0 0 24 24" className="size-4 text-muted-foreground">
-          <path d={SPARKLE_PATH} fill="currentColor" className={loop("mattr-ais-sparkle")} />
-          <path d={TWINKLE_PATH} fill="currentColor" className={loop("mattr-ais-twinkle")} />
+          <path d={SPARKLE_PATH} fill="currentColor" className={loop("matter-ais-sparkle")} />
+          <path d={TWINKLE_PATH} fill="currentColor" className={loop("matter-ais-twinkle")} />
         </svg>
       );
     case "researching":
       return (
         <svg viewBox="0 0 24 24" className="size-4 text-muted-foreground">
-          <g className={loop("mattr-ais-lens")}>
+          <g className={loop("matter-ais-lens")}>
             <circle {...STROKE} cx={10.5} cy={10.5} r={5.5} strokeWidth={2.25} />
             <path {...STROKE} d="M14.75 14.75L19 19" strokeWidth={2.5} />
           </g>
@@ -363,7 +363,7 @@ function MattrAiStatusGlyph({
               {...STROKE}
               d={`M${x} 19V5`}
               strokeWidth={3}
-              className={loop("mattr-ais-bar")}
+              className={loop("matter-ais-bar")}
             />
           ))}
         </svg>
@@ -377,9 +377,9 @@ function MattrAiStatusGlyph({
               d={WAVE_PATH}
               pathLength={1}
               strokeWidth={2.25}
-              className={loop("mattr-ais-ink")}
+              className={loop("matter-ais-ink")}
             />
-            <g className={loop("mattr-ais-pen")}>
+            <g className={loop("matter-ais-pen")}>
               <path d={PEN_PATH} fill="currentColor" transform="scale(0.66) translate(-3 -21)" />
             </g>
           </g>

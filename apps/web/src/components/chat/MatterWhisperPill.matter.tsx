@@ -41,21 +41,21 @@ import { ThreadRelationshipIcon } from "./ThreadRelationshipIcon";
 import { ThreadRelationshipsPanel } from "./ThreadRelationshipsControl";
 import { ThreadServersPanel } from "./ThreadServersPanel";
 import {
-  closeMattrLineagePopover,
-  countMattrPreviousAgents,
-  deriveMattrWhisperRows,
-  isMattrWhisperActive,
-  type MattrLineageView,
-  type MattrWhisperRow,
-  oldestMattrWhisperStart,
-  openMattrLineagePopover,
-  setMattrLineageView,
-  stackMattrWhisperAvatars,
-  useMattrLineagePopover,
-} from "./mattrThreadRibbon.logic";
+  closeMatterLineagePopover,
+  countMatterPreviousAgents,
+  deriveMatterWhisperRows,
+  isMatterWhisperActive,
+  type MatterLineageView,
+  type MatterWhisperRow,
+  oldestMatterWhisperStart,
+  openMatterLineagePopover,
+  setMatterLineageView,
+  stackMatterWhisperAvatars,
+  useMatterLineagePopover,
+} from "./matterThreadRibbon.logic";
 
 /** The parent's pending background work and its Stop, from the thread lifecycle. */
-export interface MattrBackgroundWork {
+export interface MatterBackgroundWork {
   readonly tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>;
   /** Null while the turn is live (the composer owns that Stop) or the user can't operate. */
   readonly onStop: (() => Promise<void>) | null;
@@ -65,17 +65,17 @@ export interface MattrBackgroundWork {
 interface LineageThreadProps {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
-  readonly backgroundWork: MattrBackgroundWork;
+  readonly backgroundWork: MatterBackgroundWork;
 }
 
 /** Everything the pill and the Ribbon's agents button read about the thread's lineage. */
-export function useMattrLineageModel(props: LineageThreadProps) {
+export function useMatterLineageModel(props: LineageThreadProps) {
   const gt = useGT();
   const ref = scopeThreadRef(props.environmentId, props.threadId);
   const projection = useQuietThreadProjection(ref)?.projection ?? null;
   const relationshipShells = useThreadRelationshipShells(ref);
   const subagents = projection?.subagents ?? [];
-  const rows = deriveMattrWhisperRows({
+  const rows = deriveMatterWhisperRows({
     subagents,
     backgroundTasks: props.backgroundWork.tasks,
     fallbackTitle: gt("Subagent"),
@@ -88,13 +88,13 @@ export function useMattrLineageModel(props: LineageThreadProps) {
     ref,
     threadKey: scopedThreadKey(ref),
     rows,
-    previousCount: countMattrPreviousAgents(subagents),
+    previousCount: countMatterPreviousAgents(subagents),
     sideChatCount,
   };
 }
 
 /** Automations bound to the thread, and how many of them are running now. */
-export function useMattrThreadAutomationCounts(environmentId: EnvironmentId, threadId: ThreadId) {
+export function useMatterThreadAutomationCounts(environmentId: EnvironmentId, threadId: ThreadId) {
   const tasksQuery = useEnvironmentQuery(
     serverEnvironment.scheduledTasksLive({ environmentId, input: {} }),
     useMessages(),
@@ -121,14 +121,14 @@ function WhisperRowTimer({ startedAtMs }: { readonly startedAtMs: number | null 
 }
 
 function LineageRow(props: {
-  readonly row: MattrWhisperRow;
+  readonly row: MatterWhisperRow;
   readonly environmentId: EnvironmentId;
   readonly parentThreadId: ThreadId;
   readonly providerEntries: ReadonlyArray<ProviderInstanceEntry>;
   readonly providers: ReadonlyArray<ServerProvider> | undefined;
   readonly stopping: boolean;
   readonly stopDisabled: boolean;
-  readonly onStop: (row: MattrWhisperRow) => void;
+  readonly onStop: (row: MatterWhisperRow) => void;
 }) {
   const gt = useGT();
   const navigate = useNavigate();
@@ -138,7 +138,7 @@ function LineageRow(props: {
   const driver = row.driver ?? provider?.driver;
   const open = (intent: Parameters<typeof openSideThread>[0]["intent"]) => {
     if (row.childThreadId === null) return;
-    closeMattrLineagePopover();
+    closeMatterLineagePopover();
     openSideThread({
       threadRef: scopeThreadRef(props.environmentId, row.childThreadId),
       panelRef: scopeThreadRef(props.environmentId, props.parentThreadId),
@@ -153,14 +153,14 @@ function LineageRow(props: {
   const triggerProps = row.childThreadId === null || row.remoteLabel !== null ? {} : trigger(open);
   const navigable = row.childThreadId !== null && row.remoteLabel === null;
   return (
-    <li data-mattr-lineage-row data-kind={row.kind}>
+    <li data-matter-lineage-row data-kind={row.kind}>
       <Tooltip>
         <TooltipTrigger
           delay={300}
           render={
             <button
               type="button"
-              data-mattr-lineage-row-open
+              data-matter-lineage-row-open
               disabled={!navigable}
               {...triggerProps}
               onClick={(event) => {
@@ -179,17 +179,17 @@ function LineageRow(props: {
               status={row.status}
             />
           ) : (
-            <TerminalIcon aria-hidden data-mattr-lineage-row-glyph />
+            <TerminalIcon aria-hidden data-matter-lineage-row-glyph />
           )}
-          <span data-mattr-lineage-row-title>{row.title}</span>
+          <span data-matter-lineage-row-title>{row.title}</span>
           {row.remoteLabel !== null ? (
-            <span data-mattr-lineage-row-meta>
+            <span data-matter-lineage-row-meta>
               <T>
                 on <Var>{row.remoteLabel}</Var>
               </T>
             </span>
           ) : null}
-          <span data-mattr-lineage-row-time>
+          <span data-matter-lineage-row-time>
             <WhisperRowTimer startedAtMs={row.startedAtMs} />
           </span>
         </TooltipTrigger>
@@ -204,7 +204,7 @@ function LineageRow(props: {
             render={
               <button
                 type="button"
-                data-mattr-lineage-row-stop
+                data-matter-lineage-row-stop
                 aria-label={gt("Stop {title}", { title: row.title })}
                 disabled={props.stopDisabled}
                 data-stopping={props.stopping || undefined}
@@ -212,7 +212,7 @@ function LineageRow(props: {
               />
             }
           >
-            <span aria-hidden data-mattr-stop-glyph />
+            <span aria-hidden data-matter-stop-glyph />
           </TooltipTrigger>
           <TooltipPopup side="top">
             <T context="verb, stops one running subagent">Stop</T>
@@ -230,13 +230,13 @@ function LineageFooterLink(props: {
   readonly onClick: () => void;
 }) {
   return (
-    <button type="button" data-mattr-lineage-link onClick={props.onClick}>
+    <button type="button" data-matter-lineage-link onClick={props.onClick}>
       {props.icon}
-      <span data-mattr-lineage-link-label>{props.label}</span>
+      <span data-matter-lineage-link-label>{props.label}</span>
       {props.count !== undefined && props.count > 0 ? (
-        <span data-mattr-lineage-link-count>{props.count}</span>
+        <span data-matter-lineage-link-count>{props.count}</span>
       ) : null}
-      <ChevronRightIcon aria-hidden data-mattr-lineage-link-chevron />
+      <ChevronRightIcon aria-hidden data-matter-lineage-link-chevron />
     </button>
   );
 }
@@ -246,10 +246,10 @@ function LineageFooterLink(props: {
  * running rows with Stop and Stop all, servers and automations while they run, and drilldowns
  * into previous agents and side chats, which reuse the details card's own lineage panel.
  */
-export function MattrLineagePopoverContent(
+export function MatterLineagePopoverContent(
   props: LineageThreadProps & {
-    readonly view: MattrLineageView;
-    readonly model: ReturnType<typeof useMattrLineageModel>;
+    readonly view: MatterLineageView;
+    readonly model: ReturnType<typeof useMatterLineageModel>;
     readonly serverCount: number;
     readonly automationCount: number;
   },
@@ -262,7 +262,7 @@ export function MattrLineagePopoverContent(
   const canInterrupt = useEnvironmentScope(props.environmentId, AuthOrchestrationOperateScope);
   const [stoppingKeys, setStoppingKeys] = useState<ReadonlySet<string>>(new Set());
   const { rows, previousCount, sideChatCount } = props.model;
-  const stopRow = async (row: MattrWhisperRow) => {
+  const stopRow = async (row: MatterWhisperRow) => {
     if (row.stopTarget === null || stoppingKeys.has(row.key)) return;
     setStoppingKeys((current) => new Set(current).add(row.key));
     const result = await interruptTurn({
@@ -299,20 +299,20 @@ export function MattrLineagePopoverContent(
             ? gt("Servers")
             : gt("Automations");
     return (
-      <div data-mattr-lineage data-view={props.view}>
-        <div data-mattr-lineage-header>
+      <div data-matter-lineage data-view={props.view}>
+        <div data-matter-lineage-header>
           <button
             type="button"
-            data-mattr-lineage-back
+            data-matter-lineage-back
             aria-label={gt("Back to lineage")}
-            onClick={() => setMattrLineageView("main")}
+            onClick={() => setMatterLineageView("main")}
           >
             <ChevronLeftIcon aria-hidden />
             <T context="navigates back to the lineage list">Back</T>
           </button>
-          <span data-mattr-lineage-title>{title}</span>
+          <span data-matter-lineage-title>{title}</span>
         </div>
-        <div data-mattr-lineage-drilldown>
+        <div data-matter-lineage-drilldown>
           {props.view === "previous" || props.view === "sideChats" ? (
             <ThreadRelationshipsPanel
               environmentId={props.environmentId}
@@ -331,9 +331,9 @@ export function MattrLineagePopoverContent(
   }
 
   return (
-    <div data-mattr-lineage data-view="main">
-      <div data-mattr-lineage-header>
-        <span data-mattr-lineage-title>
+    <div data-matter-lineage data-view="main">
+      <div data-matter-lineage-header>
+        <span data-matter-lineage-title>
           {rows.length > 0 ? (
             <T>
               Lineage · <Var>{rows.length}</Var> running
@@ -345,11 +345,11 @@ export function MattrLineagePopoverContent(
         {rows.length > 0 ? (
           <button
             type="button"
-            data-mattr-lineage-stop-all
+            data-matter-lineage-stop-all
             disabled={!canStopAll || stoppingAll}
             onClick={stopAll}
           >
-            <span aria-hidden data-mattr-stop-glyph />
+            <span aria-hidden data-matter-stop-glyph />
             {stoppingAll ? (
               <T>Stopping...</T>
             ) : (
@@ -359,7 +359,7 @@ export function MattrLineagePopoverContent(
         ) : null}
       </div>
       {rows.length > 0 ? (
-        <ul data-mattr-lineage-rows aria-label={gt("Running agents")}>
+        <ul data-matter-lineage-rows aria-label={gt("Running agents")}>
           {rows.map((row) => (
             <LineageRow
               key={row.key}
@@ -375,29 +375,29 @@ export function MattrLineagePopoverContent(
           ))}
         </ul>
       ) : (
-        <p data-mattr-lineage-empty>
+        <p data-matter-lineage-empty>
           <T>Nothing running right now.</T>
         </p>
       )}
-      <div data-mattr-lineage-footer>
+      <div data-matter-lineage-footer>
         <LineageFooterLink
           icon={<HistoryIcon aria-hidden />}
           label={<T>Previous agents</T>}
           count={previousCount}
-          onClick={() => setMattrLineageView("previous")}
+          onClick={() => setMatterLineageView("previous")}
         />
         <LineageFooterLink
           icon={<MessagesSquareIcon aria-hidden />}
           label={<T>Side chats</T>}
           count={sideChatCount}
-          onClick={() => setMattrLineageView("sideChats")}
+          onClick={() => setMatterLineageView("sideChats")}
         />
         {props.serverCount > 0 ? (
           <LineageFooterLink
             icon={<TerminalIcon aria-hidden />}
             label={<T context="running dev servers">Servers</T>}
             count={props.serverCount}
-            onClick={() => setMattrLineageView("servers")}
+            onClick={() => setMatterLineageView("servers")}
           />
         ) : null}
         {props.automationCount > 0 ? (
@@ -405,7 +405,7 @@ export function MattrLineagePopoverContent(
             icon={<CalendarClockIcon aria-hidden />}
             label={<T>Automations</T>}
             count={props.automationCount}
-            onClick={() => setMattrLineageView("automations")}
+            onClick={() => setMatterLineageView("automations")}
           />
         ) : null}
       </div>
@@ -414,18 +414,18 @@ export function MattrLineagePopoverContent(
 }
 
 /** The frosted Lineage popover, anchored above the pill or below the Ribbon's agents button. */
-export function MattrLineagePopover(
+export function MatterLineagePopover(
   props: LineageThreadProps & {
     readonly anchor: "pill" | "ribbon";
     /** Forces the popup closed before unmounting so Base UI never strands an open portal. */
     readonly closed?: boolean;
-    readonly model: ReturnType<typeof useMattrLineageModel>;
+    readonly model: ReturnType<typeof useMatterLineageModel>;
     readonly serverCount: number;
     readonly automationCount: number;
     readonly trigger: ReactNode;
   },
 ) {
-  const popover = useMattrLineagePopover();
+  const popover = useMatterLineagePopover();
   const open =
     props.closed !== true &&
     popover.threadKey === props.model.threadKey &&
@@ -434,21 +434,21 @@ export function MattrLineagePopover(
     <Popover
       open={open}
       onOpenChange={(next) => {
-        if (next) openMattrLineagePopover(props.model.threadKey, props.anchor);
-        else closeMattrLineagePopover();
+        if (next) openMatterLineagePopover(props.model.threadKey, props.anchor);
+        else closeMatterLineagePopover();
       }}
     >
       {props.trigger}
       <PopoverPopup
-        data-mattr-frosted=""
-        data-mattr-lineage-popup={props.anchor}
+        data-matter-frosted=""
+        data-matter-lineage-popup={props.anchor}
         side={props.anchor === "pill" ? "top" : "bottom"}
         align={props.anchor === "pill" ? "start" : "end"}
         sideOffset={6}
         padding="none"
       >
         {open ? (
-          <MattrLineagePopoverContent
+          <MatterLineagePopoverContent
             environmentId={props.environmentId}
             threadId={props.threadId}
             backgroundWork={props.backgroundWork}
@@ -467,21 +467,21 @@ export function MattrLineagePopover(
  * A 28px pill floating above the composer while subagents, background commands, servers or
  * automations run. Idle, it renders nothing. It replaces upstream's background work line.
  */
-export function MattrWhisperPill(props: LineageThreadProps) {
+export function MatterWhisperPill(props: LineageThreadProps) {
   const gt = useGT();
-  const model = useMattrLineageModel(props);
+  const model = useMatterLineageModel(props);
   const servers = useThreadDiscoveredPorts({
     environmentId: props.environmentId,
     threadId: props.threadId,
   });
-  const automations = useMattrThreadAutomationCounts(props.environmentId, props.threadId);
+  const automations = useMatterThreadAutomationCounts(props.environmentId, props.threadId);
   const runningAutomations = automations.running;
   const providersByEnvironment = useEnvironmentProviders();
   const providers = providersByEnvironment.get(props.environmentId);
   const providerEntries = deriveProviderInstanceEntries(providers ?? []);
-  const popover = useMattrLineagePopover();
+  const popover = useMatterLineagePopover();
   const { rows } = model;
-  const active = isMattrWhisperActive({
+  const active = isMatterWhisperActive({
     rowCount: rows.length,
     serverCount: servers.length,
     runningAutomationCount: runningAutomations,
@@ -489,13 +489,13 @@ export function MattrWhisperPill(props: LineageThreadProps) {
   const open = popover.threadKey === model.threadKey && popover.anchor === "pill";
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the external lineage popover store when the pill goes idle so Base UI closes cleanly and a future run never reopens it unasked
   useLayoutEffect(() => {
-    if (!active && open) closeMattrLineagePopover();
+    if (!active && open) closeMatterLineagePopover();
   }, [active, open]);
   if (!active && !open) {
     return null;
   }
-  const oldest = oldestMattrWhisperStart(rows);
-  const avatars = stackMattrWhisperAvatars(rows);
+  const oldest = oldestMatterWhisperStart(rows);
+  const avatars = stackMatterWhisperAvatars(rows);
   const [firstServer] = servers;
   const label =
     rows.length > 0
@@ -508,8 +508,8 @@ export function MattrWhisperPill(props: LineageThreadProps) {
             count: runningAutomations,
           });
   return (
-    <div data-mattr-whisper-pill-row>
-      <MattrLineagePopover
+    <div data-matter-whisper-pill-row>
+      <MatterLineagePopover
         {...props}
         anchor="pill"
         closed={!active}
@@ -521,20 +521,20 @@ export function MattrWhisperPill(props: LineageThreadProps) {
             render={
               <button
                 type="button"
-                data-mattr-whisper-pill
+                data-matter-whisper-pill
                 data-open={(active && open) || undefined}
                 aria-label={gt("Lineage: {label}", { label })}
               />
             }
           >
             {avatars.length > 0 ? (
-              <span data-mattr-whisper-avatars aria-hidden>
+              <span data-matter-whisper-avatars aria-hidden>
                 {avatars.map(({ row, zIndex }) => {
                   const provider = providers?.find(
                     (entry) => entry.instanceId === row.providerInstanceId,
                   );
                   return (
-                    <span key={row.key} data-mattr-whisper-avatar style={{ zIndex }}>
+                    <span key={row.key} data-matter-whisper-avatar style={{ zIndex }}>
                       {row.kind === "subagent" ? (
                         <ThreadRelationshipIcon
                           driver={row.driver ?? provider?.driver}
@@ -551,19 +551,19 @@ export function MattrWhisperPill(props: LineageThreadProps) {
                 })}
               </span>
             ) : null}
-            <span data-mattr-whisper-label>{label}</span>
+            <span data-matter-whisper-label>{label}</span>
             {oldest !== null ? (
-              <span data-mattr-whisper-timer>
+              <span data-matter-whisper-timer>
                 <WhisperRowTimer startedAtMs={oldest} />
               </span>
             ) : null}
             {firstServer ? (
-              <span data-mattr-whisper-server>
+              <span data-matter-whisper-server>
                 :{firstServer.port}
                 {servers.length > 1 ? ` +${servers.length - 1}` : ""}
               </span>
             ) : null}
-            <ChevronUpIcon aria-hidden data-mattr-whisper-chevron />
+            <ChevronUpIcon aria-hidden data-matter-whisper-chevron />
           </PopoverTrigger>
         }
       />

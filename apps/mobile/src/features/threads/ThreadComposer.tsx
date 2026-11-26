@@ -122,7 +122,7 @@ import {
 } from "../voice-input/ComposerDictationControl";
 import { useVoiceInputController } from "../voice-input/useVoiceInputController";
 import { resolveVoiceComposerPresentation } from "../voice-input/voiceInputPresentation";
-import { ComposerVoiceModeButton } from "../mattr-voice/ComposerVoiceModeButton";
+import { ComposerVoiceModeButton } from "../matter-voice/ComposerVoiceModeButton";
 import type { ExistingThreadSettingsRouteParams } from "./ThreadSettingsSheet";
 import { perfProbe } from "../development/perf-probe-hooks";
 import {
@@ -1059,7 +1059,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                     disabled={isSubmissionLocked || operateDenied}
                     onPress={() => {
                       Keyboard.dismiss();
-                      navigation.navigate("MattrVoiceMode", {
+                      navigation.navigate("MatterVoiceMode", {
                         environmentId: String(props.environmentId),
                         threadId: String(props.selectedThread.id),
                         threadTitle: props.selectedThread.title || gt("Untitled thread"),

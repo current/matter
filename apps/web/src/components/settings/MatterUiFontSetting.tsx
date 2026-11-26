@@ -6,19 +6,19 @@ import * as Schema from "effect/Schema";
 
 import { isFontFamilyAvailable } from "../../appearanceFonts";
 import {
-  applyMattrUiFont,
-  DEFAULT_MATTR_UI_FONT,
-  loadMattrUiFont,
-  MATTR_UI_FONTS,
-  MattrUiFont,
-  type MattrUiFontDefinition,
+  applyMatterUiFont,
+  DEFAULT_MATTER_UI_FONT,
+  loadMatterUiFont,
+  MATTER_UI_FONTS,
+  MatterUiFont,
+  type MatterUiFontDefinition,
   SYSTEM_STAND_IN,
-  useMattrUiFont,
-} from "../../mattrUiFont";
+  useMatterUiFont,
+} from "../../matterUiFont";
 import { RadioGroup } from "../ui/radio-group";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 
-const isMattrUiFont = Schema.is(MattrUiFont);
+const isMatterUiFont = Schema.is(MatterUiFont);
 
 const installedCache = new Map<string, boolean>();
 function isInstalled(family: string): boolean {
@@ -31,30 +31,30 @@ function isInstalled(family: string): boolean {
 }
 
 /** Settings → Appearance: the interface typeface, saved on this device. */
-export function MattrUiFontSetting() {
+export function MatterUiFontSetting() {
   const gt = useGT();
-  const [font, setFont] = useMattrUiFont();
+  const [font, setFont] = useMatterUiFont();
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- fetches each bundled face so every tile previews in its own font.
   useEffect(() => {
-    for (const definition of MATTR_UI_FONTS) void loadMattrUiFont(definition.id);
+    for (const definition of MATTER_UI_FONTS) void loadMatterUiFont(definition.id);
   }, []);
 
   return (
     <SettingsRow
-      id="mattr-ui-font"
+      id="matter-ui-font"
       title={gt("UI font")}
       description={gt(
         "The typeface for the whole interface. Code keeps the code font. Licensed faces are used when installed, otherwise a bundled open stand-in.",
       )}
       devicePreference
       resetAction={
-        font !== DEFAULT_MATTR_UI_FONT ? (
+        font !== DEFAULT_MATTER_UI_FONT ? (
           <SettingResetButton
             ariaLabel={gt("Reset UI font to default")}
             onClick={() => {
-              applyMattrUiFont(document.documentElement, DEFAULT_MATTR_UI_FONT);
-              setFont(DEFAULT_MATTR_UI_FONT);
+              applyMatterUiFont(document.documentElement, DEFAULT_MATTER_UI_FONT);
+              setFont(DEFAULT_MATTER_UI_FONT);
             }}
           />
         ) : null
@@ -65,15 +65,15 @@ export function MattrUiFontSetting() {
           aria-label={gt("UI font")}
           value={font}
           onValueChange={(value) => {
-            if (!isMattrUiFont(value)) return;
+            if (!isMatterUiFont(value)) return;
             // Apply here too, so the pick never depends on the entry hook having subscribed.
-            applyMattrUiFont(document.documentElement, value);
+            applyMatterUiFont(document.documentElement, value);
             setFont(value);
           }}
           className="grid grid-cols-1 @min-[32rem]/settings-row:grid-cols-2 @min-[48rem]/settings-row:grid-cols-3"
         >
-          {MATTR_UI_FONTS.map((definition) => (
-            <MattrUiFontTile key={definition.id} definition={definition} />
+          {MATTER_UI_FONTS.map((definition) => (
+            <MatterUiFontTile key={definition.id} definition={definition} />
           ))}
         </RadioGroup>
       </div>
@@ -81,7 +81,7 @@ export function MattrUiFontSetting() {
   );
 }
 
-function MattrUiFontTile({ definition }: { readonly definition: MattrUiFontDefinition }) {
+function MatterUiFontTile({ definition }: { readonly definition: MatterUiFontDefinition }) {
   const gt = useGT();
   const installed = definition.localFamily !== undefined && isInstalled(definition.localFamily);
   // Without the licensed face this pick renders exactly like the default, so it can't be picked.
@@ -99,7 +99,7 @@ function MattrUiFontTile({ definition }: { readonly definition: MattrUiFontDefin
     <RadioPrimitive.Root
       value={definition.id}
       disabled={unavailable}
-      data-mattr-ui-font-option={definition.id}
+      data-matter-ui-font-option={definition.id}
       className="group/font relative flex min-w-0 cursor-pointer data-disabled:cursor-not-allowed data-disabled:opacity-50 flex-col gap-2.5 rounded-lg bg-card px-3 pt-2.5 pb-3 text-left outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
     >
       <span className="flex min-w-0 items-start gap-2">

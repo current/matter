@@ -1,29 +1,29 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { shouldShowMattrComposerContextStrip } from "./components/chat/MattrComposerParts.mattr";
+import { shouldShowMatterComposerContextStrip } from "./components/chat/MatterComposerParts.matter";
 import {
-  DEFAULT_MATTR_GOOEY_SEND,
-  MATTR_GOOEY_SEND_STORAGE_KEY,
-  readMattrGooeySend,
-  writeMattrGooeySend,
-} from "./mattrGooeySend";
+  DEFAULT_MATTER_GOOEY_SEND,
+  MATTER_GOOEY_SEND_STORAGE_KEY,
+  readMatterGooeySend,
+  writeMatterGooeySend,
+} from "./matterGooeySend";
 
-describe("mattrGooeySend storage", () => {
+describe("matterGooeySend storage", () => {
   it("defaults to enabled and persists toggles in localStorage", () => {
-    expect(DEFAULT_MATTR_GOOEY_SEND).toBe(true);
-    expect(readMattrGooeySend()).toBe(true);
+    expect(DEFAULT_MATTER_GOOEY_SEND).toBe(true);
+    expect(readMatterGooeySend()).toBe(true);
 
-    writeMattrGooeySend(false);
-    expect(readMattrGooeySend()).toBe(false);
+    writeMatterGooeySend(false);
+    expect(readMatterGooeySend()).toBe(false);
 
-    writeMattrGooeySend(true);
-    expect(readMattrGooeySend()).toBe(true);
+    writeMatterGooeySend(true);
+    expect(readMatterGooeySend()).toBe(true);
   });
 
   it("falls back to the default on invalid stored data", () => {
     using consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const originalWindow = globalThis.window;
-    const store = new Map<string, string>([[MATTR_GOOEY_SEND_STORAGE_KEY, '"not-a-boolean"']]);
+    const store = new Map<string, string>([[MATTER_GOOEY_SEND_STORAGE_KEY, '"not-a-boolean"']]);
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: {
@@ -36,7 +36,7 @@ describe("mattrGooeySend storage", () => {
       },
     });
     try {
-      expect(readMattrGooeySend()).toBe(true);
+      expect(readMatterGooeySend()).toBe(true);
       expect(consoleError).toHaveBeenCalled();
     } finally {
       Object.defineProperty(globalThis, "window", {
@@ -47,7 +47,7 @@ describe("mattrGooeySend storage", () => {
   });
 });
 
-describe("shouldShowMattrComposerContextStrip", () => {
+describe("shouldShowMatterComposerContextStrip", () => {
   const base = {
     embedded: false,
     hasActiveProject: true,
@@ -60,23 +60,23 @@ describe("shouldShowMattrComposerContextStrip", () => {
   };
 
   it("shows the under-tray in both new-chat drafts and active threads for real projects by default", () => {
-    expect(shouldShowMattrComposerContextStrip({ ...base, isDraftHeroState: true })).toBe(true);
-    expect(shouldShowMattrComposerContextStrip({ ...base, isDraftHeroState: false })).toBe(true);
+    expect(shouldShowMatterComposerContextStrip({ ...base, isDraftHeroState: true })).toBe(true);
+    expect(shouldShowMatterComposerContextStrip({ ...base, isDraftHeroState: false })).toBe(true);
     expect(
-      shouldShowMattrComposerContextStrip({ ...base, isDraftHeroState: false, isGitRepo: false }),
+      shouldShowMatterComposerContextStrip({ ...base, isDraftHeroState: false, isGitRepo: false }),
     ).toBe(true);
   });
 
   it("hides the under-tray in active threads when Keep context strip is turned off", () => {
     expect(
-      shouldShowMattrComposerContextStrip({
+      shouldShowMatterComposerContextStrip({
         ...base,
         isDraftHeroState: false,
         persistInActiveThreads: false,
       }),
     ).toBe(false);
     expect(
-      shouldShowMattrComposerContextStrip({
+      shouldShowMatterComposerContextStrip({
         ...base,
         isDraftHeroState: true,
         persistInActiveThreads: false,
@@ -86,7 +86,7 @@ describe("shouldShowMattrComposerContextStrip", () => {
 
   it("keeps the strip for scratch drafts and collapses it cleanly without a real active project", () => {
     expect(
-      shouldShowMattrComposerContextStrip({
+      shouldShowMatterComposerContextStrip({
         ...base,
         isScratchProject: true,
         isDraftHeroState: true,
@@ -94,16 +94,16 @@ describe("shouldShowMattrComposerContextStrip", () => {
       }),
     ).toBe(true);
     expect(
-      shouldShowMattrComposerContextStrip({
+      shouldShowMatterComposerContextStrip({
         ...base,
         isScratchProject: true,
         isDraftHeroState: false,
         isGitRepo: false,
       }),
     ).toBe(false);
-    expect(shouldShowMattrComposerContextStrip({ ...base, hasActiveProject: false })).toBe(false);
-    expect(shouldShowMattrComposerContextStrip({ ...base, embedded: true })).toBe(false);
-    expect(shouldShowMattrComposerContextStrip({ ...base, showProviderSubagentBar: true })).toBe(
+    expect(shouldShowMatterComposerContextStrip({ ...base, hasActiveProject: false })).toBe(false);
+    expect(shouldShowMatterComposerContextStrip({ ...base, embedded: true })).toBe(false);
+    expect(shouldShowMatterComposerContextStrip({ ...base, showProviderSubagentBar: true })).toBe(
       false,
     );
   });

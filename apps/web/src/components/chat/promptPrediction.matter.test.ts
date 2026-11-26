@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { isPredictionAcceptKey, isPredictionClamped } from "./promptPrediction.mattr";
+import { isPredictionAcceptKey, isPredictionClamped } from "./promptPrediction.matter";
 import { promptSuggestionToAccept } from "./usePromptSuggestion";
 
 describe("isPredictionAcceptKey", () => {

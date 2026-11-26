@@ -17,9 +17,9 @@ import {
   preloadIconPacks,
   setIconPack,
   type IconPackId,
-} from "../../../../../antimatter/icons/iconPack";
-import { drawPackIcon, packIconSpecOf } from "../../../../../antimatter/icons/packIcon";
-import { useMattrIconPack, useMattrIconPackState } from "../../mattrIconPack";
+} from "../../../../../matter/icons/iconPack";
+import { drawPackIcon, packIconSpecOf } from "../../../../../matter/icons/packIcon";
+import { useMatterIconPack, useMatterIconPackState } from "../../matterIconPack";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 
@@ -50,7 +50,7 @@ const PREVIEW_ICONS = {
 
 /** Six real app icons drawn in `pack`, whatever pack the rest of the app shows. */
 function IconPackPreview({ pack }: { pack: IconPackId }) {
-  const { sources, failed } = useMattrIconPackState();
+  const { sources, failed } = useMatterIconPackState();
   const source = iconPackSource(pack);
   const ready = source === null || sources[source] !== undefined || failed[source] === true;
   return (
@@ -79,14 +79,14 @@ function IconPackPreview({ pack }: { pack: IconPackId }) {
 }
 
 /** Settings → Appearance row choosing the app's icon pack; saved on this device, applied live. */
-export function MattrIconPackSetting() {
+export function MatterIconPackSetting() {
   const gt = useGT();
   const m = useMessages();
-  const pack = useMattrIconPack();
+  const pack = useMatterIconPack();
   const current = ICON_PACK_OPTIONS.find((option) => option.id === pack);
   return (
     <SettingsRow
-      id="mattr-icon-pack"
+      id="matter-icon-pack"
       title={gt("Icon pack")}
       description={gt("Choose the icon set used across the app. Changes apply instantly.")}
       devicePreference

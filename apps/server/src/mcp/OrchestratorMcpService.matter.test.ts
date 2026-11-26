@@ -30,18 +30,18 @@ import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import type { McpInvocationScope } from "./McpInvocationContext.ts";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
 
-const parentThreadId = ThreadId.make("thread:mattr-delegation-parent");
-const projectId = ProjectId.make("project:mattr-delegation");
+const parentThreadId = ThreadId.make("thread:matter-delegation-parent");
+const projectId = ProjectId.make("project:matter-delegation");
 const claudeMain = ProviderInstanceId.make("claudeAgent");
 const claudeAlt = ProviderInstanceId.make("claude-alt");
 const claudeDriver = ProviderDriverKind.make("claudeAgent");
 
 const scope: McpInvocationScope = {
-  environmentId: EnvironmentId.make("environment:mattr-delegation"),
-  requestNamespace: "provider-session:mattr-delegation",
+  environmentId: EnvironmentId.make("environment:matter-delegation"),
+  requestNamespace: "provider-session:matter-delegation",
   thread: {
     threadId: parentThreadId,
-    providerSessionId: "provider-session:mattr-delegation",
+    providerSessionId: "provider-session:matter-delegation",
     providerInstanceId: claudeMain,
   },
   client: undefined,
@@ -80,10 +80,10 @@ const parentProjection = {
   },
   runs: [
     {
-      id: RunId.make("run:mattr-delegation-parent"),
+      id: RunId.make("run:matter-delegation-parent"),
       ordinal: 1,
       status: "running",
-      rootNodeId: NodeId.make("node:mattr-delegation-root"),
+      rootNodeId: NodeId.make("node:matter-delegation-root"),
       providerInstanceId: claudeMain,
       modelSelection: { instanceId: claudeMain, model: "claude-opus-5-5" },
     },
@@ -143,7 +143,7 @@ const capabilitiesWith = (settings: Partial<ServerSettingsType>) =>
     return new Map(result.providers.map((entry) => [entry.providerInstanceId, entry]));
   }).pipe(Effect.provide(serviceLayer(settings)));
 
-describe("OrchestratorMcpService mattr delegation", () => {
+describe("OrchestratorMcpService Matter delegation", () => {
   it.effect("shows usage left while multi-provider delegation is on, even with usage hidden", () =>
     Effect.gen(function* () {
       const byId = yield* capabilitiesWith({ agentUsageLimitsVisible: false });
@@ -195,7 +195,7 @@ describe("OrchestratorMcpService mattr delegation", () => {
           task: "Summarize the diff.",
           target: { providerInstanceId: claudeAlt },
           mode: "async",
-          clientRequestId: "mattr-delegation-excluded-1",
+          clientRequestId: "matter-delegation-excluded-1",
         })
         .pipe(Effect.flip);
       assert.equal(failure.code, "instance_excluded");

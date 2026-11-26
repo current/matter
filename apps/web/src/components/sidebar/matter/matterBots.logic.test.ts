@@ -1,7 +1,7 @@
 import type { BotIdentity, BotPendingRequest } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { botNeedsAttention, hostDotTone, rankCrew, shortHostLabel } from "./mattrBots.logic";
+import { botNeedsAttention, hostDotTone, rankCrew, shortHostLabel } from "./matterBots.logic";
 
 const bot = (overrides: Partial<BotIdentity> & Pick<BotIdentity, "remoteBotId">): BotIdentity => ({
   providerId: "grok-bot",

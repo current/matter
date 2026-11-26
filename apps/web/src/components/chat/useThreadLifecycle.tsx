@@ -796,7 +796,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     attentionNow: runStop?.state === "unresponsive" ? runStopNow : childInputNow,
     workNow: runStop?.state === "stopping" ? runStopNow : (quietRunNow ?? backgroundWorkNow),
     backgroundWorkNow,
-    mattrBackgroundWork: {
+    matterBackgroundWork: {
       tasks: activeBackgroundTasks,
       onStop:
         runIsLive || !canOperateThread || isStoppingBackgroundWork

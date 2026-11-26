@@ -94,8 +94,8 @@ import {
   resolvePreviewAnnotationImage,
   userMessageFileLabel,
 } from "./TimelineUserMessageRow.logic";
-import { MattrSentReplyHeader, MattrUserReplyButton } from "./MattrComposerReplyBar.mattr";
-import { extractLeadingReplyReference } from "./mattrMessageReply.mattr";
+import { MatterSentReplyHeader, MatterUserReplyButton } from "./MatterComposerReplyBar.matter";
+import { extractLeadingReplyReference } from "./matterMessageReply.matter";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 // Drawn inside the media so dark screenshots keep an edge on the dark background.
@@ -376,7 +376,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
                 <RevertUserMessageButton turnCount={revertTurnCount} messageId={row.message.id} />
               )}
               <MessageCopyButton text={text} variant="ghost" />
-              <MattrUserReplyButton
+              <MatterUserReplyButton
                 messageId={row.message.id}
                 itemId={row.projectedItem?.sourceItemId}
                 rawText={text}
@@ -900,7 +900,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             variant="ghost"
           />
         )}
-        <MattrUserReplyButton
+        <MatterUserReplyButton
           messageId={row.message.id}
           itemId={row.projectedItem?.sourceItemId}
           rawText={bubbleText}
@@ -946,7 +946,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         />
       ) : null}
       {leadingReply ? (
-        <MattrSentReplyHeader record={leadingReply.record} currentThreadRef={ctx.threadRef} />
+        <MatterSentReplyHeader record={leadingReply.record} currentThreadRef={ctx.threadRef} />
       ) : null}
       {mediaAboveText ? (
         <div className="flex max-w-[80%] justify-end">

@@ -18,7 +18,7 @@ export interface HostedBrowserWebviewWrapperStyle {
 }
 
 const HIDDEN_BROWSER_WEBVIEW_OFFSET = -100_000;
-// The app behind a parked guest can be translucent (mattr's shell materials). Opacity 0 and clip-path
+// The app behind a parked guest can be translucent (Matter's shell materials). Opacity 0 and clip-path
 // stop the guest's frames on macOS Electron 44; 0.001 keeps them and composites to zero visible pixels.
 const PARKED_BROWSER_WEBVIEW_OPACITY = 0.001;
 

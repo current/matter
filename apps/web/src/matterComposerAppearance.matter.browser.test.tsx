@@ -1,23 +1,23 @@
 import "./index.css";
 
 import { describe, expect, it } from "vite-plus/test";
-import shellCss from "../../../antimatter/shell.css?inline";
+import shellCss from "../../../matter/shell.css?inline";
 import { render } from "../test/render";
 import { ComposerSurface } from "./components/chat/ComposerSurface";
 import {
   adaptComposerTint,
-  applyMattrComposerAppearance,
-  DEFAULT_MATTR_COMPOSER_APPEARANCE,
-  MATTR_COMPOSER_APPEARANCE_STORAGE_KEY,
-  type MattrComposerAppearance,
-  startMattrComposerAppearance,
-  writeMattrComposerAppearance,
-} from "./mattrComposerAppearance";
+  applyMatterComposerAppearance,
+  DEFAULT_MATTER_COMPOSER_APPEARANCE,
+  MATTER_COMPOSER_APPEARANCE_STORAGE_KEY,
+  type MatterComposerAppearance,
+  startMatterComposerAppearance,
+  writeMatterComposerAppearance,
+} from "./matterComposerAppearance";
 
 const root = document.documentElement;
 
-function apply(patch: Partial<MattrComposerAppearance>) {
-  applyMattrComposerAppearance(root, { ...DEFAULT_MATTR_COMPOSER_APPEARANCE, ...patch });
+function apply(patch: Partial<MatterComposerAppearance>) {
+  applyMatterComposerAppearance(root, { ...DEFAULT_MATTER_COMPOSER_APPEARANCE, ...patch });
 }
 
 function shellStyles(): Disposable {
@@ -31,7 +31,7 @@ function shellStyles(): Disposable {
       root.classList.remove("dark");
       delete root.dataset.themeId;
       root.style.removeProperty("--app-theme-sidebar");
-      localStorage.removeItem(MATTR_COMPOSER_APPEARANCE_STORAGE_KEY);
+      localStorage.removeItem(MATTER_COMPOSER_APPEARANCE_STORAGE_KEY);
     },
   };
 }
@@ -48,7 +48,7 @@ function Composer({
       <div className="topbar-scroll-fade h-20 overflow-y-auto" data-testid="scroller">
         <div className="h-60" />
       </div>
-      <ComposerSurface.Shell data-mattr-composer="" contextRow={contextRow}>
+      <ComposerSurface.Shell data-matter-composer="" contextRow={contextRow}>
         <ComposerSurface.Host>
           {attachedBanner ? <div data-composer-banner-surface="attached">banner</div> : null}
           <ComposerSurface.Main>
@@ -64,7 +64,7 @@ function Composer({
   );
 }
 
-const shell = () => document.querySelector<HTMLElement>("[data-mattr-composer]")!;
+const shell = () => document.querySelector<HTMLElement>("[data-matter-composer]")!;
 const host = () => document.querySelector<HTMLElement>('[data-slot="composer-host"]')!;
 const main = () => document.querySelector<HTMLElement>("[data-chat-composer-main-surface]")!;
 const contextStrip = () =>
@@ -82,16 +82,16 @@ const mask = (element: Element) => {
   return style.maskImage || style.getPropertyValue("-webkit-mask-image");
 };
 
-describe("applyMattrComposerAppearance", () => {
+describe("applyMatterComposerAppearance", () => {
   it("leaves no attribute or variable behind for the defaults", () => {
     apply({ material: "glass", shape: "pill", scrollFade: false, color: "#4b4fa8" });
     apply({});
     for (const name of [
-      "mattrScrollFade",
-      "mattrComposerMaterial",
-      "mattrComposerShape",
-      "mattrComposerBlur",
-      "mattrComposerTint",
+      "matterScrollFade",
+      "matterComposerMaterial",
+      "matterComposerShape",
+      "matterComposerBlur",
+      "matterComposerTint",
     ]) {
       expect(root.dataset[name], name).toBeUndefined();
     }
@@ -108,13 +108,13 @@ describe("applyMattrComposerAppearance", () => {
 
   it("writes the material, shape, blur and fitted tints", () => {
     apply({ material: "frosted", shape: "compact", transparency: 40, blur: 24, color: "#c0673f" });
-    expect(root.dataset.mattrComposerMaterial).toBe("frosted");
-    expect(root.dataset.mattrComposerShape).toBe("compact");
-    expect(root.dataset.mattrComposerBlur).toBe("on");
+    expect(root.dataset.matterComposerMaterial).toBe("frosted");
+    expect(root.dataset.matterComposerShape).toBe("compact");
+    expect(root.dataset.matterComposerBlur).toBe("on");
     expect(root.style.getPropertyValue("--mca-opacity")).toBe("60%");
     expect(root.style.getPropertyValue("--mca-card-lift")).toBe("30%");
     expect(root.style.getPropertyValue("--mca-blur")).toBe("24px");
-    expect(root.dataset.mattrComposerTint).toBe("custom");
+    expect(root.dataset.matterComposerTint).toBe("custom");
     expect(root.style.getPropertyValue("--mca-tint-light")).toBe(
       adaptComposerTint("#c0673f", "light", "subtle"),
     );
@@ -126,23 +126,23 @@ describe("applyMattrComposerAppearance", () => {
 
   it("never marks a blur for Solid or Minimal", () => {
     apply({ material: "minimal", blur: 40, color: "#c0673f" });
-    expect(root.dataset.mattrComposerBlur).toBeUndefined();
-    expect(root.dataset.mattrComposerTint).toBeUndefined();
+    expect(root.dataset.matterComposerBlur).toBeUndefined();
+    expect(root.dataset.matterComposerTint).toBeUndefined();
     expect(root.style.getPropertyValue("--mca-opacity")).toBe("");
     apply({ material: "solid", blur: 40 });
-    expect(root.dataset.mattrComposerBlur).toBeUndefined();
+    expect(root.dataset.matterComposerBlur).toBeUndefined();
     apply({});
   });
 
   it("follows storage writes from the start call", () => {
     using _styles = shellStyles();
-    const stop = startMattrComposerAppearance(root);
+    const stop = startMatterComposerAppearance(root);
     try {
-      expect(root.dataset.mattrScrollFade).toBeUndefined();
-      writeMattrComposerAppearance({ scrollFade: false, material: "tinted" });
-      expect(root.dataset.mattrScrollFade).toBe("off");
-      expect(root.dataset.mattrComposerMaterial).toBe("tinted");
-      expect(root.dataset.mattrComposerTint).toBe("shell");
+      expect(root.dataset.matterScrollFade).toBeUndefined();
+      writeMatterComposerAppearance({ scrollFade: false, material: "tinted" });
+      expect(root.dataset.matterScrollFade).toBe("off");
+      expect(root.dataset.matterComposerMaterial).toBe("tinted");
+      expect(root.dataset.matterComposerTint).toBe("shell");
     } finally {
       stop();
     }

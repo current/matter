@@ -341,7 +341,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     environmentOnly: true,
   },
   {
-    id: "mattr-multi-provider-delegation",
+    id: "matter-multi-provider-delegation",
     title: msg("Multi-provider delegation"),
     to: "/settings/threads",
     scope: "environment-defaults",
@@ -358,17 +358,17 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-    id: "mattr-island",
-    title: msg("mattr Island"),
+    id: "matter-island",
+    title: msg("Matter Island"),
     to: "/settings/general",
-    targetId: "mattr-island",
+    targetId: "matter-island",
     desktopOnly: true,
     searchTerms: [
       msg("floating notch pill voice siri wave dictation control tap option tap shortcut"),
     ],
   },
   {
-    id: "mattr-addons",
+    id: "matter-addons",
     title: msg("Add-ons"),
     to: "/settings/addons",
     searchTerms: [
@@ -378,10 +378,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-    id: "mattr-voice-assistant",
+    id: "matter-voice-assistant",
     title: msg("Voice Assistant & Voice Mode"),
     to: "/settings/general",
-    targetId: "mattr-voice-assistant",
+    targetId: "matter-voice-assistant",
     searchTerms: [
       msg(
         "voice mode hands free road trip driving assistant tts speech spoken briefings barge in smart routing",
@@ -462,39 +462,39 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("texture noise arc film paper sidebar frame shell")],
   },
   {
-    id: "mattr-scroll-fade",
+    id: "matter-scroll-fade",
     title: msg("Scroll edge fade"),
     to: "/settings/appearance",
     searchTerms: [msg("vignette gradient fade mask top edge chat scroll header")],
   },
   {
-    id: "mattr-composer-material",
+    id: "matter-composer-material",
     title: msg("Composer material"),
     to: "/settings/appearance",
     searchTerms: [msg("prompt input box frosted glass tinted minimal solid translucent surface")],
   },
   {
-    id: "mattr-composer-shape",
+    id: "matter-composer-shape",
     title: msg("Composer style"),
     to: "/settings/appearance",
     searchTerms: [msg("prompt input box shape shelf floating compact pill rounded corners")],
   },
   {
-    // Prefixed because the slider control already owns the `mattr-composer-transparency` id.
-    id: "setting-mattr-composer-transparency",
+    // Prefixed because the slider control already owns the `matter-composer-transparency` id.
+    id: "setting-matter-composer-transparency",
     title: msg("Composer transparency"),
     to: "/settings/appearance",
     searchTerms: [msg("prompt input box opacity see through translucent")],
   },
   {
-    // Prefixed because the slider control already owns the `mattr-composer-blur` id.
-    id: "setting-mattr-composer-blur",
+    // Prefixed because the slider control already owns the `matter-composer-blur` id.
+    id: "setting-matter-composer-blur",
     title: msg("Composer blur"),
     to: "/settings/appearance",
     searchTerms: [msg("prompt input box frosted backdrop blur strength")],
   },
   {
-    id: "mattr-composer-color",
+    id: "matter-composer-color",
     title: msg("Composer color"),
     to: "/settings/appearance",
     searchTerms: [msg("prompt input box tint colour hue shell match")],

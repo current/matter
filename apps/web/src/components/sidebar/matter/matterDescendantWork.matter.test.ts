@@ -2,34 +2,34 @@ import { ProjectId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contrac
 import { describe, expect, it } from "vite-plus/test";
 
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
-import { buildThreadGroups, threadRowStatus } from "./mattrFinalSidebar.logic";
+import { buildThreadGroups, threadRowStatus } from "./matterFinalSidebar.logic";
 import {
   resolveProjectAttention,
-  toMattrThreadItem,
+  toMatterThreadItem,
   withDescendantWork,
   withNativeSubagentWork,
   workingDescendantSince,
   workingNativeSubagentKeys,
-  type MattrThreadItem,
-} from "./mattrSidebar.logic";
-import { buildTimelineBuckets } from "./mattrTimelineSidebar.logic";
+  type MatterThreadItem,
+} from "./matterSidebar.logic";
+import { buildTimelineBuckets } from "./matterTimelineSidebar.logic";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
 const NOW_MS = Date.parse(NOW_ISO);
-const MATTR = { key: "env:mattr", name: "mattr" };
+const MATTER = { key: "env:matter", name: "Matter" };
 
 function item(id: string, overrides: ThreadFixtureOverrides = {}) {
-  return toMattrThreadItem(
+  return toMatterThreadItem(
     makeThreadFixture({
       id: ThreadId.make(id),
-      projectId: ProjectId.make(MATTR.key),
+      projectId: ProjectId.make(MATTER.key),
       title: id,
       // Yesterday, so only running work keeps a row in Recent.
       latestUserMessageAt: "2026-03-09T14:00:00.000Z",
       createdAt: "2026-03-09T14:00:00.000Z",
       ...overrides,
     }),
-    MATTR,
+    MATTER,
     NOW_ISO,
   );
 }
@@ -58,7 +58,10 @@ function subagentOf(parent: string, id: string, overrides: ThreadFixtureOverride
   });
 }
 
-const lift = (items: ReadonlyArray<MattrThreadItem>, children: ReadonlyArray<MattrThreadItem>) => {
+const lift = (
+  items: ReadonlyArray<MatterThreadItem>,
+  children: ReadonlyArray<MatterThreadItem>,
+) => {
   const since = workingDescendantSince([...items, ...children]);
   return { items: withDescendantWork(items, since), children: withDescendantWork(children, since) };
 };
@@ -130,8 +133,8 @@ describe("descendant work", () => {
       filter: "all",
     });
     expect(buckets.recent.map((entry) => entry.key)).toEqual([parent.key]);
-    expect(resolveProjectAttention(items, MATTR.key)).toBe("running");
-    const groups = buildThreadGroups(items, [MATTR], {
+    expect(resolveProjectAttention(items, MATTER.key)).toBe("running");
+    const groups = buildThreadGroups(items, [MATTER], {
       sort: "project",
       projectFilter: null,
       filter: "all",

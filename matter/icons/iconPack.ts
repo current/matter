@@ -104,7 +104,7 @@ function load(source: IconPackSource) {
     },
     (error: unknown) => {
       pending.delete(source);
-      console.warn(`[mattr] ${source} icons failed to load, drawing lucide:`, error);
+      console.warn(`[Matter] ${source} icons failed to load, drawing lucide:`, error);
       setState({ ...state, failed: { ...state.failed, [source]: true } });
       settle();
     },

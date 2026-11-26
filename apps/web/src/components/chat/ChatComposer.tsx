@@ -132,19 +132,19 @@ import {
 import { ComposerBanner } from "./ComposerBanner";
 import { ComposerSurface } from "./ComposerSurface";
 import {
-  MattrComposerAttachButton,
-  MattrDictateIcon,
-  MattrGooeySendAnchor,
-  type MattrGooeySendAction,
-  MattrVoiceModeIcon,
-} from "./MattrComposerParts.mattr";
-import { MattrComposerReplyBar } from "./MattrComposerReplyBar.mattr";
-import { MattrComposerModeControl } from "./MattrComposerModeControl.mattr";
+  MatterComposerAttachButton,
+  MatterDictateIcon,
+  MatterGooeySendAnchor,
+  type MatterGooeySendAction,
+  MatterVoiceModeIcon,
+} from "./MatterComposerParts.matter";
+import { MatterComposerReplyBar } from "./MatterComposerReplyBar.matter";
+import { MatterComposerModeControl } from "./MatterComposerModeControl.matter";
 import {
-  deriveMattrComposerInteractionMode,
-  type MattrPlanImplementation,
-} from "./mattrInteractionMode.mattr";
-import { useMattrGooeySendSetting } from "../../mattrGooeySend";
+  deriveMatterComposerInteractionMode,
+  type MatterPlanImplementation,
+} from "./matterInteractionMode.matter";
+import { useMatterGooeySendSetting } from "../../matterGooeySend";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";
 import {
@@ -169,7 +169,7 @@ import { useDictationSubmissionShortcut } from "../../speech/useDictationSubmiss
 import { useEnvironmentSpeechInput } from "../../speech/useEnvironmentSpeechInput";
 import { ComposerSpeechButton, ComposerSpeechRecordingPill } from "./ComposerSpeechButton";
 import { ComposerVoiceModeButton } from "./ComposerVoiceModeButton";
-import { MattrVoiceModeBar } from "../../island/MattrVoiceModeBar";
+import { MatterVoiceModeBar } from "../../island/MatterVoiceModeBar";
 import { openThreadVoiceMode } from "../../island/voiceAssistantStore";
 import { useIsVoiceModeHost, voiceModeThreadKey } from "../../island/voiceModeHost";
 import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection";
@@ -328,7 +328,7 @@ import { HELD_COMPOSER_SEND_BANNER_ID } from "./ComposerHeldSendBanner";
 import { ComposerControlsBar } from "./ComposerControlsBar";
 import { composerCommandKeyHandler } from "./composerCommandKey";
 import { promptSuggestionToAccept, usePromptSuggestion } from "./usePromptSuggestion";
-import { PromptPredictionGhost } from "./PromptPredictionGhost.mattr";
+import { PromptPredictionGhost } from "./PromptPredictionGhost.matter";
 import { useFreshSessionArmed } from "./freshSessionArms";
 
 function consumePasteAsTextShortcut(deadline: { current: number }): boolean {
@@ -393,7 +393,7 @@ export interface ChatComposerHandle {
     interactionMode: ProviderInteractionMode;
     nativeGoals: boolean;
     nativeGoalStarted: boolean;
-    planImplementation: MattrPlanImplementation | null;
+    planImplementation: MatterPlanImplementation | null;
     /** Switches the composer's mode; leaving a running native goal also clears it. */
     setInteractionMode: (mode: ProviderInteractionMode) => void;
   };
@@ -1262,7 +1262,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerPreviewAnnotations.length === 0 &&
     composerReviewComments.length === 0;
   const linkedEnvironments = useLinkedEnvironments(environmentId);
-  const mattrMode = deriveMattrComposerInteractionMode({
+  const matterMode = deriveMatterComposerInteractionMode({
     composerDraftTarget,
     composerMode: composerDraft.interactionMode,
     thread: activeThread,
@@ -1278,9 +1278,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       canOperateThread && environmentUnavailable === null && sendDisabledReason === null,
     onClearNativeGoal: props.onClearNativeGoal,
   });
-  const setMattrModeStable = useStableCallback(mattrMode.setMode);
-  const planImplementationId = mattrMode.planImplementation?.planId ?? null;
-  const planImplementationPrompt = mattrMode.planImplementation?.prompt ?? null;
+  const setMatterModeStable = useStableCallback(matterMode.setMode);
+  const planImplementationId = matterMode.planImplementation?.planId ?? null;
+  const planImplementationPrompt = matterMode.planImplementation?.prompt ?? null;
   const {
     items: composerMenuItems,
     isLoading: isComposerMenuLoading,
@@ -1305,7 +1305,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     workspaceSkillsScanning,
     questionAttachmentTarget,
     modelMentions: { instanceEntries: providerInstanceEntries, modelOptionsByInstance },
-    nativeGoalProvider: mattrMode.nativeGoals,
+    nativeGoalProvider: matterMode.nativeGoals,
   });
 
   const composerMenuOpen = Boolean(composerTrigger);
@@ -2003,7 +2003,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return true;
   };
   const applyPromptReplacementStable = useStableCallback(applyPromptReplacement);
-  // mattr: the Questions card's inline "Something else" field edits the same answer.
+  // Matter: the Questions card's inline "Something else" field edits the same answer.
   const onChangeActivePendingUserInputCustomAnswerStable = useStableCallback(
     (questionId: string, value: string) => {
       const cursor = collapseExpandedComposerCursor(value, value.length, isLiteralPendingAnswer);
@@ -2113,7 +2113,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       ? voiceModeThreadKey(environmentId, activeThreadId)
       : null;
   const voiceModeHere = useIsVoiceModeHost(voiceModeHostKey, !backgroundThread);
-  const [gooeySendEnabled] = useMattrGooeySendSetting();
+  const [gooeySendEnabled] = useMatterGooeySendSetting();
   const handleStartDictationStable = useStableCallback(() => {
     void speechInput.start();
   });
@@ -2204,7 +2204,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       }
       if (item.command === "plan" || item.command === "goal" || item.command === "default") {
         // A native goal provider takes the objective as `/goal <objective>`.
-        const keepsGoalCommand = item.command === "goal" && mattrMode.nativeGoals;
+        const keepsGoalCommand = item.command === "goal" && matterMode.nativeGoals;
         const applied = applyPromptReplacement(
           trigger.rangeStart,
           trigger.rangeEnd,
@@ -2213,7 +2213,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         );
         if (applied) {
           setComposerHighlightedItemId(null);
-          mattrMode.setMode(item.command);
+          matterMode.setMode(item.command);
         }
         return;
       }
@@ -2724,7 +2724,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       dismissPromptSuggestion,
       hasActiveReply: replyTo !== null,
       dismissReply: dismissComposerReply,
-      cycleInteractionMode: mattrMode.cycleMode,
+      cycleInteractionMode: matterMode.cycleMode,
     })(key, event, isTaskItem);
   };
 
@@ -3598,10 +3598,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         selectedProvider,
         selectedModel,
         selectedProviderModels,
-        interactionMode: mattrMode.mode,
-        nativeGoals: mattrMode.nativeGoals,
-        nativeGoalStarted: mattrMode.nativeGoalStarted,
-        setInteractionMode: setMattrModeStable,
+        interactionMode: matterMode.mode,
+        nativeGoals: matterMode.nativeGoals,
+        nativeGoalStarted: matterMode.nativeGoalStarted,
+        setInteractionMode: setMatterModeStable,
         planImplementation:
           planImplementationId !== null && planImplementationPrompt !== null
             ? { planId: planImplementationId, prompt: planImplementationPrompt }
@@ -3670,10 +3670,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       selectedProvider,
       selectedProviderModels,
       compactThreadContextStable,
-      mattrMode.mode,
-      mattrMode.nativeGoals,
-      mattrMode.nativeGoalStarted,
-      setMattrModeStable,
+      matterMode.mode,
+      matterMode.nativeGoals,
+      matterMode.nativeGoalStarted,
+      setMatterModeStable,
       planImplementationId,
       planImplementationPrompt,
     ],
@@ -3724,7 +3724,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       />
     ) : null;
   const composerAttachButton = showComposerAttachAction ? (
-    <MattrComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
+    <MatterComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
   ) : null;
   const showVoiceModeTrigger =
     routeKind === "server" &&
@@ -3733,7 +3733,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     pendingPrimaryAction === null &&
     !isEditingQueuedMessage;
   const useGooeySendMenu = gooeySendEnabled && pendingPrimaryAction === null;
-  const gooeySendActions: MattrGooeySendAction[] = useGooeySendMenu
+  const gooeySendActions: MatterGooeySendAction[] = useGooeySendMenu
     ? [
         ...(speechInput.available && speechInput.state.phase === "idle"
           ? [
@@ -3742,7 +3742,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 label: gt("Dictate"),
                 shortcut: dictationShortcutLabel,
                 disabled: dictationDisabled,
-                icon: <MattrDictateIcon />,
+                icon: <MatterDictateIcon />,
                 onSelect: handleStartDictationStable,
               },
             ]
@@ -3753,7 +3753,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 id: "voice-mode" as const,
                 label: gt("Voice mode"),
                 disabled: environmentUnavailable !== null || !canOperateThread,
-                icon: <MattrVoiceModeIcon />,
+                icon: <MatterVoiceModeIcon />,
                 onSelect: handleOpenThreadVoiceModeStable,
               },
             ]
@@ -3762,9 +3762,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     : [];
   const wrapGooeyPrimaryCircle = useGooeySendMenu
     ? (button: React.ReactNode, state: { readonly active: boolean }) => (
-        <MattrGooeySendAnchor actions={gooeySendActions} anchorActive={state.active}>
+        <MatterGooeySendAnchor actions={gooeySendActions} anchorActive={state.active}>
           {button}
-        </MattrGooeySendAnchor>
+        </MatterGooeySendAnchor>
       )
     : undefined;
   return (
@@ -3882,7 +3882,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           className={composerProviderState.composerFrameClassName}
         >
           {voiceModeHere ? (
-            <MattrVoiceModeBar variant="composer" hostThreadKey={voiceModeHostKey} />
+            <MatterVoiceModeBar variant="composer" hostThreadKey={voiceModeHostKey} />
           ) : null}
           <div
             ref={composerSurfaceRef}
@@ -3985,7 +3985,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             ) : null}
 
             {replyTo && !hasBlockingComposerTopDrawer && !isComposerCollapsedMobile ? (
-              <MattrComposerReplyBar
+              <MatterComposerReplyBar
                 replyTo={replyTo}
                 currentThreadRef={routeThreadRef}
                 onDismiss={dismissComposerReply}
@@ -4220,11 +4220,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <div className="me-2">{composerAttachButton}</div>
                 ) : null}
                 {!dictationTakesFooter && !isLiteralPendingAnswer ? (
-                  <MattrComposerModeControl
-                    mode={mattrMode.mode}
-                    onModeChange={mattrMode.setMode}
+                  <MatterComposerModeControl
+                    mode={matterMode.mode}
+                    onModeChange={matterMode.setMode}
                     disabled={!canOperateThread || environmentUnavailable !== null}
-                    onClear={() => mattrMode.setMode("default")}
+                    onClear={() => matterMode.setMode("default")}
                   />
                 ) : null}
                 <div

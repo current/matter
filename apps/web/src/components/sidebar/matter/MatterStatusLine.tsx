@@ -28,8 +28,8 @@ import { isSidebarUtilityPage, useNavigateToMainApp } from "../mainAppLocation";
 import { SidebarProviderUpdatePill } from "../SidebarProviderUpdatePill";
 import { SidebarThreadUndoNotice } from "../SidebarThreadUndoNotice";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "../SidebarUpdatePill";
-import { hostDotTone, shortHostLabel } from "./mattrBots.logic";
-import { MattrTip } from "./MattrSidebarParts";
+import { hostDotTone, shortHostLabel } from "./matterBots.logic";
+import { MatterTip } from "./MatterSidebarParts";
 
 const quietButton =
   "inline-flex h-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground outline-hidden ring-ring transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset aria-[current=page]:bg-sidebar-row-active aria-[current=page]:text-sidebar-foreground [&_svg]:size-3.5 [&_svg]:shrink-0";
@@ -38,7 +38,7 @@ const quietButton =
  * The custom layouts' whole footer in one line: the host chip opens every utility, Usage and
  * Settings stay one click away, and update and undo notices appear above it only while they apply.
  */
-export function MattrStatusLine() {
+export function MatterStatusLine() {
   const gt = useGT();
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
@@ -79,7 +79,7 @@ export function MattrStatusLine() {
           : null;
 
   return (
-    <div className="flex shrink-0 flex-col gap-1 px-2 pb-1.5" data-mattr-status-line>
+    <div className="flex shrink-0 flex-col gap-1 px-2 pb-1.5" data-matter-status-line>
       <div className="flex flex-col gap-1 empty:hidden">
         <SidebarProviderUpdatePill />
         <SidebarUpdateArchitectureWarning />
@@ -112,7 +112,7 @@ export function MattrStatusLine() {
                   <span
                     role="img"
                     aria-label={dot.label}
-                    data-mattr-host-dot={dotTone}
+                    data-matter-host-dot={dotTone}
                     className={cn(
                       "absolute -right-0.5 -bottom-0.5 size-[7px] rounded-full ring-2 ring-sidebar",
                       dot.className,
@@ -166,7 +166,7 @@ export function MattrStatusLine() {
           </Menu>
         )}
         <SidebarUpdatePill />
-        <MattrTip label={gt("Usage")} side="top">
+        <MatterTip label={gt("Usage")} side="top">
           <button
             type="button"
             aria-label={gt("Usage")}
@@ -176,8 +176,8 @@ export function MattrStatusLine() {
           >
             <ChartNoAxesColumnIcon aria-hidden />
           </button>
-        </MattrTip>
-        <MattrTip label={gt("Settings")} side="top">
+        </MatterTip>
+        <MatterTip label={gt("Settings")} side="top">
           <button
             type="button"
             aria-label={gt("Settings")}
@@ -187,7 +187,7 @@ export function MattrStatusLine() {
           >
             <SettingsIcon aria-hidden />
           </button>
-        </MattrTip>
+        </MatterTip>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { msg } from "gt-react";
 import { m } from "../i18n/messages";
 import { PcmResampler } from "../speech/pcmResampler";
-import type { VoiceSpeakRequest } from "../../../../antimatter/voice-assistant/types";
+import type { VoiceSpeakRequest } from "../../../../matter/voice-assistant/types";
 
 const TARGET_SAMPLE_RATE = 16_000;
 const PRE_SPEECH_MS = 400;
@@ -468,7 +468,7 @@ function isFluxTurnEventKind(value: unknown): value is DeepgramFluxTurnEventKind
   return typeof value === "string" && VALID_FLUX_TURN_EVENTS.has(value);
 }
 
-/** Parses a Deepgram Flux v2 JSON message forwarded by the mattr Flux WS proxy. */
+/** Parses a Deepgram Flux v2 JSON message forwarded by the Matter Flux WS proxy. */
 export function parseDeepgramFluxServerMessage(raw: string): DeepgramFluxServerMessage | null {
   let parsed: unknown;
   try {

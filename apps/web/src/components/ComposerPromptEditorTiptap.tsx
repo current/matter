@@ -189,7 +189,7 @@ export interface ComposerPromptEditorProps {
   placeholder: string;
   /** Rendered after the placeholder text, such as a key hint. */
   placeholderSuffix?: ReactNode;
-  /** mattr: rendered instead of the placeholder text, which stays the accessible placeholder. */
+  /** Matter: rendered instead of the placeholder text, which stays the accessible placeholder. */
   placeholderContent?: ReactNode;
   ariaLabel?: string | undefined;
   suggestionListId?: string | undefined;

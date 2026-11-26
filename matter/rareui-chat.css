@@ -4,74 +4,74 @@
    unmounts when the turn ends. SVG internals repaint on the main thread, so loops are stepped
    to about 30fps per keyframe segment, as upstream's shimmer is. Swaps play once. Reduced motion shows the end state. */
 
-.mattr-ais-icon svg {
+.matter-ais-icon svg {
   overflow: visible;
 }
 
-/* Static shapes are each icon's resting frame; `.mattr-ais-loop` adds the motion. */
-.mattr-ais-sparkle,
-.mattr-ais-twinkle {
+/* Static shapes are each icon's resting frame; `.matter-ais-loop` adds the motion. */
+.matter-ais-sparkle,
+.matter-ais-twinkle {
   transform-box: fill-box;
   transform-origin: center;
 }
-.mattr-ais-bar {
+.matter-ais-bar {
   stroke-dasharray: 9 20;
 }
-.mattr-ais-pen {
+.matter-ais-pen {
   transform: translate(12.5px, 19px);
 }
 
-.mattr-ais-loop {
+.matter-ais-loop {
   animation-play-state: var(--visible-animation-state, paused) !important;
 }
-.mattr-ais-sparkle.mattr-ais-loop {
-  animation: mattr-ais-sparkle 2.4s steps(36) infinite;
+.matter-ais-sparkle.matter-ais-loop {
+  animation: matter-ais-sparkle 2.4s steps(36) infinite;
 }
-.mattr-ais-twinkle.mattr-ais-loop {
-  animation: mattr-ais-twinkle 1.2s steps(18) infinite;
+.matter-ais-twinkle.matter-ais-loop {
+  animation: matter-ais-twinkle 1.2s steps(18) infinite;
 }
-.mattr-ais-lens.mattr-ais-loop {
-  animation: mattr-ais-lens 2s steps(15) infinite;
+.matter-ais-lens.matter-ais-loop {
+  animation: matter-ais-lens 2s steps(15) infinite;
 }
-.mattr-ais-bar.mattr-ais-loop {
-  animation: mattr-ais-bar 0.9s steps(14) infinite both;
+.matter-ais-bar.matter-ais-loop {
+  animation: matter-ais-bar 0.9s steps(14) infinite both;
 }
-.mattr-ais-bar.mattr-ais-loop:nth-child(2) {
+.matter-ais-bar.matter-ais-loop:nth-child(2) {
   animation-delay: 0.15s;
 }
-.mattr-ais-bar.mattr-ais-loop:nth-child(3) {
+.matter-ais-bar.matter-ais-loop:nth-child(3) {
   animation-delay: 0.3s;
 }
-.mattr-ais-ink.mattr-ais-loop {
-  animation: mattr-ais-ink 2.4s steps(3) infinite;
+.matter-ais-ink.matter-ais-loop {
+  animation: matter-ais-ink 2.4s steps(3) infinite;
 }
-.mattr-ais-pen.mattr-ais-loop {
-  animation: mattr-ais-pen 2.4s steps(3) infinite;
+.matter-ais-pen.matter-ais-loop {
+  animation: matter-ais-pen 2.4s steps(3) infinite;
 }
-.mattr-ais-check {
+.matter-ais-check {
   stroke-dasharray: 1 2;
-  animation: mattr-ais-check 600ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+  animation: matter-ais-check 600ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
 }
 
 /* Label, detail and icon swaps: RareUI's springs as one-shot curves. The leaving copy sits
    on top of the new one so the row measures only the new label. */
-.mattr-ais-text-in {
-  animation: mattr-ais-text-in 500ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+.matter-ais-text-in {
+  animation: matter-ais-text-in 500ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
 }
-.mattr-ais-text-out {
-  animation: mattr-ais-text-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+.matter-ais-text-out {
+  animation: matter-ais-text-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
-.mattr-ais-icon-in {
-  animation: mattr-ais-icon-in 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.matter-ais-icon-in {
+  animation: matter-ais-icon-in 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
-.mattr-ais-icon-out {
-  animation: mattr-ais-icon-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+.matter-ais-icon-out {
+  animation: matter-ais-icon-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
-.mattr-ais-row {
+.matter-ais-row {
   transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes mattr-ais-sparkle {
+@keyframes matter-ais-sparkle {
   0% {
     transform: rotate(0deg) scale(1);
   }
@@ -82,7 +82,7 @@
     transform: rotate(90deg) scale(1);
   }
 }
-@keyframes mattr-ais-twinkle {
+@keyframes matter-ais-twinkle {
   0%,
   100% {
     transform: scale(0.4);
@@ -93,7 +93,7 @@
     opacity: 1;
   }
 }
-@keyframes mattr-ais-lens {
+@keyframes matter-ais-lens {
   0%,
   100% {
     transform: translate(0, -2px);
@@ -108,7 +108,7 @@
     transform: translate(-2px, 0);
   }
 }
-@keyframes mattr-ais-bar {
+@keyframes matter-ais-bar {
   0%,
   100% {
     stroke-dasharray: 4 20;
@@ -117,33 +117,33 @@
     stroke-dasharray: 14 20;
   }
 }
-@keyframes mattr-ais-check {
+@keyframes matter-ais-check {
   from {
     stroke-dasharray: 0 2;
   }
 }
-@keyframes mattr-ais-text-in {
+@keyframes matter-ais-text-in {
   from {
     transform: translateY(8px);
     opacity: 0;
     filter: blur(4px);
   }
 }
-@keyframes mattr-ais-text-out {
+@keyframes matter-ais-text-out {
   to {
     transform: translateY(-8px);
     opacity: 0;
     filter: blur(4px);
   }
 }
-@keyframes mattr-ais-icon-in {
+@keyframes matter-ais-icon-in {
   from {
     transform: scale(0.5) rotate(-30deg);
     opacity: 0;
     filter: blur(4px);
   }
 }
-@keyframes mattr-ais-icon-out {
+@keyframes matter-ais-icon-out {
   to {
     transform: scale(0.5) rotate(30deg);
     opacity: 0;
@@ -152,7 +152,7 @@
 }
 /* The pen draws a wave, holds it, and lifts back to the start; points sit at eased arc length
    so the tip stays on the ink (RareUI's WAVE_X / WAVE_Y / WAVE_PROGRESS). */
-@keyframes mattr-ais-ink {
+@keyframes matter-ais-ink {
   0% {
     stroke-dasharray: 0 2;
     opacity: 1;
@@ -227,7 +227,7 @@
     opacity: 0;
   }
 }
-@keyframes mattr-ais-pen {
+@keyframes matter-ais-pen {
   0% {
     transform: translate(3px, 19px);
   }
@@ -301,13 +301,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mattr-ais,
-  .mattr-ais * {
+  .matter-ais,
+  .matter-ais * {
     animation: none !important;
     transition: none !important;
   }
-  .mattr-ais-text-out,
-  .mattr-ais-icon-out {
+  .matter-ais-text-out,
+  .matter-ais-icon-out {
     display: none;
   }
 }

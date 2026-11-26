@@ -38,14 +38,14 @@ import {
   useEnvironmentSpeechInput,
   useVoiceTranscriptionDestination,
 } from "../speech/useEnvironmentSpeechInput";
-import { useMattrApiConfig } from "../addons/mattrApi";
-import { parseMattrPlanOverview } from "../components/chat/mattrPlanParser.mattr";
+import { useMatterApiConfig } from "../addons/matterApi";
+import { parseMatterPlanOverview } from "../components/chat/matterPlanParser.matter";
 import {
   providerHasNativeGoals,
   withNativeGoalCommand,
-} from "../components/chat/mattrInteractionMode.mattr";
-import { approveMattrPlan } from "../components/chat/useMattrPlanApproval.mattr";
-import { createMattrTasksActions } from "../components/tasks/mattrTasksStore";
+} from "../components/chat/matterInteractionMode.matter";
+import { approveMatterPlan } from "../components/chat/useMatterPlanApproval.matter";
+import { createMatterTasksActions } from "../components/tasks/matterTasksStore";
 import { primaryServerProvidersAtom } from "../state/server";
 import { usePreparedConnection } from "../state/session";
 import { useProjects } from "../state/entities";
@@ -61,7 +61,7 @@ import {
 import { useAtomCommand } from "../state/use-atom-command";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { resolveThreadRouteTarget } from "../threadRoutes";
-import { MattrVoiceModeBar } from "./MattrVoiceModeBar";
+import { MatterVoiceModeBar } from "./MatterVoiceModeBar";
 import { useHasVoiceModeHost } from "./voiceModeHost";
 import { VoiceBriefingCoordinator } from "./VoiceBriefingCoordinator";
 import { captureTaskTitle, composeCaptureText } from "./islandCapture";
@@ -87,13 +87,13 @@ import type {
   IslandPendingUserInput,
   IslandSnapshot,
   IslandThreadSummary,
-} from "../../../../antimatter/island/types";
+} from "../../../../matter/island/types";
 import type {
   VoiceAssistantClientAction,
   VoiceAvailableTtsInfo,
   VoiceTranscribeResponse,
   VoiceWorkspaceContext,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 
 const MAX_RECENT_THREADS = 12;
 const MAX_DONE_NOTIFICATIONS = 8;
@@ -113,14 +113,14 @@ function defaultApprovalOptions(): ReadonlyArray<IslandApprovalOption> {
 
 const planOverviewCache = new Map<
   string,
-  { readonly markdown: string; readonly overview: ReturnType<typeof parseMattrPlanOverview> }
+  { readonly markdown: string; readonly overview: ReturnType<typeof parseMatterPlanOverview> }
 >();
 
 /** The host re-renders on every streamed token; a plan is parsed again only when it changes. */
 function cachedPlanOverview(planId: string, markdown: string) {
   const hit = planOverviewCache.get(planId);
   if (hit && hit.markdown === markdown) return hit.overview;
-  const overview = parseMattrPlanOverview(markdown);
+  const overview = parseMatterPlanOverview(markdown);
   planOverviewCache.delete(planId);
   planOverviewCache.set(planId, { markdown, overview });
   if (planOverviewCache.size > MAX_CACHED_PLAN_OVERVIEWS) {
@@ -173,7 +173,7 @@ function isEditableElementFocused(): boolean {
   return (active as HTMLElement).isContentEditable === true;
 }
 
-export function MattrIslandHost() {
+export function MatterIslandHost() {
   const islandBridge = window.desktopBridge?.island;
   const settings = useIslandSettings();
   const assistantState = useVoiceAssistantState();
@@ -191,7 +191,7 @@ export function MattrIslandHost() {
   const voiceMicrophone = useClientSettings((s) => s.voiceMicrophone);
   const speechLanguage = useClientSettings((s) => s.speechLanguage);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
-  const tasksApiConfig = useMattrApiConfig();
+  const tasksApiConfig = useMatterApiConfig();
 
   const respondToApproval = useOrchestrationCommand(threadEnvironment.respondToApproval, {
     reportFailure: false,
@@ -503,7 +503,7 @@ export function MattrIslandHost() {
     environmentId: speechEnvironmentId,
     projectId: selectedShell?.raw.projectId ?? null,
     projectName: selectedProjectTitle,
-    ownerKey: "mattr-island-voice",
+    ownerKey: "matter-island-voice",
     disabled: !islandBridge || !settings.enabled,
     offerSetup: false,
     presented: true,
@@ -777,7 +777,7 @@ export function MattrIslandHost() {
       if (!title) return;
       const firstLine = text.trim().split("\n")[0]?.trim() ?? "";
       const note = composeCaptureText(text.trim().slice(firstLine.length), files, urls);
-      void createMattrTasksActions(tasksApiConfig)
+      void createMatterTasksActions(tasksApiConfig)
         .create({
           title,
           ...(note ? { note } : {}),
@@ -794,7 +794,7 @@ export function MattrIslandHost() {
       const shellEntry = shellsByKey.get(threadKey({ environmentId: envId, threadId: tId }));
       const markdown = planMarkdownById.get(planId);
       if (!shellEntry || markdown === undefined) return;
-      void approveMattrPlan({
+      void approveMatterPlan({
         threadRef: { environmentId: envId, threadId: tId },
         planId: PlanId.make(planId),
         planMarkdown: markdown,
@@ -1160,7 +1160,7 @@ export function MattrIslandHost() {
         return;
       }
       case "open-island-settings": {
-        void navigate({ to: "/settings/general", hash: "mattr-island" });
+        void navigate({ to: "/settings/general", hash: "matter-island" });
         return;
       }
       case "submit-capture": {
@@ -1309,7 +1309,7 @@ export function MattrIslandHost() {
               )}
             >
               <div className="w-full max-w-xl">
-                <MattrVoiceModeBar variant="floating" />
+                <MatterVoiceModeBar variant="floating" />
               </div>
             </div>,
             pageCard ?? document.body,

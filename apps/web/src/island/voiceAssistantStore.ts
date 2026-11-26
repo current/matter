@@ -5,7 +5,7 @@ import type {
   IslandVoiceAssistantState,
   IslandVoiceAssistantTurn,
   IslandVoicePanelMode,
-} from "../../../../antimatter/island/types";
+} from "../../../../matter/island/types";
 import type {
   VoiceAssistantClientAction,
   VoiceAssistantHistoryMessage,
@@ -21,9 +21,9 @@ import type {
   VoiceAssistantSettings,
   VoiceWorkspaceApprovalSummary,
   VoiceWorkspaceContext,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 import { getIslandSettings } from "./islandSettingsStore";
-import { playMattrAudioCue } from "../speech/mattrAudioCues";
+import { playMatterAudioCue } from "../speech/matterAudioCues";
 import {
   createDeepgramFluxCapture,
   createHandsFreeVadCapture,
@@ -171,7 +171,7 @@ function normalizeCommandPhrase(raw: string): string {
     .toLowerCase()
     .replace(/^[.,!?;:"'()[\]\s]+|[.,!?;:"'()[\]\s]+$/g, "")
     .replace(/\s+/g, " ")
-    .replace(/^(hey mattr|ok mattr|okay mattr|mattr)\s+/i, "")
+    .replace(/^(hey Matter|ok Matter|okay Matter|Matter)\s+/i, "")
     .replace(/\s+please$/i, "")
     .trim();
 }
@@ -1245,7 +1245,7 @@ export function setVoiceModeOpen(
       return;
     }
     emit({ sessionOpen: true, mode: "voice-mode", scopedThread: null, originThread: null });
-    playMattrAudioCue("voice-mode-open");
+    playMatterAudioCue("voice-mode-open");
     if (options?.autoStartHandsFree !== false && hostBridge !== null && !state.handsFreeActive) {
       void startHandsFree();
     }
@@ -1254,7 +1254,7 @@ export function setVoiceModeOpen(
   if (!state.sessionOpen) return;
   stopHandsFree({ silent: true });
   emit({ sessionOpen: false });
-  playMattrAudioCue("voice-mode-close");
+  playMatterAudioCue("voice-mode-close");
 }
 
 /**
@@ -1285,7 +1285,7 @@ export function openThreadVoiceMode(
       : {}),
   });
   if (!wasOpen) {
-    playMattrAudioCue("voice-mode-open");
+    playMatterAudioCue("voice-mode-open");
   }
   if (options?.autoStartHandsFree !== false && hostBridge !== null && !state.handsFreeActive) {
     void startHandsFree();
@@ -1426,7 +1426,7 @@ async function startHandsFree(): Promise<void> {
     error: null,
   });
   if (playOpenCue) {
-    playMattrAudioCue("voice-mode-open");
+    playMatterAudioCue("voice-mode-open");
   }
 
   const shouldTryFlux =
@@ -1565,7 +1565,7 @@ function stopHandsFree(options?: { readonly silent?: boolean }): void {
     activeBriefingLabel: null,
   });
   if (playCloseCue) {
-    playMattrAudioCue("voice-mode-close");
+    playMatterAudioCue("voice-mode-close");
   }
 }
 
@@ -1761,7 +1761,7 @@ export async function submitVoiceAssistantUtterance(
     error: null,
   });
   if (enteredThinking && effectiveMode !== "dictation") {
-    playMattrAudioCue("voice-mode-thinking");
+    playMatterAudioCue("voice-mode-thinking");
   }
 
   const controller = new AbortController();

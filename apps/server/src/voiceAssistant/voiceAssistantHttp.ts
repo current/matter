@@ -21,7 +21,7 @@ import type {
   VoiceServerTtsPreferences,
   VoiceSpeakRequest,
   VoiceTranscribeResponse,
-} from "../../../../antimatter/voice-assistant/types.ts";
+} from "../../../../matter/voice-assistant/types.ts";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import {
   failEnvironmentAuthInvalid,

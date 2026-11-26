@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { AddonIdSchema, AddonRuntimeStatus } from "./mattrAddons.ts";
+import { AddonIdSchema, AddonRuntimeStatus } from "./matterAddons.ts";
 
 /**
  * Provider-independent model for external persistent agents ("Bots"). Agents, conversations and
@@ -105,7 +105,7 @@ export const BotMessageRole = Schema.Literals(["user", "agent", "system"]);
 export type BotMessageRole = typeof BotMessageRole.Type;
 
 export const BotMessageAttribution = Schema.Literals([
-  "user-via-mattr",
+  "user-via-matter",
   "user-via-other-client",
   "agent",
   "other-agent",
@@ -119,7 +119,7 @@ export const BotAttachment = Schema.Struct({
   name: Schema.String,
   mimeType: Schema.NullOr(Schema.String),
   sizeBytes: Schema.NullOr(Schema.Int),
-  /** Served through mattr's server, never a provider URL that needs provider credentials. */
+  /** Served through Matter's server, never a provider URL that needs provider credentials. */
   url: Schema.NullOr(Schema.String),
 });
 export type BotAttachment = typeof BotAttachment.Type;
@@ -137,7 +137,7 @@ export const BotMessagePart = Schema.Union([
   Schema.Struct({ type: Schema.Literal("markdown"), text: Schema.String }),
   Schema.Struct({ type: Schema.Literal("attachment"), attachmentId: RemoteId }),
   Schema.Struct({ type: Schema.Literal("artifact"), artifactId: RemoteId }),
-  /** Provider content mattr cannot render natively; the UI shows the text and a deep link. */
+  /** Provider content Matter cannot render natively; the UI shows the text and a deep link. */
   Schema.Struct({ type: Schema.Literal("unsupported"), fallbackText: Schema.String }),
 ]);
 export type BotMessagePart = typeof BotMessagePart.Type;

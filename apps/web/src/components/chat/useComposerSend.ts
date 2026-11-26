@@ -68,9 +68,9 @@ import {
   isGoalClearCommand,
   nativeGoalCommand,
   prependKeepingGoalCommand,
-  resolveMattrModeSend,
+  resolveMatterModeSend,
   setComposerInteractionMode,
-} from "./mattrInteractionMode.mattr";
+} from "./matterInteractionMode.matter";
 import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
@@ -832,7 +832,7 @@ export function useComposerSend(input: ComposerSendInput) {
         previewAnnotations: sendContextPreviewAnnotations,
         direct: directAnnotation,
       });
-    const modeSend = resolveMattrModeSend({
+    const modeSend = resolveMatterModeSend({
       prompt: promptAtSend,
       bypass: directAnnotation !== undefined,
       editingQueuedMessage: queuedRunEdit.isEditing,

@@ -11,7 +11,7 @@ import { derivePendingUserInputProgress } from "../../pendingUserInput";
 import type { PendingUserInput } from "../../session-logic";
 import ChatMarkdown from "../ChatMarkdown";
 import { BackgroundThreadContext } from "./backgroundThread";
-import { mattrAnimatedHeightRef } from "./mattrCardMotion.mattr";
+import { matterAnimatedHeightRef } from "./matterCardMotion.matter";
 
 const OPTION_LETTERS = "ABCDEFGHI";
 const SINGLE_SELECT_ADVANCE_DELAY_MS = 200;
@@ -19,7 +19,7 @@ const SHORTCUT_BLOCKERS =
   'select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [aria-modal="true"], [role="menu"], [role="combobox"], [data-slot$="popup"]';
 
 /** The option a key picks: 1–9 or A–I, in row order; the custom row takes the next slot. */
-export function mattrQuestionShortcutIndex(key: string): number | null {
+export function matterQuestionShortcutIndex(key: string): number | null {
   if (/^[1-9]$/.test(key)) return Number(key) - 1;
   const letter = OPTION_LETTERS.indexOf(key.toUpperCase());
   return key.length === 1 && letter >= 0 ? letter : null;
@@ -31,7 +31,7 @@ function clearAutoAdvance(timerRef: { current: number | null }): void {
   timerRef.current = null;
 }
 
-export interface MattrQuestionsCardProps {
+export interface MatterQuestionsCardProps {
   readonly prompt: PendingUserInput;
   readonly cwd: string | undefined;
   readonly threadRef: ScopedThreadRef;
@@ -46,8 +46,8 @@ export interface MattrQuestionsCardProps {
   readonly onDismiss: (requestId: RuntimeRequestId) => void;
 }
 
-/** mattr: the Questions card that replaces upstream's pending user input banner. */
-export function MattrQuestionsCard({
+/** Matter: the Questions card that replaces upstream's pending user input banner. */
+export function MatterQuestionsCard({
   prompt,
   cwd,
   threadRef,
@@ -60,7 +60,7 @@ export function MattrQuestionsCard({
   onPrevious,
   onChangeCustomAnswer,
   onDismiss,
-}: MattrQuestionsCardProps) {
+}: MatterQuestionsCardProps) {
   const gt = useGT();
   const canRespond = prompt.responseCapability !== "not_resumable";
   const inputDisabled = disabled || isResponding;
@@ -167,14 +167,14 @@ export function MattrQuestionsCard({
       if (event.key === "Enter" && !event.shiftKey) {
         if (
           target instanceof HTMLElement &&
-          target.closest("button:not([data-mattr-qp-option]), a[href], summary")
+          target.closest("button:not([data-matter-qp-option]), a[href], summary")
         ) {
           return;
         }
         if (advanceFromShortcut()) event.preventDefault();
         return;
       }
-      const index = mattrQuestionShortcutIndex(event.key);
+      const index = matterQuestionShortcutIndex(event.key);
       if (index === null) return;
       if (pickFromShortcut(index)) event.preventDefault();
     };
@@ -199,31 +199,31 @@ export function MattrQuestionsCard({
 
   return (
     <section
-      data-mattr-questions=""
+      data-matter-questions=""
       dir={promptDirection}
       aria-label={gt("Questions")}
       aria-busy={isResponding || undefined}
     >
-      <header data-mattr-qp-header="">
-        <span data-mattr-qp-glyph="question" aria-hidden>
+      <header data-matter-qp-header="">
+        <span data-matter-qp-glyph="question" aria-hidden>
           <MessageCircleQuestionIcon />
         </span>
-        <span data-mattr-qp-heading="">{gt("Questions")}</span>
+        <span data-matter-qp-heading="">{gt("Questions")}</span>
         {activeQuestion.header.trim().toLowerCase() !== "questions" ? (
-          <span data-mattr-qp-pill="" dir={textDirection(activeQuestion.header)}>
+          <span data-matter-qp-pill="" dir={textDirection(activeQuestion.header)}>
             {activeQuestion.header}
           </span>
         ) : null}
       </header>
 
-      <div data-mattr-height="" ref={mattrAnimatedHeightRef}>
+      <div data-matter-height="" ref={matterAnimatedHeightRef}>
         <div>
           <div
             key={activeQuestion.id}
-            data-mattr-qp-step={shownStep.direction}
-            data-mattr-question-id={activeQuestion.id}
+            data-matter-qp-step={shownStep.direction}
+            data-matter-question-id={activeQuestion.id}
           >
-            <div data-mattr-qp-question="">
+            <div data-matter-qp-question="">
               <ChatMarkdown
                 text={activeQuestion.question}
                 cwd={cwd}
@@ -232,10 +232,10 @@ export function MattrQuestionsCard({
               />
             </div>
             {activeQuestion.multiSelect ? (
-              <p data-mattr-qp-hint="">{gt("Select all that apply")}</p>
+              <p data-matter-qp-hint="">{gt("Select all that apply")}</p>
             ) : null}
             <div
-              data-mattr-qp-options=""
+              data-matter-qp-options=""
               role="group"
               aria-label={activeQuestion.header}
               data-multi-select={activeQuestion.multiSelect ? "" : undefined}
@@ -250,25 +250,25 @@ export function MattrQuestionsCard({
                   <div key={`${activeQuestion.id}:${optionValue}`}>
                     <button
                       type="button"
-                      data-mattr-qp-option=""
+                      data-matter-qp-option=""
                       data-selected={isSelected ? "" : undefined}
                       aria-pressed={isSelected}
                       disabled={responseDisabled}
                       onClick={() => selectOption(activeQuestion.id, optionValue)}
                     >
                       <OptionKey index={index} />
-                      <span data-mattr-qp-option-text="">
+                      <span data-matter-qp-option-text="">
                         <span dir={textDirection(option.label)}>{option.label}</span>
                         {option.description && option.description !== option.label ? (
-                          <span data-mattr-qp-option-description="">{option.description}</span>
+                          <span data-matter-qp-option-description="">{option.description}</span>
                         ) : null}
                       </span>
                       {activeQuestion.multiSelect && isSelected ? (
-                        <CheckIcon data-mattr-qp-check="" aria-hidden />
+                        <CheckIcon data-matter-qp-check="" aria-hidden />
                       ) : null}
                     </button>
                     {option.preview ? (
-                      <div data-mattr-qp-preview="">
+                      <div data-matter-qp-preview="">
                         <ChatMarkdown
                           text={option.preview}
                           cwd={cwd}
@@ -282,8 +282,8 @@ export function MattrQuestionsCard({
               })}
               {allowsCustomAnswer ? (
                 <label
-                  data-mattr-qp-option=""
-                  data-mattr-qp-custom=""
+                  data-matter-qp-option=""
+                  data-matter-qp-custom=""
                   data-selected={customAnswerActive ? "" : undefined}
                   data-disabled={responseDisabled ? "" : undefined}
                 >
@@ -324,9 +324,9 @@ export function MattrQuestionsCard({
         </div>
       </div>
 
-      <footer data-mattr-qp-footer="">
+      <footer data-matter-qp-footer="">
         {total > 1 ? (
-          <div data-mattr-qp-stepper="">
+          <div data-matter-qp-stepper="">
             <button
               type="button"
               aria-label={gt("Previous question")}
@@ -338,7 +338,7 @@ export function MattrQuestionsCard({
             >
               <ChevronUpIcon aria-hidden />
             </button>
-            <span data-mattr-qp-count="" aria-live="polite">
+            <span data-matter-qp-count="" aria-live="polite">
               {progress.questionIndex + 1}/{total}
             </span>
             <button
@@ -353,11 +353,11 @@ export function MattrQuestionsCard({
         ) : (
           <span />
         )}
-        <div data-mattr-qp-actions="">
+        <div data-matter-qp-actions="">
           {prompt.dismissible ? (
             <button
               type="button"
-              data-mattr-qp-pill-button="secondary"
+              data-matter-qp-pill-button="secondary"
               disabled={isResponding}
               onClick={() => {
                 clearAutoAdvance(autoAdvanceTimerRef);
@@ -369,13 +369,13 @@ export function MattrQuestionsCard({
           ) : null}
           <button
             type="button"
-            data-mattr-qp-pill-button="primary"
+            data-matter-qp-pill-button="primary"
             data-ready={canContinue ? "" : undefined}
             disabled={!canContinue}
             onClick={handleAdvance}
           >
             {continueLabel}
-            <span data-mattr-qp-enter="" aria-hidden>
+            <span data-matter-qp-enter="" aria-hidden>
               ↵
             </span>
           </button>
@@ -388,7 +388,7 @@ export function MattrQuestionsCard({
 function OptionKey({ index }: { index: number }) {
   const letter = OPTION_LETTERS[index];
   return (
-    <span data-mattr-qp-key="" aria-hidden>
+    <span data-matter-qp-key="" aria-hidden>
       {letter ?? index + 1}
     </span>
   );

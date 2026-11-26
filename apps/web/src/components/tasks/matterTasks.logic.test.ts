@@ -1,4 +1,4 @@
-import type { MattrTask, ServerProvider } from "@t3tools/contracts";
+import type { MatterTask, ServerProvider } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -9,10 +9,10 @@ import {
   listViewTasks,
   planTaskMove,
   taskPrompt,
-} from "./mattrTasks.logic";
+} from "./matterTasks.logic";
 import { resolveTaskAgentChoice, taskModelSelection } from "./taskAgent";
 
-const task = (overrides: Partial<MattrTask> & Pick<MattrTask, "id">): MattrTask => ({
+const task = (overrides: Partial<MatterTask> & Pick<MatterTask, "id">): MatterTask => ({
   title: overrides.id,
   note: "",
   status: "todo",

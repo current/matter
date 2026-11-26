@@ -260,8 +260,8 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { BotsSidebarSection } from "./bots/BotsSidebarSection";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
-import { MattrCustomSidebarHost } from "./sidebar/mattr/MattrCustomSidebarHost";
-import { useMattrSidebarLayout } from "./sidebar/mattr/mattrSidebarStore";
+import { MatterCustomSidebarHost } from "./sidebar/matter/MatterCustomSidebarHost";
+import { useMatterSidebarLayout } from "./sidebar/matter/matterSidebarStore";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { TooltipScrollDismissArea } from "./ui/tooltip";
 import {
@@ -930,9 +930,9 @@ function readRouteThreadKey(router: AnyRouter): string | null {
 }
 
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
-  const [mattrLayout] = useMattrSidebarLayout();
-  if (mattrLayout !== "classic") {
-    return <MattrCustomSidebarHost layout={mattrLayout} routeReveal={routeReveal} />;
+  const [matterLayout] = useMatterSidebarLayout();
+  if (matterLayout !== "classic") {
+    return <MatterCustomSidebarHost layout={matterLayout} routeReveal={routeReveal} />;
   }
   return <ClassicSidebar routeReveal={routeReveal} />;
 }

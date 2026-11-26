@@ -2,22 +2,22 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import { act, fakeTimers, render } from "../../../test/render";
 import "../../index.css";
-import "../../../../../antimatter/rareui-chat.css";
+import "../../../../../matter/rareui-chat.css";
 import { setLocalStorageItem } from "../../hooks/useLocalStorage";
 import {
-  MATTR_AI_STATUS_STYLE_STORAGE_KEY,
-  MattrAiStatusPhaseCtx,
-  MattrAiStatusStyle,
-  type MattrAiStatusPhase,
-  deriveMattrThinkingCoordination,
-  readMattrAiStatusStyle,
-} from "../../mattrAiStatus";
+  MATTER_AI_STATUS_STYLE_STORAGE_KEY,
+  MatterAiStatusPhaseCtx,
+  MatterAiStatusStyle,
+  type MatterAiStatusPhase,
+  deriveMatterThinkingCoordination,
+  readMatterAiStatusStyle,
+} from "../../matterAiStatus";
 import {
-  MattrAiStatus,
-  MattrThinkingTimelineRow,
-  MattrTimelineActivityProvider,
-  MattrWorkingTimelineRow,
-} from "./MattrAiStatusIndicator";
+  MatterAiStatus,
+  MatterThinkingTimelineRow,
+  MatterTimelineActivityProvider,
+  MatterWorkingTimelineRow,
+} from "./MatterAiStatusIndicator";
 import {
   TimelineRowActivityCtx,
   TimelineRowCtx,
@@ -26,9 +26,9 @@ import {
   type TimelineRowSharedState,
 } from "./timelineRowContext";
 
-function aiStatusStyle(style: MattrAiStatusStyle): Disposable {
-  setLocalStorageItem(MATTR_AI_STATUS_STYLE_STORAGE_KEY, style, MattrAiStatusStyle);
-  return { [Symbol.dispose]: () => localStorage.removeItem(MATTR_AI_STATUS_STYLE_STORAGE_KEY) };
+function aiStatusStyle(style: MatterAiStatusStyle): Disposable {
+  setLocalStorageItem(MATTER_AI_STATUS_STYLE_STORAGE_KEY, style, MatterAiStatusStyle);
+  return { [Symbol.dispose]: () => localStorage.removeItem(MATTER_AI_STATUS_STYLE_STORAGE_KEY) };
 }
 
 const activity = {
@@ -50,19 +50,19 @@ const shared = {
   onToggleWorkGroup: vi.fn(),
 } as unknown as TimelineRowSharedState;
 
-function WorkingRow({ phase }: { phase: MattrAiStatusPhase }) {
+function WorkingRow({ phase }: { phase: MatterAiStatusPhase }) {
   return (
     <TimelineRowCtx value={shared}>
       <TimelineRowActivityCtx value={activity}>
-        <MattrAiStatusPhaseCtx value={phase}>
-          <MattrWorkingTimelineRow
+        <MatterAiStatusPhaseCtx value={phase}>
+          <MatterWorkingTimelineRow
             row={{
               kind: "working",
               id: "working-indicator-row",
               createdAt: "2026-01-01T00:00:00.000Z",
             }}
           />
-        </MattrAiStatusPhaseCtx>
+        </MatterAiStatusPhaseCtx>
       </TimelineRowActivityCtx>
     </TimelineRowCtx>
   );
@@ -75,58 +75,60 @@ const infiniteAnimations = (root: Element) =>
 
 describe("AI status style store", () => {
   it("defaults to upstream's indicator and reads the saved style", () => {
-    expect(readMattrAiStatusStyle()).toBe("default");
+    expect(readMatterAiStatusStyle()).toBe("default");
     using _style = aiStatusStyle("rareui");
-    expect(localStorage.getItem(MATTR_AI_STATUS_STYLE_STORAGE_KEY)).toBe(JSON.stringify("rareui"));
-    expect(readMattrAiStatusStyle()).toBe("rareui");
+    expect(localStorage.getItem(MATTER_AI_STATUS_STYLE_STORAGE_KEY)).toBe(JSON.stringify("rareui"));
+    expect(readMatterAiStatusStyle()).toBe("rareui");
   });
 
   it("falls back to the default on a value it doesn't know", () => {
     using _consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    localStorage.setItem(MATTR_AI_STATUS_STYLE_STORAGE_KEY, JSON.stringify("confetti"));
-    expect(readMattrAiStatusStyle()).toBe("default");
-    localStorage.removeItem(MATTR_AI_STATUS_STYLE_STORAGE_KEY);
+    localStorage.setItem(MATTER_AI_STATUS_STYLE_STORAGE_KEY, JSON.stringify("confetti"));
+    expect(readMatterAiStatusStyle()).toBe("default");
+    localStorage.removeItem(MATTER_AI_STATUS_STYLE_STORAGE_KEY);
   });
 });
 
-describe("MattrWorkingTimelineRow", () => {
+describe("MatterWorkingTimelineRow", () => {
   it("renders upstream's working timer by default", async () => {
     await using screen = await render(<WorkingRow phase="editing" />, { router: false });
     await expect.poll(() => screen.container.textContent).toMatch(/Working for \d/);
-    expect(screen.container.querySelector(".mattr-ais")).toBeNull();
+    expect(screen.container.querySelector(".matter-ais")).toBeNull();
   });
 
   it("shows RareUI's status for the live phase and follows phase and style changes", async () => {
     using _style = aiStatusStyle("rareui");
     await using screen = await render(<WorkingRow phase="thinking" />, { router: false });
-    const status = () => screen.container.querySelector<HTMLElement>(".mattr-ais");
+    const status = () => screen.container.querySelector<HTMLElement>(".matter-ais");
     const label = () =>
-      screen.container.querySelector('[data-slot="mattr-ai-status-label"]')?.firstChild
+      screen.container.querySelector('[data-slot="matter-ai-status-label"]')?.firstChild
         ?.textContent;
-    await expect.poll(() => status()?.dataset.mattrAiStatus).toBe("thinking");
+    await expect.poll(() => status()?.dataset.matterAiStatus).toBe("thinking");
     expect(label()).toBe("Thinking");
     expect(
-      screen.container.querySelector('[data-slot="mattr-ai-status-timer"]')?.textContent,
+      screen.container.querySelector('[data-slot="matter-ai-status-timer"]')?.textContent,
     ).toMatch(/\d/);
 
     await screen.rerender(<WorkingRow phase="running" />);
     await expect.poll(label).toBe("Running command");
-    expect(status()?.dataset.mattrAiStatus).toBe("analyzing");
+    expect(status()?.dataset.matterAiStatus).toBe("analyzing");
 
     // A beat of thinking between tool calls is held back, so the label doesn't flicker.
-    await expect.poll(() => screen.container.querySelector(".mattr-ais-text-out")).toBeNull();
+    await expect.poll(() => screen.container.querySelector(".matter-ais-text-out")).toBeNull();
     {
       using _timers = fakeTimers();
       await screen.rerender(<WorkingRow phase="thinking" />);
       await screen.rerender(<WorkingRow phase="running" />);
       await act(() => vi.advanceTimersByTime(1000));
       expect(label()).toBe("Running command");
-      expect(screen.container.querySelector(".mattr-ais-text-out")).toBeNull();
+      expect(screen.container.querySelector(".matter-ais-text-out")).toBeNull();
     }
 
     await act(() => {
-      setLocalStorageItem(MATTR_AI_STATUS_STYLE_STORAGE_KEY, "default", MattrAiStatusStyle);
-      window.dispatchEvent(new StorageEvent("storage", { key: MATTR_AI_STATUS_STYLE_STORAGE_KEY }));
+      setLocalStorageItem(MATTER_AI_STATUS_STYLE_STORAGE_KEY, "default", MatterAiStatusStyle);
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: MATTER_AI_STATUS_STYLE_STORAGE_KEY }),
+      );
     });
     await expect.poll(status).toBeNull();
     expect(screen.container.textContent).toMatch(/Working for/);
@@ -136,33 +138,33 @@ describe("MattrWorkingTimelineRow", () => {
     using _style = aiStatusStyle("rareui");
     await using screen = await render(<WorkingRow phase="input" />, { router: false });
     await expect
-      .poll(() => screen.container.querySelector<HTMLElement>(".mattr-ais")?.dataset.active)
+      .poll(() => screen.container.querySelector<HTMLElement>(".matter-ais")?.dataset.active)
       .toBeUndefined();
     expect(screen.container.textContent).toContain("Needs your input");
-    expect(screen.container.querySelector('[data-slot="mattr-ai-status-timer"]')).toBeNull();
+    expect(screen.container.querySelector('[data-slot="matter-ai-status-timer"]')).toBeNull();
     expect(infiniteAnimations(screen.container)).toEqual([]);
   });
 });
 
-describe("MattrAiStatus", () => {
+describe("MatterAiStatus", () => {
   it("loops only while active", async () => {
-    await using screen = await render(<MattrAiStatus icon="writing" label="Writing" active />, {
+    await using screen = await render(<MatterAiStatus icon="writing" label="Writing" active />, {
       router: false,
     });
     await expect.poll(() => infiniteAnimations(screen.container).length).toBeGreaterThan(0);
-    await screen.rerender(<MattrAiStatus icon="done" label="Worked for 9s" active={false} />);
+    await screen.rerender(<MatterAiStatus icon="done" label="Worked for 9s" active={false} />);
     await expect.poll(() => infiniteAnimations(screen.container)).toEqual([]);
   });
 
   it("swaps labels with the leaving copy on top, then drops it", async () => {
-    await using screen = await render(<MattrAiStatus icon="thinking" label="Thinking" active />, {
+    await using screen = await render(<MatterAiStatus icon="thinking" label="Thinking" active />, {
       router: false,
     });
-    expect(screen.container.querySelector(".mattr-ais-text-in")).toBeNull();
-    await screen.rerender(<MattrAiStatus icon="researching" label="Searching" active />);
-    await expect.poll(() => screen.container.querySelector(".mattr-ais-text-in")).not.toBeNull();
-    await expect.poll(() => screen.container.querySelector(".mattr-ais-text-out")).toBeNull();
-    await expect.poll(() => screen.container.querySelector(".mattr-ais-icon-out")).toBeNull();
+    expect(screen.container.querySelector(".matter-ais-text-in")).toBeNull();
+    await screen.rerender(<MatterAiStatus icon="researching" label="Searching" active />);
+    await expect.poll(() => screen.container.querySelector(".matter-ais-text-in")).not.toBeNull();
+    await expect.poll(() => screen.container.querySelector(".matter-ais-text-out")).toBeNull();
+    await expect.poll(() => screen.container.querySelector(".matter-ais-icon-out")).toBeNull();
   });
 
   it("stops every animation under reduced motion", () => {
@@ -174,13 +176,13 @@ describe("MattrAiStatus", () => {
       )
       .flatMap((rule) => [...rule.cssRules])
       .map((rule) => rule.cssText);
-    const statusRule = reducedRules.find((rule) => rule.startsWith(".mattr-ais, .mattr-ais *"));
+    const statusRule = reducedRules.find((rule) => rule.startsWith(".matter-ais, .matter-ais *"));
     expect(statusRule).toMatch(/animation: [^;]*none !important/);
     expect(statusRule).toContain("transition: none !important");
   });
 });
 
-describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
+describe("MatterThinkingTimelineRow and working/thinking coordination", () => {
   const workingRow: Extract<TimelineRow, { kind: "working" }> = {
     kind: "working",
     id: "working-indicator-row",
@@ -209,7 +211,7 @@ describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
     using _style = aiStatusStyle("rareui");
     const rows: ReadonlyArray<TimelineRow> = [workingRow, plainThinkingRow];
     expect(
-      deriveMattrThinkingCoordination(rows, {
+      deriveMatterThinkingCoordination(rows, {
         awaitingUser: false,
         isPreparingWorktree: false,
         isCompacting: false,
@@ -222,25 +224,27 @@ describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
 
     await using screen = await render(
       <TimelineRowCtx value={shared}>
-        <MattrTimelineActivityProvider value={activity} rows={rows}>
-          <MattrWorkingTimelineRow row={workingRow} />
-          <MattrThinkingTimelineRow row={plainThinkingRow} />
-        </MattrTimelineActivityProvider>
+        <MatterTimelineActivityProvider value={activity} rows={rows}>
+          <MatterWorkingTimelineRow row={workingRow} />
+          <MatterThinkingTimelineRow row={plainThinkingRow} />
+        </MatterTimelineActivityProvider>
       </TimelineRowCtx>,
       { router: false },
     );
 
-    const statuses = screen.container.querySelectorAll(".mattr-ais");
+    const statuses = screen.container.querySelectorAll(".matter-ais");
     expect(statuses.length).toBe(1);
-    expect((statuses[0] as HTMLElement).dataset.mattrAiStatus).toBe("thinking");
-    expect(screen.container.querySelectorAll('[data-slot="mattr-ai-status-label"]').length).toBe(1);
+    expect((statuses[0] as HTMLElement).dataset.matterAiStatus).toBe("thinking");
+    expect(screen.container.querySelectorAll('[data-slot="matter-ai-status-label"]').length).toBe(
+      1,
+    );
   });
 
   it("renders a single RareUI Thinking row below a steered message while keeping the top row calm", async () => {
     using _style = aiStatusStyle("rareui");
     const rows: ReadonlyArray<TimelineRow> = [workingRow, steerMessageRow, plainThinkingRow];
     expect(
-      deriveMattrThinkingCoordination(rows, {
+      deriveMatterThinkingCoordination(rows, {
         awaitingUser: false,
         isPreparingWorktree: false,
         isCompacting: false,
@@ -253,14 +257,14 @@ describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
 
     await using screen = await render(
       <TimelineRowCtx value={shared}>
-        <MattrTimelineActivityProvider value={activity} rows={rows}>
+        <MatterTimelineActivityProvider value={activity} rows={rows}>
           <div data-testid="top-working">
-            <MattrWorkingTimelineRow row={workingRow} />
+            <MatterWorkingTimelineRow row={workingRow} />
           </div>
           <div data-testid="bottom-thinking">
-            <MattrThinkingTimelineRow row={plainThinkingRow} />
+            <MatterThinkingTimelineRow row={plainThinkingRow} />
           </div>
-        </MattrTimelineActivityProvider>
+        </MatterTimelineActivityProvider>
       </TimelineRowCtx>,
       { router: false },
     );
@@ -268,12 +272,12 @@ describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
     const top = screen.container.querySelector('[data-testid="top-working"]')!;
     const bottom = screen.container.querySelector('[data-testid="bottom-thinking"]')!;
     await expect.poll(() => top.textContent).toMatch(/Working for \d/);
-    expect(top.querySelector(".mattr-ais")).toBeNull();
-    const bottomStatus = bottom.querySelector<HTMLElement>(".mattr-ais");
+    expect(top.querySelector(".matter-ais")).toBeNull();
+    const bottomStatus = bottom.querySelector<HTMLElement>(".matter-ais");
     expect(bottomStatus).not.toBeNull();
-    expect(bottomStatus?.dataset.mattrAiStatus).toBe("thinking");
+    expect(bottomStatus?.dataset.matterAiStatus).toBe("thinking");
     expect(
-      bottom.querySelector('[data-slot="mattr-ai-status-label"]')?.firstChild?.textContent,
+      bottom.querySelector('[data-slot="matter-ai-status-label"]')?.firstChild?.textContent,
     ).toBe("Thinking");
   });
 
@@ -292,17 +296,17 @@ describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
 
     await using screen = await render(
       <TimelineRowCtx value={{ ...shared, onToggleWorkGroup }}>
-        <MattrTimelineActivityProvider value={activity} rows={rows}>
-          <MattrThinkingTimelineRow row={toggleRow} />
-        </MattrTimelineActivityProvider>
+        <MatterTimelineActivityProvider value={activity} rows={rows}>
+          <MatterThinkingTimelineRow row={toggleRow} />
+        </MatterTimelineActivityProvider>
       </TimelineRowCtx>,
       { router: false },
     );
 
-    const status = screen.container.querySelector<HTMLElement>(".mattr-ais");
-    expect(status?.dataset.mattrAiStatus).toBe("analyzing");
+    const status = screen.container.querySelector<HTMLElement>(".matter-ais");
+    expect(status?.dataset.matterAiStatus).toBe("analyzing");
     expect(
-      screen.container.querySelector('[data-slot="mattr-ai-status-label"]')?.firstChild
+      screen.container.querySelector('[data-slot="matter-ai-status-label"]')?.firstChild
         ?.textContent,
     ).toBe("Waiting on 2 subagents");
     const button = screen.container.querySelector("button");
@@ -317,15 +321,15 @@ describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
 
     await using screen = await render(
       <TimelineRowCtx value={shared}>
-        <MattrTimelineActivityProvider value={activity} rows={rows}>
-          <MattrWorkingTimelineRow row={workingRow} />
-          <MattrThinkingTimelineRow row={plainThinkingRow} />
-        </MattrTimelineActivityProvider>
+        <MatterTimelineActivityProvider value={activity} rows={rows}>
+          <MatterWorkingTimelineRow row={workingRow} />
+          <MatterThinkingTimelineRow row={plainThinkingRow} />
+        </MatterTimelineActivityProvider>
       </TimelineRowCtx>,
       { router: false },
     );
 
-    expect(screen.container.querySelector(".mattr-ais")).toBeNull();
+    expect(screen.container.querySelector(".matter-ais")).toBeNull();
     await expect.poll(() => screen.container.textContent).toMatch(/Working for \d/);
     expect(screen.container.textContent).toContain("Thinking");
   });

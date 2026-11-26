@@ -1,9 +1,9 @@
 import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  MattrTaskCreateRequest,
-  MattrTaskReorderRequest,
-  MattrTaskUpdateRequest,
+  MatterTaskCreateRequest,
+  MatterTaskReorderRequest,
+  MatterTaskUpdateRequest,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -16,19 +16,19 @@ import {
   INVALID_REQUEST,
   json,
   readJson,
-} from "../../bots/mattrHttp.ts";
-import * as MattrTasksService from "./MattrTasksService.ts";
+} from "../../bots/matterHttp.ts";
+import * as MatterTasksService from "./MatterTasksService.ts";
 
-const decodeCreate = Schema.decodeUnknownEffect(MattrTaskCreateRequest);
-const decodeUpdate = Schema.decodeUnknownEffect(MattrTaskUpdateRequest);
-const decodeReorder = Schema.decodeUnknownEffect(MattrTaskReorderRequest);
+const decodeCreate = Schema.decodeUnknownEffect(MatterTaskCreateRequest);
+const decodeUpdate = Schema.decodeUnknownEffect(MatterTaskUpdateRequest);
+const decodeReorder = Schema.decodeUnknownEffect(MatterTaskReorderRequest);
 
-const tasksErrorResponse = (error: MattrTasksService.MattrTasksError) =>
+const tasksErrorResponse = (error: MatterTasksService.MatterTasksError) =>
   Effect.succeed(json({ error: error.reason }, error.reason === "not_found" ? 404 : 500));
 
 const layerTasksRoutes = Layer.unwrap(
   Effect.gen(function* () {
-    const tasks = yield* MattrTasksService.MattrTasksService;
+    const tasks = yield* MatterTasksService.MatterTasksService;
 
     const listRoute = HttpRouter.add(
       "GET",
@@ -37,7 +37,7 @@ const layerTasksRoutes = Layer.unwrap(
         yield* authenticate(AuthOrchestrationReadScope);
         return yield* tasks.list.pipe(
           Effect.map((list) => json({ tasks: list })),
-          Effect.catchTags({ MattrTasksError: tasksErrorResponse }),
+          Effect.catchTags({ MatterTasksError: tasksErrorResponse }),
         );
       }).pipe(catchAuthErrors),
     );
@@ -51,7 +51,7 @@ const layerTasksRoutes = Layer.unwrap(
         if (!body) return INVALID_REQUEST;
         return yield* tasks.create(body).pipe(
           Effect.map((task) => json({ task })),
-          Effect.catchTags({ MattrTasksError: tasksErrorResponse }),
+          Effect.catchTags({ MatterTasksError: tasksErrorResponse }),
         );
       }).pipe(catchAuthErrors),
     );
@@ -65,7 +65,7 @@ const layerTasksRoutes = Layer.unwrap(
         if (!body) return INVALID_REQUEST;
         return yield* tasks.reorder(body).pipe(
           Effect.map((list) => json({ tasks: list })),
-          Effect.catchTags({ MattrTasksError: tasksErrorResponse }),
+          Effect.catchTags({ MatterTasksError: tasksErrorResponse }),
         );
       }).pipe(catchAuthErrors),
     );
@@ -80,7 +80,7 @@ const layerTasksRoutes = Layer.unwrap(
         if (!id || !body) return INVALID_REQUEST;
         return yield* tasks.update(id, body).pipe(
           Effect.map((task) => json({ task })),
-          Effect.catchTags({ MattrTasksError: tasksErrorResponse }),
+          Effect.catchTags({ MatterTasksError: tasksErrorResponse }),
         );
       }).pipe(catchAuthErrors),
     );
@@ -96,7 +96,7 @@ const layerTasksRoutes = Layer.unwrap(
           .remove(id)
           .pipe(
             Effect.as(json({ ok: true })),
-            Effect.catchTags({ MattrTasksError: tasksErrorResponse }),
+            Effect.catchTags({ MatterTasksError: tasksErrorResponse }),
           );
       }).pipe(catchAuthErrors),
     );
@@ -105,4 +105,4 @@ const layerTasksRoutes = Layer.unwrap(
   }),
 );
 
-export const layerMattrTasks = layerTasksRoutes.pipe(Layer.provide(MattrTasksService.layer));
+export const layerMatterTasks = layerTasksRoutes.pipe(Layer.provide(MatterTasksService.layer));

@@ -15,7 +15,7 @@ interface AddonPresentation {
 const ADDON_PRESENTATION: Readonly<Record<string, AddonPresentation>> = {
   "grok-bot": {
     title: msg("Grok Bot"),
-    description: msg("Talk to your existing Grok Bot teammates from the mattr sidebar."),
+    description: msg("Talk to your existing Grok Bot teammates from the Matter sidebar."),
     Icon: BotIcon,
     statusLabels: {
       connected: msg("Connected"),
@@ -25,7 +25,7 @@ const ADDON_PRESENTATION: Readonly<Record<string, AddonPresentation>> = {
   },
   "devin-bot": {
     title: msg("Devin Bot"),
-    description: msg("Talk to your Devin Bots and answer what they need from the mattr sidebar."),
+    description: msg("Talk to your Devin Bots and answer what they need from the Matter sidebar."),
     Icon: BotIcon,
     statusLabels: {
       connected: msg("Connected"),

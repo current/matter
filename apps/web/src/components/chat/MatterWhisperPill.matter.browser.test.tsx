@@ -48,11 +48,11 @@ vi.mock(import("./ThreadRelationshipsControl"), () => ({
   )) as never,
 }));
 
-import shellCss from "../../../../../antimatter/shell.css?inline";
+import shellCss from "../../../../../matter/shell.css?inline";
 import indexCss from "../../index.css?inline";
 import { render } from "../../../test/render";
-import { MattrWhisperPill, type MattrBackgroundWork } from "./MattrWhisperPill.mattr";
-import { closeMattrLineagePopover, readMattrLineagePopover } from "./mattrThreadRibbon.logic";
+import { MatterWhisperPill, type MatterBackgroundWork } from "./MatterWhisperPill.matter";
+import { closeMatterLineagePopover, readMatterLineagePopover } from "./matterThreadRibbon.logic";
 
 const NOW = Date.parse("2026-11-26T12:00:00.000Z");
 const ENVIRONMENT = EnvironmentId.make("environment");
@@ -84,7 +84,7 @@ function withStyles() {
     [Symbol.dispose]: () => {
       style.remove();
       vi.useRealTimers();
-      closeMattrLineagePopover();
+      closeMatterLineagePopover();
       state.subagents = [];
       state.shells = [];
       state.servers = [];
@@ -95,32 +95,32 @@ function withStyles() {
   };
 }
 
-const idleWork: MattrBackgroundWork = { tasks: [], onStop: null, stopping: false };
+const idleWork: MatterBackgroundWork = { tasks: [], onStop: null, stopping: false };
 
-describe("MattrWhisperPill", () => {
+describe("MatterWhisperPill", () => {
   it("renders nothing while idle", async () => {
     using _styles = withStyles();
     state.subagents = [agent("done", 30, "completed")];
     await using screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
-    expect(screen.container.querySelector("[data-mattr-whisper-pill-row]")).toBeNull();
+    expect(screen.container.querySelector("[data-matter-whisper-pill-row]")).toBeNull();
   });
 
   it("shows stacked avatars, the running count and the oldest timer as a 28px pill", async () => {
     using _styles = withStyles();
     state.subagents = [agent("a", 2), agent("b", 18), agent("c", 26), agent("d", 29)];
     await using screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     const pill = page.getByRole("button", { name: "Lineage: 4 running" });
     await expect.element(pill).toBeVisible();
     await expect.element(screen.getByText("29m")).toBeVisible();
-    const element = screen.container.querySelector<HTMLElement>("[data-mattr-whisper-pill]")!;
+    const element = screen.container.querySelector<HTMLElement>("[data-matter-whisper-pill]")!;
     expect(element.getBoundingClientRect().height).toBe(28);
     expect(getComputedStyle(element).borderRadius).toBe("10px");
     expect(getComputedStyle(element).fontStyle).toBe("normal");
-    const avatars = screen.container.querySelectorAll<HTMLElement>("[data-mattr-whisper-avatar]");
+    const avatars = screen.container.querySelectorAll<HTMLElement>("[data-matter-whisper-avatar]");
     expect(Array.from(avatars, (avatar) => avatar.style.zIndex)).toEqual(["3", "2", "1"]);
   });
 
@@ -128,12 +128,12 @@ describe("MattrWhisperPill", () => {
     using _styles = withStyles();
     state.subagents = [agent("a", 2), agent("b", 18)];
     await using _screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     await page.getByRole("button", { name: "Lineage: 2 running" }).click();
     await expect.element(page.getByText("Lineage · 2 running")).toBeVisible();
-    const popup = document.querySelector<HTMLElement>("[data-mattr-lineage-popup='pill']")!;
-    expect(popup.hasAttribute("data-mattr-frosted")).toBe(true);
+    const popup = document.querySelector<HTMLElement>("[data-matter-lineage-popup='pill']")!;
+    expect(popup.hasAttribute("data-matter-frosted")).toBe(true);
     expect(getComputedStyle(popup).borderRadius).toBe("12px");
     await expect.element(page.getByText("Build a")).toBeVisible();
     await expect.element(page.getByText("Build b")).toBeVisible();
@@ -157,7 +157,7 @@ describe("MattrWhisperPill", () => {
     using _styles = withStyles();
     state.subagents = [agent("a", 2), agent("old", 90, "completed")];
     await using _screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     await page.getByRole("button", { name: "Lineage: 1 running" }).click();
     await page.getByRole("button", { name: /Previous agents/ }).click();
@@ -170,7 +170,7 @@ describe("MattrWhisperPill", () => {
     using _styles = withStyles();
     const onStop = vi.fn(async () => {});
     await using _screen = await render(
-      <MattrWhisperPill
+      <MatterWhisperPill
         environmentId={ENVIRONMENT}
         threadId={THREAD}
         backgroundWork={{
@@ -191,10 +191,10 @@ describe("MattrWhisperPill", () => {
     document.documentElement.classList.add("dark");
     state.servers = [{ pid: 1, port: 5173, terminal: null, processName: "node" }];
     await using screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     await expect.element(screen.getByText(":5173")).toBeVisible();
-    const pill = screen.container.querySelector<HTMLElement>("[data-mattr-whisper-pill]")!;
+    const pill = screen.container.querySelector<HTMLElement>("[data-matter-whisper-pill]")!;
     expect(getComputedStyle(pill).backgroundColor).toBe("rgb(28, 28, 28)");
   });
 
@@ -202,29 +202,29 @@ describe("MattrWhisperPill", () => {
     using _styles = withStyles();
     state.subagents = [agent("a", 2)];
     await using screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     await page.getByRole("button", { name: "Lineage: 1 running" }).click();
     await expect.element(page.getByText("Lineage · 1 running")).toBeVisible();
-    expect(readMattrLineagePopover().threadKey).not.toBeNull();
+    expect(readMatterLineagePopover().threadKey).not.toBeNull();
 
     // Transition active -> idle while the popover is open.
     state.subagents = [agent("a", 2, "completed")];
     await screen.rerender(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
-    await expect.poll(() => readMattrLineagePopover().threadKey).toBeNull();
-    expect(screen.container.querySelector("[data-mattr-whisper-pill-row]")).toBeNull();
-    expect(document.querySelector("[data-mattr-lineage-popup='pill']")).toBeNull();
+    await expect.poll(() => readMatterLineagePopover().threadKey).toBeNull();
+    expect(screen.container.querySelector("[data-matter-whisper-pill-row]")).toBeNull();
+    expect(document.querySelector("[data-matter-lineage-popup='pill']")).toBeNull();
 
     // Starting a new subagent later must mount the pill closed, not spontaneously open the popover.
     state.subagents = [agent("b", 1)];
     await screen.rerender(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     await expect.element(page.getByRole("button", { name: "Lineage: 1 running" })).toBeVisible();
-    expect(readMattrLineagePopover().threadKey).toBeNull();
-    expect(document.querySelector("[data-mattr-lineage-popup='pill']")).toBeNull();
+    expect(readMatterLineagePopover().threadKey).toBeNull();
+    expect(document.querySelector("[data-matter-lineage-popup='pill']")).toBeNull();
   });
 
   it("shows multi-instance provider badges in both the collapsed avatars and expanded Lineage rows", async () => {
@@ -253,15 +253,15 @@ describe("MattrWhisperPill", () => {
     ];
     state.subagents = [agent("main", 2), { ...agent("alt", 5), providerInstanceId: "claude-alt" }];
     await using screen = await render(
-      <MattrWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
-    const pill = screen.container.querySelector<HTMLElement>("[data-mattr-whisper-pill]")!;
+    const pill = screen.container.querySelector<HTMLElement>("[data-matter-whisper-pill]")!;
     expect(pill.textContent).toContain("CL");
     expect(pill.textContent).toContain("CA");
 
     await page.getByRole("button", { name: "Lineage: 2 running" }).click();
     await expect.element(page.getByText("Lineage · 2 running")).toBeVisible();
-    const popup = document.querySelector<HTMLElement>("[data-mattr-lineage-popup='pill']")!;
+    const popup = document.querySelector<HTMLElement>("[data-matter-lineage-popup='pill']")!;
     expect(popup.textContent).toContain("CL");
     expect(popup.textContent).toContain("CA");
   });

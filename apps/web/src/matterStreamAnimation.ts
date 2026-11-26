@@ -9,7 +9,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { STREAM_CARET_CLASS } from "./components/chat/mattrStreamHast";
+import { STREAM_CARET_CLASS } from "./components/chat/matterStreamHast";
 
 import {
   readLocalStorageValue,
@@ -17,9 +17,9 @@ import {
   useLocalStorage,
 } from "./hooks/useLocalStorage";
 
-export const MATTR_STREAM_ANIMATION_STORAGE_KEY = "mattr:stream-animation:v1";
+export const MATTER_STREAM_ANIMATION_STORAGE_KEY = "mattr:stream-animation:v1";
 
-export const MattrStreamAnimation = Schema.Literals([
+export const MatterStreamAnimation = Schema.Literals([
   "instant",
   "blur",
   "fade",
@@ -27,13 +27,13 @@ export const MattrStreamAnimation = Schema.Literals([
   "typewriter",
   "rareui",
 ]);
-export type MattrStreamAnimation = typeof MattrStreamAnimation.Type;
-export type MattrAnimatedStream = Exclude<MattrStreamAnimation, "instant">;
+export type MatterStreamAnimation = typeof MatterStreamAnimation.Type;
+export type MatterAnimatedStream = Exclude<MatterStreamAnimation, "instant">;
 
-export const DEFAULT_MATTR_STREAM_ANIMATION: MattrStreamAnimation = "instant";
+export const DEFAULT_MATTER_STREAM_ANIMATION: MatterStreamAnimation = "instant";
 
-export const MATTR_STREAM_ANIMATIONS: ReadonlyArray<{
-  readonly id: MattrStreamAnimation;
+export const MATTER_STREAM_ANIMATIONS: ReadonlyArray<{
+  readonly id: MatterStreamAnimation;
   readonly name: string;
   readonly description: string;
 }> = [
@@ -81,19 +81,19 @@ export const MATTR_STREAM_ANIMATIONS: ReadonlyArray<{
   },
 ];
 
-export function readMattrStreamAnimation(): MattrStreamAnimation {
+export function readMatterStreamAnimation(): MatterStreamAnimation {
   return readLocalStorageValue(
-    MATTR_STREAM_ANIMATION_STORAGE_KEY,
-    DEFAULT_MATTR_STREAM_ANIMATION,
-    MattrStreamAnimation,
+    MATTER_STREAM_ANIMATION_STORAGE_KEY,
+    DEFAULT_MATTER_STREAM_ANIMATION,
+    MatterStreamAnimation,
   );
 }
 
-export function useMattrStreamAnimationSetting() {
+export function useMatterStreamAnimationSetting() {
   return useLocalStorage(
-    MATTR_STREAM_ANIMATION_STORAGE_KEY,
-    DEFAULT_MATTR_STREAM_ANIMATION,
-    MattrStreamAnimation,
+    MATTER_STREAM_ANIMATION_STORAGE_KEY,
+    DEFAULT_MATTER_STREAM_ANIMATION,
+    MatterStreamAnimation,
   );
 }
 
@@ -106,13 +106,13 @@ function reducedMotionQuery(): MediaQueryList | null {
 }
 
 /** The mode streaming text plays in: Instant whenever the system asks for reduced motion. */
-export function readEffectiveMattrStreamAnimation(): MattrStreamAnimation {
+export function readEffectiveMatterStreamAnimation(): MatterStreamAnimation {
   if (reducedMotionQuery()?.matches) return "instant";
-  return readMattrStreamAnimation();
+  return readMatterStreamAnimation();
 }
 
-function subscribeEffectiveMattrStreamAnimation(onChange: () => void): () => void {
-  const stopStorage = subscribeLocalStorageKey(MATTR_STREAM_ANIMATION_STORAGE_KEY, onChange);
+function subscribeEffectiveMatterStreamAnimation(onChange: () => void): () => void {
+  const stopStorage = subscribeLocalStorageKey(MATTER_STREAM_ANIMATION_STORAGE_KEY, onChange);
   const query = reducedMotionQuery();
   query?.addEventListener("change", onChange);
   return () => {
@@ -122,13 +122,13 @@ function subscribeEffectiveMattrStreamAnimation(onChange: () => void): () => voi
 }
 
 const subscribeNothing = () => () => {};
-const readInstant = (): MattrStreamAnimation => "instant";
+const readInstant = (): MatterStreamAnimation => "instant";
 
 /** The animated mode for a message, or null when it renders exactly as upstream does. */
-export function useEffectiveMattrStreamAnimation(active: boolean): MattrAnimatedStream | null {
+export function useEffectiveMatterStreamAnimation(active: boolean): MatterAnimatedStream | null {
   const mode = useSyncExternalStore(
-    active ? subscribeEffectiveMattrStreamAnimation : subscribeNothing,
-    active ? readEffectiveMattrStreamAnimation : readInstant,
+    active ? subscribeEffectiveMatterStreamAnimation : subscribeNothing,
+    active ? readEffectiveMatterStreamAnimation : readInstant,
     readInstant,
   );
   return mode === "instant" ? null : mode;
@@ -327,11 +327,11 @@ export function useBurstPacedText(text: string, pacing: boolean): string {
 }
 
 /** What ChatMarkdown renders for a message: the (paced) text and its animation, if any. */
-export function useMattrStreamingText(
+export function useMatterStreamingText(
   text: string,
   streaming: boolean,
-): { readonly text: string; readonly animation: MattrAnimatedStream | null } {
-  const animation = useEffectiveMattrStreamAnimation(streaming);
+): { readonly text: string; readonly animation: MatterAnimatedStream | null } {
+  const animation = useEffectiveMatterStreamAnimation(streaming);
   const paced = usePacedText(text, animation === "typewriter");
   const burst = useBurstPacedText(paced, animation === "rareui");
   return { text: burst, animation };

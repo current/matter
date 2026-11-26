@@ -294,9 +294,9 @@ describe("resolveAdvertisedEndpointPairingUrl", () => {
   });
 
   it("wraps into a hosted pairing URL only when VITE_HOSTED_APP_URL is explicitly configured", () => {
-    vi.stubEnv("VITE_HOSTED_APP_URL", "https://mattr.example.com");
+    vi.stubEnv("VITE_HOSTED_APP_URL", "https://matter.example.com");
     expect(resolveAdvertisedEndpointPairingUrl(tailscaleHttpsEndpoint, "PAIRCODE")).toBe(
-      "https://mattr.example.com/pair?host=https%3A%2F%2Fmac.tailnet.ts.net%2F#token=PAIRCODE",
+      "https://matter.example.com/pair?host=https%3A%2F%2Fmac.tailnet.ts.net%2F#token=PAIRCODE",
     );
   });
 
@@ -308,20 +308,20 @@ describe("resolveAdvertisedEndpointPairingUrl", () => {
   });
 
   it("keeps direct pairing URLs for HTTP LAN endpoints even when VITE_HOSTED_APP_URL is set", () => {
-    vi.stubEnv("VITE_HOSTED_APP_URL", "https://mattr.example.com");
+    vi.stubEnv("VITE_HOSTED_APP_URL", "https://matter.example.com");
     expect(resolveAdvertisedEndpointPairingUrl(lanEndpoint, "PAIRCODE")).toBe(
       "http://192.168.1.20:3773/pair#token=PAIRCODE",
     );
   });
 
-  it("describes direct Tailscale HTTPS links for mattr and Add to Home Screen", () => {
+  it("describes direct Tailscale HTTPS links for Matter and Add to Home Screen", () => {
     expect(
       endpointShareHint(tailscaleHttpsEndpoint, "https://mac.tailnet.ts.net/pair#token=PAIRCODE"),
-    ).toBe("Opens mattr directly · Add to Home Screen on phone");
+    ).toBe("Opens Matter directly · Add to Home Screen on phone");
     expect(
       endpointShareHint(
         tailscaleHttpsEndpoint,
-        "https://mattr.example.com/pair?host=https%3A%2F%2Fmac.tailnet.ts.net%2F#token=PAIRCODE",
+        "https://matter.example.com/pair?host=https%3A%2F%2Fmac.tailnet.ts.net%2F#token=PAIRCODE",
       ),
     ).toBe("Opens the hosted app, no install needed");
   });

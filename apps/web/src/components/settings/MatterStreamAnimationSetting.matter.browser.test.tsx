@@ -3,17 +3,17 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../../test/render";
 import "../../index.css";
-import "../../../../../antimatter/stream-animation.css";
+import "../../../../../matter/stream-animation.css";
 import { setLocalStorageItem } from "../../hooks/useLocalStorage";
 import {
-  DEFAULT_MATTR_STREAM_ANIMATION,
-  MATTR_STREAM_ANIMATION_STORAGE_KEY,
-  MATTR_STREAM_ANIMATIONS,
-  MattrStreamAnimation,
-  readEffectiveMattrStreamAnimation,
-  readMattrStreamAnimation,
-  useEffectiveMattrStreamAnimation,
-} from "../../mattrStreamAnimation";
+  DEFAULT_MATTER_STREAM_ANIMATION,
+  MATTER_STREAM_ANIMATION_STORAGE_KEY,
+  MATTER_STREAM_ANIMATIONS,
+  MatterStreamAnimation,
+  readEffectiveMatterStreamAnimation,
+  readMatterStreamAnimation,
+  useEffectiveMatterStreamAnimation,
+} from "../../matterStreamAnimation";
 
 vi.mock(import("./settingsLayout"), async (original) => ({
   ...(await original()),
@@ -25,11 +25,11 @@ vi.mock(import("./settingsLayout"), async (original) => ({
   ),
 }));
 
-import { MattrStreamAnimationSetting, previewArrivals } from "./MattrStreamAnimationSetting";
+import { MatterStreamAnimationSetting, previewArrivals } from "./MatterStreamAnimationSetting";
 
-function streamMode(mode: MattrStreamAnimation): Disposable {
-  setLocalStorageItem(MATTR_STREAM_ANIMATION_STORAGE_KEY, mode, MattrStreamAnimation);
-  return { [Symbol.dispose]: () => localStorage.removeItem(MATTR_STREAM_ANIMATION_STORAGE_KEY) };
+function streamMode(mode: MatterStreamAnimation): Disposable {
+  setLocalStorageItem(MATTER_STREAM_ANIMATION_STORAGE_KEY, mode, MatterStreamAnimation);
+  return { [Symbol.dispose]: () => localStorage.removeItem(MATTER_STREAM_ANIMATION_STORAGE_KEY) };
 }
 
 function reduceMotion(matches: boolean): Disposable {
@@ -49,18 +49,18 @@ function reduceMotion(matches: boolean): Disposable {
 
 describe("streaming text animation store", () => {
   it("defaults to Instant and reads the saved mode", () => {
-    expect(DEFAULT_MATTR_STREAM_ANIMATION).toBe("instant");
-    expect(readMattrStreamAnimation()).toBe("instant");
+    expect(DEFAULT_MATTER_STREAM_ANIMATION).toBe("instant");
+    expect(readMatterStreamAnimation()).toBe("instant");
     using _mode = streamMode("blur");
-    expect(localStorage.getItem(MATTR_STREAM_ANIMATION_STORAGE_KEY)).toBe(JSON.stringify("blur"));
-    expect(readMattrStreamAnimation()).toBe("blur");
+    expect(localStorage.getItem(MATTER_STREAM_ANIMATION_STORAGE_KEY)).toBe(JSON.stringify("blur"));
+    expect(readMatterStreamAnimation()).toBe("blur");
   });
 
   it("falls back to Instant on a value it doesn't know", () => {
     using _mode = streamMode("blur");
     using consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    localStorage.setItem(MATTR_STREAM_ANIMATION_STORAGE_KEY, JSON.stringify("confetti"));
-    expect(readMattrStreamAnimation()).toBe("instant");
+    localStorage.setItem(MATTER_STREAM_ANIMATION_STORAGE_KEY, JSON.stringify("confetti"));
+    expect(readMatterStreamAnimation()).toBe("instant");
     expect(consoleError).toHaveBeenCalled();
   });
 
@@ -68,16 +68,16 @@ describe("streaming text animation store", () => {
     using _mode = streamMode("rise");
     {
       using _motion = reduceMotion(false);
-      expect(readEffectiveMattrStreamAnimation()).toBe("rise");
+      expect(readEffectiveMatterStreamAnimation()).toBe("rise");
     }
     using _motion = reduceMotion(true);
-    expect(readEffectiveMattrStreamAnimation()).toBe("instant");
+    expect(readEffectiveMatterStreamAnimation()).toBe("instant");
   });
 
   it("follows changes only while a message streams", async () => {
     function Probe({ active }: { active: boolean }) {
       return (
-        <output data-active={active}>{useEffectiveMattrStreamAnimation(active) ?? "none"}</output>
+        <output data-active={active}>{useEffectiveMatterStreamAnimation(active) ?? "none"}</output>
       );
     }
     await using screen = await render(
@@ -92,10 +92,10 @@ describe("streaming text animation store", () => {
     expect(value(true)).toBe("none");
     using _mode = streamMode("instant");
     await act(() => {
-      setLocalStorageItem(MATTR_STREAM_ANIMATION_STORAGE_KEY, "fade", MattrStreamAnimation);
+      setLocalStorageItem(MATTER_STREAM_ANIMATION_STORAGE_KEY, "fade", MatterStreamAnimation);
       // Another window's write arrives as a storage event.
       window.dispatchEvent(
-        new StorageEvent("storage", { key: MATTR_STREAM_ANIMATION_STORAGE_KEY }),
+        new StorageEvent("storage", { key: MATTER_STREAM_ANIMATION_STORAGE_KEY }),
       );
     });
     await expect.poll(() => value(true)).toBe("fade");
@@ -103,12 +103,12 @@ describe("streaming text animation store", () => {
   });
 });
 
-describe("MattrStreamAnimationSetting", () => {
+describe("MatterStreamAnimationSetting", () => {
   it("lists all six modes and saves a pick", async () => {
     using _mode = streamMode("instant");
-    await using _screen = await render(<MattrStreamAnimationSetting />, { router: false });
+    await using _screen = await render(<MatterStreamAnimationSetting />, { router: false });
     const options = page.getByRole("radio");
-    await expect.poll(() => options.elements().length).toBe(MATTR_STREAM_ANIMATIONS.length);
+    await expect.poll(() => options.elements().length).toBe(MATTER_STREAM_ANIMATIONS.length);
     for (const name of [
       "Instant",
       "Blur Reveal",
@@ -124,43 +124,45 @@ describe("MattrStreamAnimationSetting", () => {
     const blur = page.getByRole("radio", { name: /^Blur Reveal/ });
     await userEvent.click(blur);
     await expect.element(blur).toBeChecked();
-    expect(readMattrStreamAnimation()).toBe("blur");
+    expect(readMatterStreamAnimation()).toBe("blur");
 
     await userEvent.click(page.getByRole("button", { name: "Reset streaming text to default" }));
-    expect(readMattrStreamAnimation()).toBe("instant");
+    expect(readMatterStreamAnimation()).toBe("instant");
   });
 
   it("replays the preview in the picked mode, then leaves it at rest", async () => {
     using _mode = streamMode("blur");
-    await using screen = await render(<MattrStreamAnimationSetting />, { router: false });
-    const live = () => screen.container.querySelector<HTMLElement>("[data-mattr-stream]");
-    await expect.poll(() => live()?.dataset.mattrStream).toBe("blur");
+    await using screen = await render(<MatterStreamAnimationSetting />, { router: false });
+    const live = () => screen.container.querySelector<HTMLElement>("[data-matter-stream]");
+    await expect.poll(() => live()?.dataset.matterStream).toBe("blur");
     await expect.poll(() => live(), { timeout: 5000 }).toBeNull();
-    expect(screen.container.querySelector(".mattr-sw")).toBeNull();
-    expect(screen.container.querySelector(".mattr-stream-caret")).toBeNull();
+    expect(screen.container.querySelector(".matter-sw")).toBeNull();
+    expect(screen.container.querySelector(".matter-stream-caret")).toBeNull();
 
     await userEvent.click(page.getByRole("button", { name: "Replay preview" }));
-    await expect.poll(() => live()?.dataset.mattrStream).toBe("blur");
+    await expect.poll(() => live()?.dataset.matterStream).toBe("blur");
   });
 
   it("saves RareUI and previews it in bursts with no dot or caret, then rests plain", async () => {
     using _mode = streamMode("instant");
-    await using screen = await render(<MattrStreamAnimationSetting />, { router: false });
+    await using screen = await render(<MatterStreamAnimationSetting />, { router: false });
     const rareui = page.getByRole("radio", { name: /^RareUI/ });
     await userEvent.click(rareui);
     await expect.element(rareui).toBeChecked();
-    expect(localStorage.getItem(MATTR_STREAM_ANIMATION_STORAGE_KEY)).toBe(JSON.stringify("rareui"));
+    expect(localStorage.getItem(MATTER_STREAM_ANIMATION_STORAGE_KEY)).toBe(
+      JSON.stringify("rareui"),
+    );
 
-    const live = () => screen.container.querySelector<HTMLElement>("[data-mattr-stream]");
-    const dot = () => screen.container.querySelector(".mattr-stream-dot");
-    await expect.poll(() => live()?.dataset.mattrStream).toBe("rareui");
-    await expect.poll(() => screen.container.querySelector(".mattr-sw")).not.toBeNull();
+    const live = () => screen.container.querySelector<HTMLElement>("[data-matter-stream]");
+    const dot = () => screen.container.querySelector(".matter-stream-dot");
+    await expect.poll(() => live()?.dataset.matterStream).toBe("rareui");
+    await expect.poll(() => screen.container.querySelector(".matter-sw")).not.toBeNull();
     expect(dot()).toBeNull();
-    expect(screen.container.querySelector(".mattr-stream-caret")).toBeNull();
+    expect(screen.container.querySelector(".matter-stream-caret")).toBeNull();
     await expect.poll(() => live(), { timeout: 10_000 }).toBeNull();
     expect(dot()).toBeNull();
-    expect(screen.container.querySelector(".mattr-sw")).toBeNull();
-    expect(screen.container.querySelector(".mattr-stream-caret")).toBeNull();
+    expect(screen.container.querySelector(".matter-sw")).toBeNull();
+    expect(screen.container.querySelector(".matter-stream-caret")).toBeNull();
   });
 
   it("splits the sample into arrivals that end at the whole text", () => {

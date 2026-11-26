@@ -19,9 +19,9 @@ import { BackgroundThreadContext } from "./backgroundThread";
 import { TimelineRowActivityCtx, TimelineRowCtx } from "./timelineRowContext";
 
 /** Plans older than this on mount are treated as historical and do not auto-approve. */
-export const MATTR_PLAN_AUTO_APPROVE_FRESHNESS_MS = 30_000;
+export const MATTER_PLAN_AUTO_APPROVE_FRESHNESS_MS = 30_000;
 
-export type MattrPlanApproveCommandResult = AtomCommandResult<unknown, unknown>;
+export type MatterPlanApproveCommandResult = AtomCommandResult<unknown, unknown>;
 
 export function isLatestActiveProposedPlan(
   plans: ReadonlyArray<OrchestrationV2PlanArtifact> | undefined,
@@ -49,17 +49,17 @@ export function isRecentProposedPlan(
       ? createdMs
       : Number.NaN;
   if (!Number.isFinite(latestMs)) return false;
-  return nowMs - latestMs <= MATTR_PLAN_AUTO_APPROVE_FRESHNESS_MS;
+  return nowMs - latestMs <= MATTER_PLAN_AUTO_APPROVE_FRESHNESS_MS;
 }
 
 type CommandValue<C> = C extends AtomCommand<infer W, infer _A, infer _E> ? W : never;
 
 /**
- * mattr: approving a proposed plan leaves plan mode and queues a turn that implements it.
+ * Matter: approving a proposed plan leaves plan mode and queues a turn that implements it.
  * `sourceProposedPlan` lets the server mark the plan completed, so its card stops offering
  * Approve.
  */
-export async function approveMattrPlan(input: {
+export async function approveMatterPlan(input: {
   readonly threadRef: ScopedThreadRef;
   readonly planId: PlanId;
   readonly planMarkdown: string;
@@ -69,11 +69,11 @@ export async function approveMattrPlan(input: {
   };
   readonly setInteractionMode: (
     value: CommandValue<typeof threadEnvironment.setInteractionMode>,
-  ) => Promise<MattrPlanApproveCommandResult>;
+  ) => Promise<MatterPlanApproveCommandResult>;
   readonly startTurn: (
     value: CommandValue<typeof threadEnvironment.startTurn>,
-  ) => Promise<MattrPlanApproveCommandResult>;
-}): Promise<MattrPlanApproveCommandResult> {
+  ) => Promise<MatterPlanApproveCommandResult>;
+}): Promise<MatterPlanApproveCommandResult> {
   const { threadRef, planId, thread } = input;
   const { environmentId, threadId } = threadRef;
   if (thread.interactionMode !== DEFAULT_INTERACTION_MODE) {
@@ -108,7 +108,7 @@ export async function approveMattrPlan(input: {
 }
 
 /** Returns null where the thread cannot take a turn. */
-function useMattrPlanApproval(threadRef: ScopedThreadRef | null, planId: PlanId) {
+function useMatterPlanApproval(threadRef: ScopedThreadRef | null, planId: PlanId) {
   const thread = useQuietThreadShell(threadRef);
   const setInteractionMode = useOrchestrationCommand(threadEnvironment.setInteractionMode, {
     reportFailure: false,
@@ -117,17 +117,17 @@ function useMattrPlanApproval(threadRef: ScopedThreadRef | null, planId: PlanId)
     reportFailure: false,
   });
   if (!threadRef || !thread) return null;
-  return (planMarkdown: string): Promise<MattrPlanApproveCommandResult> =>
-    approveMattrPlan({ threadRef, planId, planMarkdown, thread, setInteractionMode, startTurn });
+  return (planMarkdown: string): Promise<MatterPlanApproveCommandResult> =>
+    approveMatterPlan({ threadRef, planId, planMarkdown, thread, setInteractionMode, startTurn });
 }
 
 /** The timeline row's Approve: offered only while the plan is active and the thread idle. */
-export function useMattrProposedPlanApprove(plan: ProposedPlan) {
+export function useMatterProposedPlanApprove(plan: ProposedPlan) {
   const { threadRef, canOperateThread } = use(TimelineRowCtx);
   const { isWorking, awaitingUser } = use(TimelineRowActivityCtx);
   const backgroundThread = use(BackgroundThreadContext);
   const threadProjection = useQuietThreadProjection(threadRef);
-  const approve = useMattrPlanApproval(threadRef, plan.id);
+  const approve = useMatterPlanApproval(threadRef, plan.id);
   const [liveOrFresh, setLiveOrFresh] = useState(() => isWorking || isRecentProposedPlan(plan));
 
   if (!liveOrFresh && isWorking) {

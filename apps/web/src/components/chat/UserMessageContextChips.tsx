@@ -29,7 +29,7 @@ import ChatMarkdown from "../ChatMarkdown";
 import { EnvironmentContextChip } from "../EnvironmentContextChip";
 import { ThreadContextChip } from "../ThreadContextChip";
 import { ResponseReplyCard } from "./AssistantCitationChip";
-import { MattrInlineUserReplyCard } from "./MattrComposerReplyBar.mattr";
+import { MatterInlineUserReplyCard } from "./MatterComposerReplyBar.matter";
 import { MessageCircleIcon, MousePointerClickIcon, PaintbrushIcon } from "lucide-react";
 import type { ComposerContextId, KnownComposerContextRecord } from "@t3tools/contracts";
 import { buildExpandedImagePreview } from "./ExpandedImagePreview";
@@ -347,7 +347,7 @@ const userMessageContextPresentationRegistry = createContextPresentationRegistry
       render: (record, context) =>
         record.kind === "response" ? (
           record.role === "user" ? (
-            <MattrInlineUserReplyCard
+            <MatterInlineUserReplyCard
               record={record}
               copyMarkdown={context.copyMarkdown}
               leading={context.reference.leading ?? false}

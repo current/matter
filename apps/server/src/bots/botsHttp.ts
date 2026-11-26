@@ -33,7 +33,7 @@ import {
   json,
   readJson,
   readQuery,
-} from "./mattrHttp.ts";
+} from "./matterHttp.ts";
 import { layerRegisteredBotProviders } from "./registeredProviders.ts";
 
 const decodeSetEnabled = Schema.decodeUnknownEffect(AddonSetEnabledRequest);
@@ -324,7 +324,7 @@ const layerBotsRoutes = Layer.unwrap(
 );
 
 /** Add-on, Bots and Claude Cloud routes with the platform and every registered provider. */
-export const layerMattrAddonsAndBots = Layer.mergeAll(
+export const layerMatterAddonsAndBots = Layer.mergeAll(
   layerBotsRoutes,
   layerRegisteredBotProviders,
   layerClaudeCloudRoutes,

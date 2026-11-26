@@ -8,8 +8,8 @@ import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { Switch } from "../ui/switch";
 import { useWelcomeAgents, WelcomeSection } from "./WelcomePage";
 
-/** mattr: offers multi-provider delegation once two or more subscriptions are signed in. */
-export function MattrDelegationWelcome({
+/** Matter: offers multi-provider delegation once two or more subscriptions are signed in. */
+export function MatterDelegationWelcome({
   environmentId,
 }: {
   readonly environmentId: EnvironmentId;

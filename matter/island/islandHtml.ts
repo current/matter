@@ -240,7 +240,7 @@ export function buildIslandHtml(): string {
   const M = (${islandModelRuntime.toString()})();
   const SHADERS = ${shadersJson};
   const GLYPHS = ${glyphsJson};
-  const bridge = window.mattrIsland;
+  const bridge = window.matterIsland;
   const shell = document.getElementById("shell");
   const panel = document.getElementById("panel");
   const panelInner = document.getElementById("panel-inner");

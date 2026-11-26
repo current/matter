@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 
 import * as DesktopIpc from "../ipc/DesktopIpc.ts";
 import * as DesktopIsland from "./DesktopIsland.ts";
-import type { IslandSettings, IslandSnapshot } from "../../../../antimatter/island/types.ts";
+import type { IslandSettings, IslandSnapshot } from "../../../../matter/island/types.ts";
 
 const ISLAND_SYNC_SNAPSHOT_CHANNEL = "desktop:island-sync-snapshot";
 const ISLAND_UPDATE_SETTINGS_CHANNEL = "desktop:island-update-settings";

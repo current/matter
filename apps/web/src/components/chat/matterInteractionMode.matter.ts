@@ -14,7 +14,7 @@ import type { MessageResolver } from "../../i18n/messages";
 import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "../../proposedPlan";
 import { isLatestRunSettled } from "../../session-logic";
 
-export const MATTR_INTERACTION_MODES = [
+export const MATTER_INTERACTION_MODES = [
   "default",
   "plan",
   "goal",
@@ -22,8 +22,8 @@ export const MATTR_INTERACTION_MODES = [
 
 /** Shift+Tab order: Default → Plan → Goal → Default. */
 export function nextInteractionMode(mode: ProviderInteractionMode): ProviderInteractionMode {
-  const index = MATTR_INTERACTION_MODES.indexOf(mode);
-  return MATTR_INTERACTION_MODES[(index + 1) % MATTR_INTERACTION_MODES.length] ?? "default";
+  const index = MATTER_INTERACTION_MODES.indexOf(mode);
+  return MATTER_INTERACTION_MODES[(index + 1) % MATTER_INTERACTION_MODES.length] ?? "default";
 }
 
 /**
@@ -113,7 +113,7 @@ const MODE_SLASH_COPY = {
 } as const;
 
 /** `/plan`, `/goal` and `/default` for the composer's slash menu. */
-export function mattrInteractionModeSlashItems(resolve: MessageResolver, nativeGoals: boolean) {
+export function matterInteractionModeSlashItems(resolve: MessageResolver, nativeGoals: boolean) {
   return [
     {
       id: "slash:plan",
@@ -140,7 +140,7 @@ export function mattrInteractionModeSlashItems(resolve: MessageResolver, nativeG
 }
 
 /** What a send does with a leading `/plan`, `/goal` or `/default`. */
-export type MattrInteractionModeSend =
+export type MatterInteractionModeSend =
   /** The command alone: switch modes, clear the composer, send nothing. */
   | { readonly kind: "switch"; readonly mode: ProviderInteractionMode }
   /** Send `prompt`, switching to `mode` first when it is set. */
@@ -156,7 +156,7 @@ export function resolveInteractionModeSend(input: {
   readonly prompt: string;
   readonly nativeGoals: boolean;
   readonly attachmentCount: number;
-}): MattrInteractionModeSend | null {
+}): MatterInteractionModeSend | null {
   const match = MODE_COMMAND.exec(input.prompt);
   if (match === null) return null;
   const mode = match[1]!.toLowerCase() as ProviderInteractionMode;
@@ -181,13 +181,13 @@ export function resolveInteractionModeSend(input: {
 }
 
 /** The newest proposed plan, and the "implement" prompt an empty Plan composer sends for it. */
-export interface MattrPlanImplementation {
+export interface MatterPlanImplementation {
   readonly planId: PlanId;
   readonly prompt: string;
 }
 
 /** What one send carries after reading mode commands and the Plan "implement" shortcut. */
-export interface MattrModeSendResolution {
+export interface MatterModeSendResolution {
   /** Text to send; null when the send only switched modes. */
   readonly prompt: string | null;
   readonly interactionMode: ProviderInteractionMode;
@@ -199,7 +199,7 @@ export interface MattrModeSendResolution {
   readonly sourceProposedPlanId: PlanId | null;
 }
 
-export function resolveMattrModeSend(input: {
+export function resolveMatterModeSend(input: {
   readonly prompt: string;
   /** Direct annotation sends and queued-message edits keep their text as typed. */
   readonly bypass: boolean;
@@ -209,10 +209,10 @@ export function resolveMattrModeSend(input: {
   readonly nativeGoals: boolean;
   /** The thread already runs a native goal, so Goal prompts steer it instead of starting one. */
   readonly nativeGoalStarted: boolean;
-  readonly planImplementation: MattrPlanImplementation | null;
+  readonly planImplementation: MatterPlanImplementation | null;
   readonly attachmentCount: number;
   readonly contextCount: number;
-}): MattrModeSendResolution {
+}): MatterModeSendResolution {
   const resolution = resolveModeCommandSend(input);
   return resolution.prompt === null || input.bypass || input.editingQueuedMessage
     ? resolution
@@ -223,8 +223,8 @@ export function resolveMattrModeSend(input: {
 }
 
 function resolveModeCommandSend(
-  input: Parameters<typeof resolveMattrModeSend>[0],
-): MattrModeSendResolution {
+  input: Parameters<typeof resolveMatterModeSend>[0],
+): MatterModeSendResolution {
   const unchanged = {
     prompt: input.prompt,
     interactionMode: input.interactionMode,
@@ -321,7 +321,7 @@ export function clearPersistedComposerInteractionMode(
 }
 
 /** Everything the composer needs about its interaction mode, derived from the draft and the thread. */
-export function deriveMattrComposerInteractionMode(input: {
+export function deriveMatterComposerInteractionMode(input: {
   readonly composerDraftTarget: ComposerThreadTarget;
   readonly composerMode: ProviderInteractionMode | null | undefined;
   readonly thread:
@@ -358,7 +358,7 @@ export function deriveMattrComposerInteractionMode(input: {
     mode === "goal" && nativeGoalStarted && input.selectedProvider !== "antigravity";
   const planMarkdown = input.latestProposedPlanMarkdown ?? null;
   const planId = input.latestProposedPlanId ?? null;
-  const planImplementation: MattrPlanImplementation | null =
+  const planImplementation: MatterPlanImplementation | null =
     mode === "plan" &&
     planMarkdown !== null &&
     planId !== null &&

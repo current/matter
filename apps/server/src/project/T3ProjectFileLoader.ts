@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 import { T3_PROJECT_FILE_NAME, type T3ProjectFile } from "@t3tools/contracts";
 import { T3ProjectFileFromJson } from "@t3tools/shared/t3ProjectFile";
 
-import { readProjectFileString } from "./MattrProjectFile.ts";
+import { readProjectFileString } from "./MatterProjectFile.ts";
 
 const decodeT3ProjectFileJson = Schema.decodeEffect(T3ProjectFileFromJson);
 

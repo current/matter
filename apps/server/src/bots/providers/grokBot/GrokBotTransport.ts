@@ -103,7 +103,7 @@ export interface GrokBotMessage {
     readonly options: readonly GrokBotWidgetOption[];
     readonly respondedValue: string | null;
   } | null;
-  /** A Grok Bot card mattr can't draw, such as a connector prompt. */
+  /** A Grok Bot card Matter can't draw, such as a connector prompt. */
   readonly cardType: string | null;
 }
 

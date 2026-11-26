@@ -90,7 +90,7 @@ function toBotProviderError(error: DevinBotTransportError): BotProviderError {
     case "DevinBotBridgeError":
       switch (error.reason) {
         case "store_unavailable":
-          return fail("disconnected", "Open Devin's agent view so mattr can reach your Bots.");
+          return fail("disconnected", "Open Devin's agent view so Matter can reach your Bots.");
         case "auth_required":
           return fail("auth_required", "Sign in to Devin, then try again.");
         case "not_found":
@@ -242,7 +242,7 @@ const botFingerprint = (bot: DevinBotSummary, askCount: number, avatar: string |
 
 /**
  * Devin Bots through Devin.app's loopback Chrome DevTools port. Every call reuses the signed-in
- * webapp's own API client inside the renderer, so no credential reaches mattr. It only probes
+ * webapp's own API client inside the renderer, so no credential reaches Matter. It only probes
  * 127.0.0.1 on the configured port and never launches, quits or restarts Devin.app.
  */
 export const make = Effect.fn("DevinBotAdapter.make")(function* (
@@ -407,7 +407,7 @@ export const make = Effect.fn("DevinBotAdapter.make")(function* (
             : message.fromAgent
               ? "other-agent"
               : nonce !== undefined
-                ? "user-via-mattr"
+                ? "user-via-matter"
                 : "user-via-other-client",
           authorBotId: role === "agent" ? botId : null,
           markdown: message.text,
@@ -609,7 +609,7 @@ export const make = Effect.fn("DevinBotAdapter.make")(function* (
             conversationId,
             providerId: DEVIN_BOT_PROVIDER_ID,
             role: "user",
-            attribution: "user-via-mattr",
+            attribution: "user-via-matter",
             authorBotId: null,
             markdown: text,
             parts: [{ type: "markdown", text }],

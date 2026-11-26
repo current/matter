@@ -196,7 +196,7 @@ function SidebarBrandMark(_props: { onBackdrop: boolean }) {
   return (
     <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
       <span className="truncate font-semibold [text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both_cap_alphabetic]:py-1">
-        {"mattr"}
+        {"Matter"}
       </span>
     </span>
   );

@@ -18,7 +18,7 @@ import type {
   VoiceWorkspaceProjectSummary,
   VoiceWorkspaceQuestionSummary,
   VoiceWorkspaceThreadSummary,
-} from "../../../../antimatter/voice-assistant/types.ts";
+} from "../../../../matter/voice-assistant/types.ts";
 import type * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import type * as ProjectService from "../project/ProjectService.ts";
 

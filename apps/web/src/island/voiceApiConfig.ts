@@ -1,4 +1,4 @@
-import { mattrFetchCredentials } from "../addons/mattrApi";
+import { matterFetchCredentials } from "../addons/matterApi";
 import type { VoiceTtsApiConfig } from "./voiceModeAudio";
 
 interface VoiceApiConnection {
@@ -22,5 +22,5 @@ export function buildVoiceApiConfig(
   } else if (prepared?.httpAuthorization?._tag === "Dpop") {
     headers.authorization = `Bearer ${prepared.httpAuthorization.accessToken}`;
   }
-  return { baseUrl, headers, credentials: mattrFetchCredentials(headers) };
+  return { baseUrl, headers, credentials: matterFetchCredentials(headers) };
 }

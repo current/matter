@@ -41,7 +41,7 @@ import { makeAntigravityAuth, type AntigravityAuth } from "../AntigravityAuth.ts
 import * as AntigravityInstallation from "../AntigravityInstallation.ts";
 import { brokenRuntimeError } from "../providerCompatibility.ts";
 import * as AntigravityUsage from "./AntigravityUsage.ts";
-import * as MattrAntigravityQuota from "./MattrAntigravityQuota.ts";
+import * as MatterAntigravityQuota from "./MatterAntigravityQuota.ts";
 import {
   antigravityAuthConfigIssue,
   antigravityAuthLabel,
@@ -599,7 +599,7 @@ export const AntigravityDriver: ProviderDriver<
       };
     });
 
-    const quota = yield* MattrAntigravityQuota.makeMattrAntigravityQuota({
+    const quota = yield* MatterAntigravityQuota.makeMatterAntigravityQuota({
       reports:
         enabled &&
         auth.authMethod === "oauth-personal" &&
@@ -610,7 +610,7 @@ export const AntigravityDriver: ProviderDriver<
           directories.runtimeTemp,
           processEnvironment,
         );
-        return yield* MattrAntigravityQuota.runAntigravityUsageCommand({
+        return yield* MatterAntigravityQuota.runAntigravityUsageCommand({
           command: spawn.command,
           env: spawn.env,
           cwd: runtimeTempDirectory,

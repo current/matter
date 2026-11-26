@@ -1,215 +1,219 @@
 /* Settings → Appearance: the composer's material, style and color
-   (apps/web/src/mattrComposerAppearance.ts writes the root attributes). Every default leaves no
+   (apps/web/src/matterComposerAppearance.ts writes the root attributes). Every default leaves no
    attribute, so the approved composer in composer.css renders untouched, and backdrop blur only
-   exists while data-mattr-composer-blur is on. */
+   exists while data-matter-composer-blur is on. */
 
 /* Color. Custom seeds arrive pre-fitted per scheme (--mca-tint-light/-dark); Match shell reuses
    the Shell color, already fitted to a legible window by shellTint.ts, softened toward the card. */
-html[data-mattr-composer-tint="custom"] :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
+html[data-matter-composer-tint="custom"]
+  :is([data-matter-composer], [data-matter-whisper-pill-row]) {
   --mca-tint: var(--mca-tint-light);
 }
 
-html.dark[data-mattr-composer-tint="custom"]
-  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
+html.dark[data-matter-composer-tint="custom"]
+  :is([data-matter-composer], [data-matter-whisper-pill-row]) {
   --mca-tint: var(--mca-tint-dark);
 }
 
-html[data-mattr-composer-tint="shell"] :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
-  --mca-tint: color-mix(in oklab, var(--mattr-shell-tint-light, var(--sidebar)) 45%, #ffffff);
+html[data-matter-composer-tint="shell"]
+  :is([data-matter-composer], [data-matter-whisper-pill-row]) {
+  --mca-tint: color-mix(in oklab, var(--matter-shell-tint-light, var(--sidebar)) 45%, #ffffff);
 }
 
-html.dark[data-mattr-composer-tint="shell"]
-  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
+html.dark[data-matter-composer-tint="shell"]
+  :is([data-matter-composer], [data-matter-whisper-pill-row]) {
   --mca-tint: color-mix(
     in oklab,
-    var(--mattr-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 55%,
+    var(--matter-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 55%,
     #1c1c1c
   );
 }
 
-html[data-mattr-composer-material="tinted"][data-mattr-composer-tint="shell"]
-  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
-  --mca-tint: color-mix(in oklab, var(--mattr-shell-tint-light, var(--sidebar)) 80%, #ffffff);
+html[data-matter-composer-material="tinted"][data-matter-composer-tint="shell"]
+  :is([data-matter-composer], [data-matter-whisper-pill-row]) {
+  --mca-tint: color-mix(in oklab, var(--matter-shell-tint-light, var(--sidebar)) 80%, #ffffff);
 }
 
-html.dark[data-mattr-composer-material="tinted"][data-mattr-composer-tint="shell"]
-  :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
+html.dark[data-matter-composer-material="tinted"][data-matter-composer-tint="shell"]
+  :is([data-matter-composer], [data-matter-whisper-pill-row]) {
   --mca-tint: color-mix(
     in oklab,
-    var(--mattr-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 90%,
+    var(--matter-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 90%,
     #262626
   );
 }
 
-html[data-mattr-composer-tint] [data-mattr-composer] {
+html[data-matter-composer-tint] [data-matter-composer] {
   --mc-card: var(--mca-tint);
   --mc-card-line: color-mix(in oklab, var(--mca-tint), #000000 9%);
   --mc-shelf: color-mix(in oklab, var(--mca-tint), #000000 5%);
   --mc-shelf-line: color-mix(in oklab, var(--mca-tint), #000000 11%);
 }
 
-html.dark[data-mattr-composer-tint] [data-mattr-composer] {
+html.dark[data-matter-composer-tint] [data-matter-composer] {
   --mc-card-line: color-mix(in oklab, var(--mca-tint), #ffffff 7%);
   --mc-shelf: color-mix(in oklab, var(--mca-tint), #000000 22%);
   --mc-shelf-line: color-mix(in oklab, var(--mca-tint), #ffffff 10%);
 }
 
 /* Style. Radii stay concentric: shelf = card + shelf padding. */
-html[data-mattr-composer-shape="compact"] [data-mattr-composer] {
+html[data-matter-composer-shape="compact"] [data-matter-composer] {
   --mc-radius-card: 10px;
   --mc-radius-shelf: 13px;
   --mc-shelf-pad: 3px;
 }
 
-html[data-mattr-composer-shape="compact"] [data-mattr-composer] [data-chat-composer-body] {
+html[data-matter-composer-shape="compact"] [data-matter-composer] [data-chat-composer-body] {
   padding: 10px 14px 4px;
 }
 
-html[data-mattr-composer-shape="compact"] [data-mattr-composer] [data-chat-composer-footer] {
+html[data-matter-composer-shape="compact"] [data-matter-composer] [data-chat-composer-footer] {
   min-height: 38px;
 }
 
-html[data-mattr-composer-shape="compact"]
-  [data-mattr-composer]
+html[data-matter-composer-shape="compact"]
+  [data-matter-composer]
   [data-slot="composer-context-strip"] {
   min-height: 32px;
 }
 
-html[data-mattr-composer-shape="pill"] [data-mattr-composer] {
+html[data-matter-composer-shape="pill"] [data-matter-composer] {
   --mc-radius-card: 18px;
   --mc-radius-shelf: 22px;
 }
 
-html[data-mattr-composer-shape="pill"] [data-mattr-composer] [data-chat-composer-body] {
+html[data-matter-composer-shape="pill"] [data-matter-composer] [data-chat-composer-body] {
   padding: 15px 19px 7px;
 }
 
-html[data-mattr-composer-shape="pill"] [data-mattr-composer] [data-chat-composer-footer] {
+html[data-matter-composer-shape="pill"] [data-matter-composer] [data-chat-composer-footer] {
   padding: 0 10px 0 13px;
 }
 
-html[data-mattr-composer-shape="pill"] [data-mattr-composer] [data-slot="composer-context-strip"] {
+html[data-matter-composer-shape="pill"]
+  [data-matter-composer]
+  [data-slot="composer-context-strip"] {
   padding: 0 12px;
 }
 
 /* Floating and Minimal drop the visible shelf. Solid and Minimal keep the page color underneath so
    chat scrolling behind the under-tray never shows through its labels. */
-html:is([data-mattr-composer-shape="floating"], [data-mattr-composer-material="minimal"])
-  [data-mattr-composer][data-context-row] {
+html:is([data-matter-composer-shape="floating"], [data-matter-composer-material="minimal"])
+  [data-matter-composer][data-context-row] {
   background-color: var(--background);
   border-color: transparent;
   padding: 0;
 }
 
-html[data-mattr-composer-shape="floating"]:not(
-    [data-mattr-composer-material="minimal"],
-    [data-mattr-composer-material="glass"]
+html[data-matter-composer-shape="floating"]:not(
+    [data-matter-composer-material="minimal"],
+    [data-matter-composer-material="glass"]
   )
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"],
-html[data-mattr-composer-shape="floating"]:not(
-    [data-mattr-composer-material="minimal"],
-    [data-mattr-composer-material="glass"]
+html[data-matter-composer-shape="floating"]:not(
+    [data-matter-composer-material="minimal"],
+    [data-matter-composer-material="glass"]
   )
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   box-shadow:
     0 1px 2px rgb(20 22 30 / 6%),
     0 14px 34px -16px rgb(20 22 30 / 30%);
 }
 
-html.dark[data-mattr-composer-shape="floating"]:not(
-    [data-mattr-composer-material="minimal"],
-    [data-mattr-composer-material="glass"]
+html.dark[data-matter-composer-shape="floating"]:not(
+    [data-matter-composer-material="minimal"],
+    [data-matter-composer-material="glass"]
   )
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"],
-html.dark[data-mattr-composer-shape="floating"]:not(
-    [data-mattr-composer-material="minimal"],
-    [data-mattr-composer-material="glass"]
+html.dark[data-matter-composer-shape="floating"]:not(
+    [data-matter-composer-material="minimal"],
+    [data-matter-composer-material="glass"]
   )
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 4%),
     0 16px 36px -14px rgb(0 0 0 / 70%);
 }
 
-html[data-mattr-composer-shape="floating"]
-  [data-mattr-composer]
+html[data-matter-composer-shape="floating"]
+  [data-matter-composer]
   [data-slot="composer-context-strip"] {
   margin-top: 4px;
 }
 
 /* Minimal: one flat card with a hairline, no shadow. */
-html[data-mattr-composer-material="minimal"] [data-mattr-composer] {
+html[data-matter-composer-material="minimal"] [data-matter-composer] {
   --mc-card-shadow: none;
 }
 
-html[data-mattr-composer-material="minimal"] [data-mattr-composer] [data-slot="composer-host"],
-html[data-mattr-composer-material="minimal"]
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+html[data-matter-composer-material="minimal"] [data-matter-composer] [data-slot="composer-host"],
+html[data-matter-composer-material="minimal"]
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   box-shadow: none;
 }
 
 /* Frosted, Glass and Tinted paint the shelf and card at --mca-opacity. */
 html:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
   )
-  [data-mattr-composer] {
+  [data-matter-composer] {
   --mca-shelf-paint: color-mix(in srgb, var(--mc-shelf) var(--mca-opacity, 100%), transparent);
   --mca-card-paint: color-mix(in srgb, var(--mc-card) var(--mca-opacity, 100%), transparent);
 }
 
 /* On a shelf the card already sits over the shelf's paint, so it only adds a lighter lift. */
 html:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
-  ):not([data-mattr-composer-shape="floating"])
-  [data-mattr-composer][data-context-row] {
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
+  ):not([data-matter-composer-shape="floating"])
+  [data-matter-composer][data-context-row] {
   --mca-card-paint: color-mix(in srgb, var(--mc-card) var(--mca-card-lift, 100%), transparent);
   background-color: var(--mca-shelf-paint);
 }
 
 /* Floating translucent leaves the outer wrapper unpainted so the card blurs and paints once at its
    own radius, while the under-tray sits on its own clean surface behind its labels. */
-html[data-mattr-composer-shape="floating"]:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
+html[data-matter-composer-shape="floating"]:is(
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
   )
-  [data-mattr-composer][data-context-row] {
+  [data-matter-composer][data-context-row] {
   background-color: transparent;
 }
 
-html[data-mattr-composer-shape="floating"]:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
+html[data-matter-composer-shape="floating"]:is(
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
   )
-  [data-mattr-composer]
+  [data-matter-composer]
   [data-slot="composer-context-strip"] {
   background-color: var(--background);
   border-radius: 10px;
 }
 
 html:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
   )
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"],
 html:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
   )
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   background-color: var(--mca-card-paint);
 }
@@ -218,40 +222,44 @@ html:is(
    becomes a containing block for fixed descendants. Non-floating shelves blur once on the shell;
    floating and trayless composers blur directly on the card (or main surface when a banner is
    attached so side gutters next to the inset banner stay clean). */
-html[data-mattr-composer-blur="on"]:not([data-mattr-composer-shape="floating"])
-  [data-mattr-composer][data-context-row] {
+html[data-matter-composer-blur="on"]:not([data-matter-composer-shape="floating"])
+  [data-matter-composer][data-context-row] {
   background-color: transparent;
   border-color: transparent;
 }
 
-html[data-mattr-composer-blur="on"]
-  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-blur="on"]
+  [data-matter-composer]:not([data-context-row]):not(
+    :has([data-composer-banner-surface="attached"])
+  )
   [data-slot="composer-host"],
-html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-blur="on"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"],
-html[data-mattr-composer-blur="on"]
-  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+html[data-matter-composer-blur="on"]
+  [data-matter-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface],
-html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+html[data-matter-composer-blur="on"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   background-color: transparent;
 }
 
-html[data-mattr-composer-blur="on"]:not([data-mattr-composer-shape="floating"])
-  [data-mattr-composer][data-context-row]::before,
-html[data-mattr-composer-blur="on"]
-  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-blur="on"]:not([data-matter-composer-shape="floating"])
+  [data-matter-composer][data-context-row]::before,
+html[data-matter-composer-blur="on"]
+  [data-matter-composer]:not([data-context-row]):not(
+    :has([data-composer-banner-surface="attached"])
+  )
   [data-slot="composer-host"]::before,
-html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-blur="on"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"]::before,
-html[data-mattr-composer-blur="on"]
-  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+html[data-matter-composer-blur="on"]
+  [data-matter-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface]::before,
-html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+html[data-matter-composer-blur="on"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface]::before {
   content: "";
   display: block;
@@ -265,65 +273,69 @@ html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
 }
 
 /* Covers the border too (a negative z-index paints above it), so it redraws the line once. */
-html[data-mattr-composer-blur="on"]:not([data-mattr-composer-shape="floating"])
-  [data-mattr-composer][data-context-row]::before {
+html[data-matter-composer-blur="on"]:not([data-matter-composer-shape="floating"])
+  [data-matter-composer][data-context-row]::before {
   inset: -1px;
   background-color: var(--mca-shelf-paint);
   box-shadow: inset 0 0 0 1px var(--mc-shelf-line);
 }
 
-html[data-mattr-composer-blur="on"]
-  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-blur="on"]
+  [data-matter-composer]:not([data-context-row]):not(
+    :has([data-composer-banner-surface="attached"])
+  )
   [data-slot="composer-host"]::before,
-html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-blur="on"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"]::before,
-html[data-mattr-composer-blur="on"]
-  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+html[data-matter-composer-blur="on"]
+  [data-matter-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface]::before,
-html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+html[data-matter-composer-blur="on"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface]::before {
   background-color: var(--mca-card-paint);
 }
 
 /* Glass: clearer, more saturated, with a specular top hairline and a soft depth rim. */
-html[data-mattr-composer-material="glass"] [data-mattr-composer] {
+html[data-matter-composer-material="glass"] [data-matter-composer] {
   --mca-saturate: 1.4;
   --mca-specular: inset 0 1px 0 rgb(255 255 255 / 70%), inset 0 0 0 0.5px rgb(255 255 255 / 30%);
   --mca-depth: 0 1px 2px rgb(20 22 30 / 6%), 0 10px 30px -14px rgb(20 22 30 / 26%);
 }
 
-html.dark[data-mattr-composer-material="glass"] [data-mattr-composer] {
+html.dark[data-matter-composer-material="glass"] [data-matter-composer] {
   --mca-specular: inset 0 1px 0 rgb(255 255 255 / 9%), inset 0 0 0 0.5px rgb(255 255 255 / 4%);
   --mca-depth: 0 12px 32px -14px rgb(0 0 0 / 62%);
 }
 
-html[data-mattr-composer-material="glass"]:not([data-mattr-composer-shape="floating"])
-  [data-mattr-composer][data-context-row] {
+html[data-matter-composer-material="glass"]:not([data-matter-composer-shape="floating"])
+  [data-matter-composer][data-context-row] {
   box-shadow: var(--mca-specular), var(--mca-depth);
 }
 
-html[data-mattr-composer-material="glass"]
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-material="glass"]
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"],
-html[data-mattr-composer-material="glass"]
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+html[data-matter-composer-material="glass"]
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   box-shadow: var(--mca-specular);
 }
 
-html[data-mattr-composer-material="glass"]
-  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-material="glass"]
+  [data-matter-composer]:not([data-context-row]):not(
+    :has([data-composer-banner-surface="attached"])
+  )
   [data-slot="composer-host"],
-html[data-mattr-composer-material="glass"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+html[data-matter-composer-material="glass"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:not(:has([data-composer-banner-surface="attached"]))
   [data-slot="composer-host"],
-html[data-mattr-composer-material="glass"]
-  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+html[data-matter-composer-material="glass"]
+  [data-matter-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface],
-html[data-mattr-composer-material="glass"][data-mattr-composer-shape="floating"]
-  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+html[data-matter-composer-material="glass"][data-matter-composer-shape="floating"]
+  [data-matter-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   box-shadow: var(--mca-specular), var(--mca-depth);
 }
@@ -331,71 +343,71 @@ html[data-mattr-composer-material="glass"][data-mattr-composer-shape="floating"]
 /* Whisper Pill (thread-ribbon.css) follows the composer's color, style and material. It sits above
    the composer rather than inside it, so it reads the same root attributes. :root outranks
    thread-ribbon.css's theme surface, which loads later. */
-:root[data-mattr-composer-tint] [data-mattr-whisper-pill-row] {
+:root[data-matter-composer-tint] [data-matter-whisper-pill-row] {
   --mw-bg: var(--mca-tint);
   --mw-line: color-mix(in oklab, var(--mca-tint), #000000 11%);
 }
 
-:root.dark[data-mattr-composer-tint] [data-mattr-whisper-pill-row] {
+:root.dark[data-matter-composer-tint] [data-matter-whisper-pill-row] {
   --mw-line: color-mix(in oklab, var(--mca-tint), #ffffff 10%);
 }
 
-html[data-mattr-composer-shape="compact"] [data-mattr-whisper-pill-row] {
+html[data-matter-composer-shape="compact"] [data-matter-whisper-pill-row] {
   --mw-radius: 8px;
 }
 
-html[data-mattr-composer-shape="pill"] [data-mattr-whisper-pill-row] {
+html[data-matter-composer-shape="pill"] [data-matter-whisper-pill-row] {
   --mw-radius: 999px;
 }
 
-html[data-mattr-composer-shape="floating"]:not(
-    [data-mattr-composer-material="minimal"],
-    [data-mattr-composer-material="glass"]
+html[data-matter-composer-shape="floating"]:not(
+    [data-matter-composer-material="minimal"],
+    [data-matter-composer-material="glass"]
   )
-  [data-mattr-whisper-pill-row] {
+  [data-matter-whisper-pill-row] {
   --mw-shadow: 0 1px 2px rgb(20 22 30 / 6%), 0 8px 20px -12px rgb(20 22 30 / 26%);
 }
 
-html.dark[data-mattr-composer-shape="floating"]:not(
-    [data-mattr-composer-material="minimal"],
-    [data-mattr-composer-material="glass"]
+html.dark[data-matter-composer-shape="floating"]:not(
+    [data-matter-composer-material="minimal"],
+    [data-matter-composer-material="glass"]
   )
-  [data-mattr-whisper-pill-row] {
+  [data-matter-whisper-pill-row] {
   --mw-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), 0 10px 22px -12px rgb(0 0 0 / 70%);
 }
 
-html[data-mattr-composer-material="minimal"] [data-mattr-whisper-pill-row] {
+html[data-matter-composer-material="minimal"] [data-matter-whisper-pill-row] {
   --mw-shadow: none;
 }
 
-html[data-mattr-composer-material="glass"] [data-mattr-whisper-pill-row] {
+html[data-matter-composer-material="glass"] [data-matter-whisper-pill-row] {
   --mw-specular: inset 0 1px 0 rgb(255 255 255 / 70%), inset 0 0 0 0.5px rgb(255 255 255 / 30%);
   --mw-shadow: var(--mw-specular);
 }
 
-html.dark[data-mattr-composer-material="glass"] [data-mattr-whisper-pill-row] {
+html.dark[data-matter-composer-material="glass"] [data-matter-whisper-pill-row] {
   --mw-specular: inset 0 1px 0 rgb(255 255 255 / 9%), inset 0 0 0 0.5px rgb(255 255 255 / 4%);
 }
 
 /* Avatar rings keep the solid --mw-bg, so they stay crisp over a translucent fill. */
 html:is(
-    [data-mattr-composer-material="frosted"],
-    [data-mattr-composer-material="glass"],
-    [data-mattr-composer-material="tinted"]
+    [data-matter-composer-material="frosted"],
+    [data-matter-composer-material="glass"],
+    [data-matter-composer-material="tinted"]
   )
-  [data-mattr-whisper-pill-row] {
+  [data-matter-whisper-pill-row] {
   --mw-paint: color-mix(in srgb, var(--mw-bg) var(--mca-opacity, 100%), transparent);
 }
 
 /* Blur rides ::before, which covers the border, so it redraws the hairline (as the shelf does). */
-html[data-mattr-composer-blur="on"] [data-mattr-whisper-pill] {
+html[data-matter-composer-blur="on"] [data-matter-whisper-pill] {
   position: relative;
   isolation: isolate;
   background-color: transparent;
   border-color: transparent;
 }
 
-html[data-mattr-composer-blur="on"] [data-mattr-whisper-pill]::before {
+html[data-matter-composer-blur="on"] [data-matter-whisper-pill]::before {
   content: "";
   position: absolute;
   inset: -1px;
@@ -410,12 +422,12 @@ html[data-mattr-composer-blur="on"] [data-mattr-whisper-pill]::before {
   backdrop-filter: blur(var(--mca-blur)) saturate(var(--mca-saturate, 1.05));
 }
 
-html[data-mattr-composer-material="glass"] [data-mattr-whisper-pill]::before {
+html[data-matter-composer-material="glass"] [data-matter-whisper-pill]::before {
   --mca-saturate: 1.4;
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  html[data-mattr-composer-blur="on"] :is([data-mattr-composer], [data-mattr-whisper-pill-row]) {
+  html[data-matter-composer-blur="on"] :is([data-matter-composer], [data-matter-whisper-pill-row]) {
     --mca-opacity: 100%;
   }
 }

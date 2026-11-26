@@ -1,6 +1,6 @@
 # T3 Code
 
-> **Fork:** this checkout is mattr, a personal fork of T3 Code. Read @antimatter/CONTEXT.md first; where it differs from this file, it wins.
+> **Fork:** this checkout is Matter, a personal fork of T3 Code. Read @matter/CONTEXT.md first; where it differs from this file, it wins.
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity, Kiro, Pi, Muse Code, fx) and serves web, desktop, and mobile clients.
 

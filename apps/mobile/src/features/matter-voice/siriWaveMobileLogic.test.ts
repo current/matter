@@ -5,7 +5,7 @@ import {
   SIRI_WAVE_FRAG,
   SIRI_WAVE_VERT,
   siriWaveStretch,
-} from "../../../../../antimatter/island/siriWaveShaders";
+} from "../../../../../matter/island/siriWaveShaders";
 import {
   buildSiriWaveHtml,
   siriWaveCanvasHeight,

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { ADDON_SECRET_CONFIG_KEY_PATTERN, findAddonManifest } from "./mattrAddons.ts";
+import { ADDON_SECRET_CONFIG_KEY_PATTERN, findAddonManifest } from "./matterAddons.ts";
 import {
   CLAUDE_CLOUD_DEFAULT_SETTINGS,
   claudeCloudAgentInstructions,
   claudeCloudSettingsFromConfig,
   parseClaudeCloudSessionRef,
-} from "./mattrClaudeCloud.ts";
+} from "./matterClaudeCloud.ts";
 
 describe("claude-cloud add-on", () => {
   it("is registered off by default and experimental", () => {

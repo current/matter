@@ -1,5 +1,5 @@
 import { render } from "../../../test/render";
-import { MATTR_ADDON_MANIFESTS, type AddonEntry } from "@t3tools/contracts";
+import { MATTER_ADDON_MANIFESTS, type AddonEntry } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -7,9 +7,9 @@ import "../../index.css";
 
 const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} }));
 
-vi.mock(import("../../addons/mattrApi"), async (original) => ({
+vi.mock(import("../../addons/matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
 import { closeClaudeCloudDialog, openClaudeCloudDialog } from "../../addons/claudeCloudApi";
@@ -19,7 +19,7 @@ import { ClaudeCloudModalHost } from "./ClaudeCloudModal";
 const CLOUD_ID = "cse_01ABCDEFGH1234";
 
 const entries = (cloudEnabled: boolean): ReadonlyArray<AddonEntry> =>
-  MATTR_ADDON_MANIFESTS.map((manifest) => {
+  MATTER_ADDON_MANIFESTS.map((manifest) => {
     const on = manifest.id === "claude-cloud" && cloudEnabled;
     return {
       manifest,

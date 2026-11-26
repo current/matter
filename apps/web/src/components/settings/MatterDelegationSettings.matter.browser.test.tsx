@@ -51,7 +51,7 @@ vi.mock(import("./settingsLayout"), async (original) => ({
   )) as never,
 }));
 
-import { MattrDelegationSettings } from "./MattrDelegationSettings";
+import { MatterDelegationSettings } from "./MatterDelegationSettings";
 
 function entry(id: string, displayName: string, enabled = true): ProviderInstanceEntry {
   return {
@@ -70,7 +70,7 @@ const ENTRIES = [
 
 async function setup() {
   state.settings = DEFAULT_UNIFIED_SETTINGS;
-  const content = () => <MattrDelegationSettings entries={ENTRIES} disabled={false} />;
+  const content = () => <MatterDelegationSettings entries={ENTRIES} disabled={false} />;
   const screen = await render(content(), { router: false });
   state.updateSettings.mockReset().mockImplementation((patch) => {
     state.settings = { ...state.settings, ...patch } as typeof DEFAULT_UNIFIED_SETTINGS;
@@ -79,7 +79,7 @@ async function setup() {
   return screen;
 }
 
-describe("MattrDelegationSettings", () => {
+describe("MatterDelegationSettings", () => {
   it("is on by default and lists enabled instances in the delegation pool", async () => {
     await using _screen = await setup();
     await expect

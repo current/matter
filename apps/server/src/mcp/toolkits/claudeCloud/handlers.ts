@@ -63,7 +63,7 @@ const requireProject = (projectId: ProjectId | undefined) =>
     ? Effect.fail(
         new OrchestratorMcpFailure({
           code: "target_required",
-          message: "Pass projectId: this MCP client is not running inside a mattr thread.",
+          message: "Pass projectId: this MCP client is not running inside a Matter thread.",
         }),
       )
     : Effect.succeed(projectId);

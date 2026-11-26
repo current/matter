@@ -1,15 +1,15 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mtk-*` classes come from the fork stylesheet antimatter/tasks.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mtk-*` classes come from the fork stylesheet matter/tasks.css, which loads outside Tailwind. */
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
-  MATTR_TASK_NOTE_MAX_LENGTH,
-  MATTR_TASK_STATUSES,
-  MATTR_TASK_TITLE_MAX_LENGTH,
+  MATTER_TASK_NOTE_MAX_LENGTH,
+  MATTER_TASK_STATUSES,
+  MATTER_TASK_TITLE_MAX_LENGTH,
   type EnvironmentId,
-  type MattrTask,
-  type MattrTaskPriority,
-  type MattrTaskStatus,
-  type MattrTaskUpdateRequest,
+  type MatterTask,
+  type MatterTaskPriority,
+  type MatterTaskStatus,
+  type MatterTaskUpdateRequest,
   type ProjectId,
   type ServerProvider,
 } from "@t3tools/contracts";
@@ -43,8 +43,8 @@ import {
 } from "../ui/menu";
 import { Popover, PopoverPopup } from "../ui/popover";
 import { toastManager } from "../ui/toast";
-import { localIsoDate, taskPrompt } from "./mattrTasks.logic";
-import type { MattrTasksActions } from "./mattrTasksStore";
+import { localIsoDate, taskPrompt } from "./matterTasks.logic";
+import type { MatterTasksActions } from "./matterTasksStore";
 import {
   modelLabel,
   providerLabel,
@@ -66,14 +66,14 @@ export function TaskInspector({
   startRef,
 }: {
   readonly environmentId: EnvironmentId;
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly actions: MattrTasksActions;
+  readonly actions: MatterTasksActions;
   readonly onClose: () => void;
   readonly startRef: RefObject<HTMLButtonElement | null>;
 }) {
   const gt = useGT();
-  const save = (patch: MattrTaskUpdateRequest) =>
+  const save = (patch: MatterTaskUpdateRequest) =>
     actions.update(task.id, patch).then(
       () => true,
       () => {
@@ -81,7 +81,7 @@ export function TaskInspector({
         return false;
       },
     );
-  const update = (patch: MattrTaskUpdateRequest) => {
+  const update = (patch: MatterTaskUpdateRequest) => {
     void save(patch);
   };
 
@@ -140,7 +140,7 @@ function TaskTitleField({
   task,
   onCommit,
 }: {
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly onCommit: (title: string) => void;
 }) {
   const gt = useGT();
@@ -155,7 +155,7 @@ function TaskTitleField({
       className="mtk-inspector-title"
       aria-label={gt("Task title")}
       value={draft}
-      maxLength={MATTR_TASK_TITLE_MAX_LENGTH}
+      maxLength={MATTER_TASK_TITLE_MAX_LENGTH}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
@@ -172,7 +172,7 @@ function TaskNoteField({
   task,
   onCommit,
 }: {
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly onCommit: (note: string) => void;
 }) {
   const gt = useGT();
@@ -183,7 +183,7 @@ function TaskNoteField({
       aria-label={gt("Note")}
       placeholder={gt("Add a note")}
       value={draft}
-      maxLength={MATTR_TASK_NOTE_MAX_LENGTH}
+      maxLength={MATTER_TASK_NOTE_MAX_LENGTH}
       rows={1}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {
@@ -195,7 +195,7 @@ function TaskNoteField({
 
 export function usePriorityLabel() {
   const gt = useGT();
-  return (priority: MattrTaskPriority) => {
+  return (priority: MatterTaskPriority) => {
     switch (priority) {
       case "high":
         return gt("High", { $context: "task priority" });
@@ -213,8 +213,8 @@ function TaskSchedulePicker({
   task,
   onChange,
 }: {
-  readonly task: MattrTask;
-  readonly onChange: (patch: MattrTaskUpdateRequest) => void;
+  readonly task: MatterTask;
+  readonly onChange: (patch: MatterTaskUpdateRequest) => void;
 }) {
   const gt = useGT();
   const priorityLabel = usePriorityLabel();
@@ -341,10 +341,10 @@ function TaskMoreMenu({
   onClose,
   onChange,
 }: {
-  readonly task: MattrTask;
-  readonly actions: MattrTasksActions;
+  readonly task: MatterTask;
+  readonly actions: MatterTasksActions;
   readonly onClose: () => void;
-  readonly onChange: (patch: MattrTaskUpdateRequest) => void;
+  readonly onChange: (patch: MatterTaskUpdateRequest) => void;
 }) {
   const gt = useGT();
   const statusLabel = useTaskStatusLabel();
@@ -358,9 +358,9 @@ function TaskMoreMenu({
           <MenuGroupLabel>{gt("Move to")}</MenuGroupLabel>
           <MenuRadioGroup
             value={task.status}
-            onValueChange={(value: MattrTaskStatus) => onChange({ status: value })}
+            onValueChange={(value: MatterTaskStatus) => onChange({ status: value })}
           >
-            {MATTR_TASK_STATUSES.map((status) => (
+            {MATTER_TASK_STATUSES.map((status) => (
               <MenuRadioItem closeOnClick key={status} value={status}>
                 {statusLabel(status)}
               </MenuRadioItem>
@@ -420,10 +420,10 @@ function TaskAgentSection({
   startRef,
 }: {
   readonly environmentId: EnvironmentId;
-  readonly task: MattrTask;
+  readonly task: MatterTask;
   readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly onChange: (patch: MattrTaskUpdateRequest) => void;
-  readonly onSave: (patch: MattrTaskUpdateRequest) => Promise<boolean>;
+  readonly onChange: (patch: MatterTaskUpdateRequest) => void;
+  readonly onSave: (patch: MatterTaskUpdateRequest) => Promise<boolean>;
   readonly startRef: RefObject<HTMLButtonElement | null>;
 }) {
   const gt = useGT();

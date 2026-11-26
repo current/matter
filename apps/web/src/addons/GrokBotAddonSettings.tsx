@@ -16,7 +16,7 @@ import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { cn } from "../lib/utils";
 import { ADDON_STATUS_LABELS } from "./addonRegistry";
 import { getAddonConfig, updateAddonConfig } from "./addonStore";
-import { useMattrApiConfig } from "./mattrApi";
+import { useMatterApiConfig } from "./matterApi";
 
 const parsePort = (raw: string) => {
   const port = Number(raw.trim());
@@ -31,7 +31,7 @@ const STATUS_DOT: Readonly<Partial<Record<AddonRuntimeStatus["kind"], string>>> 
 
 /**
  * Grok Bot's connection card in Settings → Add-ons: the live connection, the loopback debug port,
- * the command that reopens Grok Bot with it, and a connection test. mattr never launches or
+ * the command that reopens Grok Bot with it, and a connection test. Matter never launches or
  * restarts Grok Bot.
  */
 export function GrokBotAddonSettings({
@@ -47,7 +47,7 @@ export function GrokBotAddonSettings({
 }) {
   const gt = useGT();
   const m = useMessages();
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const [savedPort, setSavedPort] = useState(GROK_BOT_DEFAULT_CDP_PORT);
   const [draft, setDraft] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);

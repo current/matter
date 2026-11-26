@@ -144,11 +144,11 @@ import { ThreadActivityAnnouncer } from "./ThreadActivityAnnouncer";
 import { useStableHandoffRuns, useIncrementalTimelineRows, useStableRows } from "./useTimelineRows";
 import { useClientSettings } from "../../hooks/useSettings";
 import {
-  MattrThinkingTimelineRow,
-  MattrTimelineActivityProvider,
-  MattrWorkingTimelineRow,
-} from "./MattrAiStatusIndicator";
-import { useMattrMessageReveal } from "./mattrMessageReply.mattr";
+  MatterThinkingTimelineRow,
+  MatterTimelineActivityProvider,
+  MatterWorkingTimelineRow,
+} from "./MatterAiStatusIndicator";
+import { useMatterMessageReveal } from "./matterMessageReply.matter";
 
 function timelineListStateFor(identity: string): {
   readonly identity: string;
@@ -876,7 +876,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     viewport: timelineViewportElement,
     onManualNavigation: navigateTimeline,
   });
-  useMattrMessageReveal({
+  useMatterMessageReveal({
     threadRef: citationThreadRef,
     rows,
     listRef,
@@ -1492,7 +1492,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     <>
       {activityAnnouncer}
       <MarkdownFindContext value={findActive}>
-        <MattrTimelineActivityProvider value={activityState} rows={rows}>
+        <MatterTimelineActivityProvider value={activityState} rows={rows}>
           <TooltipScrollDismissArea
             ref={attachTimelineViewportElement}
             className="relative h-full min-h-0"
@@ -1572,7 +1572,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
               }}
             />
           </TooltipScrollDismissArea>
-        </MattrTimelineActivityProvider>
+        </MatterTimelineActivityProvider>
       </MarkdownFindContext>
     </>
   );
@@ -1742,7 +1742,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
           ) : null}
           {row.kind === "work-live" ? <LiveWorkEntryTimelineRow row={row} /> : null}
           {row.kind === "work-toggle" ? <WorkGroupToggleTimelineRow row={row} /> : null}
-          {row.kind === "thinking" ? <MattrThinkingTimelineRow row={row} /> : null}
+          {row.kind === "thinking" ? <MatterThinkingTimelineRow row={row} /> : null}
         </WorkLogBlock>
       ) : null}
       {row.kind === "turn-fold" ? <TurnFoldTimelineRow key={row.id} row={row} /> : null}
@@ -1758,7 +1758,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       {row.kind === "sent-message" ? <SentMessageTimelineRow row={row} /> : null}
       {row.kind === "viewed-images" ? <ViewedImagesTimelineRow row={row} /> : null}
       {row.kind === "mcp-app" ? <McpAppTimelineRow row={row} /> : null}
-      {row.kind === "working" ? <MattrWorkingTimelineRow row={row} /> : null}
+      {row.kind === "working" ? <MatterWorkingTimelineRow row={row} /> : null}
       {row.kind === "worktree-setup" ? <WorktreeSetupTimelineRow row={row} /> : null}
       {row.kind === "event" ? <V2EventTimelineRow row={row} /> : null}
     </div>

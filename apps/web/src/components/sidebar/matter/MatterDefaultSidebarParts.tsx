@@ -1,4 +1,4 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet antimatter/sidebar.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet matter/sidebar.css, which loads outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import type {
   BotIdentity,
@@ -17,7 +17,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 
 import { fetchClaudeCloudStatus, openClaudeCloudDialog } from "../../../addons/claudeCloudApi";
-import { useMattrApiConfig } from "../../../addons/mattrApi";
+import { useMatterApiConfig } from "../../../addons/matterApi";
 import { useEnabledBotProviderAddons, useIsAddonEnabled } from "../../../addons/useAddonRegistry";
 import { setVoiceModeOpen } from "../../../island/voiceAssistantStore";
 import { useDesktopUpdateState } from "../../../state/desktopUpdate";
@@ -50,22 +50,22 @@ import {
   hostDotTone,
   rankCrew,
   shortHostLabel,
-} from "./mattrBots.logic";
+} from "./matterBots.logic";
 import {
   compactAge,
   formatResetLabel,
   pickUsageMeters,
-  type MattrUsageMeter,
-} from "./mattrFinalSidebar.logic";
-import { MattrTip } from "./MattrSidebarParts";
+  type MatterUsageMeter,
+} from "./matterFinalSidebar.logic";
+import { MatterTip } from "./MatterSidebarParts";
 import {
-  useMattrSidebarLayout,
-  useMattrTimelineSubagents,
-  type MattrSidebarLayout,
-} from "./mattrSidebarStore";
+  useMatterSidebarLayout,
+  useMatterTimelineSubagents,
+  type MatterSidebarLayout,
+} from "./matterSidebarStore";
 
 /** A thread's provider as its own colored brand mark. */
-export function MattrProviderMark({ driver }: { driver: ProviderDriverKind | null }) {
+export function MatterProviderMark({ driver }: { driver: ProviderDriverKind | null }) {
   if (driver === null) {
     return (
       <span
@@ -82,8 +82,8 @@ export function MattrProviderMark({ driver }: { driver: ProviderDriverKind | nul
   );
 }
 
-/** The frosted popup both rail menus use, styled by antimatter/sidebar.css. */
-export function MattrMenuPopup({
+/** The frosted popup both rail menus use, styled by matter/sidebar.css. */
+export function MatterMenuPopup({
   children,
   align = "start",
   side = "bottom",
@@ -114,7 +114,7 @@ export function MattrMenuPopup({
   );
 }
 
-export function MattrMenuItem({
+export function MatterMenuItem({
   icon,
   label,
   hint,
@@ -134,7 +134,7 @@ export function MattrMenuItem({
   );
 }
 
-export function MattrMenuRadioItem({
+export function MatterMenuRadioItem({
   value,
   label,
   hint,
@@ -173,8 +173,8 @@ function useHostStatus() {
   return { fullLabel, label: shortHostLabel(fullLabel), tone, status };
 }
 
-/** The "mattr ⌄" brand menu: Settings, Usage, Voice Mode, layout, and the host's state. */
-export function MattrBrandMenu({
+/** The "Matter ⌄" brand menu: Settings, Usage, Voice Mode, layout, and the host's state. */
+export function MatterBrandMenu({
   onNavigate,
   caret,
 }: {
@@ -183,8 +183,8 @@ export function MattrBrandMenu({
 }) {
   const gt = useGT();
   const navigate = useNavigate();
-  const [layout, setLayout] = useMattrSidebarLayout();
-  const [showSubagents, setShowSubagents] = useMattrTimelineSubagents();
+  const [layout, setLayout] = useMatterSidebarLayout();
+  const [showSubagents, setShowSubagents] = useMatterTimelineSubagents();
   const voiceEnabled = useIsAddonEnabled("voice-assistant");
   const host = useHostStatus();
   const go = (to: () => void) => {
@@ -193,24 +193,24 @@ export function MattrBrandMenu({
   };
   return (
     <MenuPrimitive.Root>
-      <MenuPrimitive.Trigger className="mfs-wn" aria-label={gt("mattr menu")}>
+      <MenuPrimitive.Trigger className="mfs-wn" aria-label={gt("Matter menu")}>
         <T3Wordmark aria-hidden className="mfs-logo" />
-        <span>{"mattr"}</span>
+        <span>{"Matter"}</span>
         {caret ?? <ChevronDownIcon aria-hidden className="mfs-caret" />}
       </MenuPrimitive.Trigger>
-      <MattrMenuPopup>
-        <MattrMenuItem
+      <MatterMenuPopup>
+        <MatterMenuItem
           icon={<SettingsIcon aria-hidden />}
           label={gt("Settings")}
           onClick={() => go(() => void navigate({ to: "/settings" }))}
         />
-        <MattrMenuItem
+        <MatterMenuItem
           icon={<ChartNoAxesColumnIcon aria-hidden />}
           label={gt("Usage")}
           onClick={() => go(() => void navigate({ to: "/usage" }))}
         />
         {voiceEnabled ? (
-          <MattrMenuItem
+          <MatterMenuItem
             icon={<RadioIcon aria-hidden />}
             label={gt("Voice Mode")}
             onClick={() => go(() => setVoiceModeOpen(true))}
@@ -223,12 +223,12 @@ export function MattrBrandMenu({
           </MenuPrimitive.GroupLabel>
           <MenuPrimitive.RadioGroup
             value={layout}
-            onValueChange={(value: MattrSidebarLayout) => setLayout(value)}
+            onValueChange={(value: MatterSidebarLayout) => setLayout(value)}
           >
-            <MattrMenuRadioItem value="inbox" label={gt("Default")} />
-            <MattrMenuRadioItem value="spaces" label={gt("Spaces")} />
-            <MattrMenuRadioItem value="timeline" label={gt("Timeline")} />
-            <MattrMenuRadioItem value="classic" label={gt("Classic")} />
+            <MatterMenuRadioItem value="inbox" label={gt("Default")} />
+            <MatterMenuRadioItem value="spaces" label={gt("Spaces")} />
+            <MatterMenuRadioItem value="timeline" label={gt("Timeline")} />
+            <MatterMenuRadioItem value="classic" label={gt("Classic")} />
           </MenuPrimitive.RadioGroup>
           {layout === "timeline" ? (
             <>
@@ -249,13 +249,13 @@ export function MattrBrandMenu({
           ) : null}
         </MenuPrimitive.Group>
         <div className="mfs-menu-sep" />
-        <div className="mfs-menu-host" data-mattr-host-status={host.tone ?? "ok"}>
+        <div className="mfs-menu-host" data-matter-host-status={host.tone ?? "ok"}>
           <span className="mfs-dot" style={{ background: host.status.color }} />
           <span className="min-w-0 truncate">
             {host.fullLabel} · {host.status.label}
           </span>
         </div>
-      </MattrMenuPopup>
+      </MatterMenuPopup>
     </MenuPrimitive.Root>
   );
 }
@@ -264,7 +264,7 @@ export function MattrBrandMenu({
 export function useCrewBots() {
   const providers = useEnabledBotProviderAddons();
   const enabled = providers.length > 0;
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const state = useBotsState();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the Bots event stream open while the rail shows Bots
   useEffect(() => {
@@ -285,9 +285,9 @@ export function useCrewBots() {
 
 const CLOUD_REFRESH_MS = 60_000;
 
-/** Claude Cloud sessions mattr tracks, while the add-on is on. */
+/** Claude Cloud sessions Matter tracks, while the add-on is on. */
 function useClaudeCloudSessions(enabled: boolean): ReadonlyArray<TrackedClaudeCloudSession> | null {
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const [sessions, setSessions] = useState<ReadonlyArray<TrackedClaudeCloudSession> | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- polls the server's Claude Cloud session list while the add-on is on
   useEffect(() => {
@@ -365,7 +365,7 @@ function CrewBotRow({
 }
 
 /** Crew: Bots and Claude Cloud as standing teammates. Absent while no such add-on is on. */
-export function MattrCrew({
+export function MatterCrew({
   crew,
   nowMs,
 }: {
@@ -420,7 +420,7 @@ export function MattrCrew({
   );
 }
 
-function resetText(meter: MattrUsageMeter, nowMs: number, gt: ReturnType<typeof useGT>) {
+function resetText(meter: MatterUsageMeter, nowMs: number, gt: ReturnType<typeof useGT>) {
   // A reset that already passed means the meter is stale until the next poll; skip the time.
   if (meter.resetsAt === null || !(Date.parse(meter.resetsAt) > nowMs)) {
     return gt("{percent}% left", { percent: 100 - meter.usedPercent });
@@ -436,12 +436,12 @@ function resetText(meter: MattrUsageMeter, nowMs: number, gt: ReturnType<typeof 
 }
 
 /** Footer A's meters, pure so tests can render them without a server. */
-export function MattrUsageMeters({
+export function MatterUsageMeters({
   meters,
   nowMs,
   onOpen,
 }: {
-  meters: ReadonlyArray<MattrUsageMeter>;
+  meters: ReadonlyArray<MatterUsageMeter>;
   nowMs: number;
   onOpen: () => void;
 }) {
@@ -454,7 +454,7 @@ export function MattrUsageMeters({
         const reset = resetText(meter, nowMs, gt);
         const color = meter.driver === "claudeAgent" ? "var(--mfs-claude)" : "var(--mfs-fg)";
         return (
-          <MattrTip key={meter.key} label={`${meter.accountName} · ${reset}`} side="top">
+          <MatterTip key={meter.key} label={`${meter.accountName} · ${reset}`} side="top">
             <button
               type="button"
               className="mfs-m"
@@ -466,7 +466,7 @@ export function MattrUsageMeters({
               onClick={onOpen}
             >
               <span className="mfs-ln">
-                <MattrProviderMark driver={meter.driver} />
+                <MatterProviderMark driver={meter.driver} />
                 <span>{label}</span>
                 <b>{`${meter.usedPercent}%`}</b>
               </span>
@@ -475,7 +475,7 @@ export function MattrUsageMeters({
               </span>
               <span className="mfs-rs block">{reset}</span>
             </button>
-          </MattrTip>
+          </MatterTip>
         );
       })}
     </div>
@@ -483,7 +483,7 @@ export function MattrUsageMeters({
 }
 
 /** Upstream's pill doubles as an always-on "Check for updates" button; Default shows it only while an update applies. */
-export function MattrUpdateNotice() {
+export function MatterUpdateNotice() {
   const state = useDesktopUpdateState();
   const action = state ? resolveDesktopUpdateButtonAction(state) : "none";
   const everything = useUpdateEverything(
@@ -496,7 +496,7 @@ export function MattrUpdateNotice() {
 }
 
 /** Footer A: notices while they apply, the two tightest usage meters, then host and Settings. */
-export function MattrFooter({ nowMs }: { nowMs: number }) {
+export function MatterFooter({ nowMs }: { nowMs: number }) {
   const gt = useGT();
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
@@ -516,17 +516,17 @@ export function MattrFooter({ nowMs }: { nowMs: number }) {
       <div className="mfs-notices">
         <SidebarProviderUpdatePill />
         <SidebarUpdateArchitectureWarning />
-        <MattrUpdateNotice />
+        <MatterUpdateNotice />
         <SidebarThreadUndoNotice />
       </div>
-      <footer className="mfs-f" data-mattr-footer>
-        <MattrUsageMeters
+      <footer className="mfs-f" data-matter-footer>
+        <MatterUsageMeters
           meters={meters}
           nowMs={nowMs}
           onOpen={() => go(() => void navigate({ to: "/usage" }))}
         />
         <div className="mfs-hl">
-          <MattrTip label={`${host.fullLabel} · ${host.status.label}`} side="top">
+          <MatterTip label={`${host.fullLabel} · ${host.status.label}`} side="top">
             <button
               type="button"
               className="mfs-host"
@@ -539,14 +539,14 @@ export function MattrFooter({ nowMs }: { nowMs: number }) {
               {host.tone !== null ? (
                 <span
                   className="mfs-dot"
-                  data-mattr-host-dot={host.tone}
+                  data-matter-host-dot={host.tone}
                   style={{ background: host.status.color }}
                 />
               ) : null}
               <span>{host.label}</span>
             </button>
-          </MattrTip>
-          <MattrTip label={gt("Settings")} side="top">
+          </MatterTip>
+          <MatterTip label={gt("Settings")} side="top">
             <button
               type="button"
               className="mfs-gear"
@@ -560,7 +560,7 @@ export function MattrFooter({ nowMs }: { nowMs: number }) {
             >
               <SettingsIcon aria-hidden />
             </button>
-          </MattrTip>
+          </MatterTip>
         </div>
       </footer>
     </>

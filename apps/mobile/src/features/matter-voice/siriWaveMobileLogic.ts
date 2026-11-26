@@ -4,7 +4,7 @@ import {
   SIRI_WAVE_VERT,
   type SiriWaveVariant,
   type SiriWaveVisualState,
-} from "../../../../../antimatter/island/siriWaveShaders";
+} from "../../../../../matter/island/siriWaveShaders";
 
 export type SiriWaveMobileMode =
   | "idle"
@@ -78,7 +78,7 @@ export const SIRI_WAVE_MESSAGE_READY = "siri-wave-ready";
 export const SIRI_WAVE_MESSAGE_FAILED = "siri-wave-webgl-failed";
 
 /**
- * The page renders Lilt's shaders unchanged from `antimatter/island/siriWaveShaders.ts`, the
+ * The page renders Lilt's shaders unchanged from `matter/island/siriWaveShaders.ts`, the
  * same source the Mac, web and Island use. `window.__siri.set(state)` drives it.
  */
 export function buildSiriWaveHtml(): string {

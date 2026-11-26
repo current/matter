@@ -15,7 +15,7 @@ import {
   failEnvironmentScopeRequired,
 } from "../auth/http.ts";
 
-/** Shared plumbing for mattr's fork-only `/api/mattr/*` routes. */
+/** Shared plumbing for Matter's fork-only `/api/mattr/*` routes. */
 
 const NO_STORE_HEADERS = {
   "cache-control": "no-store",

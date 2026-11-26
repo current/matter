@@ -4,14 +4,14 @@ const CLIENT_SOURCE = /\/(apps\/mobile\/src|packages\/[^/]+\/src)\//;
 
 const rebrand = (text) =>
   text
-    .replace(/\bT3(\s+)Connect\b/g, "mattr$1Connect")
-    .replace(/\bT3(\s+)Code(?! for GitHub)/g, "mattr")
-    .replace(/\bT3%20Code\b/g, "mattr")
-    .replace(/\bT3(\s+)(threads?\b|home\b|desktop\b)/g, "mattr$1$2");
+    .replace(/\bT3(\s+)Connect\b/g, "Matter$1Connect")
+    .replace(/\bT3(\s+)Code(?! for GitHub)/g, "Matter")
+    .replace(/\bT3%20Code\b/g, "Matter")
+    .replace(/\bT3(\s+)(threads?\b|home\b|desktop\b)/g, "Matter$1$2");
 
-module.exports = function mattrMobileRebrand() {
+module.exports = function matterMobileRebrand() {
   // Tests assert upstream's English copy.
-  if (process.env.VITEST) return { name: "mattr-mobile-rebrand", visitor: {} };
+  if (process.env.VITEST) return { name: "matter-mobile-rebrand", visitor: {} };
 
   const applies = (state) => {
     const filename = state.filename?.split("\\").join("/") ?? "";
@@ -25,7 +25,7 @@ module.exports = function mattrMobileRebrand() {
   };
 
   return {
-    name: "mattr-mobile-rebrand",
+    name: "matter-mobile-rebrand",
     visitor: {
       StringLiteral(path, state) {
         if (!applies(state)) return;

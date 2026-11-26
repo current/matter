@@ -4,7 +4,7 @@ import { msg, useGT, useMessages } from "gt-react";
 import { CheckIcon, XIcon } from "lucide-react";
 import { useEffect, useState, type PointerEvent, type ReactElement } from "react";
 
-import { MattrDictateIcon } from "./MattrComposerParts.mattr";
+import { MatterDictateIcon } from "./MatterComposerParts.matter";
 
 import { VoiceInputErrorPill } from "./VoiceInputErrorPill";
 import { VoiceInputPill, VoiceWaveform } from "./VoiceInputPill";
@@ -175,7 +175,7 @@ export function ComposerSpeechButton(props: {
         }}
         className="shrink-0"
       >
-        <MattrDictateIcon />
+        <MatterDictateIcon />
       </Button>
     </ShortcutTooltip>
   );

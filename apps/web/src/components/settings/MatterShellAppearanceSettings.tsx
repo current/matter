@@ -10,28 +10,28 @@ import {
   type ShellGlassStyle,
   type ShellMaterial,
 } from "@t3tools/contracts/settings";
-import { SHELL_COLOR_PRESETS } from "../../../../../antimatter/shellTint";
+import { SHELL_COLOR_PRESETS } from "../../../../../matter/shellTint";
 import { isElectron } from "../../env";
 import { isMacPlatform } from "../../lib/utils";
-import { MattrSidebarLayoutSetting } from "../sidebar/mattr/MattrSidebarLayoutSetting";
+import { MatterSidebarLayoutSetting } from "../sidebar/matter/MatterSidebarLayoutSetting";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
-import { DEFAULT_MATTR_GOOEY_SEND, useMattrGooeySendSetting } from "../../mattrGooeySend";
+import { DEFAULT_MATTER_GOOEY_SEND, useMatterGooeySendSetting } from "../../matterGooeySend";
 import {
-  DEFAULT_MATTR_THREAD_RIBBON,
-  useMattrThreadRibbonSetting,
-} from "../chat/mattrThreadRibbon.logic";
-import { MattrAiStatusSetting } from "./MattrAiStatusSetting";
+  DEFAULT_MATTER_THREAD_RIBBON,
+  useMatterThreadRibbonSetting,
+} from "../chat/matterThreadRibbon.logic";
+import { MatterAiStatusSetting } from "./MatterAiStatusSetting";
 import {
   AppearanceSlider,
   ColorSwatch,
   CustomColorSwatch,
   SHELL_COLOR_LABELS,
-} from "./MattrAppearanceControls";
-import { MattrComposerAppearanceSettings } from "./MattrComposerAppearanceSettings";
-import { MattrIconPackSetting } from "./MattrIconPackSetting";
-import { MattrStreamAnimationSetting } from "./MattrStreamAnimationSetting";
-import { MattrUiFontSetting } from "./MattrUiFontSetting";
+} from "./MatterAppearanceControls";
+import { MatterComposerAppearanceSettings } from "./MatterComposerAppearanceSettings";
+import { MatterIconPackSetting } from "./MatterIconPackSetting";
+import { MatterStreamAnimationSetting } from "./MatterStreamAnimationSetting";
+import { MatterUiFontSetting } from "./MatterUiFontSetting";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
@@ -58,14 +58,14 @@ function isShellGlassStyle(value: unknown): value is ShellGlassStyle {
   return value === "regular" || value === "clear";
 }
 
-export function MattrShellAppearanceSettings() {
+export function MatterShellAppearanceSettings() {
   const searchableSetting = useSearchableSetting();
   const gt = useGT();
   const m = useMessages();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
-  const [gooeySend, setGooeySend] = useMattrGooeySendSetting();
-  const [threadRibbon, setThreadRibbon] = useMattrThreadRibbonSetting();
+  const [gooeySend, setGooeySend] = useMatterGooeySendSetting();
+  const [threadRibbon, setThreadRibbon] = useMatterThreadRibbonSetting();
   const material = settings.shellMaterial;
   // Blur amount and glass style drive macOS-only native calls; Windows maps materials to
   // acrylic and mica, which have no such knobs.
@@ -285,24 +285,24 @@ export function MattrShellAppearanceSettings() {
         }
       />
 
-      <MattrSidebarLayoutSetting />
-      <MattrUiFontSetting />
-      <MattrIconPackSetting />
-      <MattrAiStatusSetting />
-      <MattrStreamAnimationSetting />
-      <MattrComposerAppearanceSettings />
+      <MatterSidebarLayoutSetting />
+      <MatterUiFontSetting />
+      <MatterIconPackSetting />
+      <MatterAiStatusSetting />
+      <MatterStreamAnimationSetting />
+      <MatterComposerAppearanceSettings />
       <SettingsRow
-        id="mattr-gooey-send"
+        id="matter-gooey-send"
         title={gt("Gooey send button")}
         description={gt(
           "Right-click the send button to pop out Dictate and Voice Mode. Turn off to show both buttons inline.",
         )}
         devicePreference
         resetAction={
-          gooeySend !== DEFAULT_MATTR_GOOEY_SEND ? (
+          gooeySend !== DEFAULT_MATTER_GOOEY_SEND ? (
             <SettingResetButton
               ariaLabel={gt("Reset gooey send button to default")}
-              onClick={() => setGooeySend(DEFAULT_MATTR_GOOEY_SEND)}
+              onClick={() => setGooeySend(DEFAULT_MATTER_GOOEY_SEND)}
             />
           ) : null
         }
@@ -315,17 +315,17 @@ export function MattrShellAppearanceSettings() {
         }
       />
       <SettingsRow
-        id="mattr-thread-ribbon"
+        id="matter-thread-ribbon"
         title={gt("Thread ribbon")}
         description={gt(
           "Show thread actions in the top bar and running agents above the composer. Turn off for the classic details card.",
         )}
         devicePreference
         resetAction={
-          threadRibbon !== DEFAULT_MATTR_THREAD_RIBBON ? (
+          threadRibbon !== DEFAULT_MATTER_THREAD_RIBBON ? (
             <SettingResetButton
               ariaLabel={gt("Reset thread ribbon to default")}
-              onClick={() => setThreadRibbon(DEFAULT_MATTR_THREAD_RIBBON)}
+              onClick={() => setThreadRibbon(DEFAULT_MATTER_THREAD_RIBBON)}
             />
           ) : null
         }

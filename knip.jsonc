@@ -111,15 +111,15 @@
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still
       // reports an entire component module when nothing imports it.
-      // mattr: Settings and Usage render in MattrInsetPage, so upstream's AppRouteModal is
+      // Matter: Settings and Usage render in MatterInsetPage, so upstream's AppRouteModal is
       // kept unedited (merge-friendly) with its close button unused; likewise the composer's
-      // paperclip, replaced by MattrComposerAttachButton.
+      // paperclip, replaced by MatterComposerAttachButton.
       "ignoreIssues": {
         "src/components/ui/*.tsx": ["exports", "nsExports", "duplicates"],
         "src/components/AppRouteModal.tsx": ["exports"],
         "src/components/chat/ComposerAttachmentStrip.tsx": ["exports"],
       },
-      // mattr's icon plugin reads these sets' icons.json from disk at build time.
+      // Matter's icon plugin reads these sets' icons.json from disk at build time.
       "ignoreDependencies": ["^@iconify-json/"],
     },
     "apps/marketing": {

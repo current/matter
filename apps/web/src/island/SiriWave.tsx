@@ -6,7 +6,7 @@ import {
   siriWaveStretch,
   type SiriWaveVariant,
   type SiriWaveVisualState,
-} from "../../../../antimatter/island/siriWaveShaders";
+} from "../../../../matter/island/siriWaveShaders";
 
 export type { SiriWaveVariant, SiriWaveVisualState };
 

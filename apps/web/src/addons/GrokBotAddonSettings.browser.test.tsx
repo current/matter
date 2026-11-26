@@ -7,9 +7,9 @@ import "../index.css";
 
 const config = vi.hoisted(() => ({ baseUrl: "http://server.test", headers: {} }));
 
-vi.mock(import("./mattrApi"), async (original) => ({
+vi.mock(import("./matterApi"), async (original) => ({
   ...(await original()),
-  useMattrApiConfig: () => config,
+  useMatterApiConfig: () => config,
 }));
 
 import { GrokBotAddonSettings } from "./GrokBotAddonSettings";

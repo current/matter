@@ -3,18 +3,18 @@ import { File, Paths } from "expo-file-system";
 
 import {
   encodeMonoPcmWav,
-  MATTR_AUDIO_CUE_SAMPLE_RATE,
-  renderMattrAudioCuePcm,
-  type MattrAudioCueId,
-} from "../../../../antimatter/voice-assistant/audioCuesSynth";
+  MATTER_AUDIO_CUE_SAMPLE_RATE,
+  renderMatterAudioCuePcm,
+  type MatterAudioCueId,
+} from "../../../../matter/voice-assistant/audioCuesSynth";
 import { disposeAudioPlayer } from "./audioSession";
 
-export type { MattrAudioCueId };
+export type { MatterAudioCueId };
 
-const CUE_FILE_PREFIX = "mattr-audio-cue-v1";
+const CUE_FILE_PREFIX = "matter-audio-cue-v1";
 const PLAYBACK_FAILSAFE_MS = 1_200;
 
-const cachedCueUris = new Map<MattrAudioCueId, Promise<string | null>>();
+const cachedCueUris = new Map<MatterAudioCueId, Promise<string | null>>();
 
 export interface MobileAudioCuePreferences {
   readonly voiceSoundCuesEnabled?: boolean | undefined;
@@ -30,7 +30,7 @@ export function setMobileAudioCuePreferencesReader(
 }
 
 export function isMobileAudioCueEnabled(
-  cue: MattrAudioCueId,
+  cue: MatterAudioCueId,
   preferences?: MobileAudioCuePreferences | null,
 ): boolean {
   const resolved = preferences ?? preferencesReader?.() ?? null;
@@ -39,15 +39,15 @@ export function isMobileAudioCueEnabled(
   return true;
 }
 
-async function ensureCueFileUri(cue: MattrAudioCueId): Promise<string | null> {
+async function ensureCueFileUri(cue: MatterAudioCueId): Promise<string | null> {
   const existing = cachedCueUris.get(cue);
   if (existing) return existing;
 
   const work = (async (): Promise<string | null> => {
     try {
       const file = new File(Paths.cache, `${CUE_FILE_PREFIX}-${cue}.wav`);
-      const pcm = renderMattrAudioCuePcm(cue, MATTR_AUDIO_CUE_SAMPLE_RATE);
-      const wav = encodeMonoPcmWav(pcm, MATTR_AUDIO_CUE_SAMPLE_RATE);
+      const pcm = renderMatterAudioCuePcm(cue, MATTER_AUDIO_CUE_SAMPLE_RATE);
+      const wav = encodeMonoPcmWav(pcm, MATTER_AUDIO_CUE_SAMPLE_RATE);
       file.create({ overwrite: true });
       await file.write(wav);
       return file.uri;
@@ -67,7 +67,7 @@ async function ensureCueFileUri(cue: MattrAudioCueId): Promise<string | null> {
  * Never throws when audio hardware or Expo native modules are unavailable.
  */
 export async function playMobileAudioCue(
-  cue: MattrAudioCueId,
+  cue: MatterAudioCueId,
   options?: {
     readonly force?: boolean;
     readonly preferences?: MobileAudioCuePreferences | null;

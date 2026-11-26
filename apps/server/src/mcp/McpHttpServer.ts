@@ -1676,7 +1676,7 @@ export const layerMilestoneEvents = Layer.effectDiscard(
 );
 
 /**
- * mattr's claude-cloud add-on tools. Outside layerTools: they are listed only while the add-on
+ * Matter's claude-cloud add-on tools. Outside layerTools: they are listed only while the add-on
  * is on and agents may delegate, so they cost no context otherwise.
  */
 const layerClaudeCloudToolkit = toolkitRegistration(

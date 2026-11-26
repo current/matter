@@ -60,14 +60,14 @@ it.each([
 });
 
 it.each([
-  [undefined, "mattr"],
-  ["development", "mattr Dev"],
-  ["preview", "mattr Preview"],
+  [undefined, "Matter"],
+  ["development", "Matter Dev"],
+  ["preview", "Matter Preview"],
 ])("brands APP_VARIANT=%j as %j", async (value, name) => {
   const config = await loadConfig(value);
   expect(config.name).toBe(name);
   expect(config.scheme).toMatch(/^t3code/);
-  expect(config.ios?.infoPlist?.NSLocalNetworkUsageDescription).toContain("mattr");
+  expect(config.ios?.infoPlist?.NSLocalNetworkUsageDescription).toContain("Matter");
   expect(JSON.stringify(config.ios?.infoPlist)).not.toContain("T3 Code");
   expect(config.icon).toContain("assets/nightly/nightly-ios-1024.png");
   expect(config.ios?.icon).toContain("assets/nightly/app-icon.icon");
@@ -83,7 +83,7 @@ it("keeps Voice Mode listening and speaking with the screen locked", async () =>
     expect.objectContaining({ enableBackgroundPlayback: true, enableBackgroundRecording: true }),
   ]);
   expect(config.ios?.infoPlist?.UIBackgroundModes).toContain("audio");
-  expect(config.ios?.infoPlist?.NSSpeechRecognitionUsageDescription).toContain("mattr");
+  expect(config.ios?.infoPlist?.NSSpeechRecognitionUsageDescription).toContain("Matter");
 });
 
 it.each([
@@ -117,10 +117,10 @@ it("leaves paid builds' plugin order and team alone", async () => {
 it("honors Personal Team bundle id and team id overrides", async () => {
   const config = await loadConfig(undefined, {
     T3CODE_IOS_PERSONAL_TEAM: "1",
-    T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID: "com.example.mattr",
+    T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID: "com.example.matter",
     T3CODE_IOS_APPLE_TEAM_ID: "ABCDE12345",
   });
-  expect(config.ios?.bundleIdentifier).toBe("com.example.mattr");
+  expect(config.ios?.bundleIdentifier).toBe("com.example.matter");
   expect(config.ios?.appleTeamId).toBe("ABCDE12345");
 });
 
@@ -133,7 +133,7 @@ it("rejects an invalid Personal Team bundle id", async () => {
   ).rejects.toThrow("T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID");
 });
 
-it("defaults relay and Clerk config from antimatter/build-env.mjs when unset", async () => {
+it("defaults relay and Clerk config from matter/build-env.mjs when unset", async () => {
   const config = await loadConfig(undefined, { T3CODE_IOS_PERSONAL_TEAM: "1" });
   expect(config.extra?.relay?.url).toBe("https://relay.t3.codes");
   expect(config.extra?.clerk?.publishableKey).toBe("pk_live_Y2xlcmsudDMuY29kZXMk");

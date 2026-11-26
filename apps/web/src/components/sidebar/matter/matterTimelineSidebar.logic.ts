@@ -1,18 +1,22 @@
-import { compactAge, type MattrChildItem, type MattrListFilter } from "./mattrFinalSidebar.logic";
-import type { MattrThreadItem } from "./mattrSidebar.logic";
+import {
+  compactAge,
+  type MatterChildItem,
+  type MatterListFilter,
+} from "./matterFinalSidebar.logic";
+import type { MatterThreadItem } from "./matterSidebar.logic";
 
-export type MattrTimelineSort = "updated" | "created";
+export type MatterTimelineSort = "updated" | "created";
 
-export interface MattrTimelineBuckets {
+export interface MatterTimelineBuckets {
   /** Pinned threads that match the current scope and filter, newest first. */
-  readonly pinned: ReadonlyArray<MattrThreadItem>;
+  readonly pinned: ReadonlyArray<MatterThreadItem>;
   /** Today's threads, plus anything running or waiting on you whatever its age. */
-  readonly recent: ReadonlyArray<MattrThreadItem>;
-  readonly yesterday: ReadonlyArray<MattrThreadItem>;
-  readonly earlier: ReadonlyArray<MattrThreadItem>;
+  readonly recent: ReadonlyArray<MatterThreadItem>;
+  readonly yesterday: ReadonlyArray<MatterThreadItem>;
+  readonly earlier: ReadonlyArray<MatterThreadItem>;
 }
 
-function timelineAt(item: MattrThreadItem, sort: MattrTimelineSort): number {
+function timelineAt(item: MatterThreadItem, sort: MatterTimelineSort): number {
   const at = Date.parse(sort === "created" ? item.createdAt : item.activityAt);
   return Number.isFinite(at) ? at : 0;
 }
@@ -25,7 +29,7 @@ function startOfLocalDay(nowMs: number, daysBack = 0): number {
 }
 
 /** Same listing rule as the default rail: live, or settled/snoozed but raising a hand. */
-function isListed(item: MattrThreadItem, needsChildParents: ReadonlySet<string>): boolean {
+function isListed(item: MatterThreadItem, needsChildParents: ReadonlySet<string>): boolean {
   return (
     item.attention === "needs" ||
     needsChildParents.has(item.key) ||
@@ -35,25 +39,25 @@ function isListed(item: MattrThreadItem, needsChildParents: ReadonlySet<string>)
 
 /** Top-level threads by local calendar day, newest first within each bucket. */
 export function buildTimelineBuckets(
-  items: ReadonlyArray<MattrThreadItem>,
+  items: ReadonlyArray<MatterThreadItem>,
   options: {
     readonly nowMs: number;
-    readonly sort: MattrTimelineSort;
+    readonly sort: MatterTimelineSort;
     readonly projectFilter: string | null;
-    readonly filter: MattrListFilter;
+    readonly filter: MatterListFilter;
     readonly needsChildParents?: ReadonlySet<string>;
     /** Rows with a subagent still working, kept in Recent so it stays on screen. */
     readonly activeChildParents?: ReadonlySet<string>;
   },
-): MattrTimelineBuckets {
+): MatterTimelineBuckets {
   const needsChildParents = options.needsChildParents ?? new Set<string>();
   const activeChildParents = options.activeChildParents ?? new Set<string>();
   const todayStart = startOfLocalDay(options.nowMs);
   const yesterdayStart = startOfLocalDay(options.nowMs, 1);
-  const pinned: MattrThreadItem[] = [];
-  const recent: MattrThreadItem[] = [];
-  const yesterday: MattrThreadItem[] = [];
-  const earlier: MattrThreadItem[] = [];
+  const pinned: MatterThreadItem[] = [];
+  const recent: MatterThreadItem[] = [];
+  const yesterday: MatterThreadItem[] = [];
+  const earlier: MatterThreadItem[] = [];
   for (const item of items) {
     if (!isListed(item, needsChildParents)) continue;
     if (options.projectFilter !== null && item.projectKey !== options.projectFilter) continue;
@@ -74,7 +78,7 @@ export function buildTimelineBuckets(
     } else if (at >= yesterdayStart) yesterday.push(item);
     else earlier.push(item);
   }
-  const newestFirst = (left: MattrThreadItem, right: MattrThreadItem) =>
+  const newestFirst = (left: MatterThreadItem, right: MatterThreadItem) =>
     timelineAt(right, options.sort) - timelineAt(left, options.sort);
   return {
     pinned: pinned.toSorted(newestFirst),
@@ -85,7 +89,7 @@ export function buildTimelineBuckets(
 }
 
 /** A subagent or delegated task that is still working or waiting on you. */
-export function isActiveSubagent(child: MattrThreadItem): boolean {
+export function isActiveSubagent(child: MatterThreadItem): boolean {
   return child.attention === "running" || child.attention === "needs";
 }
 
@@ -94,10 +98,10 @@ export function isActiveSubagent(child: MattrThreadItem): boolean {
  * ones never appear, and nothing does while the setting is off.
  */
 export function activeSubagentsByParent(
-  children: ReadonlyArray<MattrChildItem>,
+  children: ReadonlyArray<MatterChildItem>,
   enabled: boolean,
-): ReadonlyMap<string, ReadonlyArray<MattrChildItem>> {
-  const index = new Map<string, MattrChildItem[]>();
+): ReadonlyMap<string, ReadonlyArray<MatterChildItem>> {
+  const index = new Map<string, MatterChildItem[]>();
   if (!enabled) return index;
   for (const child of children) {
     if (child.ancestorKey === child.key || !isActiveSubagent(child)) continue;
@@ -120,20 +124,20 @@ export function activeSubagentsByParent(
 }
 
 /** How long an active subagent has been running. */
-export function subagentElapsed(child: MattrThreadItem, nowMs: number): string {
+export function subagentElapsed(child: MatterThreadItem, nowMs: number): string {
   return compactAge(child.runningSince ?? child.activityAt, nowMs);
 }
 
 /** Where the thread's files live: none when detached from a project, its own worktree, or the project's checkout. */
-export function workspaceKind(item: MattrThreadItem): "none" | "worktree" | "local" {
+export function workspaceKind(item: MatterThreadItem): "none" | "worktree" | "local" {
   if (item.projectName === null) return "none";
   return item.worktreePath !== null ? "worktree" : "local";
 }
 
-export type MattrUsageMeterTone = "normal" | "warn" | "critical";
+export type MatterUsageMeterTone = "normal" | "warn" | "critical";
 
 /** Severity bucket for a usage meter's used percentage. */
-export function usageMeterTone(usedPercent: number): MattrUsageMeterTone {
+export function usageMeterTone(usedPercent: number): MatterUsageMeterTone {
   if (usedPercent >= 95) return "critical";
   if (usedPercent >= 75) return "warn";
   return "normal";

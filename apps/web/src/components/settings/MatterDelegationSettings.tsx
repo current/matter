@@ -3,7 +3,7 @@ import { useGT } from "gt-react";
 
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { Switch } from "../ui/switch";
-import { MattrSwitchableAccounts } from "./MattrSwitchableAccounts";
+import { MatterSwitchableAccounts } from "./MatterSwitchableAccounts";
 import { useSearchableSetting } from "./settingsSearch";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { SettingResetButton, SettingsRow } from "./settingsLayout";
@@ -13,8 +13,8 @@ import {
   useUpdateScopedSettings,
 } from "./useScopedSettings";
 
-/** mattr: whether agents spread parallel subagents across every signed-in subscription. */
-export function MattrDelegationSettings({
+/** Matter: whether agents spread parallel subagents across every signed-in subscription. */
+export function MatterDelegationSettings({
   entries,
   disabled,
 }: {
@@ -35,7 +35,7 @@ export function MattrDelegationSettings({
       serverScoped
       settingKeys={["mattrMultiProviderDelegation"]}
       mixed={mixed}
-      {...searchableSetting("mattr-multi-provider-delegation")}
+      {...searchableSetting("matter-multi-provider-delegation")}
       description={gt(
         "Spread parallel subagents across all signed-in subscriptions based on remaining usage.",
       )}
@@ -57,7 +57,7 @@ export function MattrDelegationSettings({
       }
     >
       {enabled && !mixed ? (
-        <MattrSwitchableAccounts
+        <MatterSwitchableAccounts
           entries={entries}
           excludedInstanceIds={settings.mattrDelegationExcludedInstanceIds}
           disabled={disabled}

@@ -3,7 +3,7 @@ import {
   type IslandPendingApproval,
   type IslandSnapshot,
   type IslandThreadSummary,
-} from "../../../../antimatter/island/types.ts";
+} from "../../../../matter/island/types.ts";
 
 export function makeIslandThread(
   overrides: Partial<IslandThreadSummary> = {},

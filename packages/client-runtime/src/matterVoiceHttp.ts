@@ -9,13 +9,13 @@ import {
 } from "./state/environmentHttpAuth.ts";
 
 /**
- * mattr fork: authenticated requests to `/api/mattr/*` routes, which sit outside the contract's
+ * Matter fork: authenticated requests to `/api/mattr/*` routes, which sit outside the contract's
  * HTTP API groups. Reuses the contract request path so Bearer, cookie and DPoP (proof signing,
  * token renewal, one retry on a rejected token) behave exactly like every other environment call.
  * `send` performs the fetch with the headers and URL this module settles on for each attempt.
  */
-export const executeMattrEnvironmentRequest = Effect.fn(
-  "clientRuntime.mattr.executeEnvironmentRequest",
+export const executeMatterEnvironmentRequest = Effect.fn(
+  "clientRuntime.matter.executeEnvironmentRequest",
 )(function* <A, E>(input: {
   readonly prepared: PreparedConnection;
   readonly method: "GET" | "POST";

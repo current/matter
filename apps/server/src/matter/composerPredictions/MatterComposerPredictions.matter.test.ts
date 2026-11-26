@@ -19,8 +19,8 @@ import * as TestClock from "effect/testing/TestClock";
 
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import * as ServerSettings from "../../serverSettings.ts";
-import * as MattrComposerPredictions from "./MattrComposerPredictions.ts";
-import * as MattrPredictionRunner from "./MattrPredictionRunner.ts";
+import * as MatterComposerPredictions from "./MatterComposerPredictions.ts";
+import * as MatterPredictionRunner from "./MatterPredictionRunner.ts";
 
 const threadId = ThreadId.make("thread:predict");
 const instanceId = ProviderInstanceId.make("claudeAgent");
@@ -78,7 +78,7 @@ const makeHarness = (): Harness => ({
 });
 
 const layerFor = (harness: Harness) =>
-  MattrComposerPredictions.layerCoordinator.pipe(
+  MatterComposerPredictions.layerCoordinator.pipe(
     Layer.provide(
       Layer.mergeAll(
         Layer.mock(ProjectionStore.ProjectionStoreV2)({
@@ -96,7 +96,7 @@ const layerFor = (harness: Harness) =>
             promptSuggestionsEnabled: harness.enabled,
           })),
         }),
-        Layer.succeed(MattrPredictionRunner.MattrPredictionRunner, {
+        Layer.succeed(MatterPredictionRunner.MatterPredictionRunner, {
           routes: () =>
             Effect.succeed([{ kind: "claude", instanceId, model: "claude-sonnet-5-5" }] as const),
           run: () =>
@@ -120,7 +120,7 @@ const settle = Effect.gen(function* () {
 });
 
 const current = Effect.gen(function* () {
-  const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+  const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
   const head = yield* Stream.runHead(predictions.subscribe(threadId));
   return Option.getOrNull(head);
 });
@@ -131,7 +131,7 @@ const completeRun = (
   status: OrchestrationV2Run["status"] = "completed",
 ) =>
   Effect.gen(function* () {
-    const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+    const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
     harness.projection = {
       ...harness.projection,
       runs: [...harness.projection.runs.filter((r) => r.ordinal !== ordinal), run(ordinal, status)],
@@ -147,7 +147,7 @@ const requestEvent = (status: OrchestrationV2RuntimeRequest["status"]) =>
     payload: { status },
   }) as OrchestrationV2DomainEvent;
 
-describe("MattrComposerPredictions", () => {
+describe("MatterComposerPredictions", () => {
   it.effect("publishes a prediction one second after a run completes", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
@@ -167,7 +167,7 @@ describe("MattrComposerPredictions", () => {
   it.effect("cancels a waiting prediction when a new run starts, and clears the old one", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
-      const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+      const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
       yield* completeRun(harness, 1);
       yield* predictions.observe(runEvent(run(2, "running")));
       yield* settle;
@@ -181,7 +181,7 @@ describe("MattrComposerPredictions", () => {
   it.effect("serves a repeated completion of the same run from the cache", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
-      const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+      const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
       yield* completeRun(harness, 1);
       yield* TestClock.adjust("1 second");
       yield* settle;
@@ -203,7 +203,7 @@ describe("MattrComposerPredictions", () => {
     () => {
       const harness = makeHarness();
       return Effect.gen(function* () {
-        const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+        const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
         // The parent's turn is over; its background work holds the run as waiting.
         yield* completeRun(harness, 1, "waiting");
         yield* TestClock.adjust("1 second");
@@ -252,7 +252,7 @@ describe("MattrComposerPredictions", () => {
     () => {
       const harness = makeHarness();
       return Effect.gen(function* () {
-        const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+        const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
         yield* completeRun(harness, 1);
         yield* TestClock.adjust("1 second");
         yield* settle;
@@ -280,7 +280,7 @@ describe("MattrComposerPredictions", () => {
   it.effect("keeps a scheduled prediction when a finished turn's request settles", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
-      const predictions = yield* MattrComposerPredictions.MattrComposerPredictions;
+      const predictions = yield* MatterComposerPredictions.MatterComposerPredictions;
       yield* completeRun(harness, 1);
       yield* predictions.observe(requestEvent("cancelled"));
       yield* TestClock.adjust("1 second");

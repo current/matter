@@ -333,9 +333,9 @@ describe("GrokBotAdapter through BotsPlatformService", () => {
           clientNonce: "nonce-ship",
         });
         assert.strictEqual(sent.clientNonce, "nonce-ship");
-        assert.strictEqual(sent.attribution, "user-via-mattr");
+        assert.strictEqual(sent.attribution, "user-via-matter");
         assert.strictEqual(sent.deliveryState, "sent");
-        // The transcript copy carries mattr's nonce, so the client swaps its pending copy for it.
+        // The transcript copy carries Matter's nonce, so the client swaps its pending copy for it.
         const echoed = yield* waitFor(
           (e) => e.type === "message-upserted" && e.message.remoteId === "remote-3",
         );
@@ -344,7 +344,7 @@ describe("GrokBotAdapter through BotsPlatformService", () => {
             echoed.message.clientNonce,
             echoed.message.attribution,
           ],
-          ["nonce-ship", "user-via-mattr"],
+          ["nonce-ship", "user-via-matter"],
         );
 
         const refused = yield* platform

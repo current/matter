@@ -11,7 +11,7 @@ import {
   type MacShellNative,
   setMacShellNativeForTests,
   shellMaterialOptions,
-} from "./MattrShellMaterial.ts";
+} from "./MatterShellMaterial.ts";
 
 const CONTENT_VIEW = 0x1234n;
 const GLASS_VIEW = 0x5678n;
@@ -53,7 +53,7 @@ afterEach(() => {
   setMacShellNativeForTests(undefined);
 });
 
-describe("MattrShellMaterial", () => {
+describe("MatterShellMaterial", () => {
   it.effect("keeps solid windows on their solid background without enabling vibrancy", () =>
     Effect.gen(function* () {
       const window = makeFakeWindow();

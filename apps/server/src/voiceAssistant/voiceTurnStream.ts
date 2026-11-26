@@ -11,7 +11,7 @@ import type {
   VoiceAssistantTurnRequest,
   VoiceAssistantTurnResponse,
   VoiceSpeakRequest,
-} from "../../../../antimatter/voice-assistant/types.ts";
+} from "../../../../matter/voice-assistant/types.ts";
 import type { VoiceAssistantService } from "./VoiceAssistantService.ts";
 import { createSentenceChunker } from "./voiceSentenceChunker.ts";
 import type { VoiceTtsService, VoiceTtsSpeakResult } from "./VoiceTtsService.ts";

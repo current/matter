@@ -26,7 +26,7 @@ import {
   type VoiceSpeakRequest,
   type VoiceTranscribeResponse,
   type VoiceTtsProvider,
-} from "../../../../antimatter/voice-assistant/types.ts";
+} from "../../../../matter/voice-assistant/types.ts";
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
@@ -834,7 +834,7 @@ const make = Effect.gen(function* () {
     const voice = sanitizeMacosVoice(input.voice);
     const rate = Math.min(300, Math.max(120, Math.round(180 * input.speed)));
     const tempDir = yield* fileSystem
-      .makeTempDirectoryScoped({ prefix: "mattr-tts-" })
+      .makeTempDirectoryScoped({ prefix: "matter-tts-" })
       .pipe(Effect.mapError((cause) => new VoiceTtsSynthesisError({ provider: "macos", cause })));
     const inputPath = path.join(tempDir, "input.txt");
     const outputPath = path.join(tempDir, "speech.wav");

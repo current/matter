@@ -72,7 +72,7 @@ import {
 } from "./ContextHandoffDelivery.ts";
 import { isProviderCommand, outputInstructions } from "./runOutput.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
-import { withMattrGoalModeInstructions } from "@t3tools/provider-core/server/orchestrationInstructions";
+import { withMatterGoalModeInstructions } from "@t3tools/provider-core/server/orchestrationInstructions";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import { unsentManualContinuationSource } from "@t3tools/shared/orchestrationV2ManualContinuation";
@@ -1220,7 +1220,7 @@ export const layer: Layer.Layer<
       const modeText =
         commandText || messageText.trimStart().startsWith("/")
           ? messageText
-          : withMattrGoalModeInstructions(
+          : withMatterGoalModeInstructions(
               messageText,
               resolvedRuntimePolicy.interactionMode,
               goalDriver,

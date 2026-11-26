@@ -46,7 +46,7 @@ const ACCOUNT_SCOPE_ID = "local";
 const DEFAULT_POLL_INTERVALS: BotProviderPollIntervals = { idleMs: 10_000, activeMs: 1_500 };
 /** Grok Bot can take a moment to flag a run after a send; keep polling fast meanwhile. */
 const SEND_ACTIVE_WINDOW_MS = 30_000;
-/** Enough to map every send a session can still see back to mattr's nonce. */
+/** Enough to map every send a session can still see back to Matter's nonce. */
 const MAX_TRACKED_SENDS = 500;
 const AVATAR_DATA_URL = /^data:image\/(png|jpeg|gif|webp);base64,/;
 
@@ -221,7 +221,7 @@ function toBotConversation(bot: GrokBotSummary): BotConversation {
   };
 }
 
-/** Markdown for a message, including what mattr can't draw natively. */
+/** Markdown for a message, including what Matter can't draw natively. */
 function messageContent(message: GrokBotMessage): {
   readonly markdown: string;
   readonly parts: ReadonlyArray<BotMessagePart>;
@@ -283,7 +283,7 @@ const widgetRequestId = (widget: { readonly botId: string; readonly entryId: str
 /**
  * Grok Bot through its loopback Chrome DevTools port. It only ever probes 127.0.0.1 on the
  * configured port: it never launches, quits or restarts the Grok Bot app. Every read and write
- * goes through Grok Bot's own renderer stores, so mattr never changes which chat Grok Bot shows.
+ * goes through Grok Bot's own renderer stores, so Matter never changes which chat Grok Bot shows.
  */
 export const make = Effect.fn("GrokBotAdapter.make")(function* (
   options: GrokBotAdapterOptions = {},
@@ -316,8 +316,8 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
         return yield* availabilityError(availability, port);
       }
 
-      /** Grok Bot's nonce for each send mattr made, mapped to the nonce mattr's client sent. */
-      const mattrNonceByGrokNonce = new Map<string, string>();
+      /** Grok Bot's nonce for each send Matter made, mapped to the nonce Matter's client sent. */
+      const matterNonceByGrokNonce = new Map<string, string>();
       const seenMessages = new Map<string, Map<string, string>>();
       const openRequests = new Map<
         string,
@@ -326,7 +326,7 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
       const activeUntilMs = new Map<string, number>();
       let previousBots: Map<string, GrokBotSummary> | null = null;
       let botCount = 0;
-      // A send and a transcript sync never overlap, so a synced send always maps to mattr's nonce.
+      // A send and a transcript sync never overlap, so a synced send always maps to Matter's nonce.
       const transcriptLock = yield* Semaphore.make(1);
 
       const discover = provider.discoverBots().pipe(Effect.mapError(toBotProviderError));
@@ -334,8 +334,10 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
         provider.listMessages(botId, cursor ?? undefined).pipe(Effect.mapError(toBotProviderError));
 
       const toMessage = (message: GrokBotMessage): BotMessage => {
-        const mattrNonce =
-          message.clientNonce === null ? undefined : mattrNonceByGrokNonce.get(message.clientNonce);
+        const matterNonce =
+          message.clientNonce === null
+            ? undefined
+            : matterNonceByGrokNonce.get(message.clientNonce);
         const fromUser = message.role === "user";
         const { markdown, parts } = messageContent(message);
         return {
@@ -346,8 +348,8 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
           attribution: fromUser
             ? message.fromAgentName
               ? "other-agent"
-              : mattrNonce !== undefined
-                ? "user-via-mattr"
+              : matterNonce !== undefined
+                ? "user-via-matter"
                 : "user-via-other-client"
             : message.role === "system"
               ? "system"
@@ -366,7 +368,7 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
           artifacts: [],
           createdAt: isoFromMs(message.timestampMs ?? 0),
           seq: message.seq !== null && Number.isInteger(message.seq) ? message.seq : null,
-          clientNonce: mattrNonce ?? message.clientNonce,
+          clientNonce: matterNonce ?? message.clientNonce,
           deliveryState: "sent",
         };
       };
@@ -483,11 +485,11 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
         };
       });
 
-      const rememberSend = (grokNonce: string, mattrNonce: string) => {
-        mattrNonceByGrokNonce.set(grokNonce, mattrNonce);
-        if (mattrNonceByGrokNonce.size <= MAX_TRACKED_SENDS) return;
-        const oldest = mattrNonceByGrokNonce.keys().next().value;
-        if (oldest !== undefined) mattrNonceByGrokNonce.delete(oldest);
+      const rememberSend = (grokNonce: string, matterNonce: string) => {
+        matterNonceByGrokNonce.set(grokNonce, matterNonce);
+        if (matterNonceByGrokNonce.size <= MAX_TRACKED_SENDS) return;
+        const oldest = matterNonceByGrokNonce.keys().next().value;
+        if (oldest !== undefined) matterNonceByGrokNonce.delete(oldest);
       };
 
       return {
@@ -543,7 +545,7 @@ export const make = Effect.fn("GrokBotAdapter.make")(function* (
             conversationId,
             providerId: PROVIDER_ID,
             role: "user",
-            attribution: "user-via-mattr",
+            attribution: "user-via-matter",
             authorBotId: null,
             markdown: text,
             parts: [{ type: "markdown", text }],

@@ -1253,7 +1253,7 @@ export interface DesktopBridge {
     prepare: (locale: string) => Promise<DesktopAppleSpeechResult>;
     transcribe: (input: { locale: string; pcm: Uint8Array }) => Promise<DesktopAppleSpeechResult>;
   };
-  /** mattr Island floating notch pill & voice session bridge. */
+  /** Matter Island floating notch pill & voice session bridge. */
   island?: {
     syncSnapshot: (snapshot: unknown) => Promise<void>;
     updateSettings: (settings: unknown) => Promise<void>;

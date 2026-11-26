@@ -9,7 +9,7 @@ import { createBrowserHistory, createHashHistory } from "@tanstack/react-router"
 import * as Schema from "effect/Schema";
 
 import { applyAppearanceContrast } from "./appearanceContrast";
-import { applyMattrShellAppearance } from "./mattrShellAppearance";
+import { applyMatterShellAppearance } from "./matterShellAppearance";
 import { applyAppearanceFontVariables, TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "./appearanceFonts";
 import { startElectronBrowserHost } from "./browser/ElectronBrowserHost";
 import { startBrowserProfileReporting } from "./browser/BrowserProfileReporter";
@@ -112,7 +112,7 @@ function startClientAppearance(): void {
       previous?.shellTransparency !== settings.shellTransparency ||
       previous?.shellColor !== settings.shellColor
     ) {
-      applyMattrShellAppearance(root, settings);
+      applyMatterShellAppearance(root, settings);
     }
     if (
       previous?.fontFamilySans !== settings.fontFamilySans ||

@@ -1,4 +1,4 @@
-/** The mattr Flux proxy closes with this when the server has no Deepgram key. */
+/** The Matter Flux proxy closes with this when the server has no Deepgram key. */
 export const FLUX_NOT_CONFIGURED_CLOSE_CODE = 4401;
 const FLUX_CONNECT_TIMEOUT_MS = 5_000;
 // After a tap to send, Flux gets this long to finalize the words it already heard.

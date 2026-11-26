@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Re-signs a built macOS release with Antimatter's self-signed certificate and rebuilds the
+// Re-signs a built macOS release with Matter's self-signed certificate and rebuilds the
 // zip, DMG, blockmaps and update manifest to match. Runs after electron-builder so upstream merges stay clean.
 // With --app-path it signs one unpacked .app in place and stops: ship-local's install path needs no zip or DMG.
-// Usage: node antimatter/sign-mac-release.mjs (--release-dir <dir> | --app-path <app>) --identity <sha1> [--keychain <path>]
+// Usage: node matter/sign-mac-release.mjs (--release-dir <dir> | --app-path <app>) --identity <sha1> [--keychain <path>]
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -18,7 +18,7 @@ const { values } = NodeUtil.parseArgs({
     "app-path": { type: "string" },
     identity: { type: "string" },
     keychain: { type: "string" },
-    "product-name": { type: "string", default: "mattr" },
+    "product-name": { type: "string", default: "Matter" },
   },
 });
 const identity = values.identity?.trim();
@@ -80,7 +80,7 @@ async function signRelease(releaseDir) {
   if (!zipName) throw new Error(`${manifestName} lists no zip`);
   const zipPath = NodePath.join(releaseDir, zipName);
 
-  const work = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "antimatter-sign-"));
+  const work = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "matter-sign-"));
   try {
     run("ditto", ["-x", "-k", zipPath, work]);
     const appName = NodeFS.readdirSync(work).find((name) => name.endsWith(".app"));

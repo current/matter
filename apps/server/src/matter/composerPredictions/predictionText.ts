@@ -1,5 +1,5 @@
 /**
- * mattr composer predictions: the transcript the predictor reads, the prompt it runs, and the
+ * Matter composer predictions: the transcript the predictor reads, the prompt it runs, and the
  * clean-up applied to its answer. Pure, so every limit here is unit tested.
  */
 

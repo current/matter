@@ -11,7 +11,11 @@ import type {
 import { useSyncExternalStore } from "react";
 
 import { getAddonStoreState, reconnectAddon } from "../../addons/addonStore";
-import { mattrApiRequest, mattrFetchCredentials, type MattrApiConfig } from "../../addons/mattrApi";
+import {
+  matterApiRequest,
+  matterFetchCredentials,
+  type MatterApiConfig,
+} from "../../addons/matterApi";
 
 export interface BotsState {
   readonly providers: ReadonlyArray<BotProviderDescriptor>;
@@ -111,8 +115,8 @@ function applyBotEvent(current: BotsState, event: BotEvent): BotsState {
   }
 }
 
-async function loadSnapshot(config: MattrApiConfig, signal: AbortSignal) {
-  const { providers } = await mattrApiRequest<BotProvidersResponse>(
+async function loadSnapshot(config: MatterApiConfig, signal: AbortSignal) {
+  const { providers } = await matterApiRequest<BotProvidersResponse>(
     config,
     "/api/mattr/bots/providers",
     { signal },
@@ -120,7 +124,7 @@ async function loadSnapshot(config: MattrApiConfig, signal: AbortSignal) {
   const lists = await Promise.all(
     providers.map(async (provider) => {
       if (provider.status.kind !== "connected") return [provider.providerId, []] as const;
-      const response = await mattrApiRequest<BotListResponse>(
+      const response = await matterApiRequest<BotListResponse>(
         config,
         `/api/mattr/bots/bots?providerId=${encodeURIComponent(provider.providerId)}`,
         { signal },
@@ -128,7 +132,7 @@ async function loadSnapshot(config: MattrApiConfig, signal: AbortSignal) {
       return [provider.providerId, response.bots] as const;
     }),
   );
-  const { requests } = await mattrApiRequest<BotPendingRequestsResponse>(
+  const { requests } = await matterApiRequest<BotPendingRequestsResponse>(
     config,
     "/api/mattr/bots/pending",
     { signal },
@@ -143,10 +147,10 @@ async function loadSnapshot(config: MattrApiConfig, signal: AbortSignal) {
 }
 
 /** Reads server-sent events from a fetch body, since EventSource can't send auth headers. */
-async function readEventStream(config: MattrApiConfig, signal: AbortSignal) {
+async function readEventStream(config: MatterApiConfig, signal: AbortSignal) {
   const response = await fetch(`${config.baseUrl}/api/mattr/bots/events`, {
     headers: { ...config.headers, accept: "text/event-stream" },
-    credentials: mattrFetchCredentials(config.headers),
+    credentials: matterFetchCredentials(config.headers),
     signal,
   });
   if (!response.ok || !response.body) throw new Error(`events_${response.status}`);
@@ -187,7 +191,7 @@ let controller: AbortController | null = null;
  * Keeps Bots in sync while at least one view needs them. Only mounted when a Bots add-on is
  * enabled, so a workspace without one opens no stream and sends no requests.
  */
-export function retainBotsSync(config: MattrApiConfig): () => void {
+export function retainBotsSync(config: MatterApiConfig): () => void {
   retainers += 1;
   if (retainers === 1) {
     const current = new AbortController();
@@ -225,7 +229,7 @@ export function retainBotsSync(config: MattrApiConfig): () => void {
  * request failed.
  */
 export async function reconnectBotProvider(
-  config: MattrApiConfig,
+  config: MatterApiConfig,
   provider: Pick<BotProviderDescriptor, "providerId" | "addonId">,
 ): Promise<AddonRuntimeStatus | null> {
   await reconnectAddon(config, provider.addonId);

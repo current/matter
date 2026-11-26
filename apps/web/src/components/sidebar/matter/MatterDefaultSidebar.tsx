@@ -1,4 +1,4 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet antimatter/sidebar.css, which loads outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet matter/sidebar.css, which loads outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { useGT } from "gt-react";
@@ -34,27 +34,27 @@ import {
   subagentStatus,
   summarizeProjects,
   threadRowStatus,
-  type MattrListFilter,
-  type MattrThreadGroup,
-} from "./mattrFinalSidebar.logic";
-import { filterThreadsByQuery, type MattrThreadItem } from "./mattrSidebar.logic";
+  type MatterListFilter,
+  type MatterThreadGroup,
+} from "./matterFinalSidebar.logic";
+import { filterThreadsByQuery, type MatterThreadItem } from "./matterSidebar.logic";
 import {
-  MattrBrandMenu,
-  MattrCrew,
-  MattrFooter,
-  MattrMenuPopup,
-  MattrMenuRadioItem,
-  MattrProviderMark,
+  MatterBrandMenu,
+  MatterCrew,
+  MatterFooter,
+  MatterMenuPopup,
+  MatterMenuRadioItem,
+  MatterProviderMark,
   useCrewBots,
-} from "./MattrDefaultSidebarParts";
-import { MattrTip } from "./MattrSidebarParts";
+} from "./MatterDefaultSidebarParts";
+import { MatterTip } from "./MatterSidebarParts";
 import {
-  useMattrCollapsedGroups,
-  useMattrInboxProjectFilter,
-  useMattrSortMode,
-} from "./mattrSidebarStore";
-import { MattrGoalModeGlyph } from "../../chat/MattrComposerModeControl.mattr";
-import type { MattrSidebarModel } from "./useMattrSidebarModel";
+  useMatterCollapsedGroups,
+  useMatterInboxProjectFilter,
+  useMatterSortMode,
+} from "./matterSidebarStore";
+import { MatterGoalModeGlyph } from "../../chat/MatterComposerModeControl.matter";
+import type { MatterSidebarModel } from "./useMatterSidebarModel";
 
 const SUBAGENT_PREVIEW_LIMIT = 5;
 const SEARCH_RESULT_LIMIT = 50;
@@ -68,7 +68,7 @@ const PR_GLYPH = {
   closed: PullRequestGlyph.closed,
 } as const;
 
-function rowMenuHandler(model: MattrSidebarModel, item: MattrThreadItem) {
+function rowMenuHandler(model: MatterSidebarModel, item: MatterThreadItem) {
   return (event: ReactMouseEvent) => {
     event.preventDefault();
     model.actions.openThreadMenu(
@@ -79,7 +79,7 @@ function rowMenuHandler(model: MattrSidebarModel, item: MattrThreadItem) {
   };
 }
 
-function ThreadTrailing({ item, nowMs }: { item: MattrThreadItem; nowMs: number }) {
+function ThreadTrailing({ item, nowMs }: { item: MatterThreadItem; nowMs: number }) {
   const status = threadRowStatus(item, nowMs);
   const pr = item.pullRequest;
   if (status.tone === "muted" && pr !== null) {
@@ -103,8 +103,8 @@ function SubagentRow({
   item,
   nowMs,
 }: {
-  model: MattrSidebarModel;
-  item: MattrThreadItem;
+  model: MatterSidebarModel;
+  item: MatterThreadItem;
   nowMs: number;
 }) {
   const gt = useGT();
@@ -119,7 +119,7 @@ function SubagentRow({
         ? gt("Failed")
         : gt("Done"));
   return (
-    <li data-mattr-subagent={item.key}>
+    <li data-matter-subagent={item.key}>
       <div
         className="mfs-sub"
         data-active={active ? "" : undefined}
@@ -134,7 +134,7 @@ function SubagentRow({
           onClick={() => model.actions.openThread(item)}
         />
         <span className="mfs-pm">
-          <MattrProviderMark driver={item.driver} />
+          <MatterProviderMark driver={item.driver} />
         </span>
         <span className="mfs-t">{item.title}</span>
         <span className="mfs-st" data-tone={status.tone}>
@@ -152,9 +152,9 @@ function ThreadRow({
   expanded,
   onToggle,
 }: {
-  model: MattrSidebarModel;
-  item: MattrThreadItem;
-  subagents: ReadonlyArray<MattrThreadItem>;
+  model: MatterSidebarModel;
+  item: MatterThreadItem;
+  subagents: ReadonlyArray<MatterThreadItem>;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -166,7 +166,7 @@ function ThreadRow({
   const visible = showAll ? subagents : subagents.slice(0, SUBAGENT_PREVIEW_LIMIT);
   const hidden = subagents.length - visible.length;
   return (
-    <li data-mattr-thread-row={item.key}>
+    <li data-matter-thread-row={item.key}>
       <div
         className="mfs-row"
         data-active={active ? "" : undefined}
@@ -181,7 +181,7 @@ function ThreadRow({
           onClick={() => model.actions.openThread(item)}
         />
         <span className="mfs-pm" data-parent={hasSubagents ? "" : undefined}>
-          <MattrProviderMark driver={item.driver} />
+          <MatterProviderMark driver={item.driver} />
           {hasSubagents ? (
             <button
               type="button"
@@ -202,7 +202,7 @@ function ThreadRow({
           ) : null}
         </span>
         <span className="mfs-t">{item.title}</span>
-        <MattrGoalModeGlyph mode={item.interactionMode} />
+        <MatterGoalModeGlyph mode={item.interactionMode} />
         <ThreadTrailing item={item} nowMs={model.nowMs} />
       </div>
       {hasSubagents && expanded ? (
@@ -238,20 +238,20 @@ function ThreadGroup({
   isExpanded,
   onToggleExpanded,
 }: {
-  model: MattrSidebarModel;
-  group: MattrThreadGroup;
-  childrenByParent: ReadonlyMap<string, ReadonlyArray<MattrThreadItem>>;
+  model: MatterSidebarModel;
+  group: MatterThreadGroup;
+  childrenByParent: ReadonlyMap<string, ReadonlyArray<MatterThreadItem>>;
   collapsed: boolean;
   onToggleCollapsed: (() => void) | null;
-  isExpanded: (item: MattrThreadItem, subagents: ReadonlyArray<MattrThreadItem>) => boolean;
-  onToggleExpanded: (item: MattrThreadItem, expanded: boolean) => void;
+  isExpanded: (item: MatterThreadItem, subagents: ReadonlyArray<MatterThreadItem>) => boolean;
+  onToggleExpanded: (item: MatterThreadItem, expanded: boolean) => void;
 }) {
   const gt = useGT();
   const name = group.name ?? gt("No project");
   return (
     <section
       aria-label={onToggleCollapsed ? name : gt("Recent")}
-      data-mattr-group={group.key ?? ""}
+      data-matter-group={group.key ?? ""}
     >
       {onToggleCollapsed ? (
         <button
@@ -300,19 +300,19 @@ function ThreadGroup({
 }
 
 /**
- * The default mattr rail ("final choice"): brand row, search, New thread, a 2x2 nav grid, the
+ * The default Matter rail ("final choice"): brand row, search, New thread, a 2x2 nav grid, the
  * activity scope, project groups with nested subagents, Crew, and Footer A's usage meters.
  */
-export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
+export function MatterDefaultSidebar({ model }: { model: MatterSidebarModel }) {
   const gt = useGT();
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { isMobile, setOpenMobile } = useSidebar();
   const { items, children, projects, activeThreadKey, nowMs, keybindings, actions } = model;
-  const [storedProjectFilter, setProjectFilter] = useMattrInboxProjectFilter();
-  const [sort, setSort] = useMattrSortMode();
-  const [collapsedGroups, setCollapsedGroups] = useMattrCollapsedGroups();
-  const [filter, setFilter] = useState<MattrListFilter>("all");
+  const [storedProjectFilter, setProjectFilter] = useMatterInboxProjectFilter();
+  const [sort, setSort] = useMatterSortMode();
+  const [collapsedGroups, setCollapsedGroups] = useMatterCollapsedGroups();
+  const [filter, setFilter] = useState<MatterListFilter>("all");
   const [query, setQuery] = useState("");
   const [expansion, setExpansion] = useState<Readonly<Record<string, boolean>>>({});
   const crew = useCrewBots();
@@ -364,9 +364,9 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
   if (activeTreeKey !== null && expansion[activeTreeKey] === undefined) {
     setExpansion((current) => ({ ...current, [activeTreeKey]: true }));
   }
-  const isExpanded = (item: MattrThreadItem, subagents: ReadonlyArray<MattrThreadItem>) =>
+  const isExpanded = (item: MatterThreadItem, subagents: ReadonlyArray<MatterThreadItem>) =>
     expansion[item.key] ?? shouldAutoExpand(item, subagents, activeThreadKey);
-  const onToggleExpanded = (item: MattrThreadItem, next: boolean) =>
+  const onToggleExpanded = (item: MatterThreadItem, next: boolean) =>
     setExpansion((current) => ({ ...current, [item.key]: next }));
   const toggleGroup = (key: string) =>
     setCollapsedGroups((current) =>
@@ -396,10 +396,10 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
   const nothingListed = groups.length === 0;
 
   return (
-    <div className="mfs" data-mattr-sidebar="default">
+    <div className="mfs" data-matter-sidebar="default">
       <div className="mfs-ws">
-        <MattrBrandMenu onNavigate={closeMobile} />
-        <MattrTip label={gt("All activity")}>
+        <MatterBrandMenu onNavigate={closeMobile} />
+        <MatterTip label={gt("All activity")}>
           <button
             type="button"
             className="mfs-wi"
@@ -409,7 +409,7 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
           >
             <InboxIcon aria-hidden />
           </button>
-        </MattrTip>
+        </MatterTip>
       </div>
 
       <div className="mfs-hd">
@@ -518,14 +518,14 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
             <span>{scopeName}</span>
             <ChevronRightIcon aria-hidden />
           </MenuPrimitive.Trigger>
-          <MattrMenuPopup>
+          <MatterMenuPopup>
             <MenuPrimitive.RadioGroup
               value={projectFilter ?? ALL_ACTIVITY}
               onValueChange={(value: string) =>
                 setProjectFilter(value === ALL_ACTIVITY ? null : value)
               }
             >
-              <MattrMenuRadioItem
+              <MatterMenuRadioItem
                 value={ALL_ACTIVITY}
                 label={gt("All activity")}
                 hint={<em>{items.filter((item) => !item.settled && !item.snoozed).length}</em>}
@@ -533,7 +533,7 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
               {projects.map((project) => {
                 const summary = projectSummary.get(project.key);
                 return (
-                  <MattrMenuRadioItem
+                  <MatterMenuRadioItem
                     key={project.key}
                     value={project.key}
                     label={project.name}
@@ -554,9 +554,9 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
                 );
               })}
             </MenuPrimitive.RadioGroup>
-          </MattrMenuPopup>
+          </MatterMenuPopup>
         </MenuPrimitive.Root>
-        <MattrTip label={sort === "project" ? gt("Sorted by project") : gt("Sorted by recent")}>
+        <MatterTip label={sort === "project" ? gt("Sorted by project") : gt("Sorted by recent")}>
           <button
             type="button"
             className="mfs-sort"
@@ -565,7 +565,7 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
           >
             <ArrowUpDownIcon aria-hidden />
           </button>
-        </MattrTip>
+        </MatterTip>
       </div>
 
       <div className="mfs-list">
@@ -590,7 +590,7 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
                       }}
                     />
                     <span className="mfs-pm">
-                      <MattrProviderMark driver={item.driver} />
+                      <MatterProviderMark driver={item.driver} />
                     </span>
                     <span className="mfs-t">{item.title}</span>
                     <span className="mfs-a">{compactAge(item.activityAt, nowMs)}</span>
@@ -626,10 +626,10 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
             ) : null}
           </>
         )}
-        <MattrCrew crew={crew} nowMs={nowMs} />
+        <MatterCrew crew={crew} nowMs={nowMs} />
       </div>
 
-      <MattrFooter nowMs={nowMs} />
+      <MatterFooter nowMs={nowMs} />
     </div>
   );
 }

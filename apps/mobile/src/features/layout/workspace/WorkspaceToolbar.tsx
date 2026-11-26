@@ -230,7 +230,7 @@ export function WorkspaceToolbar(props: {
             identifier="workspace-voice-mode"
             accessibilityLabel={gt("Voice mode")}
             icon="waveform"
-            onPress={() => navigation.navigate("MattrVoiceMode")}
+            onPress={() => navigation.navigate("MatterVoiceMode")}
           />
         </Toolbar>
       )}

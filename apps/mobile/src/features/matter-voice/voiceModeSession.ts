@@ -10,7 +10,7 @@ import {
   type VoiceAssistantTurnResponse,
   type VoiceWorkspaceApprovalSummary,
   type VoiceWorkspaceContext,
-} from "../../../../../antimatter/voice-assistant/types";
+} from "../../../../../matter/voice-assistant/types";
 import type { ActiveStreamingListening, StreamingListenOptions } from "./fluxListening";
 import { createInterruptionGuard, type InterruptionGuard } from "./interruptionGuard";
 import type {

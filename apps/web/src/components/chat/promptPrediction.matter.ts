@@ -1,4 +1,4 @@
-/** mattr: keys that fill the predicted next message into an empty composer. */
+/** Matter: keys that fill the predicted next message into an empty composer. */
 const PREDICTION_ACCEPT_KEYS: ReadonlySet<string> = new Set(["Tab", "ArrowRight"]);
 
 export function isPredictionAcceptKey(key: string): boolean {

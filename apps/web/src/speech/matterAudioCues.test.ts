@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { DEFAULT_CLIENT_SETTINGS, EnvironmentId } from "@t3tools/contracts";
-import { DEFAULT_ISLAND_SETTINGS } from "../../../../antimatter/island/types";
+import { DEFAULT_ISLAND_SETTINGS } from "../../../../matter/island/types";
 import {
   encodeMonoPcmWav,
   LILT_SELECTED_CUES,
   liltNoteFrequency,
   liltVariationHash,
-  MATTR_AUDIO_CUE_SAMPLE_RATE,
-  renderMattrAudioCuePcm,
-  type MattrAudioCueId,
-} from "../../../../antimatter/voice-assistant/audioCuesSynth";
+  MATTER_AUDIO_CUE_SAMPLE_RATE,
+  renderMatterAudioCuePcm,
+  type MatterAudioCueId,
+} from "../../../../matter/voice-assistant/audioCuesSynth";
 import type {
   VoiceAssistantTurnResponse,
   VoiceWorkspaceContext,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 import { updateIslandSettings, updateVoiceAssistantSettings } from "../island/islandSettingsStore";
 import {
   registerHostBridge,
@@ -23,16 +23,16 @@ import {
   toggleVoiceAssistantHandsFree,
 } from "../island/voiceAssistantStore";
 import {
-  isMattrAudioCueEnabled,
-  playMattrAudioCue,
-  resetMattrAudioCuesForTests,
-  setMattrAudioCueObserverForTests,
-} from "./mattrAudioCues";
+  isMatterAudioCueEnabled,
+  playMatterAudioCue,
+  resetMatterAudioCuesForTests,
+  setMatterAudioCueObserverForTests,
+} from "./matterAudioCues";
 import * as browserVoiceInput from "./browserVoiceInput";
 import * as voiceConsent from "./voiceConsent";
 import { VoiceInputSession } from "./voiceInputSession";
 
-const ALL_CUES: ReadonlyArray<MattrAudioCueId> = [
+const ALL_CUES: ReadonlyArray<MatterAudioCueId> = [
   "dictation-start",
   "dictation-stop",
   "voice-mode-open",
@@ -107,7 +107,7 @@ describe("audioCuesSynth (Lilt pop DNA)", () => {
   });
 
   it.each(ALL_CUES)("renders bounded, finite, non-silent PCM and valid WAV for %s", (cue) => {
-    const pcm = renderMattrAudioCuePcm(cue, MATTR_AUDIO_CUE_SAMPLE_RATE);
+    const pcm = renderMatterAudioCuePcm(cue, MATTER_AUDIO_CUE_SAMPLE_RATE);
     expect(pcm.length).toBeGreaterThan(1_000);
     let peak = 0;
     for (const sample of pcm) {
@@ -120,7 +120,7 @@ describe("audioCuesSynth (Lilt pop DNA)", () => {
     // Clean de-click fade-out at buffer end
     expect(Math.abs(pcm[pcm.length - 1] ?? 1)).toBeLessThan(0.01);
 
-    const wav = encodeMonoPcmWav(pcm, MATTR_AUDIO_CUE_SAMPLE_RATE);
+    const wav = encodeMonoPcmWav(pcm, MATTER_AUDIO_CUE_SAMPLE_RATE);
     expect(wav.byteLength).toBe(44 + pcm.length * 2);
     const header = new TextDecoder().decode(wav.subarray(0, 4));
     const format = new TextDecoder().decode(wav.subarray(8, 12));
@@ -134,22 +134,22 @@ describe("audioCuesSynth (Lilt pop DNA)", () => {
       for (const s of samples) max = Math.max(max, Math.abs(s));
       return max;
     };
-    expect(peakOf(renderMattrAudioCuePcm("voice-mode-thinking"))).toBeLessThan(
-      peakOf(renderMattrAudioCuePcm("dictation-start")) * 0.65,
+    expect(peakOf(renderMatterAudioCuePcm("voice-mode-thinking"))).toBeLessThan(
+      peakOf(renderMatterAudioCuePcm("dictation-start")) * 0.65,
     );
   });
 });
 
-describe("web mattrAudioCues engine", () => {
+describe("web matterAudioCues engine", () => {
   const originalAudioContext = globalThis.AudioContext;
 
   beforeEach(() => {
     updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
-    resetMattrAudioCuesForTests();
+    resetMatterAudioCuesForTests();
   });
 
   afterEach(() => {
-    resetMattrAudioCuesForTests();
+    resetMatterAudioCuesForTests();
     if (originalAudioContext === undefined) {
       delete (globalThis as { AudioContext?: typeof AudioContext }).AudioContext;
     } else {
@@ -158,17 +158,17 @@ describe("web mattrAudioCues engine", () => {
   });
 
   it("is enabled by default and respects soundCuesEnabled and thinkingCueEnabled toggles", () => {
-    expect(isMattrAudioCueEnabled("dictation-start")).toBe(true);
-    expect(isMattrAudioCueEnabled("voice-mode-thinking")).toBe(true);
+    expect(isMatterAudioCueEnabled("dictation-start")).toBe(true);
+    expect(isMatterAudioCueEnabled("voice-mode-thinking")).toBe(true);
 
     updateVoiceAssistantSettings({ thinkingCueEnabled: false });
-    expect(isMattrAudioCueEnabled("dictation-start")).toBe(true);
-    expect(isMattrAudioCueEnabled("voice-mode-open")).toBe(true);
-    expect(isMattrAudioCueEnabled("voice-mode-thinking")).toBe(false);
+    expect(isMatterAudioCueEnabled("dictation-start")).toBe(true);
+    expect(isMatterAudioCueEnabled("voice-mode-open")).toBe(true);
+    expect(isMatterAudioCueEnabled("voice-mode-thinking")).toBe(false);
 
     updateVoiceAssistantSettings({ soundCuesEnabled: false, thinkingCueEnabled: true });
     for (const cue of ALL_CUES) {
-      expect(isMattrAudioCueEnabled(cue)).toBe(false);
+      expect(isMatterAudioCueEnabled(cue)).toBe(false);
     }
   });
 
@@ -178,46 +178,46 @@ describe("web mattrAudioCues engine", () => {
       return fake.ctx;
     }) as unknown as typeof AudioContext;
 
-    expect(playMattrAudioCue("dictation-start")).toBe(true);
+    expect(playMatterAudioCue("dictation-start")).toBe(true);
     expect(fake.resume).toHaveBeenCalledTimes(1);
     await Promise.resolve();
     expect(fake.createdBuffers).toHaveLength(1);
     expect(fake.startedSources).toHaveLength(1);
 
     // Second play reuses the cached AudioBuffer
-    expect(playMattrAudioCue("dictation-start")).toBe(true);
+    expect(playMatterAudioCue("dictation-start")).toBe(true);
     expect(fake.createdBuffers).toHaveLength(1);
     expect(fake.startedSources).toHaveLength(2);
   });
 
   it("never throws when AudioContext is absent or throws in headless environments", () => {
     delete (globalThis as { AudioContext?: typeof AudioContext }).AudioContext;
-    expect(() => playMattrAudioCue("dictation-start")).not.toThrow();
-    expect(playMattrAudioCue("dictation-start")).toBe(false);
+    expect(() => playMatterAudioCue("dictation-start")).not.toThrow();
+    expect(playMatterAudioCue("dictation-start")).toBe(false);
 
     globalThis.AudioContext = vi.fn(function () {
       throw new Error("No audio device");
     }) as unknown as typeof AudioContext;
-    expect(() => playMattrAudioCue("dictation-stop")).not.toThrow();
-    expect(playMattrAudioCue("dictation-stop")).toBe(false);
+    expect(() => playMatterAudioCue("dictation-stop")).not.toThrow();
+    expect(playMatterAudioCue("dictation-stop")).toBe(false);
   });
 });
 
 describe("web Voice Mode audio cue trigger points", () => {
   beforeEach(() => {
     updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
-    resetMattrAudioCuesForTests();
+    resetMatterAudioCuesForTests();
     resetVoiceAssistantStoreForTests();
   });
 
   afterEach(() => {
     resetVoiceAssistantStoreForTests();
-    resetMattrAudioCuesForTests();
+    resetMatterAudioCuesForTests();
   });
 
   it("fires voice-mode-open on modal open, voice-mode-close on close, and a single thinking pulse per turn", async () => {
-    const played: MattrAudioCueId[] = [];
-    setMattrAudioCueObserverForTests((cue) => played.push(cue));
+    const played: MatterAudioCueId[] = [];
+    setMatterAudioCueObserverForTests((cue) => played.push(cue));
 
     const turnResponse: VoiceAssistantTurnResponse = {
       route: "assistant",
@@ -272,8 +272,8 @@ describe("web Voice Mode audio cue trigger points", () => {
   });
 
   it("fires voice-mode-open and voice-mode-close when toggling hands-free outside the modal", async () => {
-    const played: MattrAudioCueId[] = [];
-    setMattrAudioCueObserverForTests((cue) => played.push(cue));
+    const played: MatterAudioCueId[] = [];
+    setMatterAudioCueObserverForTests((cue) => played.push(cue));
 
     let active = false;
     const unregister = registerHostBridge({
@@ -308,8 +308,8 @@ describe("web Voice Mode audio cue trigger points", () => {
 
   it("suppresses thinking pulse when thinkingCueEnabled is off while keeping open/close cues", async () => {
     updateVoiceAssistantSettings({ thinkingCueEnabled: false });
-    const played: MattrAudioCueId[] = [];
-    setMattrAudioCueObserverForTests((cue) => played.push(cue));
+    const played: MatterAudioCueId[] = [];
+    setMatterAudioCueObserverForTests((cue) => played.push(cue));
 
     const unregister = registerHostBridge({
       getWorkspaceContext: emptyWorkspaceContext,
@@ -349,17 +349,17 @@ describe("web Voice Mode audio cue trigger points", () => {
 describe("web dictation audio cue trigger points", () => {
   beforeEach(() => {
     updateIslandSettings(DEFAULT_ISLAND_SETTINGS);
-    resetMattrAudioCuesForTests();
+    resetMatterAudioCuesForTests();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    resetMattrAudioCuesForTests();
+    resetMatterAudioCuesForTests();
   });
 
   it("fires dictation-start on recording start and dictation-stop when recording stops", async () => {
-    const played: MattrAudioCueId[] = [];
-    setMattrAudioCueObserverForTests((cue) => played.push(cue));
+    const played: MatterAudioCueId[] = [];
+    setMatterAudioCueObserverForTests((cue) => played.push(cue));
 
     vi.spyOn(browserVoiceInput, "createAppleSpeechVoiceInputPlatform").mockReturnValue({
       recorder: {

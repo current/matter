@@ -6,7 +6,7 @@ import type {
   ServerProviderUsageWindow,
 } from "@t3tools/contracts";
 
-import type { MattrProjectRef, MattrThreadItem } from "./mattrSidebar.logic";
+import type { MatterProjectRef, MatterThreadItem } from "./matterSidebar.logic";
 
 /** Short age such as "4m", "2h", "1d"; never "just now", so the column stays one shape. */
 export function compactAge(iso: string | null, nowMs: number): string {
@@ -24,11 +24,11 @@ export function compactAge(iso: string | null, nowMs: number): string {
   return `${Math.floor(days / 365)}y`;
 }
 
-export type MattrSortMode = "project" | "recent";
-export type MattrListFilter = "all" | "needs";
+export type MatterSortMode = "project" | "recent";
+export type MatterListFilter = "all" | "needs";
 
 /** A thread the rail lists: live, or settled/snoozed but raising a hand itself or through a child. */
-function isListed(item: MattrThreadItem, needsChildParents?: ReadonlySet<string>): boolean {
+function isListed(item: MatterThreadItem, needsChildParents?: ReadonlySet<string>): boolean {
   return (
     item.attention === "needs" ||
     needsChildParents?.has(item.key) === true ||
@@ -36,21 +36,21 @@ function isListed(item: MattrThreadItem, needsChildParents?: ReadonlySet<string>
   );
 }
 
-function byActivityDesc(left: MattrThreadItem, right: MattrThreadItem): number {
+function byActivityDesc(left: MatterThreadItem, right: MatterThreadItem): number {
   return Date.parse(right.activityAt) - Date.parse(left.activityAt);
 }
 
 /** Pinned threads first, then the most recent. */
-function byPinThenActivity(left: MattrThreadItem, right: MattrThreadItem): number {
+function byPinThenActivity(left: MatterThreadItem, right: MatterThreadItem): number {
   if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
   return byActivityDesc(left, right);
 }
 
-export interface MattrThreadGroup {
+export interface MatterThreadGroup {
   /** The project key, or null for the flat Recent list and for threads with no project. */
   readonly key: string | null;
   readonly name: string | null;
-  readonly items: ReadonlyArray<MattrThreadItem>;
+  readonly items: ReadonlyArray<MatterThreadItem>;
 }
 
 /**
@@ -58,16 +58,16 @@ export interface MattrThreadGroup {
  * by recency. A project filter and the Needs you filter narrow both.
  */
 export function buildThreadGroups(
-  items: ReadonlyArray<MattrThreadItem>,
-  projects: ReadonlyArray<MattrProjectRef>,
+  items: ReadonlyArray<MatterThreadItem>,
+  projects: ReadonlyArray<MatterProjectRef>,
   options: {
-    readonly sort: MattrSortMode;
+    readonly sort: MatterSortMode;
     readonly projectFilter: string | null;
-    readonly filter: MattrListFilter;
+    readonly filter: MatterListFilter;
     /** Rows with a subagent that needs you, from `parentsWithNeedsChild`. */
     readonly needsChildParents?: ReadonlySet<string>;
   },
-): ReadonlyArray<MattrThreadGroup> {
+): ReadonlyArray<MatterThreadGroup> {
   const needsChildParents = options.needsChildParents;
   const listed = items.filter(
     (item) =>
@@ -82,13 +82,13 @@ export function buildThreadGroups(
       ? []
       : [{ key: null, name: null, items: listed.toSorted(byActivityDesc) }];
   }
-  const byProject = new Map<string | null, MattrThreadItem[]>();
+  const byProject = new Map<string | null, MatterThreadItem[]>();
   for (const item of listed) {
     const bucket = byProject.get(item.projectKey) ?? [];
     bucket.push(item);
     byProject.set(item.projectKey, bucket);
   }
-  const groups: MattrThreadGroup[] = [];
+  const groups: MatterThreadGroup[] = [];
   for (const project of projects) {
     const bucket = byProject.get(project.key);
     if (bucket === undefined) continue;
@@ -105,7 +105,7 @@ export function buildThreadGroups(
   return groups;
 }
 
-const CHILD_RANK: Record<MattrThreadItem["attention"], number> = {
+const CHILD_RANK: Record<MatterThreadItem["attention"], number> = {
   needs: 0,
   running: 1,
   review: 2,
@@ -113,16 +113,16 @@ const CHILD_RANK: Record<MattrThreadItem["attention"], number> = {
 };
 
 /** A subagent or delegated task with the key of the rail row it nests under. */
-export interface MattrChildItem extends MattrThreadItem {
+export interface MatterChildItem extends MatterThreadItem {
   /** The nearest listed ancestor, so a subagent's own subagents nest under the same row. */
   readonly ancestorKey: string;
 }
 
 /** Points each child at its nearest listed ancestor, skipping subagents-of-subagents. */
 export function attachListedAncestors(
-  children: ReadonlyArray<MattrThreadItem>,
+  children: ReadonlyArray<MatterThreadItem>,
   threads: Parameters<typeof resolveListedAncestorThreadRef>[1],
-): ReadonlyArray<MattrChildItem> {
+): ReadonlyArray<MatterChildItem> {
   return children.map((child) => ({
     ...child,
     ancestorKey: scopedThreadKey(resolveListedAncestorThreadRef(child.ref, threads)),
@@ -131,9 +131,9 @@ export function attachListedAncestors(
 
 /** Each row's subagents and delegated tasks: blocked and running first, then newest. */
 export function indexChildrenByParent(
-  children: ReadonlyArray<MattrChildItem>,
-): ReadonlyMap<string, ReadonlyArray<MattrChildItem>> {
-  const index = new Map<string, MattrChildItem[]>();
+  children: ReadonlyArray<MatterChildItem>,
+): ReadonlyMap<string, ReadonlyArray<MatterChildItem>> {
+  const index = new Map<string, MatterChildItem[]>();
   for (const child of children) {
     if (child.ancestorKey === child.key) continue;
     const bucket = index.get(child.ancestorKey) ?? [];
@@ -154,7 +154,7 @@ export function indexChildrenByParent(
 
 /** Rows with at least one child that needs you. */
 export function parentsWithNeedsChild(
-  childrenByParent: ReadonlyMap<string, ReadonlyArray<MattrThreadItem>>,
+  childrenByParent: ReadonlyMap<string, ReadonlyArray<MatterThreadItem>>,
 ): ReadonlySet<string> {
   const keys = new Set<string>();
   for (const [key, bucket] of childrenByParent) {
@@ -165,8 +165,8 @@ export function parentsWithNeedsChild(
 
 /** The Needs you badge: threads and the subagents of listed threads that are waiting on you. */
 export function countNeedsYou(
-  items: ReadonlyArray<MattrThreadItem>,
-  children: ReadonlyArray<MattrChildItem>,
+  items: ReadonlyArray<MatterThreadItem>,
+  children: ReadonlyArray<MatterChildItem>,
 ): number {
   const rowKeys = new Set(items.map((item) => item.key));
   return (
@@ -177,8 +177,8 @@ export function countNeedsYou(
 
 /** A tree opens by itself while it is on screen or still has live children. */
 export function shouldAutoExpand(
-  parent: MattrThreadItem,
-  children: ReadonlyArray<MattrThreadItem>,
+  parent: MatterThreadItem,
+  children: ReadonlyArray<MatterThreadItem>,
   activeThreadKey: string | null,
 ): boolean {
   if (parent.key === activeThreadKey) return true;
@@ -188,16 +188,16 @@ export function shouldAutoExpand(
   );
 }
 
-export type MattrStatusTone = "running" | "needs" | "done" | "failed" | "muted";
+export type MatterStatusTone = "running" | "needs" | "done" | "failed" | "muted";
 
-export interface MattrRowStatus {
-  readonly tone: MattrStatusTone;
+export interface MatterRowStatus {
+  readonly tone: MatterStatusTone;
   /** A compact age, or null when the label is a word ("Done", "Needs you"). */
   readonly age: string | null;
 }
 
 /** What a subagent row says on its right: live elapsed time, a raised hand, or done. */
-export function subagentStatus(child: MattrThreadItem, nowMs: number): MattrRowStatus {
+export function subagentStatus(child: MatterThreadItem, nowMs: number): MatterRowStatus {
   if (child.attention === "needs") return { tone: "needs", age: null };
   if (child.attention === "running") {
     return { tone: "running", age: compactAge(child.runningSince ?? child.activityAt, nowMs) };
@@ -207,7 +207,7 @@ export function subagentStatus(child: MattrThreadItem, nowMs: number): MattrRowS
 }
 
 /** What a top-level row says on its right when it has no pull request to show. */
-export function threadRowStatus(item: MattrThreadItem, nowMs: number): MattrRowStatus {
+export function threadRowStatus(item: MatterThreadItem, nowMs: number): MatterRowStatus {
   if (item.attention === "needs") return { tone: "needs", age: compactAge(item.activityAt, nowMs) };
   if (item.attention === "running") {
     return { tone: "running", age: compactAge(item.runningSince ?? item.activityAt, nowMs) };
@@ -216,7 +216,7 @@ export function threadRowStatus(item: MattrThreadItem, nowMs: number): MattrRowS
 }
 
 /** Listed threads with an open or draft pull request, for the PRs count. */
-export function countOpenPullRequests(items: ReadonlyArray<MattrThreadItem>): number {
+export function countOpenPullRequests(items: ReadonlyArray<MatterThreadItem>): number {
   return items.filter(
     (item) =>
       isListed(item) && (item.pullRequest?.state === "open" || item.pullRequest?.state === "draft"),
@@ -225,7 +225,7 @@ export function countOpenPullRequests(items: ReadonlyArray<MattrThreadItem>): nu
 
 /** Live threads per project, for the activity scope menu. */
 export function summarizeProjects(
-  items: ReadonlyArray<MattrThreadItem>,
+  items: ReadonlyArray<MatterThreadItem>,
 ): ReadonlyMap<string, { readonly count: number; readonly running: boolean }> {
   const summary = new Map<string, { count: number; running: boolean }>();
   for (const item of items) {
@@ -267,7 +267,7 @@ export function shortWindowLabel(window: ServerProviderUsageWindow): string {
   }
 }
 
-export interface MattrUsageMeter {
+export interface MatterUsageMeter {
   readonly key: string;
   readonly driver: ProviderDriverKind;
   readonly providerName: string;
@@ -295,14 +295,14 @@ function mostConstrainingWindow(
 export function pickUsageMeters(
   providers: ReadonlyArray<ServerProvider>,
   limit = 2,
-): ReadonlyArray<MattrUsageMeter> {
-  const byDriver = new Map<string, MattrUsageMeter>();
+): ReadonlyArray<MatterUsageMeter> {
+  const byDriver = new Map<string, MatterUsageMeter>();
   for (const provider of providers) {
     const limits = provider.usageLimits;
     if (!provider.enabled || limits === undefined || limits.unavailable !== undefined) continue;
     const window = mostConstrainingWindow(limits.windows);
     if (window === null) continue;
-    const meter: MattrUsageMeter = {
+    const meter: MatterUsageMeter = {
       key: `${provider.instanceId}:${window.id}`,
       driver: provider.driver,
       providerName: SHORT_PROVIDER_NAME[provider.driver] ?? provider.displayName ?? provider.driver,

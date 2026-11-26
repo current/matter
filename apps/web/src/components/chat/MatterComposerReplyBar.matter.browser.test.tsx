@@ -1,5 +1,5 @@
 import "~/index.css";
-import "../../../../../antimatter/composer.css";
+import "../../../../../matter/composer.css";
 
 import { createMemoryHistory } from "@tanstack/react-router";
 import { EnvironmentId, MessageId, ThreadId, TurnItemId } from "@t3tools/contracts";
@@ -22,8 +22,8 @@ import {
 } from "../../../test/fakeEnvironment";
 import { act, render } from "../../../test/render";
 import { ComposerSurface } from "./ComposerSurface";
-import { MattrComposerReplyBar, MattrSentReplyHeader } from "./MattrComposerReplyBar.mattr";
-import { clearPendingMattrMessageRevealForTests } from "./mattrMessageReply.mattr";
+import { MatterComposerReplyBar, MatterSentReplyHeader } from "./MatterComposerReplyBar.matter";
+import { clearPendingMatterMessageRevealForTests } from "./matterMessageReply.matter";
 
 const insertText = (text: string) => cdp().send("Input.insertText", { text });
 
@@ -44,7 +44,7 @@ vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
   trackRpcRequestSent: () => {},
 }));
 
-describe("MattrComposerReplyBar component", () => {
+describe("MatterComposerReplyBar component", () => {
   it("renders crisp non-italic reply metadata inside the composer card and invokes jump & dismiss", async () => {
     const onJump = vi.fn();
     const onDismiss = vi.fn();
@@ -67,11 +67,11 @@ describe("MattrComposerReplyBar component", () => {
 
     await using _screen = await render(
       <div style={{ width: 640 }}>
-        <ComposerSurface.Shell data-mattr-composer="" contextRow>
+        <ComposerSurface.Shell data-matter-composer="" contextRow>
           <ComposerSurface.Host>
             <ComposerSurface.Main>
               <div data-chat-composer-surface="true">
-                <MattrComposerReplyBar
+                <MatterComposerReplyBar
                   replyTo={record}
                   onJumpToMessage={onJump}
                   onDismiss={onDismiss}
@@ -85,23 +85,23 @@ describe("MattrComposerReplyBar component", () => {
       { router: false },
     );
 
-    const bar = document.querySelector<HTMLElement>("[data-mattr-reply-bar]")!;
+    const bar = document.querySelector<HTMLElement>("[data-matter-reply-bar]")!;
     expect(bar).not.toBeNull();
-    expect(bar.dataset.mattrReplyRole).toBe("assistant");
+    expect(bar.dataset.matterReplyRole).toBe("assistant");
     expect(bar.textContent).toContain("Replying to assistant");
     expect(bar.textContent).toContain(
       "Plan Use ResponseContextRecord with extractReplyExcerpt() cleanly.",
     );
     expect(getComputedStyle(bar).fontStyle).toBe("normal");
-    expect(getComputedStyle(bar.querySelector("[data-mattr-reply-bar-excerpt]")!).fontStyle).toBe(
+    expect(getComputedStyle(bar.querySelector("[data-matter-reply-bar-excerpt]")!).fontStyle).toBe(
       "normal",
     );
 
-    await act(() => bar.querySelector<HTMLButtonElement>("[data-mattr-reply-bar-jump]")!.click());
+    await act(() => bar.querySelector<HTMLButtonElement>("[data-matter-reply-bar-jump]")!.click());
     expect(onJump).toHaveBeenCalledWith(record);
 
     await act(() =>
-      bar.querySelector<HTMLButtonElement>("[data-mattr-reply-bar-dismiss]")!.click(),
+      bar.querySelector<HTMLButtonElement>("[data-matter-reply-bar-dismiss]")!.click(),
     );
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
@@ -126,13 +126,13 @@ describe("MattrComposerReplyBar component", () => {
     });
 
     await using _screen = await render(
-      <MattrSentReplyHeader record={record} onJumpToMessage={onJump} />,
+      <MatterSentReplyHeader record={record} onJumpToMessage={onJump} />,
       { router: false },
     );
 
-    const header = document.querySelector<HTMLButtonElement>("[data-mattr-reply-header]")!;
+    const header = document.querySelector<HTMLButtonElement>("[data-matter-reply-header]")!;
     expect(header).not.toBeNull();
-    expect(header.dataset.mattrReplyRole).toBe("user");
+    expect(header.dataset.matterReplyRole).toBe("user");
     expect(header.textContent).toContain("you");
     expect(header.textContent).toContain("Can we ship this today?");
     expect(getComputedStyle(header).fontStyle).toBe("normal");
@@ -145,7 +145,7 @@ describe("MattrComposerReplyBar component", () => {
 describe("in-chat Reply end-to-end flow", () => {
   it("supports replying to assistant and user messages, swapping targets, Escape/× dismissal, thread scoping, sending, and jumping back", async () => {
     await page.viewport(1400, 900);
-    clearPendingMattrMessageRevealForTests();
+    clearPendingMatterMessageRevealForTests();
     const threadA = threadWithHistory("reply-thread-a", 2);
     const threadB = threadWithHistory("reply-thread-b", 1);
     using _environment = installFakeEnvironment([threadA, threadB], { acceptCommands: true });
@@ -170,9 +170,9 @@ describe("in-chat Reply end-to-end flow", () => {
     await expect.element(assistantReplyButton).toBeVisible();
     await assistantReplyButton.click();
 
-    const replyBar = () => document.querySelector<HTMLElement>("[data-mattr-reply-bar]");
+    const replyBar = () => document.querySelector<HTMLElement>("[data-matter-reply-bar]");
     await vi.waitFor(() => expect(replyBar()).not.toBeNull());
-    expect(replyBar()!.dataset.mattrReplyRole).toBe("assistant");
+    expect(replyBar()!.dataset.matterReplyRole).toBe("assistant");
     expect(replyBar()!.textContent).toContain("Replying to assistant");
     await vi.waitFor(() =>
       expect((editor.element() as HTMLElement).contains(document.activeElement)).toBe(true),
@@ -183,9 +183,9 @@ describe("in-chat Reply end-to-end flow", () => {
     await expect.element(userReplyButton).toBeVisible();
     await userReplyButton.click();
 
-    await vi.waitFor(() => expect(replyBar()?.dataset.mattrReplyRole).toBe("user"));
+    await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("user"));
     expect(replyBar()!.textContent).toContain("Replying to you");
-    const firstUserReplyTargetId = replyBar()!.dataset.mattrReplyMessageId;
+    const firstUserReplyTargetId = replyBar()!.dataset.matterReplyMessageId;
     expect(firstUserReplyTargetId).toBeTruthy();
 
     // 3. Pressing Escape while draft is empty cancels the reply cleanly.
@@ -201,7 +201,7 @@ describe("in-chat Reply end-to-end flow", () => {
 
     // 5. Thread scoping: setting a reply on Thread A does not leak into Thread B.
     await assistantReplyButton.click();
-    await vi.waitFor(() => expect(replyBar()?.dataset.mattrReplyRole).toBe("assistant"));
+    await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("assistant"));
     await act(() =>
       router.navigate({
         to: "/$environmentId/$threadId",
@@ -220,13 +220,13 @@ describe("in-chat Reply end-to-end flow", () => {
         params: { environmentId: ENVIRONMENT_ID, threadId: threadA.id },
       }),
     );
-    await vi.waitFor(() => expect(replyBar()?.dataset.mattrReplyRole).toBe("assistant"));
+    await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("assistant"));
 
     // 6. Swap to replying to a user message, send a reply -> wire context carries ResponseContextRecord,
     //    reply bar clears immediately, and the sent message renders a clickable reply header above the bubble.
     await page.getByRole("button", { name: "Reply to this message" }).first().click();
-    await vi.waitFor(() => expect(replyBar()?.dataset.mattrReplyRole).toBe("user"));
-    const targetUserMessageId = replyBar()!.dataset.mattrReplyMessageId!;
+    await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("user"));
+    const targetUserMessageId = replyBar()!.dataset.matterReplyMessageId!;
 
     await userEvent.click(editor);
     await insertText("Following up directly on this");
@@ -247,21 +247,21 @@ describe("in-chat Reply end-to-end flow", () => {
 
     // Sent optimistic/timeline message renders the sleek reply reference header above its bubble.
     await vi.waitFor(() => {
-      const sentHeader = document.querySelector<HTMLButtonElement>("[data-mattr-reply-header]");
+      const sentHeader = document.querySelector<HTMLButtonElement>("[data-matter-reply-header]");
       expect(sentHeader).not.toBeNull();
-      expect(sentHeader!.dataset.mattrReplyRole).toBe("user");
-      expect(sentHeader!.dataset.mattrReplyMessageId).toBe(targetUserMessageId);
+      expect(sentHeader!.dataset.matterReplyRole).toBe("user");
+      expect(sentHeader!.dataset.matterReplyMessageId).toBe(targetUserMessageId);
       expect(sentHeader!.textContent).toContain("you");
     });
 
     // Clicking the sent reply header highlights the original referenced user message.
-    const sentHeader = document.querySelector<HTMLButtonElement>("[data-mattr-reply-header]")!;
+    const sentHeader = document.querySelector<HTMLButtonElement>("[data-matter-reply-header]")!;
     await act(() => sentHeader.click());
     await vi.waitFor(() => {
       const targetRow = document.querySelector<HTMLElement>(
         `[data-message-id="${CSS.escape(targetUserMessageId)}"][data-message-role="user"]`,
       );
-      expect(targetRow?.dataset.mattrReplyHighlight).toBe("true");
+      expect(targetRow?.dataset.matterReplyHighlight).toBe("true");
     });
   });
 });

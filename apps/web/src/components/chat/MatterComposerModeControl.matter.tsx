@@ -18,7 +18,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HiddenThreadContext } from "./backgroundThread";
 import { ComposerControl } from "./ComposerControl";
 import { useComposerMenuProps } from "./composerEventScope";
-import { MATTR_INTERACTION_MODES } from "./mattrInteractionMode.mattr";
+import { MATTER_INTERACTION_MODES } from "./matterInteractionMode.matter";
 import { useComposerMenuState } from "./useComposerMenuState";
 
 const MODE_COPY = {
@@ -39,14 +39,14 @@ const MODE_COPY = {
   },
 } as const;
 
-const MATTR_MODE_SHORTCUT_LABEL = "⇧Tab";
+const MATTER_MODE_SHORTCUT_LABEL = "⇧Tab";
 
 /**
  * The composer's interaction mode: a quiet icon in Default, a tinted pill with a clear button
  * in Plan or Goal. The menu lists every mode; Shift+Tab and `/plan`, `/goal`, `/default` reach
  * the same setter.
  */
-export function MattrComposerModeControl(props: {
+export function MatterComposerModeControl(props: {
   readonly mode: ProviderInteractionMode;
   readonly onModeChange: (mode: ProviderInteractionMode) => void;
   /** The × on Plan or Goal; leaving a running native goal also clears it there. */
@@ -71,7 +71,7 @@ export function MattrComposerModeControl(props: {
         : gt("Interaction mode");
   return (
     <span
-      data-mattr-mode-control=""
+      data-matter-mode-control=""
       data-mode={mode}
       className={cn(
         "inline-flex shrink-0 items-center rounded-(--control-radius)",
@@ -88,7 +88,7 @@ export function MattrComposerModeControl(props: {
                   <ComposerControl
                     className={cn("shrink-0", active && "text-inherit hover:text-inherit")}
                     aria-label={gt("Interaction mode: {label}", { label })}
-                    data-mattr-mode-trigger=""
+                    data-matter-mode-trigger=""
                     disabled={disabled}
                   />
                 }
@@ -100,14 +100,14 @@ export function MattrComposerModeControl(props: {
               data-composer-control-icon=""
               className={cn("size-4", active && "text-current")}
             />
-            {active ? <span data-mattr-mode-label="">{label}</span> : null}
+            {active ? <span data-matter-mode-label="">{label}</span> : null}
           </TooltipTrigger>
           <TooltipPopup side="top">
-            {tooltip} · {MATTR_MODE_SHORTCUT_LABEL}
+            {tooltip} · {MATTER_MODE_SHORTCUT_LABEL}
           </TooltipPopup>
         </Tooltip>
         <MenuPopup side="top" align="start" {...composerMenuProps}>
-          <div className="w-80" data-mattr-mode-menu="">
+          <div className="w-80" data-matter-mode-menu="">
             <MenuGroup>
               <MenuGroupLabel>
                 <T>Mode</T>
@@ -118,7 +118,7 @@ export function MattrComposerModeControl(props: {
                   if (value !== mode) onModeChange(value);
                 }}
               >
-                {MATTR_INTERACTION_MODES.map((option) => {
+                {MATTER_INTERACTION_MODES.map((option) => {
                   const copy = MODE_COPY[option];
                   const OptionIcon = copy.icon;
                   return (
@@ -150,7 +150,7 @@ export function MattrComposerModeControl(props: {
         <ComposerControl
           className="shrink-0 px-1 text-inherit hover:text-inherit"
           aria-label={gt("Leave {label} mode", { label })}
-          data-mattr-mode-clear=""
+          data-matter-mode-clear=""
           disabled={disabled}
           onClick={onClear}
         >
@@ -162,14 +162,14 @@ export function MattrComposerModeControl(props: {
 }
 
 /** A tiny target on threads running in Goal mode, for the sidebars. */
-export function MattrGoalModeGlyph(props: { readonly mode: ProviderInteractionMode | undefined }) {
+export function MatterGoalModeGlyph(props: { readonly mode: ProviderInteractionMode | undefined }) {
   const gt = useGT();
   if (props.mode !== "goal") return null;
   return (
     <TargetIcon
       role="img"
       aria-label={gt("Goal mode")}
-      data-mattr-goal-glyph=""
+      data-matter-goal-glyph=""
       className="size-3 shrink-0 text-warning-foreground"
     />
   );

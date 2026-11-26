@@ -21,7 +21,7 @@ import {
   teleportClaudeCloudSession,
   useClaudeCloudDialog,
 } from "../../addons/claudeCloudApi";
-import { useMattrApiConfig } from "../../addons/mattrApi";
+import { useMatterApiConfig } from "../../addons/matterApi";
 import { useIsAddonEnabled } from "../../addons/useAddonRegistry";
 import { useProjects } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
@@ -61,7 +61,7 @@ type Outcome =
 function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
   const gt = useGT();
   const navigate = useNavigate();
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const projects = useProjects().filter(
     (project) =>

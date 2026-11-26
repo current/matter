@@ -148,11 +148,11 @@ import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as PeerForwarding from "../peer/PeerForwarding.ts";
 import * as RemoteDelegation from "../peer/RemoteDelegation.ts";
 import {
-  MATTR_DELEGATION_EXCLUDED_CONSTRAINT,
-  mattrDelegationExcludedMessage,
-  mattrDelegationExcludes,
-  mattrUsageVisible,
-} from "../mattr/delegation/mattrDelegationPolicy.ts";
+  MATTER_DELEGATION_EXCLUDED_CONSTRAINT,
+  matterDelegationExcludedMessage,
+  matterDelegationExcludes,
+  matterUsageVisible,
+} from "../matter/delegation/matterDelegationPolicy.ts";
 
 // Return recoverable handles before common MCP client timeouts expire.
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000;
@@ -1655,16 +1655,16 @@ const make = Effect.gen(function* () {
   const loadProviders = providerRegistry.getProviders;
 
   const agentUsageLimitsVisible = serverSettings.getSettings.pipe(
-    Effect.map(mattrUsageVisible),
+    Effect.map(matterUsageVisible),
     Effect.orElseSucceed(() => false),
   );
 
-  const assertMattrDelegationAllowed = (instanceId: ProviderInstanceId) =>
+  const assertMatterDelegationAllowed = (instanceId: ProviderInstanceId) =>
     serverSettings.getSettings.pipe(
       Effect.orElseSucceed(() => undefined),
       Effect.flatMap((settings) =>
-        settings !== undefined && mattrDelegationExcludes(settings, instanceId)
-          ? Effect.fail(failure("instance_excluded", mattrDelegationExcludedMessage(instanceId)))
+        settings !== undefined && matterDelegationExcludes(settings, instanceId)
+          ? Effect.fail(failure("instance_excluded", matterDelegationExcludedMessage(instanceId)))
           : Effect.void,
       ),
     );
@@ -2905,13 +2905,13 @@ const make = Effect.gen(function* () {
               parent.thread.projectId,
               provider.instanceId,
             );
-          const excludedFromDelegation = mattrDelegationExcludes(settings, provider.instanceId);
+          const excludedFromDelegation = matterDelegationExcludes(settings, provider.instanceId);
           const constraints = [
             ...providerConstraints(
               enabledForCaller ? provider : { ...provider, enabled: false },
               orchestrationCapableInstanceIds.has(provider.instanceId),
             ),
-            ...(excludedFromDelegation ? [MATTR_DELEGATION_EXCLUDED_CONSTRAINT] : []),
+            ...(excludedFromDelegation ? [MATTER_DELEGATION_EXCLUDED_CONSTRAINT] : []),
           ];
           const { listed, omitted } = listCapabilityModels({
             provider,
@@ -2944,7 +2944,7 @@ const make = Effect.gen(function* () {
             provider.supportedRuntimeModes.length === 0
               ? {}
               : { runtimeModes: [...provider.supportedRuntimeModes] }),
-            ...(!mattrUsageVisible(settings) ||
+            ...(!matterUsageVisible(settings) ||
             provider.usageLimits === undefined ||
             provider.usageLimits.windows.length === 0
               ? {}
@@ -3052,7 +3052,7 @@ const make = Effect.gen(function* () {
         skipAgentModeRefusal: isRetryOfAcceptedDelegation,
       });
       if (!isRetryOfAcceptedDelegation) {
-        yield* assertMattrDelegationAllowed(target.modelSelection.instanceId);
+        yield* assertMatterDelegationAllowed(target.modelSelection.instanceId);
       }
       const runtimeMode = yield* resolveRuntimeMode(
         parent.thread.runtimeMode,

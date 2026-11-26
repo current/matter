@@ -1,6 +1,6 @@
 // lucide-react export name → the same glyph's base name in each Iconify family, in ICON_FAMILIES
 // order. Packs add their style suffix (iconify-packs.ts); null draws Phosphor's version instead.
-// Every name is checked against the installed sets by apps/web/src/mattrIconPacks.test.ts.
+// Every name is checked against the installed sets by apps/web/src/matterIconPacks.test.ts.
 export const ICON_FAMILIES = [
   "ph",
   "heroicons",

@@ -14,10 +14,10 @@ import { cn } from "~/lib/utils";
 import { isInSideChatPane } from "~/lib/sideChatPane";
 import { ComposerBanner } from "./ComposerBanner";
 import ChatMarkdown from "../ChatMarkdown";
-import { MattrQuestionsCard } from "./MattrQuestionsCard.mattr";
+import { MatterQuestionsCard } from "./MatterQuestionsCard.matter";
 
-// mattr: tests keep upstream's banner, which they assert against.
-const MATTR_QUESTIONS_CARD = import.meta.env.MODE !== "test";
+// Matter: tests keep upstream's banner, which they assert against.
+const MATTER_QUESTIONS_CARD = import.meta.env.MODE !== "test";
 
 interface PendingUserInputPanelProps {
   pendingUserInputs: PendingUserInput[];
@@ -51,9 +51,9 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
   if (pendingUserInputs.length === 0) return null;
   const activePrompt = pendingUserInputs[0];
   if (!activePrompt) return null;
-  if (MATTR_QUESTIONS_CARD && onPrevious && onChangeCustomAnswer) {
+  if (MATTER_QUESTIONS_CARD && onPrevious && onChangeCustomAnswer) {
     return (
-      <MattrQuestionsCard
+      <MatterQuestionsCard
         key={activePrompt.requestId}
         prompt={activePrompt}
         cwd={cwd}

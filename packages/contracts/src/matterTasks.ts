@@ -2,101 +2,101 @@ import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
-/** mattr Tasks: a personal to-do list and board whose tasks can be handed to an agent thread. */
+/** Matter Tasks: a personal to-do list and board whose tasks can be handed to an agent thread. */
 
-export const MattrTaskStatus = Schema.Literals(["todo", "in_progress", "in_review", "done"]);
-export type MattrTaskStatus = typeof MattrTaskStatus.Type;
-export const MATTR_TASK_STATUSES: ReadonlyArray<MattrTaskStatus> = [
+export const MatterTaskStatus = Schema.Literals(["todo", "in_progress", "in_review", "done"]);
+export type MatterTaskStatus = typeof MatterTaskStatus.Type;
+export const MATTER_TASK_STATUSES: ReadonlyArray<MatterTaskStatus> = [
   "todo",
   "in_progress",
   "in_review",
   "done",
 ];
 
-export const MattrTaskPriority = Schema.Literals(["none", "low", "medium", "high"]);
-export type MattrTaskPriority = typeof MattrTaskPriority.Type;
+export const MatterTaskPriority = Schema.Literals(["none", "low", "medium", "high"]);
+export type MatterTaskPriority = typeof MatterTaskPriority.Type;
 
-export const MattrTaskWorkspaceMode = Schema.Literals(["local", "worktree"]);
-export type MattrTaskWorkspaceMode = typeof MattrTaskWorkspaceMode.Type;
+export const MatterTaskWorkspaceMode = Schema.Literals(["local", "worktree"]);
+export type MatterTaskWorkspaceMode = typeof MatterTaskWorkspaceMode.Type;
 
-export const MattrTaskInteractionMode = Schema.Literals(["default", "plan"]);
-export type MattrTaskInteractionMode = typeof MattrTaskInteractionMode.Type;
+export const MatterTaskInteractionMode = Schema.Literals(["default", "plan"]);
+export type MatterTaskInteractionMode = typeof MatterTaskInteractionMode.Type;
 
-export const MATTR_TASK_TITLE_MAX_LENGTH = 500;
-export const MATTR_TASK_NOTE_MAX_LENGTH = 20_000;
+export const MATTER_TASK_TITLE_MAX_LENGTH = 500;
+export const MATTER_TASK_NOTE_MAX_LENGTH = 20_000;
 
-const TaskTitle = TrimmedNonEmptyString.check(Schema.isMaxLength(MATTR_TASK_TITLE_MAX_LENGTH));
-const TaskNote = Schema.String.check(Schema.isMaxLength(MATTR_TASK_NOTE_MAX_LENGTH));
+const TaskTitle = TrimmedNonEmptyString.check(Schema.isMaxLength(MATTER_TASK_TITLE_MAX_LENGTH));
+const TaskNote = Schema.String.check(Schema.isMaxLength(MATTER_TASK_NOTE_MAX_LENGTH));
 const ShortId = TrimmedNonEmptyString.check(Schema.isMaxLength(256));
 const TaskOrder = Schema.Number.check(Schema.isFinite());
-export const MattrTaskDueDate = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/));
+export const MatterTaskDueDate = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/));
 
-export const MattrTaskThreadRef = Schema.Struct({
+export const MatterTaskThreadRef = Schema.Struct({
   environmentId: ShortId,
   threadId: ShortId,
 });
-export type MattrTaskThreadRef = typeof MattrTaskThreadRef.Type;
+export type MatterTaskThreadRef = typeof MatterTaskThreadRef.Type;
 
-export const MattrTask = Schema.Struct({
+export const MatterTask = Schema.Struct({
   id: ShortId,
   title: TaskTitle,
   note: TaskNote,
-  status: MattrTaskStatus,
+  status: MatterTaskStatus,
   order: TaskOrder,
   projectId: Schema.NullOr(ShortId),
-  dueDate: Schema.NullOr(MattrTaskDueDate),
-  priority: MattrTaskPriority,
+  dueDate: Schema.NullOr(MatterTaskDueDate),
+  priority: MatterTaskPriority,
   providerInstanceId: Schema.NullOr(ShortId),
   model: Schema.NullOr(ShortId),
   effort: Schema.NullOr(ShortId),
-  workspaceMode: MattrTaskWorkspaceMode,
-  interactionMode: MattrTaskInteractionMode,
-  linkedThreadRef: Schema.NullOr(MattrTaskThreadRef),
+  workspaceMode: MatterTaskWorkspaceMode,
+  interactionMode: MatterTaskInteractionMode,
+  linkedThreadRef: Schema.NullOr(MatterTaskThreadRef),
   createdAt: Schema.String,
   updatedAt: Schema.String,
   completedAt: Schema.NullOr(Schema.String),
 });
-export type MattrTask = typeof MattrTask.Type;
+export type MatterTask = typeof MatterTask.Type;
 
 /** Fields a client may set; the server owns `id`, timestamps and `completedAt`. */
 const EditableFields = {
   note: Schema.optionalKey(TaskNote),
-  status: Schema.optionalKey(MattrTaskStatus),
+  status: Schema.optionalKey(MatterTaskStatus),
   order: Schema.optionalKey(TaskOrder),
   projectId: Schema.optionalKey(Schema.NullOr(ShortId)),
-  dueDate: Schema.optionalKey(Schema.NullOr(MattrTaskDueDate)),
-  priority: Schema.optionalKey(MattrTaskPriority),
+  dueDate: Schema.optionalKey(Schema.NullOr(MatterTaskDueDate)),
+  priority: Schema.optionalKey(MatterTaskPriority),
   providerInstanceId: Schema.optionalKey(Schema.NullOr(ShortId)),
   model: Schema.optionalKey(Schema.NullOr(ShortId)),
   effort: Schema.optionalKey(Schema.NullOr(ShortId)),
-  workspaceMode: Schema.optionalKey(MattrTaskWorkspaceMode),
-  interactionMode: Schema.optionalKey(MattrTaskInteractionMode),
-  linkedThreadRef: Schema.optionalKey(Schema.NullOr(MattrTaskThreadRef)),
+  workspaceMode: Schema.optionalKey(MatterTaskWorkspaceMode),
+  interactionMode: Schema.optionalKey(MatterTaskInteractionMode),
+  linkedThreadRef: Schema.optionalKey(Schema.NullOr(MatterTaskThreadRef)),
 };
 
-export const MattrTaskCreateRequest = Schema.Struct({ title: TaskTitle, ...EditableFields });
-export type MattrTaskCreateRequest = typeof MattrTaskCreateRequest.Type;
+export const MatterTaskCreateRequest = Schema.Struct({ title: TaskTitle, ...EditableFields });
+export type MatterTaskCreateRequest = typeof MatterTaskCreateRequest.Type;
 
-export const MattrTaskUpdateRequest = Schema.Struct({
+export const MatterTaskUpdateRequest = Schema.Struct({
   title: Schema.optionalKey(TaskTitle),
   ...EditableFields,
 });
-export type MattrTaskUpdateRequest = typeof MattrTaskUpdateRequest.Type;
+export type MatterTaskUpdateRequest = typeof MatterTaskUpdateRequest.Type;
 
-export const MattrTaskMove = Schema.Struct({
+export const MatterTaskMove = Schema.Struct({
   id: ShortId,
-  status: MattrTaskStatus,
+  status: MatterTaskStatus,
   order: TaskOrder,
 });
-export type MattrTaskMove = typeof MattrTaskMove.Type;
+export type MatterTaskMove = typeof MatterTaskMove.Type;
 
-export const MattrTaskReorderRequest = Schema.Struct({
-  moves: Schema.Array(MattrTaskMove).check(Schema.isMaxLength(1000)),
+export const MatterTaskReorderRequest = Schema.Struct({
+  moves: Schema.Array(MatterTaskMove).check(Schema.isMaxLength(1000)),
 });
-export type MattrTaskReorderRequest = typeof MattrTaskReorderRequest.Type;
+export type MatterTaskReorderRequest = typeof MatterTaskReorderRequest.Type;
 
-export const MattrTaskListResponse = Schema.Struct({ tasks: Schema.Array(MattrTask) });
-export type MattrTaskListResponse = typeof MattrTaskListResponse.Type;
+export const MatterTaskListResponse = Schema.Struct({ tasks: Schema.Array(MatterTask) });
+export type MatterTaskListResponse = typeof MatterTaskListResponse.Type;
 
-export const MattrTaskResponse = Schema.Struct({ task: MattrTask });
-export type MattrTaskResponse = typeof MattrTaskResponse.Type;
+export const MatterTaskResponse = Schema.Struct({ task: MatterTask });
+export type MatterTaskResponse = typeof MatterTaskResponse.Type;

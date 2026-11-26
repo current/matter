@@ -49,7 +49,7 @@ import {
   rankPullRequestMatches,
 } from "../pullRequest/pullRequestList.logic";
 import type { ComposerCommandItem } from "./ComposerCommandMenu";
-import { mattrInteractionModeSlashItems } from "./mattrInteractionMode.mattr";
+import { matterInteractionModeSlashItems } from "./matterInteractionMode.matter";
 import { matchComposerModelItems } from "./composerModelMentions";
 import type { ModelEsque } from "./providerIconUtils";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -108,7 +108,7 @@ export function useComposerMenuItems({
     readonly instanceEntries: ReadonlyArray<ProviderInstanceEntry>;
     readonly modelOptionsByInstance: ReadonlyMap<ProviderInstanceId, ReadonlyArray<ModelEsque>>;
   };
-  /** The provider owns `/goal`; mattr's `/goal` stands in for its entry. */
+  /** The provider owns `/goal`; Matter's `/goal` stands in for its entry. */
   readonly nativeGoalProvider?: boolean;
 }) {
   const gt = useGT();
@@ -266,7 +266,7 @@ export function useComposerMenuItems({
           label: "/model",
           description: gt("Switch response model for this thread"),
         },
-        ...mattrInteractionModeSlashItems(messages, nativeGoalProvider),
+        ...matterInteractionModeSlashItems(messages, nativeGoalProvider),
         ...(sideChatAvailable
           ? ([
               {

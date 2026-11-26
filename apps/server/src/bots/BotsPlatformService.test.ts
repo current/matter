@@ -120,7 +120,7 @@ function makeFakeAdapter(
                 conversationId: input.conversationId,
                 providerId: "fake-bot",
                 role: "user" as const,
-                attribution: "user-via-mattr" as const,
+                attribution: "user-via-matter" as const,
                 authorBotId: null,
                 markdown: input.text,
                 parts: [{ type: "markdown" as const, text: input.text }],

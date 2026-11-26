@@ -11,17 +11,17 @@ import type {
 import { hasUnseenCompletion, resolveSidebarRowStatus } from "../../Sidebar.logic";
 
 /** Where a thread sits in the attention order, most urgent first. */
-export type MattrThreadAttention = "needs" | "running" | "review" | "idle";
-export type MattrNeedsKind = "approval" | "input" | "request" | "limited";
+export type MatterThreadAttention = "needs" | "running" | "review" | "idle";
+export type MatterNeedsKind = "approval" | "input" | "request" | "limited";
 
-export interface MattrThreadItem {
+export interface MatterThreadItem {
   readonly key: string;
   readonly ref: ScopedThreadRef;
   readonly title: string;
   readonly projectKey: string | null;
   readonly projectName: string | null;
-  readonly attention: MattrThreadAttention;
-  readonly needsKind: MattrNeedsKind | null;
+  readonly attention: MatterThreadAttention;
+  readonly needsKind: MatterNeedsKind | null;
   readonly failed: boolean;
   readonly unread: boolean;
   readonly pinned: boolean;
@@ -35,7 +35,7 @@ export interface MattrThreadItem {
   /** The provider driving the thread now, for its brand mark; null when unknown. */
   readonly driver: ProviderDriverKind | null;
   /** The thread's current pull request, for the inline PR badge. */
-  readonly pullRequest: MattrPullRequestBadge | null;
+  readonly pullRequest: MatterPullRequestBadge | null;
   /** The thread this one runs under (a subagent or delegated task), as a scoped key. */
   readonly parentKey: string | null;
   readonly createdAt: string;
@@ -46,29 +46,29 @@ export interface MattrThreadItem {
   readonly interactionMode?: ProviderInteractionMode;
 }
 
-export type MattrPullRequestState = "open" | "merged" | "closed" | "draft";
+export type MatterPullRequestState = "open" | "merged" | "closed" | "draft";
 
-export interface MattrPullRequestBadge {
+export interface MatterPullRequestBadge {
   readonly number: number;
-  readonly state: MattrPullRequestState;
+  readonly state: MatterPullRequestState;
 }
 
-export interface MattrProjectRef {
+export interface MatterProjectRef {
   readonly key: string;
   readonly name: string;
 }
 
-export function toMattrThreadItem(
+export function toMatterThreadItem(
   thread: EnvironmentThreadShell,
-  project: MattrProjectRef | null,
+  project: MatterProjectRef | null,
   nowIso: string,
   driver: ProviderDriverKind | null = null,
-): MattrThreadItem {
+): MatterThreadItem {
   const ref = scopeThreadRef(thread.environmentId, thread.id);
   const status = resolveSidebarRowStatus(thread);
   const unread = hasUnseenCompletion(thread);
-  let attention: MattrThreadAttention;
-  let needsKind: MattrNeedsKind | null = null;
+  let attention: MatterThreadAttention;
+  let needsKind: MatterNeedsKind | null = null;
   switch (status) {
     case "approval":
     case "input":
@@ -142,7 +142,7 @@ export function workingNativeSubagentKeys(
 }
 
 /** Shows those subagent threads as running, since their latest message (the launch or resume). */
-export function withNativeSubagentWork<T extends MattrThreadItem>(
+export function withNativeSubagentWork<T extends MatterThreadItem>(
   items: ReadonlyArray<T>,
   workingKeys: ReadonlySet<string>,
 ): ReadonlyArray<T> {
@@ -160,7 +160,7 @@ export function withNativeSubagentWork<T extends MattrThreadItem>(
  * grandchild counts for every ancestor; a lineage cycle stops at the first repeat.
  */
 export function workingDescendantSince(
-  lineage: ReadonlyArray<MattrThreadItem>,
+  lineage: ReadonlyArray<MatterThreadItem>,
 ): ReadonlyMap<string, string> {
   const parentOf = new Map(lineage.map((item) => [item.key, item.parentKey]));
   const since = new Map<string, string>();
@@ -185,7 +185,7 @@ export function workingDescendantSince(
  * Shows a thread as running while any of its descendants runs, even after its own turn ended.
  * A thread that needs you keeps that state; the rest return to their own once the work ends.
  */
-export function withDescendantWork<T extends MattrThreadItem>(
+export function withDescendantWork<T extends MatterThreadItem>(
   items: ReadonlyArray<T>,
   workingSince: ReadonlyMap<string, string>,
 ): ReadonlyArray<T> {
@@ -198,11 +198,11 @@ export function withDescendantWork<T extends MattrThreadItem>(
   });
 }
 
-function resolvePullRequestBadge(thread: EnvironmentThreadShell): MattrPullRequestBadge | null {
+function resolvePullRequestBadge(thread: EnvironmentThreadShell): MatterPullRequestBadge | null {
   const link = resolveThreadCurrentPullRequestLink(thread.pullRequests ?? []);
   if (link === null) return null;
   const snapshot = link.snapshot;
-  const state: MattrPullRequestState =
+  const state: MatterPullRequestState =
     snapshot === null
       ? "open"
       : snapshot.state === "open"
@@ -239,21 +239,21 @@ function latestTimestamp(values: ReadonlyArray<string | null>): string {
   return best ?? new Date(0).toISOString();
 }
 
-function byActivityDesc(left: MattrThreadItem, right: MattrThreadItem): number {
+function byActivityDesc(left: MatterThreadItem, right: MatterThreadItem): number {
   return Date.parse(right.activityAt) - Date.parse(left.activityAt);
 }
 
 /** Threads that belong in a live list: not settled and not snoozed. */
-function isLive(item: MattrThreadItem): boolean {
+function isLive(item: MatterThreadItem): boolean {
   return !item.settled && !item.snoozed;
 }
 
 /** The most urgent state among a project's threads, for its tile dot. */
 export function resolveProjectAttention(
-  items: ReadonlyArray<MattrThreadItem>,
+  items: ReadonlyArray<MatterThreadItem>,
   projectKey: string,
-): MattrThreadAttention | null {
-  let best: MattrThreadAttention | null = null;
+): MatterThreadAttention | null {
+  let best: MatterThreadAttention | null = null;
   for (const item of items) {
     if (item.projectKey !== projectKey) continue;
     if (item.attention === "needs") return "needs";
@@ -264,11 +264,11 @@ export function resolveProjectAttention(
   return best;
 }
 
-export interface MattrSpaceSections {
-  readonly pinned: ReadonlyArray<MattrThreadItem>;
-  readonly today: ReadonlyArray<MattrThreadItem>;
+export interface MatterSpaceSections {
+  readonly pinned: ReadonlyArray<MatterThreadItem>;
+  readonly today: ReadonlyArray<MatterThreadItem>;
   /** Older live threads, then settled ones, behind one fold. */
-  readonly earlier: ReadonlyArray<MattrThreadItem>;
+  readonly earlier: ReadonlyArray<MatterThreadItem>;
   readonly liveCount: number;
 }
 
@@ -279,15 +279,15 @@ function startOfLocalDayMs(nowMs: number): number {
 }
 
 export function buildSpaceSections(
-  items: ReadonlyArray<MattrThreadItem>,
+  items: ReadonlyArray<MatterThreadItem>,
   projectKey: string | null,
   nowMs: number,
-): MattrSpaceSections {
+): MatterSpaceSections {
   const dayStartMs = startOfLocalDayMs(nowMs);
-  const pinned: MattrThreadItem[] = [];
-  const today: MattrThreadItem[] = [];
-  const earlierLive: MattrThreadItem[] = [];
-  const settled: MattrThreadItem[] = [];
+  const pinned: MatterThreadItem[] = [];
+  const today: MatterThreadItem[] = [];
+  const earlierLive: MatterThreadItem[] = [];
+  const settled: MatterThreadItem[] = [];
   for (const item of items) {
     if (projectKey === null || item.projectKey !== projectKey) continue;
     if (item.settled && item.attention !== "needs") {
@@ -325,9 +325,9 @@ export function resolveActiveSpaceKey(
 
 /** Searches titles and project names; every whitespace-separated term must match. */
 export function filterThreadsByQuery(
-  items: ReadonlyArray<MattrThreadItem>,
+  items: ReadonlyArray<MatterThreadItem>,
   query: string,
-): ReadonlyArray<MattrThreadItem> {
+): ReadonlyArray<MatterThreadItem> {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (terms.length === 0) return items;
   return items

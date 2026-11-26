@@ -1,11 +1,11 @@
 import type { Element, ElementContent, Root } from "hast";
 
-import type { MattrAnimatedStream } from "../../mattrStreamAnimation";
+import type { MatterAnimatedStream } from "../../matterStreamAnimation";
 import type { MarkdownIslandOptions } from "./markdownIslands";
 
 /** Each word of streamed prose; CSS animates it once, when React first mounts it. */
-export const STREAM_WORD_CLASS = "mattr-sw";
-export const STREAM_CARET_CLASS = "mattr-stream-caret";
+export const STREAM_WORD_CLASS = "matter-sw";
+export const STREAM_CARET_CLASS = "matter-stream-caret";
 
 /** Text inside these keeps upstream's rendering; inline code animates as one unit instead. */
 const OPAQUE_TAGS = new Set([
@@ -189,16 +189,16 @@ function streamIslandOptions(base: MarkdownIslandOptions): MarkdownIslandOptions
 const treesBySource = new WeakMap<Root, { caret: boolean; tree: Root }>();
 
 /** Modes with a caret riding the end of the live text. */
-const CARET_ANIMATIONS: ReadonlySet<MattrAnimatedStream> = new Set(["blur", "typewriter"]);
+const CARET_ANIMATIONS: ReadonlySet<MatterAnimatedStream> = new Set(["blur", "typewriter"]);
 
 /**
  * The tree and island options for one block of a streaming message. Without an animation it
  * returns its inputs untouched, so finished messages render exactly as upstream renders them.
  */
-export function mattrStreamHast(
+export function matterStreamHast(
   tree: Root,
   options: MarkdownIslandOptions,
-  animation: MattrAnimatedStream | null,
+  animation: MatterAnimatedStream | null,
   liveBlock: boolean,
 ): [Root, MarkdownIslandOptions] {
   if (animation === null) return [tree, options];

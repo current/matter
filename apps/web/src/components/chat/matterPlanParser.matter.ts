@@ -1,14 +1,14 @@
-/** mattr: what the Plan Overview card shows of a proposed plan's markdown. */
+/** Matter: what the Plan Overview card shows of a proposed plan's markdown. */
 
-export interface MattrPlanStep {
+export interface MatterPlanStep {
   readonly text: string;
   readonly done: boolean;
 }
 
-export interface MattrPlanOverview {
+export interface MatterPlanOverview {
   readonly title: string | null;
   readonly summary: string | null;
-  readonly steps: ReadonlyArray<MattrPlanStep>;
+  readonly steps: ReadonlyArray<MatterPlanStep>;
 }
 
 const HEADING = /^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/;
@@ -85,7 +85,7 @@ function firstSummary(lines: ReadonlyArray<Line>, titleHeadingIndex: number): st
   return summary.length > 0 ? summary : null;
 }
 
-function step(text: string, done = false): MattrPlanStep | null {
+function step(text: string, done = false): MatterPlanStep | null {
   const clean = stripInlineMarkdown(text);
   return clean.length > 0 ? { text: clean, done } : null;
 }
@@ -114,7 +114,7 @@ function collect(lines: ReadonlyArray<Line>, pattern: RegExp, textGroup: number)
     .filter(present);
 }
 
-function planSteps(lines: ReadonlyArray<Line>, titleHeadingIndex: number): MattrPlanStep[] {
+function planSteps(lines: ReadonlyArray<Line>, titleHeadingIndex: number): MatterPlanStep[] {
   const checklist = lines
     .map((line) => {
       const match = line.text.match(CHECKLIST_ITEM);
@@ -146,7 +146,7 @@ function planSteps(lines: ReadonlyArray<Line>, titleHeadingIndex: number): Mattr
   return collect(nonTestLines, BULLET_ITEM, 2);
 }
 
-export function parseMattrPlanOverview(markdown: string): MattrPlanOverview {
+export function parseMatterPlanOverview(markdown: string): MatterPlanOverview {
   const lines = contentLines(markdown);
   const titleHeadingIndex = lines.findIndex((line) => line.isHeading);
   const title = titleHeadingIndex >= 0 ? (lines[titleHeadingIndex]?.section ?? "") : "";

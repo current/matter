@@ -145,7 +145,7 @@ const tail = (text: string) => preview(text.trim().slice(-PREVIEW_LENGTH));
 
 const defaultTitle = (prompt: string) => {
   const firstLine = prompt.trim().split("\n", 1)[0] ?? "";
-  return firstLine.length > 60 ? `${firstLine.slice(0, 59)}…` : firstLine || "mattr task";
+  return firstLine.length > 60 ? `${firstLine.slice(0, 59)}…` : firstLine || "Matter task";
 };
 
 /** Finds the new session in what `claude --cloud` printed, preferring its claude.ai link. */
@@ -717,7 +717,7 @@ export const make = Effect.gen(function* () {
         env: launch.env,
         timeoutMs: LAUNCH_TIMEOUT_MS,
         match: findLaunchedSessionId,
-        // mattr already runs Claude in this project; the folder-trust prompt defaults to yes.
+        // Matter already runs Claude in this project; the folder-trust prompt defaults to yes.
         answers: [{ when: TRUST_PROMPT, send: "\r" }],
       })
       .pipe(

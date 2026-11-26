@@ -36,7 +36,7 @@ export const ELEVENLABS_PREMADE_VOICES = [
 
 export const DEFAULT_ELEVENLABS_VOICE = "SAz9YHcvj6GT2YYXdXww";
 
-/** ElevenLabs API `voice_settings` parameters (camelCase in mattr, snake_case on the wire). */
+/** ElevenLabs API `voice_settings` parameters (camelCase in Matter, snake_case on the wire). */
 export interface ElevenLabsVoiceSettings {
   readonly stability: number;
   readonly similarityBoost: number;

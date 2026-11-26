@@ -1,4 +1,4 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mts-*` and `mfs-*` classes come from the fork stylesheets antimatter/timeline-sidebar.css and antimatter/sidebar.css, which load outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mts-*` and `mfs-*` classes come from the fork stylesheets matter/timeline-sidebar.css and matter/sidebar.css, which load outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useGT } from "gt-react";
@@ -20,15 +20,15 @@ import { SidebarUpdateArchitectureWarning } from "../SidebarUpdatePill";
 import { useNavigateToMainApp } from "../mainAppLocation";
 import { useActiveRowReveal, type SidebarRouteReveal } from "../routeReveal";
 import {
-  MattrBrandMenu,
-  MattrCrew,
-  MattrMenuItem,
-  MattrMenuPopup,
-  MattrMenuRadioItem,
-  MattrProviderMark,
-  MattrUpdateNotice,
+  MatterBrandMenu,
+  MatterCrew,
+  MatterMenuItem,
+  MatterMenuPopup,
+  MatterMenuRadioItem,
+  MatterProviderMark,
+  MatterUpdateNotice,
   useCrewBots,
-} from "./MattrDefaultSidebarParts";
+} from "./MatterDefaultSidebarParts";
 import {
   compactAge,
   countNeedsYou,
@@ -37,18 +37,18 @@ import {
   parentsWithNeedsChild,
   pickUsageMeters,
   summarizeProjects,
-  type MattrChildItem,
-  type MattrListFilter,
-  type MattrUsageMeter,
-} from "./mattrFinalSidebar.logic";
-import type { MattrPullRequestState, MattrThreadItem } from "./mattrSidebar.logic";
-import { MattrTip } from "./MattrSidebarParts";
+  type MatterChildItem,
+  type MatterListFilter,
+  type MatterUsageMeter,
+} from "./matterFinalSidebar.logic";
+import type { MatterPullRequestState, MatterThreadItem } from "./matterSidebar.logic";
+import { MatterTip } from "./MatterSidebarParts";
 import {
-  useMattrInboxProjectFilter,
-  useMattrTimelineEarlierExpanded,
-  useMattrTimelineSort,
-  useMattrTimelineSubagents,
-} from "./mattrSidebarStore";
+  useMatterInboxProjectFilter,
+  useMatterTimelineEarlierExpanded,
+  useMatterTimelineSort,
+  useMatterTimelineSubagents,
+} from "./matterSidebarStore";
 import {
   BoardGlyph,
   BranchGlyph,
@@ -72,7 +72,7 @@ import {
   SpinnerGlyph,
   TargetGlyph,
   WorktreeGlyph,
-} from "./MattrTimelineIcons";
+} from "./MatterTimelineIcons";
 import {
   activeSubagentsByParent,
   buildTimelineBuckets,
@@ -81,13 +81,13 @@ import {
   subagentElapsed,
   usageMeterTone,
   workspaceKind,
-  type MattrTimelineSort,
-} from "./mattrTimelineSidebar.logic";
-import type { MattrSidebarModel, MattrThreadMenuAction } from "./useMattrSidebarModel";
+  type MatterTimelineSort,
+} from "./matterTimelineSidebar.logic";
+import type { MatterSidebarModel, MatterThreadMenuAction } from "./useMatterSidebarModel";
 
 const ALL_ACTIVITY = "__all__";
 
-const PR_GLYPH: Record<MattrPullRequestState, typeof PullRequestOpenGlyph> = {
+const PR_GLYPH: Record<MatterPullRequestState, typeof PullRequestOpenGlyph> = {
   open: PullRequestOpenGlyph,
   draft: PullRequestOpenGlyph,
   merged: PullRequestMergedGlyph,
@@ -95,7 +95,7 @@ const PR_GLYPH: Record<MattrPullRequestState, typeof PullRequestOpenGlyph> = {
 };
 
 interface WebThreadMenuState {
-  readonly item: MattrThreadItem;
+  readonly item: MatterThreadItem;
   readonly anchor: MenuPrimitive.Positioner.Props["anchor"];
 }
 
@@ -132,15 +132,15 @@ function observeScrollFade(element: HTMLDivElement | null) {
 }
 
 interface TimelineRowContext {
-  readonly subagents: ReadonlyMap<string, ReadonlyArray<MattrChildItem>>;
+  readonly subagents: ReadonlyMap<string, ReadonlyArray<MatterChildItem>>;
   readonly needsChildParents: ReadonlySet<string>;
   /** The row to highlight when the open thread is a subagent the list doesn't show. */
   readonly hiddenActiveParent: string | null;
-  readonly sort: MattrTimelineSort;
+  readonly sort: MatterTimelineSort;
   readonly hideProjectName: boolean;
   readonly showRowMenuButton: boolean;
   readonly openWebMenu: (
-    item: MattrThreadItem,
+    item: MatterThreadItem,
     anchor: MenuPrimitive.Positioner.Props["anchor"],
   ) => void;
   readonly revealActiveRow: (row: HTMLElement | null, rowKey: string) => (() => void) | undefined;
@@ -154,8 +154,8 @@ function hasNativeContextMenu(): boolean {
 
 function openRowContextMenu(
   event: ReactMouseEvent,
-  model: MattrSidebarModel,
-  item: MattrThreadItem,
+  model: MatterSidebarModel,
+  item: MatterThreadItem,
   openWebMenu: TimelineRowContext["openWebMenu"],
 ) {
   event.preventDefault();
@@ -177,8 +177,8 @@ function TimelineRow({
   holdsActive,
   context,
 }: {
-  model: MattrSidebarModel;
-  item: MattrThreadItem;
+  model: MatterSidebarModel;
+  item: MatterThreadItem;
   childNeedsYou: boolean;
   /** The open thread is a subagent of this row that the list doesn't show. */
   holdsActive: boolean;
@@ -201,7 +201,7 @@ function TimelineRow({
     <div
       ref={revealKey !== null ? (row) => context.revealActiveRow(row, revealKey) : undefined}
       className="mts-row"
-      data-mattr-timeline-row={item.key}
+      data-matter-timeline-row={item.key}
       data-active={active || holdsActive ? "" : undefined}
       data-unread={item.unread ? "" : undefined}
       data-pinned={item.pinned ? "" : undefined}
@@ -216,7 +216,7 @@ function TimelineRow({
       />
       <span className="mts-l1">
         <span className="mts-pi">
-          <MattrProviderMark driver={item.driver} />
+          <MatterProviderMark driver={item.driver} />
         </span>
         <span className="mts-t">{item.title}</span>
         {item.interactionMode === "goal" ? (
@@ -228,14 +228,14 @@ function TimelineRow({
         ) : running ? (
           <SpinnerGlyph className="mts-spin" role="img" aria-label={gt("Running")} />
         ) : failed ? (
-          <MattrTip label={gt("Failed")}>
+          <MatterTip label={gt("Failed")}>
             <span
               className="mts-fail"
               role="img"
               aria-label={gt("Failed")}
               onClick={() => model.actions.openThread(item)}
             />
-          </MattrTip>
+          </MatterTip>
         ) : (
           <>
             {age !== "" ? <span className="mts-age">{age}</span> : null}
@@ -261,9 +261,9 @@ function TimelineRow({
       </span>
       <span className="mts-l2">
         {kind === "worktree" ? (
-          <WorktreeGlyph className="mts-mi" data-mattr-workspace="worktree" />
+          <WorktreeGlyph className="mts-mi" data-matter-workspace="worktree" />
         ) : kind === "local" ? (
-          <FolderGlyph className="mts-mi" data-mattr-workspace="local" />
+          <FolderGlyph className="mts-mi" data-matter-workspace="local" />
         ) : null}
         {!context.hideProjectName ? (
           <span className="mts-proj">{item.projectName ?? gt("No project")}</span>
@@ -275,12 +275,12 @@ function TimelineRow({
           </span>
         ) : null}
         {item.branch !== null ? (
-          <MattrTip label={item.branch} side="top">
+          <MatterTip label={item.branch} side="top">
             <span className="mts-br" onClick={() => model.actions.openThread(item)}>
               <BranchGlyph />
               <span>{formatTimelineBranchLabel(item.branch, item.projectName)}</span>
             </span>
-          </MattrTip>
+          </MatterTip>
         ) : null}
       </span>
     </div>
@@ -292,8 +292,8 @@ function TimelineSubagent({
   item,
   context,
 }: {
-  model: MattrSidebarModel;
-  item: MattrChildItem;
+  model: MatterSidebarModel;
+  item: MatterChildItem;
   context: TimelineRowContext;
 }) {
   const gt = useGT();
@@ -303,7 +303,7 @@ function TimelineSubagent({
     <div
       ref={active ? (row) => context.revealActiveRow(row, item.key) : undefined}
       className="mts-sub"
-      data-mattr-timeline-subagent={item.key}
+      data-matter-timeline-subagent={item.key}
       data-active={active ? "" : undefined}
       onContextMenu={(event) => openRowContextMenu(event, model, item, context.openWebMenu)}
     >
@@ -316,7 +316,7 @@ function TimelineSubagent({
       />
       <span className="mts-conn" aria-hidden />
       <span className="mts-pi">
-        <MattrProviderMark driver={item.driver} />
+        <MatterProviderMark driver={item.driver} />
       </span>
       <span className="mts-st">{item.title}</span>
       <span className="mts-sm" data-tone={needs ? "needs" : "running"}>
@@ -338,8 +338,8 @@ function TimelineRows({
   items,
   context,
 }: {
-  model: MattrSidebarModel;
-  items: ReadonlyArray<MattrThreadItem>;
+  model: MatterSidebarModel;
+  items: ReadonlyArray<MatterThreadItem>;
   context: TimelineRowContext;
 }) {
   const { subagents } = context;
@@ -377,9 +377,9 @@ function TimelineBucket({
   items,
   context,
 }: {
-  model: MattrSidebarModel;
+  model: MatterSidebarModel;
   label: string;
-  items: ReadonlyArray<MattrThreadItem>;
+  items: ReadonlyArray<MatterThreadItem>;
   context: TimelineRowContext;
 }) {
   if (items.length === 0) return null;
@@ -396,7 +396,7 @@ function TimelineMeters({
   nowMs,
   onOpen,
 }: {
-  meters: ReadonlyArray<MattrUsageMeter>;
+  meters: ReadonlyArray<MatterUsageMeter>;
   nowMs: number;
   onOpen: () => void;
 }) {
@@ -419,7 +419,7 @@ function TimelineMeters({
             ? `${meter.accountName} · ${gt("{percent}% used", { percent: meter.usedPercent })} · ${gt("{percent}% left", { percent: 100 - meter.usedPercent })}`
             : `${meter.accountName} · ${gt("{percent}% used", { percent: meter.usedPercent })} · ${gt("Resets in {duration}", { duration: soon })}`;
         return (
-          <MattrTip key={meter.key} label={tip} side="top">
+          <MatterTip key={meter.key} label={tip} side="top">
             <button
               type="button"
               className="mts-m"
@@ -429,7 +429,7 @@ function TimelineMeters({
             >
               <span className="mts-mh">
                 <span className="mts-pi" data-monochrome={monochrome ? "" : undefined}>
-                  <MattrProviderMark driver={meter.driver} />
+                  <MatterProviderMark driver={meter.driver} />
                 </span>
                 <span className="mts-ml">{label}</span>
                 <span className="mts-v">{`${meter.usedPercent}%`}</span>
@@ -438,7 +438,7 @@ function TimelineMeters({
                 <i style={{ width: `${meter.usedPercent}%` }} />
               </span>
             </button>
-          </MattrTip>
+          </MatterTip>
         );
       })}
     </div>
@@ -452,11 +452,11 @@ function TimelineWebContextMenu({
 }: {
   menu: WebThreadMenuState | null;
   onClose: () => void;
-  onAction: (item: MattrThreadItem, action: MattrThreadMenuAction) => void;
+  onAction: (item: MatterThreadItem, action: MatterThreadMenuAction) => void;
 }) {
   const gt = useGT();
   const item = menu?.item ?? null;
-  const run = (action: MattrThreadMenuAction) => {
+  const run = (action: MatterThreadMenuAction) => {
     if (item === null) return;
     onClose();
     onAction(item, action);
@@ -468,26 +468,26 @@ function TimelineWebContextMenu({
         if (!open) onClose();
       }}
     >
-      <MattrMenuPopup anchor={menu?.anchor} align="start" side="bottom">
+      <MatterMenuPopup anchor={menu?.anchor} align="start" side="bottom">
         {item !== null ? (
           <>
-            <MattrMenuItem label={gt("Open thread")} onClick={() => run("open")} />
+            <MatterMenuItem label={gt("Open thread")} onClick={() => run("open")} />
             <div className="mfs-menu-sep" />
-            <MattrMenuItem
+            <MatterMenuItem
               label={item.pinned ? gt("Unpin") : gt("Pin")}
               onClick={() => run(item.pinned ? "unpin" : "pin")}
             />
-            <MattrMenuItem label={gt("Mark as unread")} onClick={() => run("mark-unread")} />
-            <MattrMenuItem
+            <MatterMenuItem label={gt("Mark as unread")} onClick={() => run("mark-unread")} />
+            <MatterMenuItem
               label={item.settled ? gt("Unsettle") : gt("Settle")}
               onClick={() => run(item.settled ? "unsettle" : "settle")}
             />
-            <MattrMenuItem label={gt("Copy link")} onClick={() => run("copy-link")} />
+            <MatterMenuItem label={gt("Copy link")} onClick={() => run("copy-link")} />
             <div className="mfs-menu-sep" />
-            <MattrMenuItem label={gt("Archive")} onClick={() => run("archive")} />
+            <MatterMenuItem label={gt("Archive")} onClick={() => run("archive")} />
           </>
         ) : null}
-      </MattrMenuPopup>
+      </MatterMenuPopup>
     </MenuPrimitive.Root>
   );
 }
@@ -497,11 +497,11 @@ function TimelineWebContextMenu({
  * threads by day with workspace, pull request and branch, and running subagents nested under
  * their thread while "Show active subagents" is on.
  */
-export function MattrTimelineSidebar({
+export function MatterTimelineSidebar({
   model,
   routeReveal,
 }: {
-  model: MattrSidebarModel;
+  model: MatterSidebarModel;
   routeReveal?: SidebarRouteReveal | undefined;
 }) {
   const gt = useGT();
@@ -510,11 +510,11 @@ export function MattrTimelineSidebar({
   const pathname = useLocation({ select: (location) => location.pathname });
   const { isMobile, setOpenMobile } = useSidebar();
   const { items, children, projects, activeThreadKey, nowMs, keybindings, actions } = model;
-  const [storedProjectFilter, setProjectFilter] = useMattrInboxProjectFilter();
-  const [sort, setSort] = useMattrTimelineSort();
-  const [earlierExpanded, setEarlierExpanded] = useMattrTimelineEarlierExpanded();
-  const [showSubagents] = useMattrTimelineSubagents();
-  const [filter, setFilter] = useState<MattrListFilter>("all");
+  const [storedProjectFilter, setProjectFilter] = useMatterInboxProjectFilter();
+  const [sort, setSort] = useMatterTimelineSort();
+  const [earlierExpanded, setEarlierExpanded] = useMatterTimelineEarlierExpanded();
+  const [showSubagents] = useMatterTimelineSubagents();
+  const [filter, setFilter] = useState<MatterListFilter>("all");
   const [webMenu, setWebMenu] = useState<WebThreadMenuState | null>(null);
   const [fallbackReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
@@ -584,7 +584,7 @@ export function MattrTimelineSidebar({
     buckets.yesterday.length === 0 &&
     buckets.earlier.length === 0;
 
-  const handleWebAction = (item: MattrThreadItem, action: MattrThreadMenuAction) => {
+  const handleWebAction = (item: MatterThreadItem, action: MatterThreadMenuAction) => {
     if (actions.runThreadAction) {
       actions.runThreadAction(item, action);
       return;
@@ -593,13 +593,13 @@ export function MattrTimelineSidebar({
   };
 
   return (
-    <div className="mfs mts" data-mattr-sidebar="timeline">
+    <div className="mfs mts" data-matter-sidebar="timeline">
       <div className="mts-brand">
-        <MattrBrandMenu
+        <MatterBrandMenu
           onNavigate={closeMobile}
           caret={<ChevronDownGlyph className="mfs-caret" />}
         />
-        <MattrTip label={gt("Search")}>
+        <MatterTip label={gt("Search")}>
           <button
             type="button"
             className="mts-ib"
@@ -608,8 +608,8 @@ export function MattrTimelineSidebar({
           >
             <SearchGlyph />
           </button>
-        </MattrTip>
-        <MattrTip label={gt("Needs you")}>
+        </MatterTip>
+        <MatterTip label={gt("Needs you")}>
           <button
             type="button"
             className="mts-ib"
@@ -624,7 +624,7 @@ export function MattrTimelineSidebar({
           >
             <InboxGlyph />
           </button>
-        </MattrTip>
+        </MatterTip>
       </div>
 
       <nav className="mts-nav" aria-label={gt("Sidebar navigation")}>
@@ -695,18 +695,18 @@ export function MattrTimelineSidebar({
             <span>{scopeName}</span>
             <ChevronDownGlyph className="mts-cr" />
           </MenuPrimitive.Trigger>
-          <MattrMenuPopup>
+          <MatterMenuPopup>
             <MenuPrimitive.RadioGroup
               value={projectFilter ?? ALL_ACTIVITY}
               onValueChange={(value: string) =>
                 setProjectFilter(value === ALL_ACTIVITY ? null : value)
               }
             >
-              <MattrMenuRadioItem value={ALL_ACTIVITY} label={gt("All activity")} />
+              <MatterMenuRadioItem value={ALL_ACTIVITY} label={gt("All activity")} />
               {projects.map((project) => {
                 const summary = projectSummary.get(project.key);
                 return (
-                  <MattrMenuRadioItem
+                  <MatterMenuRadioItem
                     key={project.key}
                     value={project.key}
                     label={project.name}
@@ -715,7 +715,7 @@ export function MattrTimelineSidebar({
                 );
               })}
             </MenuPrimitive.RadioGroup>
-          </MattrMenuPopup>
+          </MatterMenuPopup>
         </MenuPrimitive.Root>
         {filter === "needs" ? (
           <button
@@ -728,7 +728,7 @@ export function MattrTimelineSidebar({
             <CloseGlyph />
           </button>
         ) : null}
-        <MattrTip
+        <MatterTip
           label={sort === "updated" ? gt("Sorted by last update") : gt("Sorted by created")}
         >
           <button
@@ -741,7 +741,7 @@ export function MattrTimelineSidebar({
             <SortGlyph />
             {sort === "created" ? <span className="mts-so-lab">{gt("Created")}</span> : null}
           </button>
-        </MattrTip>
+        </MatterTip>
       </div>
 
       <div ref={observeScrollFade} className="mts-list">
@@ -786,7 +786,7 @@ export function MattrTimelineSidebar({
             {filter === "needs" ? gt("Nothing needs you right now.") : gt("No threads yet.")}
           </p>
         ) : null}
-        <MattrCrew crew={crew} nowMs={nowMs} />
+        <MatterCrew crew={crew} nowMs={nowMs} />
       </div>
 
       <TimelineWebContextMenu
@@ -798,7 +798,7 @@ export function MattrTimelineSidebar({
       <div className="mfs-notices">
         <SidebarProviderUpdatePill />
         <SidebarUpdateArchitectureWarning />
-        <MattrUpdateNotice />
+        <MatterUpdateNotice />
         <SidebarThreadUndoNotice />
       </div>
       <TimelineMeters
@@ -806,7 +806,7 @@ export function MattrTimelineSidebar({
         nowMs={nowMs}
         onOpen={() => go(() => void navigate({ to: "/usage" }))}
       />
-      <footer className="mts-foot" data-mattr-footer>
+      <footer className="mts-foot" data-matter-footer>
         <button
           type="button"
           className="mts-set"
@@ -818,7 +818,7 @@ export function MattrTimelineSidebar({
           <GearGlyph />
           <span>{gt("Settings")}</span>
         </button>
-        <MattrTip label={gt("Keyboard shortcuts")} side="top">
+        <MatterTip label={gt("Keyboard shortcuts")} side="top">
           <button
             type="button"
             className="mts-help"
@@ -827,7 +827,7 @@ export function MattrTimelineSidebar({
           >
             <HelpGlyph />
           </button>
-        </MattrTip>
+        </MatterTip>
       </footer>
     </div>
   );

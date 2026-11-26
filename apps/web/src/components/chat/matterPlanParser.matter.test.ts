@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseMattrPlanOverview, stripInlineMarkdown } from "./mattrPlanParser.mattr";
+import { parseMatterPlanOverview, stripInlineMarkdown } from "./matterPlanParser.matter";
 
-describe("parseMattrPlanOverview", () => {
+describe("parseMatterPlanOverview", () => {
   it("reads the title, first prose paragraph and checklist items", () => {
-    const overview = parseMattrPlanOverview(
+    const overview = parseMatterPlanOverview(
       [
         "# Session auth migration",
         "",
@@ -30,7 +30,7 @@ describe("parseMattrPlanOverview", () => {
   });
 
   it("prefers the steps section over other bullets and skips test plans", () => {
-    const overview = parseMattrPlanOverview(
+    const overview = parseMatterPlanOverview(
       [
         "# Plan",
         "## Summary",
@@ -52,19 +52,19 @@ describe("parseMattrPlanOverview", () => {
 
   it("falls back to numbered items anywhere, then top-level bullets", () => {
     expect(
-      parseMattrPlanOverview("# T\n\nIntro.\n\n1. First\n2) Second\n   - detail").steps,
+      parseMatterPlanOverview("# T\n\nIntro.\n\n1. First\n2) Second\n   - detail").steps,
     ).toEqual([
       { text: "First", done: false },
       { text: "Second", done: false },
     ]);
-    expect(parseMattrPlanOverview("- one\n  - two\n- three").steps.map((s) => s.text)).toEqual([
+    expect(parseMatterPlanOverview("- one\n  - two\n- three").steps.map((s) => s.text)).toEqual([
       "one",
       "three",
     ]);
   });
 
   it("skips a step-named title heading and empty step sections without falling into Test Plan", () => {
-    const overview = parseMattrPlanOverview(
+    const overview = parseMatterPlanOverview(
       [
         "# Implementation plan",
         "",
@@ -91,7 +91,7 @@ describe("parseMattrPlanOverview", () => {
   });
 
   it("does not pull late Rollback or Risks prose up as the summary when there is no intro", () => {
-    const withStepsHeading = parseMattrPlanOverview(
+    const withStepsHeading = parseMatterPlanOverview(
       [
         "# Auth migration",
         "",
@@ -109,7 +109,7 @@ describe("parseMattrPlanOverview", () => {
       "Wire middleware",
     ]);
 
-    const withLeadingList = parseMattrPlanOverview(
+    const withLeadingList = parseMatterPlanOverview(
       [
         "# Auth migration",
         "",
@@ -122,7 +122,7 @@ describe("parseMattrPlanOverview", () => {
     );
     expect(withLeadingList.summary).toBeNull();
 
-    const withOverview = parseMattrPlanOverview(
+    const withOverview = parseMatterPlanOverview(
       [
         "# Auth migration",
         "",
@@ -137,12 +137,12 @@ describe("parseMattrPlanOverview", () => {
   });
 
   it("ignores fenced code and returns empty parts for prose-free plans", () => {
-    const overview = parseMattrPlanOverview("```\n# not a title\n- [ ] not a step\n```");
+    const overview = parseMatterPlanOverview("```\n# not a title\n- [ ] not a step\n```");
     expect(overview).toEqual({ title: null, summary: null, steps: [] });
   });
 
   it("does not take quotes or tables as the summary", () => {
-    expect(parseMattrPlanOverview("# T\n> quote\n| a |\n\nReal summary").summary).toBe(
+    expect(parseMatterPlanOverview("# T\n> quote\n| a |\n\nReal summary").summary).toBe(
       "Real summary",
     );
   });

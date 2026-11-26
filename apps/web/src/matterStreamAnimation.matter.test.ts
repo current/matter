@@ -4,20 +4,20 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   STREAM_CARET_CLASS,
   STREAM_WORD_CLASS,
-  mattrStreamHast,
+  matterStreamHast,
   splitStreamWords,
-} from "./components/chat/mattrStreamHast";
+} from "./components/chat/matterStreamHast";
 import type { MarkdownIslandOptions } from "./components/chat/markdownIslands";
 import * as Schema from "effect/Schema";
 
 import {
   type BurstPace,
-  MattrStreamAnimation,
+  MatterStreamAnimation,
   advanceBurstPacer,
   advancePacedCursor,
   pacedVisibleLength,
   wholeWordEnds,
-} from "./mattrStreamAnimation";
+} from "./matterStreamAnimation";
 
 const text = (value: string) => ({ type: "text" as const, value });
 const element = (tagName: string, children: Element["children"], properties = {}): Element => ({
@@ -91,7 +91,7 @@ describe("Smooth Pace cursor", () => {
   });
 });
 
-const isStreamAnimation = Schema.is(MattrStreamAnimation);
+const isStreamAnimation = Schema.is(MatterStreamAnimation);
 
 /** A repeatable random source: a small linear congruential generator. */
 function seeded(seed: number): () => number {
@@ -200,10 +200,10 @@ describe("RareUI burst pacer", () => {
   });
 });
 
-describe("mattrStreamHast", () => {
+describe("matterStreamHast", () => {
   it("leaves finished messages exactly as parsed", () => {
     const tree = root(element("p", [text("Hello world")]));
-    const [rendered, options] = mattrStreamHast(tree, baseOptions, null, true);
+    const [rendered, options] = matterStreamHast(tree, baseOptions, null, true);
     expect(rendered).toBe(tree);
     expect(options).toBe(baseOptions);
   });
@@ -219,7 +219,7 @@ describe("mattrStreamHast", () => {
       " ",
     ]);
     const tree = root(element("p", [text("Hello "), element("strong", [text("bold move")])]));
-    const [rendered, options] = mattrStreamHast(tree, baseOptions, "fade", false);
+    const [rendered, options] = matterStreamHast(tree, baseOptions, "fade", false);
     expect(words(rendered)).toEqual(["Hello", "bold", "move"]);
     const paragraph = rendered.children[0] as Element;
     const wordSpan = paragraph.children[0] as Element;
@@ -229,13 +229,13 @@ describe("mattrStreamHast", () => {
   });
 
   it("keeps settled words in the same positions as text arrives", () => {
-    const first = mattrStreamHast(
+    const first = matterStreamHast(
       root(element("p", [text("The quick brown")])),
       baseOptions,
       "blur",
       false,
     )[0];
-    const second = mattrStreamHast(
+    const second = matterStreamHast(
       root(element("p", [text("The quick brown fox jumps")])),
       baseOptions,
       "blur",
@@ -253,8 +253,8 @@ describe("mattrStreamHast", () => {
 
   it("returns the same rebuilt tree for an unchanged block", () => {
     const tree = root(element("p", [text("Stable block")]));
-    expect(mattrStreamHast(tree, baseOptions, "rise", false)[0]).toBe(
-      mattrStreamHast(tree, baseOptions, "rise", false)[0],
+    expect(matterStreamHast(tree, baseOptions, "rise", false)[0]).toBe(
+      matterStreamHast(tree, baseOptions, "rise", false)[0],
     );
   });
 
@@ -265,7 +265,7 @@ describe("mattrStreamHast", () => {
       element("p", [text("See "), link, text(" and "), element("code", [text("x()")])]),
       pre,
     );
-    const [rendered] = mattrStreamHast(tree, baseOptions, "blur", true);
+    const [rendered] = matterStreamHast(tree, baseOptions, "blur", true);
     const paragraph = rendered.children[0] as Element;
     expect(paragraph.children).toContain(link);
     const code = paragraph.children.find(
@@ -280,20 +280,20 @@ describe("mattrStreamHast", () => {
   it("rides the caret after the last word of the live block, for Blur and Smooth Pace only", () => {
     const tree = () =>
       root(element("ul", [element("li", [text("one")]), element("li", [text("two  ")])]));
-    const [blur] = mattrStreamHast(tree(), baseOptions, "blur", true);
+    const [blur] = matterStreamHast(tree(), baseOptions, "blur", true);
     const lastItem = (blur.children[0] as Element).children[1] as Element;
     const caret = lastItem.children.at(-1) as Element;
     expect(classesOf(caret)).toContain(STREAM_CARET_CLASS);
     expect((lastItem.children.at(-2) as Element).tagName).toBe("span");
 
-    expect(hasCaret(mattrStreamHast(tree(), baseOptions, "typewriter", true)[0])).toBe(true);
-    expect(hasCaret(mattrStreamHast(tree(), baseOptions, "fade", true)[0])).toBe(false);
-    expect(hasCaret(mattrStreamHast(tree(), baseOptions, "blur", false)[0])).toBe(false);
+    expect(hasCaret(matterStreamHast(tree(), baseOptions, "typewriter", true)[0])).toBe(true);
+    expect(hasCaret(matterStreamHast(tree(), baseOptions, "fade", true)[0])).toBe(false);
+    expect(hasCaret(matterStreamHast(tree(), baseOptions, "blur", false)[0])).toBe(false);
   });
 
   it("ends RareUI's live block on its last word, with no dot or caret", () => {
     const tree = root(element("p", [text("No dot")]));
-    const [rendered, options] = mattrStreamHast(tree, baseOptions, "rareui", true);
+    const [rendered, options] = matterStreamHast(tree, baseOptions, "rareui", true);
     const paragraph = rendered.children[0] as Element;
     const last = paragraph.children.at(-1) as Element;
     expect(classesOf(last)).toContain(STREAM_WORD_CLASS);
@@ -301,6 +301,6 @@ describe("mattrStreamHast", () => {
     expect(hasCaret(rendered)).toBe(false);
     expect(options.components).toBe(baseOptions.components);
     // Same options object per base, so rendered blocks stay cached.
-    expect(mattrStreamHast(tree, baseOptions, "rareui", true)[1]).toBe(options);
+    expect(matterStreamHast(tree, baseOptions, "rareui", true)[1]).toBe(options);
   });
 });

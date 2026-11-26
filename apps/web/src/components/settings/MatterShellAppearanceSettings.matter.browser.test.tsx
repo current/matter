@@ -5,10 +5,10 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import "../../index.css";
 import {
-  MATTR_GOOEY_SEND_STORAGE_KEY,
-  readMattrGooeySend,
-  writeMattrGooeySend,
-} from "../../mattrGooeySend";
+  MATTER_GOOEY_SEND_STORAGE_KEY,
+  readMatterGooeySend,
+  writeMatterGooeySend,
+} from "../../matterGooeySend";
 import type { ScopedSettingsPatch } from "./scopedSettings";
 
 const state = vi.hoisted(() => ({
@@ -38,24 +38,24 @@ vi.mock("../../env", async (importOriginal) => ({
 }));
 // Blur amount and glass style are macOS-only; CI browsers may run elsewhere.
 Object.defineProperty(navigator, "platform", { value: "MacIntel", configurable: true });
-vi.mock("../sidebar/mattr/MattrSidebarLayoutSetting", () => ({
-  MattrSidebarLayoutSetting: () => null,
+vi.mock("../sidebar/matter/MatterSidebarLayoutSetting", () => ({
+  MatterSidebarLayoutSetting: () => null,
 }));
-vi.mock("./MattrUiFontSetting", () => ({ MattrUiFontSetting: () => null }));
-vi.mock("./MattrIconPackSetting", () => ({ MattrIconPackSetting: () => null }));
-vi.mock("./MattrComposerAppearanceSettings", () => ({
-  MattrComposerAppearanceSettings: () => null,
+vi.mock("./MatterUiFontSetting", () => ({ MatterUiFontSetting: () => null }));
+vi.mock("./MatterIconPackSetting", () => ({ MatterIconPackSetting: () => null }));
+vi.mock("./MatterComposerAppearanceSettings", () => ({
+  MatterComposerAppearanceSettings: () => null,
 }));
 
-import { MattrShellAppearanceSettings } from "./MattrShellAppearanceSettings";
+import { MatterShellAppearanceSettings } from "./MatterShellAppearanceSettings";
 
 async function renderSettings(settings: Partial<ClientSettings> = {}) {
   state.settings = settings;
   state.updateSettings.mockReset();
-  return render(<MattrShellAppearanceSettings />, { router: false });
+  return render(<MatterShellAppearanceSettings />, { router: false });
 }
 
-describe("MattrShellAppearanceSettings", () => {
+describe("MatterShellAppearanceSettings", () => {
   it("hides the intensity rows for Solid and shows the color swatches", async () => {
     await using _screen = await renderSettings();
     await expect.element(page.getByRole("group", { name: "Shell color" })).toBeVisible();
@@ -106,7 +106,7 @@ describe("MattrShellAppearanceSettings", () => {
     expect(state.updateSettings).toHaveBeenLastCalledWith({ shellColor: "#aa3355" });
 
     state.settings = { shellColor: "#aa3355" };
-    await screen.rerender(<MattrShellAppearanceSettings />);
+    await screen.rerender(<MatterShellAppearanceSettings />);
     await expect.element(page.getByLabelText("Custom color (selected)")).toBeInTheDocument();
     await expect
       .element(page.getByRole("button", { name: "Default" }))
@@ -126,9 +126,9 @@ describe("MattrShellAppearanceSettings", () => {
   });
 
   it("toggles and resets the Gooey send button setting", async () => {
-    writeMattrGooeySend(true);
+    writeMatterGooeySend(true);
     using _cleanup = {
-      [Symbol.dispose]: () => localStorage.removeItem(MATTR_GOOEY_SEND_STORAGE_KEY),
+      [Symbol.dispose]: () => localStorage.removeItem(MATTER_GOOEY_SEND_STORAGE_KEY),
     };
     await using _screen = await renderSettings();
     const toggle = page.getByRole("switch", { name: "Gooey send button" });
@@ -136,10 +136,10 @@ describe("MattrShellAppearanceSettings", () => {
 
     await userEvent.click(toggle);
     await expect.element(toggle).not.toBeChecked();
-    expect(readMattrGooeySend()).toBe(false);
+    expect(readMatterGooeySend()).toBe(false);
 
     await userEvent.click(page.getByRole("button", { name: "Reset gooey send button to default" }));
     await expect.element(toggle).toBeChecked();
-    expect(readMattrGooeySend()).toBe(true);
+    expect(readMatterGooeySend()).toBe(true);
   });
 });

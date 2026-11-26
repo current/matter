@@ -92,7 +92,7 @@ export type DevinBridgeOperation =
 
 // Runs inside Devin's renderer. It finds the webapp's own API client and org by duck-typing React
 // context values under `.devin-app-root` (no minified names), never reads tokens, cookies or
-// `window.vscode`, and returns only the fields mattr maps. Wrapped in an IIFE so nothing leaks
+// `window.vscode`, and returns only the fields Matter maps. Wrapped in an IIFE so nothing leaks
 // into the page's globals.
 const BRIDGE_BODY = String.raw`
   const fail = (reason, status) => (status ? { ok: false, reason, status } : { ok: false, reason });

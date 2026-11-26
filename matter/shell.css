@@ -8,14 +8,14 @@
 @import "./questions-plan.css";
 @import "./thread-ribbon.css";
 
-/* Settings → Appearance → Scroll edge fade off (mattrComposerAppearance.ts): content runs straight
+/* Settings → Appearance → Scroll edge fade off (matterComposerAppearance.ts): content runs straight
    to the top edge. A mask never affects layout, so turning it off moves nothing. */
-html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
+html[data-matter-scroll-fade="off"] .topbar-scroll-fade {
   -webkit-mask-image: none;
   mask-image: none;
 }
 
-/* mattr shell: the window is a frame, like a browser's. Its top row holds the traffic lights and
+/* Matter shell: the window is a frame, like a browser's. Its top row holds the traffic lights and
    the sidebar's titlebar row; each page is an inset card below it, and the sidebar only takes
    space from the side. Unlayered, so it wins over Tailwind's layered utilities without touching
    upstream markup. Desktop-width layouts only; the mobile sheet keeps upstream's look. */
@@ -30,25 +30,25 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   /* The frame sits apart from the card. Light themes already have a darker sidebar; dark ones
      use a fixed toolbar gray and lift the card toward the card tone. */
   [data-slot="sidebar-wrapper"] {
-    --mattr-shell-gap: 8px;
-    --mattr-shell-radius: 10px;
+    --matter-shell-gap: 8px;
+    --matter-shell-radius: 10px;
     /* The frame is one base color (the theme's, or the Arc-style Shell color fitted to the theme
-       by antimatter/shellTint.ts) painted at one opacity (--mattr-shell-opacity, from the Shell
+       by matter/shellTint.ts) painted at one opacity (--matter-shell-opacity, from the Shell
        transparency setting; always 100% for Solid). */
-    --mattr-frame-base: var(--sidebar);
-    --mattr-frame: var(--mattr-frame-base);
-    --mattr-canvas: var(--background);
+    --matter-frame-base: var(--sidebar);
+    --matter-frame: var(--matter-frame-base);
+    --matter-canvas: var(--background);
     /* Resolved here, before the card sets its own titlebar row height. */
-    --mattr-frame-titlebar: var(--workspace-topbar-height);
-    --sidebar-stage-fade: var(--mattr-frame);
-    background-color: var(--mattr-frame);
+    --matter-frame-titlebar: var(--workspace-topbar-height);
+    --sidebar-stage-fade: var(--matter-frame);
+    background-color: var(--matter-frame);
   }
 
   .dark [data-slot="sidebar-wrapper"] {
-    --mattr-frame-base: #111313;
+    --matter-frame-base: #111313;
     /* A soft near-black card instead of true black, so it sits in the gray frame without a hard
        edge; raised surfaces (composer, details card) lift one step above it. */
-    --mattr-canvas: #141414;
+    --matter-canvas: #141414;
     --card: #1c1c1c;
     --popover: #1c1c1c;
     --surface-raised: #1c1c1c;
@@ -77,7 +77,7 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   /* Optical 1pt downward nudge in the 38pt bar so the visible gaps below macOS's 1pt top window
      rim and above the card match (paired with MACOS_WINDOW_BUTTON_OPTICAL_Y_OFFSET in DesktopWindow). */
   [data-slot="sidebar-wrapper"] > [data-sidebar-control] > *,
-  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"]) .drag-region > *,
+  :is([data-matter-collapsed-header], [data-slot="sidebar-inner"]) .drag-region > *,
   [data-slot="sidebar-inset"] [data-chat-header] > :not([data-workspace-titlebar-controls]),
   [data-slot="sidebar-inset"] [data-workspace-page-header] > *,
   [data-slot="sidebar-inset"] [data-right-panel-tabbar] > *,
@@ -87,37 +87,37 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
 
   /* Translucent, frosted blur, and Liquid Glass window materials let the native desktop backdrop
      show through the outer frame and sidebar while the inset page card stays solid and crisp. */
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]),
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) body,
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) #root,
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) [data-slot="sidebar"],
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"]),
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"]) body,
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"]) #root,
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"]) [data-slot="sidebar"],
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"])
     [data-slot="sidebar-container"] {
     background-color: transparent !important;
     background-image: none !important;
   }
 
-  html[data-mattr-shell-tint="on"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame-base: var(--mattr-shell-tint-light);
+  html[data-matter-shell-tint="on"] [data-slot="sidebar-wrapper"] {
+    --matter-frame-base: var(--matter-shell-tint-light);
   }
 
-  html.dark[data-mattr-shell-tint="on"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame-base: var(--mattr-shell-tint-dark);
+  html.dark[data-matter-shell-tint="on"] [data-slot="sidebar-wrapper"] {
+    --matter-frame-base: var(--matter-shell-tint-dark);
   }
 
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"])
     [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(
+    --matter-frame: color-mix(
       in srgb,
-      var(--mattr-frame-base) var(--mattr-shell-opacity, 46%),
+      var(--matter-frame-base) var(--matter-shell-opacity, 46%),
       transparent
     );
   }
 
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"])
     [data-slot="sidebar-wrapper"]
     > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])),
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"])
     [data-slot="sidebar-inset"]
     :is(
       [data-chat-header] + div,
@@ -128,10 +128,10 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
     box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
   }
 
-  html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+  html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"])
     [data-slot="sidebar-wrapper"]
     > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])),
-  html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+  html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"])
     [data-slot="sidebar-inset"]
     :is(
       [data-chat-header] + div,
@@ -142,8 +142,8 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
     box-shadow: 0 2px 12px rgb(0 0 0 / 0.24);
   }
 
-  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
-    [data-mattr-collapsed-header] {
+  html[data-matter-shell-material]:not([data-matter-shell-material="solid"])
+    [data-matter-collapsed-header] {
     background-color: transparent;
     background-image: none;
     transition: none;
@@ -151,18 +151,18 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
 
   /* Arc-style tactile monochrome grain baked into the outer shell background (zero extra overlay
      compositing layers). The inset page card stays clean. */
-  html[data-mattr-shell-grain="on"] [data-slot="sidebar-wrapper"] {
-    background-image: var(--mattr-shell-grain);
+  html[data-matter-shell-grain="on"] [data-slot="sidebar-wrapper"] {
+    background-image: var(--matter-shell-grain);
     background-repeat: repeat;
     background-size: 180px 180px;
   }
 
-  html[data-mattr-shell-grain="on"]:is(
-      :not([data-mattr-shell-material]),
-      [data-mattr-shell-material="solid"]
+  html[data-matter-shell-grain="on"]:is(
+      :not([data-matter-shell-material]),
+      [data-matter-shell-material="solid"]
     )
-    [data-mattr-collapsed-header] {
-    background-image: var(--mattr-shell-grain);
+    [data-matter-collapsed-header] {
+    background-image: var(--matter-shell-grain);
     background-repeat: repeat;
     background-size: 180px 180px;
   }
@@ -190,7 +190,7 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
     content: "";
     position: fixed;
     inset: 0 0 auto;
-    height: var(--mattr-frame-titlebar);
+    height: var(--matter-frame-titlebar);
     -webkit-app-region: drag;
   }
 
@@ -201,14 +201,14 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   /* Pages with a header place that header and the right-side panel controls directly in the 38pt
      shell topbar, while the rounded inset card begins right underneath it. */
   [data-slot="sidebar-wrapper"] > [data-slot="sidebar-inset"] {
-    --workspace-topbar-height: var(--mattr-frame-titlebar);
+    --workspace-topbar-height: var(--matter-frame-titlebar);
     --workspace-controls-top: 0px;
-    --workspace-controls-right: calc(var(--mattr-shell-gap) + 0.25rem);
-    --background: var(--mattr-canvas);
+    --workspace-controls-right: calc(var(--matter-shell-gap) + 0.25rem);
+    --background: var(--matter-canvas);
     align-self: stretch;
     height: auto;
     min-height: 0;
-    margin: 0 var(--mattr-shell-gap) var(--mattr-shell-gap) 0;
+    margin: 0 var(--matter-shell-gap) var(--matter-shell-gap) 0;
     background-color: transparent;
     background-image: none;
   }
@@ -217,14 +217,14 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   [data-slot="sidebar-wrapper"]
     > [data-slot="sidebar-inset"]:not(:has([data-chat-header], [data-workspace-page-header])) {
     --workspace-topbar-height: 44px;
-    --workspace-controls-top: var(--mattr-frame-titlebar);
-    --workspace-controls-right: calc(var(--mattr-shell-gap) + 0.75rem);
+    --workspace-controls-top: var(--matter-frame-titlebar);
+    --workspace-controls-right: calc(var(--matter-shell-gap) + 0.75rem);
     --workspace-titlebar-content-left: var(--workspace-gutter-start);
-    margin-top: var(--mattr-frame-titlebar);
-    background-color: var(--mattr-canvas);
+    margin-top: var(--matter-frame-titlebar);
+    background-color: var(--matter-canvas);
     overflow: clip;
     border: 1px solid var(--border);
-    border-radius: var(--mattr-shell-radius);
+    border-radius: var(--matter-shell-radius);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   }
 
@@ -257,16 +257,16 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   [data-slot="sidebar-inset"]
     [data-preview-panel-mode="inline"]
     [data-right-panel-surface-content] {
-    background-color: var(--mattr-canvas);
+    background-color: var(--matter-canvas);
     overflow: clip;
     border: 1px solid var(--border);
-    border-radius: var(--mattr-shell-radius);
+    border-radius: var(--matter-shell-radius);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   }
 
   /* Split-card gap when an inline right panel (diffs, preview, browser) is open beside chat. */
   [data-slot="sidebar-inset"] [data-preview-panel-mode="inline"] {
-    margin-inline-start: var(--mattr-shell-gap);
+    margin-inline-start: var(--matter-shell-gap);
   }
 
   [data-slot="sidebar-inset"]
@@ -293,38 +293,38 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   }
 
   [data-sidebar-state="collapsed"] > [data-slot="sidebar-inset"] {
-    /* Clear traffic lights (89pt inset) + sidebar toggle + mattr wordmark + history chevrons (~194pt). */
+    /* Clear traffic lights (89pt inset) + sidebar toggle + Matter wordmark + history chevrons (~194pt). */
     --workspace-titlebar-content-left: 204px;
-    margin-inline-start: var(--mattr-shell-gap);
+    margin-inline-start: var(--matter-shell-gap);
   }
 
-  /* The closed sidebar's titlebar row (MattrCollapsedSidebarHeader). Narrow when closed so it
+  /* The closed sidebar's titlebar row (MatterCollapsedSidebarHeader). Narrow when closed so it
      never covers the page header beside it in the unified 38pt shell bar. */
-  [data-mattr-collapsed-header] {
-    background-color: var(--mattr-frame);
+  [data-matter-collapsed-header] {
+    background-color: var(--matter-frame);
   }
 
-  [data-mattr-collapsed-header][data-state="closed"] {
+  [data-matter-collapsed-header][data-state="closed"] {
     width: fit-content;
   }
 
   /* The titlebar row reads as three groups, in visible gaps: traffic lights, 18pt (the inset in
      apps/desktop/src/preload.ts), toggle + wordmark 12pt apart, 16pt, then the history chevrons as
      a pair of 24px non-overlapping hit targets. */
-  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
+  :is([data-matter-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     div:has(> button > svg.lucide-arrow-left) {
     margin-inline-start: 2.5px;
   }
 
   [data-slot="sidebar-inner"]
-    :is([data-mattr-sidebar-layout="inbox"], [data-mattr-sidebar-layout="timeline"])
+    :is([data-matter-sidebar-layout="inbox"], [data-matter-sidebar-layout="timeline"])
     .drag-region
     div:has(> button > svg.lucide-arrow-left) {
     margin-inline-start: var(--workspace-titlebar-content-left);
   }
 
-  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
+  :is([data-matter-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     button:has(> svg:is(.lucide-arrow-left, .lucide-arrow-right)) {
     width: 24px;
@@ -338,7 +338,7 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
   }
 
   /* SF's chevron.right sits 1.5pt right of centre in its frame. */
-  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
+  :is([data-matter-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     button
     > svg.lucide-arrow-right {
@@ -347,7 +347,7 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
 }
 
 /* Hidden while the sidebar is open: its own titlebar row takes over. */
-[data-mattr-collapsed-header][data-state="open"] {
+[data-matter-collapsed-header][data-state="open"] {
   display: none;
 }
 
@@ -355,35 +355,35 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
    animation setting says; the resize drag still turns them off with inline styles. */
 @media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
   [data-slot="sidebar-wrapper"] {
-    --mattr-sidebar-duration: 260ms;
-    --mattr-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --matter-sidebar-duration: 260ms;
+    --matter-sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   [data-slot="sidebar"][data-side="left"] > [data-slot="sidebar-gap"] {
-    transition: width var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
+    transition: width var(--matter-sidebar-duration) var(--matter-sidebar-ease);
   }
 
   [data-slot="sidebar"][data-side="left"] > [data-slot="sidebar-container"] {
-    transition: left var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
+    transition: left var(--matter-sidebar-duration) var(--matter-sidebar-ease);
   }
 
   [data-slot="sidebar-wrapper"] > [data-slot="sidebar-inset"] {
-    transition: margin-inline-start var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
+    transition: margin-inline-start var(--matter-sidebar-duration) var(--matter-sidebar-ease);
   }
 
   /* While the sidebar slides in, the closed row stays on top until the open row is in place,
      so the titlebar buttons never move. */
-  [data-mattr-collapsed-header] {
-    transition: display var(--mattr-sidebar-duration) allow-discrete;
+  [data-matter-collapsed-header] {
+    transition: display var(--matter-sidebar-duration) allow-discrete;
   }
 
-  /* Right after a toggle (data-mattr-settling, set by MattrCollapsedSidebarHeader), the chat
+  /* Right after a toggle (data-matter-settling, set by MatterCollapsedSidebarHeader), the chat
      glides to its new lane. Only then:
      a transition on the lane would trail every frame of a window or sidebar resize. */
-  [data-mattr-settling] [data-chat-canvas] {
+  [data-matter-settling] [data-chat-canvas] {
     transition:
-      --chat-lane-inset-start var(--mattr-sidebar-duration) var(--mattr-sidebar-ease),
-      --chat-lane-inset-end var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
+      --chat-lane-inset-start var(--matter-sidebar-duration) var(--matter-sidebar-ease),
+      --chat-lane-inset-end var(--matter-sidebar-duration) var(--matter-sidebar-ease);
   }
 
   /* Right panels, the terminal drawer and the docked details card slide on the sidebar's curve.
@@ -391,7 +391,7 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
      the first frames of a navigation, so switching threads doesn't replay these. */
   [data-panel-animations="true"]
     :is([data-preview-panel-mode], div:has(> div > [data-terminal-owner="drawer"])) {
-    transition-timing-function: var(--mattr-sidebar-ease);
+    transition-timing-function: var(--matter-sidebar-ease);
   }
 
   [data-panel-animations="true"] [data-preview-panel-mode="inline"] {
@@ -409,8 +409,8 @@ html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
      after a navigation would restart an animation, so the card would blink on every switch. */
   [data-panel-animations="true"] [data-thread-details-panel="inline"] > [data-thread-details-card] {
     transition:
-      opacity var(--mattr-sidebar-duration) var(--mattr-sidebar-ease),
-      translate var(--mattr-sidebar-duration) var(--mattr-sidebar-ease);
+      opacity var(--matter-sidebar-duration) var(--matter-sidebar-ease),
+      translate var(--matter-sidebar-duration) var(--matter-sidebar-ease);
   }
 
   @starting-style {

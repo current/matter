@@ -341,13 +341,13 @@ import {
 } from "./chat/PanelLayoutControls";
 import type { ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { ThreadDetailsPanel } from "./chat/ThreadDetailsPanel";
-import { MattrThreadRibbon } from "./chat/MattrThreadRibbon.mattr";
-import { MattrWhisperPill } from "./chat/MattrWhisperPill.mattr";
+import { MatterThreadRibbon } from "./chat/MatterThreadRibbon.matter";
+import { MatterWhisperPill } from "./chat/MatterWhisperPill.matter";
 import {
-  readMattrLineagePopover,
-  toggleMattrLineagePopover,
-  useMattrThreadRibbonEnabled,
-} from "./chat/mattrThreadRibbon.logic";
+  readMatterLineagePopover,
+  toggleMatterLineagePopover,
+  useMatterThreadRibbonEnabled,
+} from "./chat/matterThreadRibbon.logic";
 import { NoActiveThreadState } from "./NoActiveThreadState";
 import {
   offersWorkspaceModes,
@@ -355,7 +355,7 @@ import {
   resolveLocalCheckoutBranchMismatch,
   shouldShowEnvironmentIndicator,
 } from "./BranchToolbar.logic";
-import { shouldShowMattrComposerContextStrip } from "./chat/MattrComposerParts.mattr";
+import { shouldShowMatterComposerContextStrip } from "./chat/MatterComposerParts.matter";
 import {
   getProviderStatusDismissalKey,
   shouldShowProviderStatusBanner,
@@ -432,7 +432,7 @@ import { draftFanoutSelectionsAtom, draftSendState } from "./chat/chatViewSend";
 import {
   clearPersistedComposerInteractionMode,
   latestProposedPlan,
-} from "./chat/mattrInteractionMode.mattr";
+} from "./chat/matterInteractionMode.matter";
 import {
   isCompactCommandMessage,
   type LocalThreadErrorEntry,
@@ -500,8 +500,8 @@ export default function ChatView(props: ChatViewProps) {
     embedded: parentPanel,
   } = props;
   const embedded = parentPanel !== undefined;
-  // mattr: the Topbar Ribbon and Whisper Pill stand in for the docked details card.
-  const mattrThreadRibbon = useMattrThreadRibbonEnabled() && !embedded;
+  // Matter: the Topbar Ribbon and Whisper Pill stand in for the docked details card.
+  const matterThreadRibbon = useMatterThreadRibbonEnabled() && !embedded;
   const panelHostShell = useQuietThreadShell(parentPanel?.hostRef ?? null);
   const canOperateThread = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
@@ -1936,7 +1936,7 @@ export default function ChatView(props: ChatViewProps) {
           providerSubagentModels,
           reportedModelSelection,
         );
-  const showComposerContextStrip = shouldShowMattrComposerContextStrip({
+  const showComposerContextStrip = shouldShowMatterComposerContextStrip({
     embedded,
     hasActiveProject: activeProject !== null,
     isScratchProject: activeProjectIsScratch,
@@ -2066,7 +2066,7 @@ export default function ChatView(props: ChatViewProps) {
     }
   };
   const sendAppMessageStable = useStableCallback(sendAppMessage);
-  // mattr: leaving a running native goal clears it at the provider; read-only or offline only switches.
+  // Matter: leaving a running native goal clears it at the provider; read-only or offline only switches.
   const clearNativeGoal = async (nextMode: ProviderInteractionMode) => {
     if (!serverThread || !canOperateThread) return;
     const connected = appAtomRegistry.get(environmentSummaries.connectedEnvironmentIdsAtom);
@@ -2103,7 +2103,7 @@ export default function ChatView(props: ChatViewProps) {
     clearPersistedComposerInteractionMode(composerDraftTarget, nextMode);
   };
   const clearNativeGoalStable = useStableCallback(clearNativeGoal);
-  const mattrLatestProposedPlan = latestProposedPlan(serverProjection);
+  const matterLatestProposedPlan = latestProposedPlan(serverProjection);
   const queuedRunsControlRef = useRef<QueuedRunsControlHandle>(null);
 
   const {
@@ -2161,7 +2161,7 @@ export default function ChatView(props: ChatViewProps) {
   const threadPanelInlineOpen =
     useRightPanelStore((state) =>
       selectThreadPanelOpen(state.threadPanelVisibilityByThreadKey, activeThreadRef, "inline"),
-    ) && !mattrThreadRibbon;
+    ) && !matterThreadRibbon;
   // Selects only the mode, so canvas resizes rerender the chat view only when the
   // card switches presentation.
   const canvasThreadPanelPresentation = useStore(
@@ -2175,7 +2175,7 @@ export default function ChatView(props: ChatViewProps) {
         detailsCardInlineOpen: threadPanelInlineOpen,
       }).detailsCardMode,
   );
-  const threadPanelPresentation = mattrThreadRibbon ? "popover" : canvasThreadPanelPresentation;
+  const threadPanelPresentation = matterThreadRibbon ? "popover" : canvasThreadPanelPresentation;
   const threadPanelOpen = useRightPanelStore((state) =>
     selectThreadPanelOpen(
       state.threadPanelVisibilityByThreadKey,
@@ -2649,7 +2649,7 @@ export default function ChatView(props: ChatViewProps) {
     attentionNow,
     workNow: lifecycleWorkNow,
     backgroundWorkNow,
-    mattrBackgroundWork,
+    matterBackgroundWork,
     childInputNow,
     goalNow,
     handleSwitchCheckoutToThread,
@@ -2701,7 +2701,7 @@ export default function ChatView(props: ChatViewProps) {
   });
   // The Whisper Pill lists background work, so the timeline's line for it would say it twice.
   const workNow =
-    mattrThreadRibbon && lifecycleWorkNow === backgroundWorkNow ? null : lifecycleWorkNow;
+    matterThreadRibbon && lifecycleWorkNow === backgroundWorkNow ? null : lifecycleWorkNow;
   const activeThreadHasCompactableConversation = hasCompactableConversation({
     visibleTurnItems: serverVisibleTurnItems,
     hasMoreHistory: serverThreadHistory.hasMoreHistory,
@@ -3018,18 +3018,18 @@ export default function ChatView(props: ChatViewProps) {
       ...terminalShortcuts,
       ...rightPanelShortcuts,
       ...threadLifecycleShortcuts,
-      ...(mattrThreadRibbon && activeThreadKey !== null
+      ...(matterThreadRibbon && activeThreadKey !== null
         ? {
             "threadPanel.toggle": () => {
-              const pillVisible = document.querySelector("[data-mattr-whisper-pill]") !== null;
+              const pillVisible = document.querySelector("[data-matter-whisper-pill]") !== null;
               const ribbonAgentsVisible =
-                document.querySelector("[data-mattr-ribbon-chip='agents']") !== null;
+                document.querySelector("[data-matter-ribbon-chip='agents']") !== null;
               if (
-                readMattrLineagePopover().threadKey === activeThreadKey ||
+                readMatterLineagePopover().threadKey === activeThreadKey ||
                 pillVisible ||
                 ribbonAgentsVisible
               ) {
-                toggleMattrLineagePopover(activeThreadKey, pillVisible);
+                toggleMatterLineagePopover(activeThreadKey, pillVisible);
               } else {
                 toggleThreadPanelStable();
               }
@@ -3623,7 +3623,7 @@ export default function ChatView(props: ChatViewProps) {
   const panelToggleControls = (
     <PanelLayoutControls
       {...panelToggleControlProps}
-      showThreadPanelControl={!inlineRightPanelOwnsTitleBar && !mattrThreadRibbon}
+      showThreadPanelControl={!inlineRightPanelOwnsTitleBar && !matterThreadRibbon}
     />
   );
   const threadPanelHeaderControl = <ThreadPanelHeaderControl {...panelToggleControlProps} />;
@@ -3696,7 +3696,7 @@ export default function ChatView(props: ChatViewProps) {
               />
             ) : null}
             {!rightPanelControlsAtRoot && !rightPanelControlsInPanel ? panelLayoutControls : null}
-            {inlineRightPanelOwnsTitleBar && !mattrThreadRibbon ? threadPanelHeaderControl : null}
+            {inlineRightPanelOwnsTitleBar && !matterThreadRibbon ? threadPanelHeaderControl : null}
             <ChatHeader
               activeThreadEnvironmentId={activeThread.environmentId}
               activeThreadId={activeThread.id}
@@ -3714,8 +3714,8 @@ export default function ChatView(props: ChatViewProps) {
                 : {})}
               {...(threadFindEnabled ? { onFindInThread: openThreadFindStable } : {})}
             />
-            {mattrThreadRibbon ? (
-              <MattrThreadRibbon
+            {matterThreadRibbon ? (
+              <MatterThreadRibbon
                 environmentId={activeThread.environmentId}
                 threadId={activeThread.id}
                 projectId={activeThread.projectId}
@@ -3746,7 +3746,7 @@ export default function ChatView(props: ChatViewProps) {
                 onUpdateProjectScript={updateProjectScriptStable}
                 onDeleteProjectScript={deleteProjectScriptStable}
                 {...(isServerThread && isGitRepo ? { onToggleChanges: onToggleDiffStable } : {})}
-                backgroundWork={mattrBackgroundWork}
+                backgroundWork={matterBackgroundWork}
                 rightPanelOpen={inlineRightPanelOwnsTitleBar}
               />
             ) : null}
@@ -3966,17 +3966,17 @@ export default function ChatView(props: ChatViewProps) {
                         : undefined
                     }
                   >
-                    {mattrThreadRibbon && !isDraftHeroState && isServerThread ? (
-                      <MattrWhisperPill
+                    {matterThreadRibbon && !isDraftHeroState && isServerThread ? (
+                      <MatterWhisperPill
                         environmentId={activeThread.environmentId}
                         threadId={activeThread.id}
-                        backgroundWork={mattrBackgroundWork}
+                        backgroundWork={matterBackgroundWork}
                       />
                     ) : null}
                     <ChildThreadApprovals threadRef={activeThreadRef} />
                     <div className="relative">
                       <ComposerSurface.Shell
-                        data-mattr-composer=""
+                        data-matter-composer=""
                         contextRow={showComposerContextStrip}
                       >
                         <ComposerSurface.Host
@@ -4077,9 +4077,9 @@ export default function ChatView(props: ChatViewProps) {
                                 sideChatAvailable={sideChat.available}
                                 sideChatDisabledReason={sideChatDisabledReason}
                                 isServerThread={isServerThread}
-                                latestProposedPlanId={mattrLatestProposedPlan?.planId ?? null}
+                                latestProposedPlanId={matterLatestProposedPlan?.planId ?? null}
                                 latestProposedPlanMarkdown={
-                                  mattrLatestProposedPlan?.markdown ?? null
+                                  matterLatestProposedPlan?.markdown ?? null
                                 }
                                 onClearNativeGoal={clearNativeGoalStable}
                                 onFreshSession={

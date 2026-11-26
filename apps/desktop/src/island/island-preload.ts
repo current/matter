@@ -13,7 +13,7 @@ import {
   type IslandDisplayMetrics,
   type IslandSnapshot,
   type IslandWindowCommand,
-} from "../../../../antimatter/island/types.ts";
+} from "../../../../matter/island/types.ts";
 
 function subscribe<T>(channel: string, listener: (value: T) => void): () => void {
   const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
@@ -23,7 +23,7 @@ function subscribe<T>(channel: string, listener: (value: T) => void): () => void
   return () => ipcRenderer.removeListener(channel, handler);
 }
 
-contextBridge.exposeInMainWorld("mattrIsland", {
+contextBridge.exposeInMainWorld("matterIsland", {
   onSnapshot: (listener: (snapshot: IslandSnapshot) => void) =>
     subscribe(ISLAND_SNAPSHOT_CHANNEL, listener),
   onCommand: (listener: (command: IslandWindowCommand) => void) =>

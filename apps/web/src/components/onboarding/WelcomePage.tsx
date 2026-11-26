@@ -104,7 +104,7 @@ import { CodexSetupSection } from "../settings/CodexSetupSection";
 import { readCodexSetupMode } from "../settings/CodexSetupSection.logic";
 import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { MattrDelegationWelcome } from "./MattrDelegationWelcome";
+import { MatterDelegationWelcome } from "./MatterDelegationWelcome";
 import { ACPRegistryIcon } from "../Icons";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -299,7 +299,7 @@ export function WelcomePage({
                 isPrimary={isPrimary}
                 onImportSourceEnabled={() => scans[0]?.refresh()}
               />
-              <MattrDelegationWelcome environmentId={environmentId} />
+              <MatterDelegationWelcome environmentId={environmentId} />
               <ProjectsSection
                 scan={scans[0]}
                 projectImport={projectImport}

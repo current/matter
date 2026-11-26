@@ -488,7 +488,7 @@ export function endpointShareHint(
     return resolve(msg("Opens the hosted app, no install needed"));
   }
   if (isTailscaleHttpsEndpoint(endpoint)) {
-    return resolve(msg("Opens mattr directly · Add to Home Screen on phone"));
+    return resolve(msg("Opens Matter directly · Add to Home Screen on phone"));
   }
   switch (endpoint.reachability) {
     case "lan":

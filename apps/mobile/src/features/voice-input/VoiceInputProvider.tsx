@@ -34,7 +34,7 @@ import {
   activateAudioSession,
   releaseAudioSession,
 } from "../../lib/audioSession";
-import { playMobileAudioCue } from "../../lib/mattrAudioCues";
+import { playMobileAudioCue } from "../../lib/matterAudioCues";
 
 // The native constructor expects platform-flattened options, as built by useAudioRecorder.
 const { ios: IOS_RECORDING_OPTIONS, android: ANDROID_RECORDING_OPTIONS } =

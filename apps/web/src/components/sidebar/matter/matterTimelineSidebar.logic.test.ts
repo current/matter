@@ -2,8 +2,8 @@ import { EnvironmentId, ProjectId, ProviderInstanceId, RunId, ThreadId } from "@
 import { describe, expect, it } from "vite-plus/test";
 
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
-import { attachListedAncestors } from "./mattrFinalSidebar.logic";
-import { toMattrThreadItem } from "./mattrSidebar.logic";
+import { attachListedAncestors } from "./matterFinalSidebar.logic";
+import { toMatterThreadItem } from "./matterSidebar.logic";
 import {
   activeSubagentsByParent,
   buildTimelineBuckets,
@@ -12,7 +12,7 @@ import {
   subagentElapsed,
   usageMeterTone,
   workspaceKind,
-} from "./mattrTimelineSidebar.logic";
+} from "./matterTimelineSidebar.logic";
 
 // Buckets follow local calendar days, so the fixtures are built in local time. Threads start on
 // the 1st, so their last message decides the bucket.
@@ -21,15 +21,15 @@ const local = (day: number, hour: number, minute = 0) =>
 const NOW_ISO = local(10, 15);
 const NOW_MS = Date.parse(NOW_ISO);
 const env = EnvironmentId.make("local");
-const MATTR = { key: "local:mattr", name: "mattr" };
+const MATTER = { key: "local:matter", name: "Matter" };
 const LILT = { key: "local:lilt", name: "Lilt" };
 
 function item(
   id: string,
   overrides: ThreadFixtureOverrides = {},
-  project: { key: string; name: string } | null = MATTR,
+  project: { key: string; name: string } | null = MATTER,
 ) {
-  return toMattrThreadItem(
+  return toMatterThreadItem(
     makeThreadFixture({
       environmentId: env,
       id: ThreadId.make(id),
@@ -69,7 +69,7 @@ function children(...items: ReturnType<typeof item>[]) {
     makeThreadFixture({
       environmentId: env,
       id: child.ref.threadId,
-      projectId: ProjectId.make("local:mattr"),
+      projectId: ProjectId.make("local:matter"),
       lineage: {
         rootThreadId: ThreadId.make("parent"),
         parentThreadId: ThreadId.make("parent"),
@@ -266,8 +266,8 @@ describe("row details", () => {
   });
 
   it("carries the branch and creation time", () => {
-    const thread = item("branch", { branch: "mattr/sidebar" });
-    expect(thread.branch).toBe("mattr/sidebar");
+    const thread = item("branch", { branch: "matter/sidebar" });
+    expect(thread.branch).toBe("matter/sidebar");
     expect(thread.createdAt).toBe(local(1, 9));
   });
 

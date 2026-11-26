@@ -4,7 +4,7 @@ import type {
   VoiceAssistantTurnRequest,
   VoiceAssistantTurnResponse,
   VoiceWorkspaceContext,
-} from "../../../../../antimatter/voice-assistant/types";
+} from "../../../../../matter/voice-assistant/types";
 import type {
   ActiveStreamingListening,
   StreamingListenOptions,

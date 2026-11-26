@@ -3,7 +3,7 @@ import {
   AddonConfig,
   AddonEnablementSource,
   findAddonManifest,
-  MATTR_ADDON_MANIFESTS,
+  MATTER_ADDON_MANIFESTS,
   type AddonEnablementSource as AddonEnablementSourceType,
   type AddonManifest,
 } from "@t3tools/contracts";
@@ -97,7 +97,7 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const filePath = path.join(serverConfig.stateDir, ADDONS_CONFIG_FILENAME);
-  const manifests = MATTR_ADDON_MANIFESTS;
+  const manifests = MATTER_ADDON_MANIFESTS;
 
   const writeLock = yield* Semaphore.make(1);
   const changesPubSub = yield* PubSub.unbounded<AddonEnablementChange>();

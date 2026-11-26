@@ -16,8 +16,8 @@ import {
   type AntigravityUsageCommandResult,
   antigravityQuotaWindows,
   interpretAntigravityUsage,
-  makeMattrAntigravityQuota,
-} from "./MattrAntigravityQuota.ts";
+  makeMatterAntigravityQuota,
+} from "./MatterAntigravityQuota.ts";
 
 // Recorded from `agy -p /usage --output-format json --print-timeout 20s` (agy 1.5.18).
 const USAGE_OUTPUT = JSON.stringify({
@@ -145,7 +145,7 @@ const setup = Effect.fn("setup")(function* (options: {
   const interrupted = yield* Ref.make(false);
   const reports: ProviderUsageLimitsReport[] = [];
   const snapshotRef = yield* Ref.make(providerSnapshot(options.auth ?? "authenticated"));
-  const quota = yield* makeMattrAntigravityQuota({
+  const quota = yield* makeMatterAntigravityQuota({
     reports: true,
     unsupported: false,
     readUsage: Effect.gen(function* () {
@@ -261,7 +261,7 @@ describe("antigravityQuotaWindows", () => {
   });
 });
 
-describe("makeMattrAntigravityQuota", () => {
+describe("makeMatterAntigravityQuota", () => {
   it.effect("publishes a reading and keeps it when a later read fails", () =>
     Effect.gen(function* () {
       const { snapshot, reports, getSnapshot } = yield* setup({ results: [ok, signedOut] });
@@ -386,13 +386,13 @@ describe("makeMattrAntigravityQuota", () => {
   it.effect("leaves other instances untouched and marks API-key instances unsupported", () =>
     Effect.gen(function* () {
       const base = providerSnapshot("authenticated");
-      const other = yield* makeMattrAntigravityQuota({
+      const other = yield* makeMatterAntigravityQuota({
         reports: false,
         unsupported: false,
         readUsage: Effect.die("never read"),
       });
       assert.strictEqual(yield* other.attach(base), base);
-      const keyed = yield* makeMattrAntigravityQuota({
+      const keyed = yield* makeMatterAntigravityQuota({
         reports: false,
         unsupported: true,
         readUsage: Effect.die("never read"),

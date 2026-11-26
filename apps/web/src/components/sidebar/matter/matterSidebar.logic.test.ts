@@ -7,20 +7,20 @@ import {
   filterThreadsByQuery,
   resolveActiveSpaceKey,
   resolveProjectAttention,
-  toMattrThreadItem,
-} from "./mattrSidebar.logic";
+  toMatterThreadItem,
+} from "./matterSidebar.logic";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
 const NOW_MS = Date.parse(NOW_ISO);
-const MATTR = { key: "env:mattr", name: "mattr" };
+const MATTER = { key: "env:matter", name: "Matter" };
 const LILT = { key: "env:lilt", name: "Lilt" };
 
 function item(
   id: string,
   overrides: ThreadFixtureOverrides = {},
-  project: { key: string; name: string } | null = MATTR,
+  project: { key: string; name: string } | null = MATTER,
 ) {
-  return toMattrThreadItem(
+  return toMatterThreadItem(
     makeThreadFixture({
       id: ThreadId.make(id),
       projectId: ProjectId.make(project?.key ?? "none"),
@@ -57,7 +57,7 @@ const completedRun = (completedAt: string) => ({
   assistantMessageId: null,
 });
 
-describe("toMattrThreadItem", () => {
+describe("toMatterThreadItem", () => {
   it("puts pending approvals and questions in front of everything", () => {
     expect(item("a", { hasPendingApprovals: true })).toMatchObject({
       attention: "needs",
@@ -105,8 +105,8 @@ describe("resolveProjectAttention", () => {
 
   it("finds the most urgent tile dot", () => {
     const items = [quiet, settled, running, lilt];
-    expect(resolveProjectAttention(items, MATTR.key)).toBe("running");
-    expect(resolveProjectAttention([...items, needs], MATTR.key)).toBe("needs");
+    expect(resolveProjectAttention(items, MATTER.key)).toBe("running");
+    expect(resolveProjectAttention([...items, needs], MATTER.key)).toBe("needs");
     expect(resolveProjectAttention(items, LILT.key)).toBeNull();
   });
 });
@@ -124,7 +124,7 @@ describe("buildSpaceSections", () => {
     const elsewhere = item("elsewhere", {}, LILT);
     const sections = buildSpaceSections(
       [pinned, today, yesterday, oldRunning, settled, elsewhere],
-      MATTR.key,
+      MATTER.key,
       NOW_MS,
     );
     expect(sections.pinned.map((entry) => entry.key)).toEqual([pinned.key]);
@@ -138,8 +138,8 @@ describe("buildSpaceSections", () => {
 
 describe("resolveActiveSpaceKey", () => {
   it("keeps a stored space that still exists and otherwise falls back to the first", () => {
-    expect(resolveActiveSpaceKey(LILT.key, [MATTR.key, LILT.key])).toBe(LILT.key);
-    expect(resolveActiveSpaceKey("gone", [MATTR.key, LILT.key])).toBe(MATTR.key);
+    expect(resolveActiveSpaceKey(LILT.key, [MATTER.key, LILT.key])).toBe(LILT.key);
+    expect(resolveActiveSpaceKey("gone", [MATTER.key, LILT.key])).toBe(MATTER.key);
     expect(resolveActiveSpaceKey(null, [])).toBeNull();
   });
 });
@@ -147,7 +147,7 @@ describe("resolveActiveSpaceKey", () => {
 describe("filterThreadsByQuery", () => {
   it("matches every term against the title and project name", () => {
     const items = [item("Island spring morphs"), item("Onboarding copy", {}, LILT)];
-    expect(filterThreadsByQuery(items, "spring mattr").map((entry) => entry.title)).toEqual([
+    expect(filterThreadsByQuery(items, "spring Matter").map((entry) => entry.title)).toEqual([
       "Island spring morphs",
     ]);
     expect(filterThreadsByQuery(items, "lilt").map((entry) => entry.title)).toEqual([

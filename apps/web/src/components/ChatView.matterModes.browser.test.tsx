@@ -1,4 +1,4 @@
-import "../../../../antimatter/composer.css";
+import "../../../../matter/composer.css";
 
 import { createMemoryHistory } from "@tanstack/react-router";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -18,7 +18,7 @@ import { cdp, page, userEvent } from "vite-plus/test/browser";
 import { AppRoot } from "~/AppRoot";
 // The route loads ChatView lazily; importing it keeps its first transform out of the timeout.
 import "~/components/ChatView";
-import { setComposerInteractionMode } from "~/components/chat/mattrInteractionMode.mattr";
+import { setComposerInteractionMode } from "~/components/chat/matterInteractionMode.matter";
 import { DraftId, useComposerDraftStore } from "~/composerDraftStore";
 import { __setClientSettingsForTests } from "~/hooks/useSettings";
 import { responseContextRecord } from "~/lib/composerContextRecords";
@@ -84,7 +84,7 @@ async function openThread(thread: FakeThread): Promise<AsyncDisposable> {
 }
 
 it("switches composer modes from the menu, the clear button, Shift+Tab and slash commands", async () => {
-  const thread = threadWithHistory("thread-mattr-modes", 1);
+  const thread = threadWithHistory("thread-matter-modes", 1);
   await using _app = await openThread(thread);
   const editor = page.getByTestId("composer-editor");
 
@@ -156,7 +156,7 @@ it("switches composer modes from the menu, the clear button, Shift+Tab and slash
 });
 
 it("starts a native goal with /goal from the first Goal prompt and steers it after", async () => {
-  const thread = threadWithHistory("thread-mattr-native-goal", 1);
+  const thread = threadWithHistory("thread-matter-native-goal", 1);
   await using _app = await openThread(thread);
   const editor = page.getByTestId("composer-editor");
   await userEvent.click(editor);
@@ -173,7 +173,7 @@ it("starts a native goal with /goal from the first Goal prompt and steers it aft
 
 it("clears a running native goal when leaving Goal mode", async () => {
   const thread: FakeThread = {
-    ...threadWithHistory("thread-mattr-goal-running", 1),
+    ...threadWithHistory("thread-matter-goal-running", 1),
     interactionMode: "goal",
   };
   await using _app = await openThread(thread);
@@ -212,11 +212,11 @@ it("starts a native goal from a brand-new draft thread left in Goal", async () =
     ...DEFAULT_CLIENT_SETTINGS,
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
-  const draftId = DraftId.make("draft-mattr-goal");
+  const draftId = DraftId.make("draft-matter-goal");
   useComposerDraftStore
     .getState()
     .setProjectDraftThreadId(scopeProjectRef(ENVIRONMENT_ID, PROJECT_ID), draftId, {
-      threadId: ThreadId.make("thread-mattr-draft-goal"),
+      threadId: ThreadId.make("thread-matter-draft-goal"),
     });
   // The draft thread itself carries Goal, as a mode picked before the first send leaves it.
   setComposerInteractionMode(draftId, "goal");
@@ -240,7 +240,7 @@ it("starts a native goal from a brand-new draft thread left in Goal", async () =
 });
 
 it("lets a server-side mode change show through after a Plan send", async () => {
-  const thread = threadWithHistory("thread-mattr-stale-plan", 1);
+  const thread = threadWithHistory("thread-matter-stale-plan", 1);
   await using _app = await openThread(thread);
   const threadRef = scopeThreadRef(ENVIRONMENT_ID, thread.id);
   await userEvent.click(page.getByTestId("composer-editor"));
@@ -263,7 +263,7 @@ it("lets a server-side mode change show through after a Plan send", async () => 
 });
 
 it("keeps /goal first when the first Goal prompt replies to a message", async () => {
-  const thread = threadWithHistory("thread-mattr-goal-reply", 1);
+  const thread = threadWithHistory("thread-matter-goal-reply", 1);
   await using _app = await openThread(thread);
   const record = responseContextRecord({
     role: "assistant",
@@ -271,14 +271,14 @@ it("keeps /goal first when the first Goal prompt replies to a message", async ()
       version: 1,
       environmentId: EnvironmentId.make(ENVIRONMENT_ID),
       threadId: ThreadId.make(thread.id),
-      messageId: MessageId.make("message-mattr-reply"),
+      messageId: MessageId.make("message-matter-reply"),
       text: "Answer to reply to",
       start: 0,
       end: 18,
       prefix: "",
       suffix: "",
     },
-    itemId: TurnItemId.make("item-mattr-reply"),
+    itemId: TurnItemId.make("item-matter-reply"),
     subagents: [],
   });
   useComposerDraftStore.getState().setReplyTo(scopeThreadRef(ENVIRONMENT_ID, thread.id), record);
@@ -296,7 +296,7 @@ it("keeps /goal first when the first Goal prompt replies to a message", async ()
 
 it("clears a running native goal when Shift+Tab leaves Goal mode", async () => {
   const thread: FakeThread = {
-    ...threadWithHistory("thread-mattr-goal-cycle", 1),
+    ...threadWithHistory("thread-matter-goal-cycle", 1),
     interactionMode: "goal",
   };
   await using _app = await openThread(thread);

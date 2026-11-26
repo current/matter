@@ -1,5 +1,5 @@
 import type { PreparedConnection } from "@t3tools/client-runtime/connection";
-import { executeMattrEnvironmentRequest } from "@t3tools/client-runtime/mattr-voice-http";
+import { executeMatterEnvironmentRequest } from "@t3tools/client-runtime/matter-voice-http";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { fetch as expoFetch } from "expo/fetch";
@@ -10,7 +10,7 @@ import type {
   VoiceAvailableTtsInfo,
   VoiceSpeakRequest,
   VoiceTranscribeResponse,
-} from "../../../../../antimatter/voice-assistant/types";
+} from "../../../../../matter/voice-assistant/types";
 import { runSpeech } from "../voice-input/voiceDestination";
 import {
   createNdjsonReader,
@@ -91,7 +91,7 @@ export function createVoiceAssistantApi(prepared: PreparedConnection) {
     let requestUrl = "";
     // Typed HTTP failures travel as values so callers see the original error, not a fiber wrapper.
     return runSpeech(
-      executeMattrEnvironmentRequest<Response, VoiceRequestFailure>({
+      executeMatterEnvironmentRequest<Response, VoiceRequestFailure>({
         prepared,
         method: input.method,
         path: input.path,

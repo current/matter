@@ -6,14 +6,14 @@
  * Desktop, and Mobile share identical sonic DNA with zero external asset dependencies.
  */
 
-export type MattrAudioCueId =
+export type MatterAudioCueId =
   | "dictation-start"
   | "dictation-stop"
   | "voice-mode-open"
   | "voice-mode-close"
   | "voice-mode-thinking";
 
-export const MATTR_AUDIO_CUE_SAMPLE_RATE = 48_000;
+export const MATTER_AUDIO_CUE_SAMPLE_RATE = 48_000;
 
 /**
  * Chris's active Lilt configuration from `~/Library/Application Support/dev.lilt.app/settings.json`:
@@ -265,11 +265,11 @@ function applyLiltFinish(
 }
 
 /**
- * Renders mono Float32 PCM samples in [-1, 1] for any mattr audio cue.
+ * Renders mono Float32 PCM samples in [-1, 1] for any Matter audio cue.
  */
-export function renderMattrAudioCuePcm(
-  cue: MattrAudioCueId,
-  sampleRate = MATTR_AUDIO_CUE_SAMPLE_RATE,
+export function renderMatterAudioCuePcm(
+  cue: MatterAudioCueId,
+  sampleRate = MATTER_AUDIO_CUE_SAMPLE_RATE,
 ): Float32Array {
   const basePeak = LILT_SELECTED_CUES.volume;
 
@@ -400,7 +400,7 @@ export function renderMattrAudioCuePcm(
 /** Encodes mono Float32 PCM samples into a compact 16-bit PCM RIFF/WAVE byte buffer. */
 export function encodeMonoPcmWav(
   samples: Float32Array,
-  sampleRate = MATTR_AUDIO_CUE_SAMPLE_RATE,
+  sampleRate = MATTER_AUDIO_CUE_SAMPLE_RATE,
 ): Uint8Array {
   const dataBytes = samples.length * 2;
   const buffer = new ArrayBuffer(44 + dataBytes);

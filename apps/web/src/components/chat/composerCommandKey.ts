@@ -19,7 +19,7 @@ import {
 } from "../../composer-logic";
 import { type PendingUserInput } from "../../session-logic";
 import { promptSuggestionToAccept } from "./usePromptSuggestion";
-import { isPredictionAcceptKey } from "./promptPrediction.mattr";
+import { isPredictionAcceptKey } from "./promptPrediction.matter";
 import {
   type EnvironmentContextRecord,
   type PreviewAnnotationPayload,

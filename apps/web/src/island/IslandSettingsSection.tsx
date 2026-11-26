@@ -34,7 +34,7 @@ import {
   setVoiceModeOpen,
   syncVoiceTtsPreferencesToServer,
 } from "./voiceAssistantStore";
-import type { IslandShortcutMode } from "../../../../antimatter/island/types";
+import type { IslandShortcutMode } from "../../../../matter/island/types";
 import {
   DEFAULT_ELEVENLABS_VOICE_SETTINGS,
   type ElevenLabsTtsModel,
@@ -43,7 +43,7 @@ import {
   type VoiceCredentialsStatus,
   type VoiceSpeakRequest,
   type VoiceTtsProvider,
-} from "../../../../antimatter/voice-assistant/types";
+} from "../../../../matter/voice-assistant/types";
 
 const SHORTCUT_OPTIONS: ReadonlyArray<{
   readonly value: IslandShortcutMode;
@@ -80,12 +80,12 @@ const DEFAULT_MODE_OPTIONS: ReadonlyArray<{
   {
     value: "smart",
     label: msg("Smart routing"),
-    hint: msg("Routes approvals, thread replies, and mattr Assistant commands automatically"),
+    hint: msg("Routes approvals, thread replies, and Matter Assistant commands automatically"),
   },
   {
     value: "assistant",
-    label: msg("mattr Assistant"),
-    hint: msg("Always talk to mattr to manage projects, threads, and tools"),
+    label: msg("Matter Assistant"),
+    hint: msg("Always talk to Matter to manage projects, threads, and tools"),
   },
   {
     value: "dictation",
@@ -338,7 +338,7 @@ export function IslandSettingsSection() {
         kind: "error",
         text:
           result.reason === "network"
-            ? gt("Could not reach the mattr server.")
+            ? gt("Could not reach the Matter server.")
             : provider === "elevenlabs"
               ? gt("Could not save ElevenLabs API key.")
               : gt("Could not save Deepgram API key."),
@@ -482,7 +482,7 @@ export function IslandSettingsSection() {
   return (
     <>
       {islandBridge ? (
-        <SettingsSection id="mattr-island" title={gt("Matter Island")}>
+        <SettingsSection id="matter-island" title={gt("Matter Island")}>
           <SettingsRow
             title={gt("Notch island")}
             description={gt(
@@ -586,7 +586,7 @@ export function IslandSettingsSection() {
         </SettingsSection>
       ) : null}
 
-      <SettingsSection id="mattr-voice-assistant" title={gt("Voice Assistant & Voice Mode")}>
+      <SettingsSection id="matter-voice-assistant" title={gt("Voice Assistant & Voice Mode")}>
         <SettingsRow
           title={gt("Hands-Free Voice Mode")}
           description={gt(
@@ -608,7 +608,7 @@ export function IslandSettingsSection() {
         <SettingsRow
           title={gt("Default voice routing")}
           description={gt(
-            "Choose whether voice input routes smartly across chats & mattr Assistant, always asks mattr, or dictates directly.",
+            "Choose whether voice input routes smartly across chats & Matter Assistant, always asks Matter, or dictates directly.",
           )}
           control={
             <Select
@@ -639,7 +639,7 @@ export function IslandSettingsSection() {
         <SettingsRow
           title={gt("Spoken voice (TTS)")}
           description={gt(
-            "Engine used for assistant replies and spoken thread briefings, on this device and the mattr iPhone app. Auto uses ElevenLabs if configured, then Deepgram Aura-2, OpenAI TTS, then macOS voice.",
+            "Engine used for assistant replies and spoken thread briefings, on this device and the Matter iPhone app. Auto uses ElevenLabs if configured, then Deepgram Aura-2, OpenAI TTS, then macOS voice.",
           )}
           control={
             <Select
@@ -1108,7 +1108,7 @@ export function IslandSettingsSection() {
           <SettingsRow
             title={gt("Voice Mode thinking pulse")}
             description={gt(
-              "Play a single subtle muted pulse when your turn finishes and mattr starts thinking.",
+              "Play a single subtle muted pulse when your turn finishes and Matter starts thinking.",
             )}
             control={
               <Switch
@@ -1124,7 +1124,7 @@ export function IslandSettingsSection() {
 
         <SettingsRow
           title={gt("Speak assistant replies")}
-          description={gt("Automatically speak mattr Assistant replies aloud.")}
+          description={gt("Automatically speak Matter Assistant replies aloud.")}
           control={
             <Switch
               checked={va.speakReplies}
@@ -1137,7 +1137,7 @@ export function IslandSettingsSection() {
         <SettingsRow
           title={gt("Interrupt on speech (barge-in)")}
           description={gt(
-            "Immediately stop mattr from speaking when you start talking in Voice Mode.",
+            "Immediately stop Matter from speaking when you start talking in Voice Mode.",
           )}
           control={
             <Switch

@@ -15,7 +15,7 @@ import * as ClaudeCloudService from "../../../cloud/ClaudeCloudService.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
-// mattr fork: listed only while the claude-cloud add-on is on and delegation is not off.
+// Matter fork: listed only while the claude-cloud add-on is on and delegation is not off.
 
 const shared = {
   failure: OrchestratorMcpFailure,
@@ -100,7 +100,7 @@ const SendTool = Tool.make("claude_cloud_send", {
 const TeleportTool = Tool.make("claude_cloud_teleport", {
   ...shared,
   description:
-    "Pull a Claude Cloud session into a fresh local worktree on its branch and open it as a mattr thread. Returns the worktree path and thread link.",
+    "Pull a Claude Cloud session into a fresh local worktree on its branch and open it as a Matter thread. Returns the worktree path and thread link.",
   parameters: Schema.Struct({
     sessionId: SessionRef,
     projectId: Schema.optionalKey(ProjectId),

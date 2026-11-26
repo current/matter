@@ -12,7 +12,7 @@ const decodeServerSettings = Schema.decodeUnknownSync(ServerSettings);
 const decodePatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const decodeClientPatch = Schema.decodeUnknownSync(ClientServerSettingsPatch);
 
-describe("mattr delegation settings", () => {
+describe("Matter delegation settings", () => {
   it("turns delegation on with an empty exclusion list for settings files written before it", () => {
     const decoded = decodeServerSettings({});
     expect(decoded.mattrMultiProviderDelegation).toBe(true);

@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-// Antimatter: the mattr logo stands in for upstream's T3 mark wherever the app shows it.
+// Matter: the Matter logo stands in for upstream's T3 mark wherever the app shows it.
 export function T3Wordmark(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} viewBox="0 0 1434 1648" xmlns="http://www.w3.org/2000/svg">

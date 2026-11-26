@@ -4,7 +4,7 @@ import type {
   VoiceWorkspaceContext,
   VoiceWorkspaceQuestionSummary,
   VoiceWorkspaceThreadSummary,
-} from "../../../../../antimatter/voice-assistant/types";
+} from "../../../../../matter/voice-assistant/types";
 
 export const MAX_VOICE_CONTEXT_THREADS = 12;
 export const MAX_VOICE_HISTORY_MESSAGES = 12;

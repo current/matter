@@ -59,11 +59,11 @@ import * as CloudSpeech from "./speech/CloudSpeech.ts";
 import { speechHttpApiLayer } from "./speech/http.ts";
 import { speechStreamRouteLayer } from "./speech/stream.ts";
 import * as VoiceAssistantService from "./voiceAssistant/VoiceAssistantService.ts";
-import * as MattrComposerPredictions from "./mattr/composerPredictions/MattrComposerPredictions.ts";
-import * as MattrDelegationInstructions from "./mattr/delegation/MattrDelegationInstructions.ts";
+import * as MatterComposerPredictions from "./matter/composerPredictions/MatterComposerPredictions.ts";
+import * as MatterDelegationInstructions from "./matter/delegation/MatterDelegationInstructions.ts";
 import * as VoiceTtsService from "./voiceAssistant/VoiceTtsService.ts";
-import { layerMattrAddonsAndBots } from "./bots/botsHttp.ts";
-import { layerMattrTasks } from "./mattr/tasks/mattrTasksHttp.ts";
+import { layerMatterAddonsAndBots } from "./bots/botsHttp.ts";
+import { layerMatterTasks } from "./matter/tasks/matterTasksHttp.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as IssueService from "./issue/IssueService.ts";
@@ -932,16 +932,16 @@ const layerMakeRoutes = Layer.mergeAll(
     PreviewTunnel.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer.pipe(
-      Layer.provide(MattrComposerPredictions.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+      Layer.provide(MatterComposerPredictions.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
     ),
     speechStreamRouteLayer,
     ServerHttp.layerVoiceAssistantRoutes.pipe(
       Layer.provide(VoiceAssistantService.layer),
       Layer.provide(VoiceTtsService.layer),
     ),
-    layerMattrAddonsAndBots,
-    layerMattrTasks,
-    MattrDelegationInstructions.layer,
+    layerMatterAddonsAndBots,
+    layerMatterTasks,
+    MatterDelegationInstructions.layer,
   ),
   McpHttpServer.layer.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),

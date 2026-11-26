@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { islandModel as M } from "../../../../antimatter/island/islandModel.ts";
+import { islandModel as M } from "../../../../matter/island/islandModel.ts";
 import {
   ISLAND_SPRINGS,
   sampleSpringEasing,
   springFromDurationBounce,
-} from "../../../../antimatter/island/islandMotion.ts";
-import type { IslandDoneNotification } from "../../../../antimatter/island/types.ts";
+} from "../../../../matter/island/islandMotion.ts";
+import type { IslandDoneNotification } from "../../../../matter/island/types.ts";
 import { makeIslandApproval, makeIslandSnapshot, makeIslandThread } from "./islandTestFixtures.ts";
 
 const NOTCH = { hasNotch: true, notchWidth: 200, notchHeight: 32, windowWidth: 520 };

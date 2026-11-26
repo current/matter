@@ -1,6 +1,6 @@
-name: Antimatter nightly
+name: Matter nightly
 
-# Builds Antimatter (this fork) whenever T3 Code ships a new nightly, or when
+# Builds Matter (this fork) whenever T3 Code ships a new nightly, or when
 # main changes. Each build merges the newest upstream nightly into main, builds
 # the macOS app, signs it with the fork's self-signed certificate, and publishes
 # a prerelease. The app's update button reads those releases.
@@ -19,7 +19,7 @@ on:
         default: false
 
 concurrency:
-  group: antimatter-nightly
+  group: matter-nightly
   cancel-in-progress: false
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
       - name: Disable upstream workflows
         run: |
           gh workflow list --all --json name,path,state \
-            --jq '.[] | select(.state == "active" and (.path | endswith("antimatter-nightly.yml") | not)) | .path' |
+            --jq '.[] | select(.state == "active" and (.path | endswith("matter-nightly.yml") | not)) | .path' |
           while read -r path; do
             echo "Disabling ${path}"
             gh workflow disable "$(basename "$path")" || true
@@ -84,7 +84,7 @@ jobs:
             exit 0
           fi
 
-          # Antimatter versions extend upstream's run number with two digits, so
+          # Matter versions extend upstream's run number with two digits, so
           # 0.1.12-nightly.20261124.5209 becomes ...520901, ...520902 for
           # rebuilds, and the next upstream nightly (5210 -> 521001) is newer.
           base=${upstream_tag#v}
@@ -120,13 +120,13 @@ jobs:
         run: |
           set -euo pipefail
           echo "main_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          git config user.name "antimatter-bot"
-          git config user.email "antimatter-bot@users.noreply.github.com"
+          git config user.name "matter-bot"
+          git config user.email "matter-bot@users.noreply.github.com"
           git fetch --no-tags "https://github.com/${UPSTREAM}.git" "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
           if ! git merge --no-edit "${UPSTREAM_TAG}"; then
             files=$(git diff --name-only --diff-filter=U)
             git merge --abort
-            title="Antimatter: merge conflict with ${UPSTREAM_TAG}"
+            title="Matter: merge conflict with ${UPSTREAM_TAG}"
             body=$(printf 'Merging upstream `%s` into `main` conflicts in:\n\n```\n%s\n```\n\nResolve it locally: `git fetch upstream --tags && git merge %s`, then push main. Builds resume on the push.\n' "$UPSTREAM_TAG" "$files" "$UPSTREAM_TAG")
             if [[ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]]; then
               gh issue create --title "$title" --body "$body" || true
@@ -144,23 +144,23 @@ jobs:
           ANTIMATTER_SIGNING_P12_PASSWORD: ${{ secrets.ANTIMATTER_SIGNING_P12_PASSWORD }}
         run: |
           set -euo pipefail
-          keychain="$RUNNER_TEMP/antimatter.keychain-db"
+          keychain="$RUNNER_TEMP/matter.keychain-db"
           keychain_password=$(openssl rand -hex 16)
-          printf '%s' "$ANTIMATTER_SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/antimatter.p12"
+          printf '%s' "$ANTIMATTER_SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/matter.p12"
           security create-keychain -p "$keychain_password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
-          security import "$RUNNER_TEMP/antimatter.p12" -k "$keychain" -P "$ANTIMATTER_SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/matter.p12" -k "$keychain" -P "$ANTIMATTER_SIGNING_P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
           # codesign finds identities only in keychains on the user search list.
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          rm "$RUNNER_TEMP/antimatter.p12"
+          rm "$RUNNER_TEMP/matter.p12"
           echo "::add-mask::$keychain_password"
-          echo "ANTIMATTER_KEYCHAIN_PASSWORD=$keychain_password" >> "$GITHUB_ENV"
+          echo "MATTER_KEYCHAIN_PASSWORD=$keychain_password" >> "$GITHUB_ENV"
           identity=$(security find-identity -p codesigning "$keychain" | awk '/Antimatter/ {print $2; exit}')
           test -n "$identity"
-          echo "ANTIMATTER_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
-          echo "ANTIMATTER_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "MATTER_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "MATTER_IDENTITY=$identity" >> "$GITHUB_ENV"
 
       - name: Build macOS app
         env:
@@ -175,10 +175,10 @@ jobs:
             --platform mac --target dmg --arch arm64 \
             --build-version "$VERSION" --verbose
 
-      - name: Sign with the Antimatter certificate
+      - name: Sign with the Matter certificate
         run: |
-          security unlock-keychain -p "$ANTIMATTER_KEYCHAIN_PASSWORD" "$ANTIMATTER_KEYCHAIN"
-          node antimatter/sign-mac-release.mjs --release-dir release --identity "$ANTIMATTER_IDENTITY" --keychain "$ANTIMATTER_KEYCHAIN"
+          security unlock-keychain -p "$MATTER_KEYCHAIN_PASSWORD" "$MATTER_KEYCHAIN"
+          node matter/sign-mac-release.mjs --release-dir release --identity "$MATTER_IDENTITY" --keychain "$MATTER_KEYCHAIN"
 
       - name: Publish release
         env:
@@ -189,7 +189,7 @@ jobs:
             gh release view "$UPSTREAM_TAG" -R "$UPSTREAM" --json body --jq '.body'
             echo
             echo "---"
-            echo "Antimatter build of upstream [${UPSTREAM_TAG}](https://github.com/${UPSTREAM}/releases/tag/${UPSTREAM_TAG}) with main at ${MAIN_SHA:0:12}."
+            echo "Matter build of upstream [${UPSTREAM_TAG}](https://github.com/${UPSTREAM}/releases/tag/${UPSTREAM_TAG}) with main at ${MAIN_SHA:0:12}."
             echo
             echo "<!-- antimatter-build: ${UPSTREAM_TAG} ${MAIN_SHA} -->"
           } > "$RUNNER_TEMP/notes.md"
@@ -197,7 +197,7 @@ jobs:
           gh release create "v${VERSION}" \
             --prerelease \
             --target "$MAIN_SHA" \
-            --title "mattr nightly ${VERSION}" \
+            --title "Matter nightly ${VERSION}" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             release/*.zip release/*.dmg release/*.blockmap release/*-mac.yml
 
@@ -210,4 +210,4 @@ jobs:
 
       - name: Remove signing keychain
         if: always()
-        run: security delete-keychain "$ANTIMATTER_KEYCHAIN" 2>/dev/null || true
+        run: security delete-keychain "$MATTER_KEYCHAIN" 2>/dev/null || true

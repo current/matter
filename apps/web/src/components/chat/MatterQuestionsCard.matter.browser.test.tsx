@@ -1,5 +1,5 @@
 import "~/index.css";
-import "../../../../../antimatter/questions-plan.css";
+import "../../../../../matter/questions-plan.css";
 
 import { EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import {
@@ -13,7 +13,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, fakeTimers, render } from "../../../test/render";
 import type { PendingUserInput } from "../../session-logic";
-import { MattrQuestionsCard, mattrQuestionShortcutIndex } from "./MattrQuestionsCard.mattr";
+import { MatterQuestionsCard, matterQuestionShortcutIndex } from "./MatterQuestionsCard.matter";
 
 const threadRef = { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") };
 
@@ -67,7 +67,7 @@ function Harness(props: {
   const [index, setIndex] = useState(props.initialIndex ?? 0);
   const question = (id: string) => prompt.questions.find((entry) => entry.id === id)!;
   return (
-    <MattrQuestionsCard
+    <MatterQuestionsCard
       prompt={prompt}
       cwd={undefined}
       threadRef={threadRef}
@@ -97,11 +97,11 @@ function Harness(props: {
   );
 }
 
-describe("MattrQuestionsCard", () => {
+describe("MatterQuestionsCard", () => {
   it("letters each option and adds an inline Something else row", async () => {
     await using screen = await render(<Harness onSubmit={vi.fn()} onDismiss={vi.fn()} />);
     await expect.element(screen.getByText("Which auth approach should we use?")).toBeVisible();
-    const keys = [...screen.container.querySelectorAll("[data-mattr-qp-key]")].map(
+    const keys = [...screen.container.querySelectorAll("[data-matter-qp-key]")].map(
       (key) => key.textContent,
     );
     expect(keys).toEqual(["A", "B", "C", "D"]);
@@ -140,14 +140,14 @@ describe("MattrQuestionsCard", () => {
     await screen.getByRole("button", { name: "Session cookies" }).click();
     await expect.element(screen.getByText("2/3")).toBeVisible();
     await expect
-      .element(screen.container.querySelector<HTMLElement>("[data-mattr-qp-step]"))
-      .toHaveAttribute("data-mattr-qp-step", "forward");
+      .element(screen.container.querySelector<HTMLElement>("[data-matter-qp-step]"))
+      .toHaveAttribute("data-matter-qp-step", "forward");
 
     await screen.getByRole("button", { name: "Previous question" }).click();
     await expect.element(screen.getByText("1/3")).toBeVisible();
     await expect
-      .element(screen.container.querySelector<HTMLElement>("[data-mattr-qp-step]"))
-      .toHaveAttribute("data-mattr-qp-step", "backward");
+      .element(screen.container.querySelector<HTMLElement>("[data-matter-qp-step]"))
+      .toHaveAttribute("data-matter-qp-step", "backward");
     await screen.getByRole("button", { name: "Next question" }).click();
     await expect.element(screen.getByText("2/3")).toBeVisible();
   });
@@ -162,7 +162,7 @@ describe("MattrQuestionsCard", () => {
     await screen.getByRole("button", { name: /Continue/ }).click();
     await expect.element(screen.getByText("Ship behind a feature flag?")).toBeVisible();
     // The header that repeats "Questions" gets no extra pill.
-    expect(screen.container.querySelector<HTMLElement>("[data-mattr-qp-pill]")).toBeNull();
+    expect(screen.container.querySelector<HTMLElement>("[data-matter-qp-pill]")).toBeNull();
     const submit = screen.getByRole("button", { name: /Submit/ });
     await expect.element(submit).not.toHaveAttribute("data-ready");
 
@@ -173,7 +173,7 @@ describe("MattrQuestionsCard", () => {
     await expect.element(field).toHaveValue("");
     await userEvent.keyboard("This is an example");
 
-    const customRow = screen.container.querySelector<HTMLElement>("[data-mattr-qp-custom]");
+    const customRow = screen.container.querySelector<HTMLElement>("[data-matter-qp-custom]");
     await expect.element(customRow).toHaveAttribute("data-selected", "");
     await expect.element(submit).toHaveAttribute("data-ready", "");
     await userEvent.keyboard("{Enter}");
@@ -214,7 +214,7 @@ describe("MattrQuestionsCard", () => {
 
     {
       await using screen = await render(
-        <MattrQuestionsCard
+        <MatterQuestionsCard
           prompt={prompt}
           cwd={undefined}
           threadRef={threadRef}
@@ -238,7 +238,7 @@ describe("MattrQuestionsCard", () => {
 
     {
       await using screen = await render(
-        <MattrQuestionsCard
+        <MatterQuestionsCard
           prompt={prompt}
           cwd={undefined}
           threadRef={threadRef}
@@ -265,7 +265,7 @@ describe("MattrQuestionsCard", () => {
     const onToggleOption = vi.fn();
     const onAdvance = vi.fn();
     await using screen = await render(
-      <MattrQuestionsCard
+      <MatterQuestionsCard
         prompt={{ ...prompt, responseCapability: "not_resumable" }}
         cwd={undefined}
         threadRef={threadRef}
@@ -363,14 +363,14 @@ describe("MattrQuestionsCard", () => {
   });
 });
 
-describe("mattrQuestionShortcutIndex", () => {
+describe("matterQuestionShortcutIndex", () => {
   it("maps 1–9 and A–I to rows and ignores other keys", () => {
-    expect(mattrQuestionShortcutIndex("1")).toBe(0);
-    expect(mattrQuestionShortcutIndex("9")).toBe(8);
-    expect(mattrQuestionShortcutIndex("a")).toBe(0);
-    expect(mattrQuestionShortcutIndex("I")).toBe(8);
-    expect(mattrQuestionShortcutIndex("j")).toBeNull();
-    expect(mattrQuestionShortcutIndex("0")).toBeNull();
-    expect(mattrQuestionShortcutIndex("Enter")).toBeNull();
+    expect(matterQuestionShortcutIndex("1")).toBe(0);
+    expect(matterQuestionShortcutIndex("9")).toBe(8);
+    expect(matterQuestionShortcutIndex("a")).toBe(0);
+    expect(matterQuestionShortcutIndex("I")).toBe(8);
+    expect(matterQuestionShortcutIndex("j")).toBeNull();
+    expect(matterQuestionShortcutIndex("0")).toBeNull();
+    expect(matterQuestionShortcutIndex("Enter")).toBeNull();
   });
 });

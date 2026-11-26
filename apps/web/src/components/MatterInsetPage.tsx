@@ -18,10 +18,10 @@ const ESCAPE_LAYER_SELECTOR =
   '[role="dialog"]:not([data-app-modal]), [aria-modal="true"]:not([data-app-modal]), [data-slot$="popup"]:not([data-app-modal])';
 
 /**
- * mattr: Settings and Usage as pages in the shell's inset card instead of upstream's floating
+ * Matter: Settings and Usage as pages in the shell's inset card instead of upstream's floating
  * `AppRouteModal`. The sidebar stays usable; Esc and the close button return to the opener.
  */
-export function MattrInsetPage({
+export function MatterInsetPage({
   label,
   breadcrumb,
   actions,
@@ -45,7 +45,7 @@ export function MattrInsetPage({
 
   const close = (viaKeyboard = false) => {
     // Closing unmounts a focused field without a blur, so commit-on-blur rows would drop input.
-    blurFocusedWithin(document.querySelector("[data-mattr-inset-page]"));
+    blurFocusedWithin(document.querySelector("[data-matter-inset-page]"));
     void closeAppModal();
     if (viaKeyboard && openerArea) requestWorkspaceFocus({ area: openerArea });
   };
@@ -105,14 +105,14 @@ export function MattrInsetPage({
   return (
     <SidebarInset
       ref={pageRef}
-      data-mattr-inset-page=""
+      data-matter-inset-page=""
       className="h-svh min-h-0 overflow-hidden overscroll-y-none md:h-dvh"
     >
       <WorkspacePageHeader electron={isElectron} className="border-b">
         {breadcrumb}
         <div className="ms-auto flex shrink-0 items-center gap-1">
           {actions}
-          <MattrInsetPageClose onClose={() => close()} />
+          <MatterInsetPageClose onClose={() => close()} />
         </div>
       </WorkspacePageHeader>
       <div
@@ -135,7 +135,7 @@ function blurFocusedWithin(container: HTMLElement | null) {
   if (focused instanceof HTMLElement && container?.contains(focused)) focused.blur();
 }
 
-function MattrInsetPageClose({ onClose }: { onClose: () => void }) {
+function MatterInsetPageClose({ onClose }: { onClose: () => void }) {
   const gt = useGT();
   return (
     <Tooltip>

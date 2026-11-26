@@ -456,7 +456,7 @@ export function deduplicateGrokBotMessages(
 
 /**
  * Finds Grok Bot's own renderer stores (roster, transcript, sendJournal) through the React context
- * a mounted component reads. Every operation goes through them, so mattr never switches the chat
+ * a mounted component reads. Every operation goes through them, so Matter never switches the chat
  * Grok Bot shows, and never reads tokens, cookies or the Keychain.
  */
 const RENDERER_STORES_SNIPPET = `

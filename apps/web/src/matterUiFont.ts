@@ -7,9 +7,9 @@ import {
   useLocalStorage,
 } from "./hooks/useLocalStorage";
 
-export const MATTR_UI_FONT_STORAGE_KEY = "mattr:ui-font:v1";
+export const MATTER_UI_FONT_STORAGE_KEY = "mattr:ui-font:v1";
 
-export const MattrUiFont = Schema.Literals([
+export const MatterUiFont = Schema.Literals([
   "system",
   "sf-pro-text",
   "geist",
@@ -21,15 +21,15 @@ export const MattrUiFont = Schema.Literals([
   "google-sans-flex",
   "berkeley-mono",
 ]);
-export type MattrUiFont = typeof MattrUiFont.Type;
+export type MatterUiFont = typeof MatterUiFont.Type;
 
-export const DEFAULT_MATTR_UI_FONT: MattrUiFont = "system";
+export const DEFAULT_MATTER_UI_FONT: MatterUiFont = "system";
 
 /** A stand-in the OS supplies, so nothing is bundled for it. */
 export const SYSTEM_STAND_IN = "system-ui";
 
-export interface MattrUiFontDefinition {
-  readonly id: MattrUiFont;
+export interface MatterUiFontDefinition {
+  readonly id: MatterUiFont;
   readonly name: string;
   readonly usedBy: string;
   readonly stack: string;
@@ -40,7 +40,7 @@ export interface MattrUiFontDefinition {
   readonly mono?: boolean;
 }
 
-export const MATTR_UI_FONTS: readonly MattrUiFontDefinition[] = [
+export const MATTER_UI_FONTS: readonly MatterUiFontDefinition[] = [
   {
     id: "system",
     name: "SF Pro / system-ui",
@@ -116,14 +116,14 @@ export const MATTR_UI_FONTS: readonly MattrUiFontDefinition[] = [
   },
 ];
 
-const FONTS_BY_ID = new Map(MATTR_UI_FONTS.map((font) => [font.id, font]));
+const FONTS_BY_ID = new Map(MATTER_UI_FONTS.map((font) => [font.id, font]));
 
-export function mattrUiFontDefinition(id: MattrUiFont): MattrUiFontDefinition {
-  return FONTS_BY_ID.get(id) ?? MATTR_UI_FONTS[0]!;
+export function matterUiFontDefinition(id: MatterUiFont): MatterUiFontDefinition {
+  return FONTS_BY_ID.get(id) ?? MATTER_UI_FONTS[0]!;
 }
 
 // Each bundled face is its own chunk, fetched only once that font is picked or previewed.
-export const MATTR_UI_FONT_LOADERS: Partial<Record<MattrUiFont, () => Promise<unknown>>> = {
+export const MATTER_UI_FONT_LOADERS: Partial<Record<MatterUiFont, () => Promise<unknown>>> = {
   geist: () => import("@fontsource-variable/geist/index.css"),
   "ibm-plex-sans": () =>
     Promise.all([
@@ -145,50 +145,50 @@ export const MATTR_UI_FONT_LOADERS: Partial<Record<MattrUiFont, () => Promise<un
     ]),
 };
 
-const loadedFonts = new Map<MattrUiFont, Promise<unknown>>();
+const loadedFonts = new Map<MatterUiFont, Promise<unknown>>();
 
-export function loadMattrUiFont(id: MattrUiFont): Promise<unknown> {
+export function loadMatterUiFont(id: MatterUiFont): Promise<unknown> {
   const existing = loadedFonts.get(id);
   if (existing) return existing;
-  const loader = MATTR_UI_FONT_LOADERS[id];
+  const loader = MATTER_UI_FONT_LOADERS[id];
   const pending = loader ? loader().catch(() => undefined) : Promise.resolve();
   loadedFonts.set(id, pending);
   return pending;
 }
 
-const STYLE_ELEMENT_ID = "mattr-ui-font";
+const STYLE_ELEMENT_ID = "matter-ui-font";
 
 /**
  * A stylesheet rule rather than an inline property: appInit owns the inline `--font-sans`
  * (Typography's custom interface font) and clears it, and an explicit pick here should win.
  */
-export function applyMattrUiFont(root: HTMLElement, id: MattrUiFont): void {
+export function applyMatterUiFont(root: HTMLElement, id: MatterUiFont): void {
   const doc = root.ownerDocument;
   const existing = doc.getElementById(STYLE_ELEMENT_ID);
-  if (id === DEFAULT_MATTR_UI_FONT) {
-    delete root.dataset.mattrUiFont;
+  if (id === DEFAULT_MATTER_UI_FONT) {
+    delete root.dataset.matterUiFont;
     existing?.remove();
     return;
   }
-  void loadMattrUiFont(id);
-  root.dataset.mattrUiFont = id;
+  void loadMatterUiFont(id);
+  root.dataset.matterUiFont = id;
   const style = existing ?? doc.head.appendChild(doc.createElement("style"));
   style.id = STYLE_ELEMENT_ID;
-  style.textContent = `:root { --font-sans: ${mattrUiFontDefinition(id).stack} !important; }`;
+  style.textContent = `:root { --font-sans: ${matterUiFontDefinition(id).stack} !important; }`;
 }
 
-export function readMattrUiFont(): MattrUiFont {
-  return readLocalStorageValue(MATTR_UI_FONT_STORAGE_KEY, DEFAULT_MATTR_UI_FONT, MattrUiFont);
+export function readMatterUiFont(): MatterUiFont {
+  return readLocalStorageValue(MATTER_UI_FONT_STORAGE_KEY, DEFAULT_MATTER_UI_FONT, MatterUiFont);
 }
 
 /** Applies the saved font before the first render and follows later changes from any window. */
-export function startMattrUiFont(root: HTMLElement = document.documentElement): () => void {
-  applyMattrUiFont(root, readMattrUiFont());
-  return subscribeLocalStorageKey(MATTR_UI_FONT_STORAGE_KEY, () =>
-    applyMattrUiFont(root, readMattrUiFont()),
+export function startMatterUiFont(root: HTMLElement = document.documentElement): () => void {
+  applyMatterUiFont(root, readMatterUiFont());
+  return subscribeLocalStorageKey(MATTER_UI_FONT_STORAGE_KEY, () =>
+    applyMatterUiFont(root, readMatterUiFont()),
   );
 }
 
-export function useMattrUiFont() {
-  return useLocalStorage(MATTR_UI_FONT_STORAGE_KEY, DEFAULT_MATTR_UI_FONT, MattrUiFont);
+export function useMatterUiFont() {
+  return useLocalStorage(MATTER_UI_FONT_STORAGE_KEY, DEFAULT_MATTER_UI_FONT, MatterUiFont);
 }

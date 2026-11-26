@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { DEFAULT_ISLAND_SETTINGS } from "../../../../antimatter/island/types";
-import { DEFAULT_VOICE_ASSISTANT_SETTINGS } from "../../../../antimatter/voice-assistant/types";
+import { DEFAULT_ISLAND_SETTINGS } from "../../../../matter/island/types";
+import { DEFAULT_VOICE_ASSISTANT_SETTINGS } from "../../../../matter/voice-assistant/types";
 import {
   getIslandSettings,
   normalizeIslandSettings,

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { relativeLuminance, SHELL_COLOR_PRESETS } from "../../../antimatter/shellTint";
+import { relativeLuminance, SHELL_COLOR_PRESETS } from "../../../matter/shellTint";
 import {
   adaptComposerTint,
   composerBlurRadius,
-  DEFAULT_MATTR_COMPOSER_APPEARANCE,
+  DEFAULT_MATTER_COMPOSER_APPEARANCE,
   effectiveComposerColor,
-  MATTR_COMPOSER_APPEARANCE_STORAGE_KEY,
-  type MattrComposerAppearance,
-  normalizeMattrComposerAppearance,
-  readMattrComposerAppearance,
-  writeMattrComposerAppearance,
-} from "./mattrComposerAppearance";
+  MATTER_COMPOSER_APPEARANCE_STORAGE_KEY,
+  type MatterComposerAppearance,
+  normalizeMatterComposerAppearance,
+  readMatterComposerAppearance,
+  writeMatterComposerAppearance,
+} from "./matterComposerAppearance";
 
 function contrast(a: string, b: string): number {
   const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x) as [
@@ -21,8 +21,8 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-const appearance = (patch: Partial<MattrComposerAppearance>): MattrComposerAppearance => ({
-  ...DEFAULT_MATTR_COMPOSER_APPEARANCE,
+const appearance = (patch: Partial<MatterComposerAppearance>): MatterComposerAppearance => ({
+  ...DEFAULT_MATTER_COMPOSER_APPEARANCE,
   ...patch,
 });
 
@@ -32,12 +32,12 @@ const INK = {
   dark: { text: "#d6d6d6", tray: "#9e9e9e" },
 } as const;
 
-describe("normalizeMattrComposerAppearance", () => {
+describe("normalizeMatterComposerAppearance", () => {
   it("fills a missing or malformed value with the defaults", () => {
-    expect(normalizeMattrComposerAppearance(null)).toEqual(DEFAULT_MATTR_COMPOSER_APPEARANCE);
-    expect(normalizeMattrComposerAppearance("glass")).toEqual(DEFAULT_MATTR_COMPOSER_APPEARANCE);
+    expect(normalizeMatterComposerAppearance(null)).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
+    expect(normalizeMatterComposerAppearance("glass")).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
     expect(
-      normalizeMattrComposerAppearance({
+      normalizeMatterComposerAppearance({
         scrollFade: "no",
         material: "chrome",
         shape: 3,
@@ -45,30 +45,30 @@ describe("normalizeMattrComposerAppearance", () => {
         blur: Number.NaN,
         color: 12,
       }),
-    ).toEqual(DEFAULT_MATTR_COMPOSER_APPEARANCE);
+    ).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
   });
 
   it("keeps valid fields from a partial value", () => {
-    expect(normalizeMattrComposerAppearance({ material: "glass", scrollFade: false })).toEqual(
+    expect(normalizeMatterComposerAppearance({ material: "glass", scrollFade: false })).toEqual(
       appearance({ material: "glass", scrollFade: false }),
     );
   });
 
   it("clamps and rounds the sliders into range", () => {
-    const clamped = normalizeMattrComposerAppearance({ transparency: 140, blur: -3 });
+    const clamped = normalizeMatterComposerAppearance({ transparency: 140, blur: -3 });
     expect(clamped.transparency).toBe(85);
     expect(clamped.blur).toBe(0);
-    expect(normalizeMattrComposerAppearance({ transparency: 42.6, blur: 17.2 })).toMatchObject({
+    expect(normalizeMatterComposerAppearance({ transparency: 42.6, blur: 17.2 })).toMatchObject({
       transparency: 43,
       blur: 17,
     });
   });
 
   it("accepts shell, normalizes hex seeds and drops anything else", () => {
-    expect(normalizeMattrComposerAppearance({ color: "shell" }).color).toBe("shell");
-    expect(normalizeMattrComposerAppearance({ color: "#ABC" }).color).toBe("#aabbcc");
-    expect(normalizeMattrComposerAppearance({ color: " 3F6E8C " }).color).toBe("#3f6e8c");
-    expect(normalizeMattrComposerAppearance({ color: "red" }).color).toBeNull();
+    expect(normalizeMatterComposerAppearance({ color: "shell" }).color).toBe("shell");
+    expect(normalizeMatterComposerAppearance({ color: "#ABC" }).color).toBe("#aabbcc");
+    expect(normalizeMatterComposerAppearance({ color: " 3F6E8C " }).color).toBe("#3f6e8c");
+    expect(normalizeMatterComposerAppearance({ color: "red" }).color).toBeNull();
   });
 });
 
@@ -127,14 +127,14 @@ describe("composerBlurRadius", () => {
 
 describe("composer appearance storage", () => {
   it("merges patches into the stored appearance", () => {
-    expect(readMattrComposerAppearance()).toEqual(DEFAULT_MATTR_COMPOSER_APPEARANCE);
-    writeMattrComposerAppearance({ material: "frosted" });
-    writeMattrComposerAppearance({ transparency: 999, scrollFade: false });
-    expect(readMattrComposerAppearance()).toEqual(
+    expect(readMatterComposerAppearance()).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
+    writeMatterComposerAppearance({ material: "frosted" });
+    writeMatterComposerAppearance({ transparency: 999, scrollFade: false });
+    expect(readMatterComposerAppearance()).toEqual(
       appearance({ material: "frosted", transparency: 85, scrollFade: false }),
     );
-    writeMattrComposerAppearance(DEFAULT_MATTR_COMPOSER_APPEARANCE);
-    expect(readMattrComposerAppearance()).toEqual(DEFAULT_MATTR_COMPOSER_APPEARANCE);
-    expect(MATTR_COMPOSER_APPEARANCE_STORAGE_KEY).toBe("mattr:composer-appearance:v1");
+    writeMatterComposerAppearance(DEFAULT_MATTER_COMPOSER_APPEARANCE);
+    expect(readMatterComposerAppearance()).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
+    expect(MATTER_COMPOSER_APPEARANCE_STORAGE_KEY).toBe("mattr:composer-appearance:v1");
   });
 });

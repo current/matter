@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
-import { playMobileAudioCue } from "../../lib/mattrAudioCues";
+import { playMobileAudioCue } from "../../lib/matterAudioCues";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { useVisibleThreadShells } from "../../state/entities";
 import { mobilePreferencesAtom } from "../../state/preferences";
@@ -35,7 +35,7 @@ import { createVoiceAssistantApi } from "./voiceAssistantApi";
 import type { VoiceThreadScope, VoiceTurnEntry } from "./voiceContextLogic";
 import { VoiceModeSession, type VoicePhase } from "./voiceModeSession";
 
-export type MattrVoiceModeRouteParams = {
+export type MatterVoiceModeRouteParams = {
   readonly environmentId?: string;
   readonly threadId?: string;
   readonly threadTitle?: string;
@@ -156,7 +156,7 @@ function RoundButton(props: {
 }
 
 function initialThreadScope(
-  params: MattrVoiceModeRouteParams | undefined,
+  params: MatterVoiceModeRouteParams | undefined,
 ): VoiceThreadScope | null {
   const environmentId = params?.environmentId?.trim();
   const threadId = params?.threadId?.trim();
@@ -178,8 +178,8 @@ function createScopeBox(initial: VoiceThreadScope | null) {
   };
 }
 
-export function MattrVoiceModeScreen(
-  props: Partial<StaticScreenProps<MattrVoiceModeRouteParams | undefined>> = {},
+export function MatterVoiceModeScreen(
+  props: Partial<StaticScreenProps<MatterVoiceModeRouteParams | undefined>> = {},
 ) {
   const gt = useGT();
   const navigation = useNavigation();

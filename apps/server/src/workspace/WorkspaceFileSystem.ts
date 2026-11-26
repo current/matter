@@ -28,7 +28,7 @@ import * as WorkspaceEntries from "./WorkspaceEntries.ts";
 import * as WorkspacePaths from "./WorkspacePaths.ts";
 import { fileHeaderMimeType } from "./fileHeaderMimeType.ts";
 import { toHostDrivePath } from "./hostDrivePath.ts";
-import { withProjectFileFallback } from "../project/MattrProjectFile.ts";
+import { withProjectFileFallback } from "../project/MatterProjectFile.ts";
 
 const PROJECT_READ_FILE_MAX_BYTES = 1024 * 1024;
 

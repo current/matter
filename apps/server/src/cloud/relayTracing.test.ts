@@ -65,7 +65,7 @@ it.effect("relay tracing waits for the desktop shell's telemetry opt-out", () =>
   );
 });
 
-it("always reports relay tracing disabled to clients in mattr", () => {
+it("always reports relay tracing disabled to clients in Matter", () => {
   assert.isFalse(allowedFor({}, undefined));
   assert.isFalse(allowedFor({ T3CODE_TELEMETRY_ENABLED: "false" }, undefined));
   assert.isFalse(allowedFor({ CI: "true" }, undefined));

@@ -4,7 +4,7 @@ import { useGT, useMessages } from "gt-react";
 import { useEffect } from "react";
 
 import { ADDON_STATUS_LABELS } from "../../addons/addonRegistry";
-import { useMattrApiConfig } from "../../addons/mattrApi";
+import { useMatterApiConfig } from "../../addons/matterApi";
 import { useEnabledBotProviderAddons } from "../../addons/useAddonRegistry";
 import { cn } from "../../lib/utils";
 import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
@@ -24,7 +24,7 @@ export function BotsSidebarSection() {
 
 function BotsSidebarSectionContent() {
   const gt = useGT();
-  const config = useMattrApiConfig();
+  const config = useMatterApiConfig();
   const bots = useBotsState();
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the Bots event stream open while the section is mounted
   useEffect(() => {
