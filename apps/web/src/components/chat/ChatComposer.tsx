@@ -1946,6 +1946,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return true;
   };
   const applyPromptReplacementStable = useStableCallback(applyPromptReplacement);
+  // mattr: the Questions card's inline "Something else" field edits the same answer.
+  const onChangeActivePendingUserInputCustomAnswerStable = useStableCallback(
+    (questionId: string, value: string) => {
+      const cursor = collapseExpandedComposerCursor(value, value.length, isLiteralPendingAnswer);
+      setComposerCursor(cursor);
+      onChangeActivePendingUserInputCustomAnswer(questionId, value, cursor, value.length, false);
+    },
+  );
 
   const readComposerSnapshot = (): {
     value: string;
@@ -3756,6 +3764,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     onToggleOption={onSelectActivePendingUserInputOption}
                     onAdvance={onAdvanceActivePendingUserInput}
                     onDismiss={onDismissActivePendingUserInput}
+                    onPrevious={onPreviousActivePendingUserInputQuestion}
+                    onChangeCustomAnswer={onChangeActivePendingUserInputCustomAnswerStable}
                   />
                 ) : null}
               </ComposerBanner.Root>

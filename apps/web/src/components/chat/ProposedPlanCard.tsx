@@ -9,6 +9,7 @@ import {
 import {
   AuthFilesystemWriteScope,
   type EnvironmentId,
+  type PlanId,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import {
@@ -38,15 +39,25 @@ import { projectEnvironment } from "~/state/projects";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
+import { MattrPlanOverviewCard, type MattrPlanApproveResult } from "./MattrPlanOverviewCard.mattr";
+
+// mattr: tests keep upstream's card, which they assert against.
+const MATTR_PLAN_OVERVIEW = import.meta.env.MODE !== "test";
 
 export const ProposedPlanCard = memo(function ProposedPlanCard({
+  planId,
   planMarkdown,
   environmentId,
   threadRef,
   cwd,
   workspaceRoot,
   findActive = false,
+  mattrApprove = null,
+  mattrAutoApproveEligible = true,
 }: {
+  planId?: PlanId;
+  mattrApprove?: ((planMarkdown: string) => Promise<MattrPlanApproveResult>) | null;
+  mattrAutoApproveEligible?: boolean;
   planMarkdown: string;
   environmentId: EnvironmentId;
   threadRef?: ScopedThreadRef | undefined;
@@ -166,6 +177,51 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
     })();
   };
 
+  const saveDialog = (
+    <Dialog
+      open={isSaveDialogOpen}
+      onOpenChange={(open) => {
+        if (!isSavingToWorkspace) {
+          setIsSaveDialogOpen(open);
+        }
+      }}
+    >
+      <DialogPopup className="max-w-xl">
+        <SavePlanToWorkspaceForm
+          initialPath={lastSavePath || downloadFilename}
+          placeholder={downloadFilename}
+          workspaceRoot={workspaceRoot}
+          canWriteFiles={canWriteFiles}
+          saving={isSavingToWorkspace}
+          onCancel={() => setIsSaveDialogOpen(false)}
+          onSave={handleSaveToWorkspace}
+        />
+      </DialogPopup>
+    </Dialog>
+  );
+
+  if (MATTR_PLAN_OVERVIEW) {
+    return (
+      <MattrPlanOverviewCard
+        planId={planId}
+        planMarkdown={planMarkdown}
+        fallbackTitle={gt("Proposed plan")}
+        environmentId={environmentId}
+        threadRef={threadRef}
+        cwd={cwd}
+        findActive={findActive}
+        isCopied={isCopied}
+        onDownload={handleDownload}
+        onCopy={handleCopyPlan}
+        onSaveToWorkspace={canWriteFiles && workspaceRoot ? openSaveDialog : null}
+        onApprove={mattrApprove}
+        autoApproveEligible={mattrAutoApproveEligible}
+      >
+        {saveDialog}
+      </MattrPlanOverviewCard>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-border/80 bg-card/70 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -242,26 +298,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
         ) : null}
       </div>
 
-      <Dialog
-        open={isSaveDialogOpen}
-        onOpenChange={(open) => {
-          if (!isSavingToWorkspace) {
-            setIsSaveDialogOpen(open);
-          }
-        }}
-      >
-        <DialogPopup className="max-w-xl">
-          <SavePlanToWorkspaceForm
-            initialPath={lastSavePath || downloadFilename}
-            placeholder={downloadFilename}
-            workspaceRoot={workspaceRoot}
-            canWriteFiles={canWriteFiles}
-            saving={isSavingToWorkspace}
-            onCancel={() => setIsSaveDialogOpen(false)}
-            onSave={handleSaveToWorkspace}
-          />
-        </DialogPopup>
-      </Dialog>
+      {saveDialog}
     </div>
   );
 });

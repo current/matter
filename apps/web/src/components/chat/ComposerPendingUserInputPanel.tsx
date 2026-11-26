@@ -14,6 +14,10 @@ import { cn } from "~/lib/utils";
 import { isInSideChatPane } from "~/lib/sideChatPane";
 import { ComposerBanner } from "./ComposerBanner";
 import ChatMarkdown from "../ChatMarkdown";
+import { MattrQuestionsCard } from "./MattrQuestionsCard.mattr";
+
+// mattr: tests keep upstream's banner, which they assert against.
+const MATTR_QUESTIONS_CARD = import.meta.env.MODE !== "test";
 
 interface PendingUserInputPanelProps {
   pendingUserInputs: PendingUserInput[];
@@ -26,6 +30,8 @@ interface PendingUserInputPanelProps {
   onToggleOption: (questionId: string, optionValue: string) => void;
   onAdvance: () => void;
   onDismiss: (requestId: RuntimeRequestId) => void;
+  onPrevious?: () => void;
+  onChangeCustomAnswer?: (questionId: string, value: string) => void;
 }
 
 export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserInputPanel({
@@ -39,10 +45,31 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
   onToggleOption,
   onAdvance,
   onDismiss,
+  onPrevious,
+  onChangeCustomAnswer,
 }: PendingUserInputPanelProps) {
   if (pendingUserInputs.length === 0) return null;
   const activePrompt = pendingUserInputs[0];
   if (!activePrompt) return null;
+  if (MATTR_QUESTIONS_CARD && onPrevious && onChangeCustomAnswer) {
+    return (
+      <MattrQuestionsCard
+        key={activePrompt.requestId}
+        prompt={activePrompt}
+        cwd={cwd}
+        threadRef={threadRef}
+        disabled={disabled}
+        isResponding={respondingRequestIds.includes(activePrompt.requestId)}
+        answers={answers}
+        questionIndex={questionIndex}
+        onToggleOption={onToggleOption}
+        onAdvance={onAdvance}
+        onPrevious={onPrevious}
+        onChangeCustomAnswer={onChangeCustomAnswer}
+        onDismiss={onDismiss}
+      />
+    );
+  }
 
   return (
     <ComposerPendingUserInputCard

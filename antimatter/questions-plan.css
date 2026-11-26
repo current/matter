@@ -1,0 +1,780 @@
+/* mattr Questions card (pending user input above the composer) and Plan Overview card
+   (proposed plans in the timeline), after Chris's CollectUI reference. Inks derive from the
+   theme's foreground/background, so dark, light and custom themes all invert cleanly.
+   Motion plays only on a change (step slide, height ease, pill fill); nothing loops. */
+
+:is(
+  [data-mattr-questions],
+  [data-mattr-plan],
+  [data-composer-banner-surface]:has(> [data-mattr-questions])
+) {
+  --mq-card: #ffffff;
+  --mq-line: rgb(0 0 0 / 8%);
+  --mq-recess: #f4f4f6;
+  --mq-ink: var(--foreground);
+  --mq-ink-2: color-mix(in srgb, var(--foreground) 62%, transparent);
+  --mq-ink-3: color-mix(in srgb, var(--foreground) 42%, transparent);
+  --mq-row: color-mix(in srgb, var(--foreground) 1.5%, transparent);
+  --mq-row-line: color-mix(in srgb, var(--foreground) 9%, transparent);
+  --mq-row-hover: color-mix(in srgb, var(--foreground) 4%, transparent);
+  --mq-row-on: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --mq-row-on-line: color-mix(in srgb, var(--foreground) 26%, transparent);
+  --mq-key: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --mq-key-hover: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --mq-quiet: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --mq-quiet-hover: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --mq-strong: var(--foreground);
+  --mq-strong-ink: var(--background);
+  --mq-idle: color-mix(in srgb, var(--foreground) 14%, transparent);
+  --mq-idle-ink: color-mix(in srgb, var(--foreground) 42%, transparent);
+  --mq-blue: #2f6fe4;
+  --mq-blue-bg: rgb(47 111 228 / 11%);
+  --mq-green: #0f9f6e;
+  --mq-green-bg: rgb(15 159 110 / 12%);
+  --mq-tip: #2a2a2d;
+  --mq-tip-ink: #f4f4f5;
+  --mq-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dark
+  :is(
+    [data-mattr-questions],
+    [data-mattr-plan],
+    [data-composer-banner-surface]:has(> [data-mattr-questions])
+  ) {
+  --mq-card: #161618;
+  --mq-line: rgb(255 255 255 / 7%);
+  --mq-recess: #0f1012;
+  --mq-idle: color-mix(in srgb, var(--foreground) 34%, transparent);
+  --mq-idle-ink: color-mix(in srgb, var(--background) 72%, transparent);
+  --mq-blue: #6d9cff;
+  --mq-blue-bg: rgb(80 130 255 / 15%);
+  --mq-green: #3ccf91;
+  --mq-green-bg: rgb(52 200 140 / 15%);
+  --mq-tip: #3a3a3d;
+}
+
+/* Custom themes keep their own surfaces. */
+html[data-theme-id]
+  :is(
+    [data-mattr-questions],
+    [data-mattr-plan],
+    [data-composer-banner-surface]:has(> [data-mattr-questions])
+  ) {
+  --mq-card: var(--app-theme-surface-raised, var(--card));
+  --mq-line: var(--app-theme-toolbar-border, var(--border));
+  --mq-recess: color-mix(
+    in srgb,
+    var(--app-theme-surface-raised, var(--card)) 45%,
+    var(--background)
+  );
+}
+
+/* ── Shared header, footer and pills ─────────────────────────────────────────────────────── */
+
+[data-mattr-qp-header] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+}
+
+[data-mattr-qp-glyph] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+
+[data-mattr-qp-glyph] svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-mattr-qp-glyph="question"] {
+  background: var(--mq-blue-bg);
+  color: var(--mq-blue);
+}
+
+[data-mattr-qp-glyph="plan"] {
+  background: var(--mq-green-bg);
+  color: var(--mq-green);
+}
+
+[data-mattr-qp-heading] {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--mq-ink);
+}
+
+[data-mattr-qp-pill] {
+  min-width: 0;
+  overflow: hidden;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--mq-quiet);
+  color: var(--mq-ink-2);
+  font-size: 11.5px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-mattr-qp-footer] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+[data-mattr-qp-actions] {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-mattr-qp-pill-button] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 160ms var(--mq-ease),
+    color 160ms var(--mq-ease),
+    transform 120ms var(--mq-ease);
+}
+
+[data-mattr-qp-pill-button]:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--mq-card),
+    0 0 0 4px var(--mq-row-on-line);
+}
+
+[data-mattr-qp-pill-button]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+[data-mattr-qp-pill-button="secondary"] {
+  background: var(--mq-quiet);
+  color: var(--mq-ink);
+}
+
+[data-mattr-qp-pill-button="secondary"]:hover:not(:disabled) {
+  background: var(--mq-quiet-hover);
+}
+
+[data-mattr-qp-pill-button="primary"] {
+  background: var(--mq-idle);
+  color: var(--mq-idle-ink);
+}
+
+[data-mattr-qp-pill-button="primary"][data-ready] {
+  background: var(--mq-strong);
+  color: var(--mq-strong-ink);
+}
+
+[data-mattr-qp-pill-button="primary"][data-ready]:hover {
+  background: color-mix(in srgb, var(--mq-strong) 88%, var(--mq-card));
+}
+
+[data-mattr-qp-pill-button]:disabled {
+  cursor: default;
+}
+
+[data-mattr-qp-enter] {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* ── Questions ───────────────────────────────────────────────────────────────────────────── */
+
+/* The banner surface above the composer becomes the card. */
+[data-composer-banner-surface]:has(> [data-mattr-questions]) {
+  padding: 0;
+}
+
+[data-composer-banner-surface]:has(> [data-mattr-questions])::before {
+  border-color: var(--mq-line);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  background: var(--mq-card);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* Keep stacked banners square where another banner sits directly above Questions. */
+[data-slot="composer-banner-attachment"]
+  + [data-slot="composer-banner-attachment"]
+  [data-composer-banner-surface="attached"]:has(> [data-mattr-questions])::before {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-width: 0;
+}
+
+[data-mattr-questions] {
+  padding: 14px 16px 12px;
+  color: var(--mq-ink);
+  font-size: 13.5px;
+  line-height: 20px;
+}
+
+[data-mattr-qp-question] {
+  margin-top: 10px;
+  color: var(--mq-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+[data-mattr-qp-question] :is(em, i) {
+  font-style: normal;
+}
+
+[data-mattr-qp-hint] {
+  margin-top: 2px;
+  color: var(--mq-ink-3);
+  font-size: 12px;
+}
+
+[data-mattr-qp-options] {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+[data-mattr-qp-option] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--mq-row-line);
+  border-radius: 10px;
+  background: var(--mq-row);
+  color: var(--mq-ink);
+  font-size: 13.5px;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 140ms var(--mq-ease),
+    border-color 140ms var(--mq-ease);
+}
+
+[data-mattr-qp-option]:hover:not(:disabled, [data-disabled]) {
+  background: var(--mq-row-hover);
+}
+
+[data-mattr-qp-option]:is(:focus-visible, :focus-within) {
+  border-color: var(--mq-row-on-line);
+}
+
+[data-mattr-qp-option][data-selected] {
+  border-color: var(--mq-row-on-line);
+  background: var(--mq-row-on);
+}
+
+[data-mattr-qp-option]:is(:disabled, [data-disabled]) {
+  cursor: default;
+  opacity: 0.55;
+}
+
+[data-mattr-qp-key] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--mq-key);
+  color: var(--mq-ink-3);
+  font-size: 11.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 140ms var(--mq-ease),
+    color 140ms var(--mq-ease);
+}
+
+[data-mattr-qp-option]:hover:not(:disabled, [data-disabled]) [data-mattr-qp-key] {
+  background: var(--mq-key-hover);
+  color: var(--mq-ink);
+}
+
+[data-mattr-qp-option][data-selected] [data-mattr-qp-key] {
+  background: var(--mq-strong);
+  color: var(--mq-strong-ink);
+}
+
+[data-mattr-qp-option-text] {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+[data-mattr-qp-option-description] {
+  color: var(--mq-ink-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+[data-mattr-qp-check] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--mq-ink-2);
+}
+
+[data-mattr-qp-custom] {
+  cursor: text;
+}
+
+[data-mattr-qp-custom] input {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mq-ink);
+  font: inherit;
+  outline: none;
+}
+
+[data-mattr-qp-custom] input::placeholder {
+  color: var(--mq-ink-3);
+  opacity: 1;
+}
+
+[data-mattr-qp-preview] {
+  padding: 6px 12px 2px 40px;
+  color: var(--mq-ink-2);
+  font-size: 12px;
+}
+
+[data-mattr-qp-stepper] {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: -4px;
+}
+
+[data-mattr-qp-stepper] button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--mq-ink-2);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 140ms var(--mq-ease),
+    color 140ms var(--mq-ease);
+}
+
+[data-mattr-qp-stepper] button svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-mattr-qp-stepper] button:hover:not(:disabled) {
+  background: var(--mq-quiet);
+  color: var(--mq-ink);
+}
+
+[data-mattr-qp-stepper] button:focus-visible {
+  box-shadow: 0 0 0 2px var(--mq-row-on-line);
+}
+
+[data-mattr-qp-stepper] button:disabled {
+  color: var(--mq-ink-3);
+  opacity: 0.5;
+  cursor: default;
+}
+
+[data-mattr-qp-count] {
+  min-width: 28px;
+  color: var(--mq-ink-2);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* One card holds the controls: the composer's own Previous / Next / Submit would repeat them,
+   except while dictation is active and uses the submit button to finish recording. */
+[data-chat-composer-form]:has([data-mattr-questions])
+  [data-pending-question-action]:not([data-voice-input-active="true"]),
+[data-chat-composer-form]:has([data-mattr-questions]) [data-chat-composer-mobile-pending-actions] {
+  display: none;
+}
+
+/* Without the mobile overlay, drop its 48px bottom padding reservation on narrow viewports. */
+@media (width < 40rem) {
+  [data-chat-composer-form]:has([data-mattr-questions]) [data-testid="composer-editor"] {
+    padding-bottom: 0.25rem;
+  }
+}
+
+/* ── Plan Overview ───────────────────────────────────────────────────────────────────────── */
+
+[data-mattr-plan] {
+  padding: 14px 16px;
+  border: 1px solid var(--mq-line);
+  border-radius: 16px;
+  background: var(--mq-card);
+  color: var(--mq-ink);
+  font-size: 13.5px;
+  line-height: 20px;
+}
+
+[data-mattr-plan-tools] {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: auto;
+  margin-inline-end: -6px;
+}
+
+[data-mattr-plan-tool] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--mq-ink-3);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 140ms var(--mq-ease),
+    color 140ms var(--mq-ease);
+}
+
+[data-mattr-plan-tool] svg {
+  width: 15px;
+  height: 15px;
+}
+
+[data-mattr-plan-tool]:is(:hover, :focus-visible) {
+  background: var(--mq-quiet);
+  color: var(--mq-ink);
+}
+
+[data-mattr-plan-title] {
+  margin-top: 12px;
+  color: var(--mq-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+[data-mattr-plan-summary] {
+  display: -webkit-box;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--mq-ink-2);
+  font-size: 13.5px;
+  line-height: 20px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+[data-mattr-plan-todos] {
+  margin-top: 12px;
+  padding: 10px 14px 8px;
+  border-radius: 12px;
+  background: var(--mq-recess);
+}
+
+[data-mattr-plan-todos-header] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+[data-mattr-plan-todos-header] svg {
+  width: 15px;
+  height: 15px;
+  color: var(--mq-ink-2);
+}
+
+[data-mattr-plan-count] {
+  margin-inline-start: auto;
+  color: var(--mq-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-plan-steps] {
+  display: grid;
+  margin-top: 4px;
+}
+
+[data-mattr-plan-step] {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+  color: var(--mq-ink-2);
+}
+
+[data-mattr-plan-step][data-done] [data-mattr-plan-step-text] {
+  color: var(--mq-ink-3);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--mq-ink-3) 60%, transparent);
+}
+
+[data-mattr-plan-step-mark] {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 20px;
+  align-items: center;
+}
+
+[data-mattr-plan-step-mark] svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--mq-ink-3);
+  stroke-width: 1.2;
+}
+
+[data-mattr-plan-step]:not([data-done]) [data-mattr-plan-step-mark] circle {
+  stroke-dasharray: 1.6 2.2;
+  stroke-linecap: round;
+}
+
+[data-mattr-plan-step][data-done] [data-mattr-plan-step-mark] circle {
+  fill: var(--mq-green);
+  stroke: var(--mq-green);
+}
+
+[data-mattr-plan-step][data-done] [data-mattr-plan-step-mark] path {
+  stroke: var(--mq-card);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-mattr-plan-more] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 0;
+  border-radius: 6px;
+  color: var(--mq-ink);
+  font-size: 13.5px;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+
+[data-mattr-plan-more]:focus-visible {
+  box-shadow: 0 0 0 2px var(--mq-row-on-line);
+}
+
+[data-mattr-plan-more-glyph] {
+  display: inline-flex;
+  width: 16px;
+  justify-content: center;
+  color: var(--mq-ink-3);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+[data-mattr-plan-more-glyph="more"]::before {
+  content: "···";
+}
+
+[data-mattr-plan-more-glyph="less"]::before {
+  content: "";
+  width: 9px;
+  height: 1.5px;
+  border-radius: 1px;
+  margin-top: 1px;
+  background: currentColor;
+}
+
+[data-mattr-plan-preview] {
+  max-height: 9.5rem;
+  overflow: hidden;
+  color: var(--mq-ink-2);
+  mask-image: linear-gradient(to bottom, black 65%, transparent);
+}
+
+[data-mattr-plan-full] {
+  margin-top: 12px;
+  padding: 2px 2px 0;
+}
+
+[data-mattr-plan-full]:not([data-open]) {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+[data-mattr-plan-auto] {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--mq-ink-3);
+  font-size: 13px;
+}
+
+[data-mattr-plan-auto-label] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mattr-plan-auto-ring] {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  outline: none;
+}
+
+[data-mattr-plan-auto-ring] svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(-90deg);
+  fill: none;
+  stroke-width: 2;
+}
+
+[data-mattr-plan-auto-ring] [data-track] {
+  stroke: var(--mq-green-bg);
+}
+
+[data-mattr-plan-auto-ring] [data-progress] {
+  stroke: var(--mq-green);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 250ms linear;
+}
+
+[data-mattr-plan-auto-cancel] {
+  position: absolute;
+  inset: 2px;
+  width: 16px;
+  height: 16px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--mq-green-bg);
+  color: var(--mq-green);
+  opacity: 0;
+  transition: opacity 120ms var(--mq-ease);
+}
+
+[data-mattr-plan-auto-tip] {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: -4px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: var(--mq-tip);
+  color: var(--mq-tip-ink);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition:
+    opacity 120ms var(--mq-ease),
+    transform 120ms var(--mq-ease);
+}
+
+[data-mattr-plan-auto-ring]:is(:hover, :focus-visible) svg {
+  opacity: 0;
+}
+
+[data-mattr-plan-auto-ring]:is(:hover, :focus-visible)
+  :is([data-mattr-plan-auto-cancel], [data-mattr-plan-auto-tip]) {
+  opacity: 1;
+}
+
+[data-mattr-plan-auto-ring]:is(:hover, :focus-visible) [data-mattr-plan-auto-tip] {
+  transform: translateY(0);
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────────────────────── */
+
+[data-mattr-height] {
+  overflow: clip;
+  overflow-clip-margin: 6px;
+}
+
+[data-mattr-height][data-mattr-height-ready] {
+  transition: height 240ms var(--mq-ease);
+}
+
+[data-mattr-qp-step="forward"] {
+  animation: mattr-qp-step-forward 220ms var(--mq-ease);
+}
+
+[data-mattr-qp-step="backward"] {
+  animation: mattr-qp-step-backward 220ms var(--mq-ease);
+}
+
+@keyframes mattr-qp-step-forward {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes mattr-qp-step-backward {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mattr-height][data-mattr-height-ready],
+  [data-mattr-plan-auto-ring] [data-progress],
+  [data-mattr-plan-auto-cancel],
+  [data-mattr-plan-auto-tip],
+  [data-mattr-qp-pill-button],
+  [data-mattr-qp-option],
+  [data-mattr-qp-key] {
+    transition: none;
+  }
+
+  [data-mattr-qp-step] {
+    animation: none;
+  }
+}

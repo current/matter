@@ -11,6 +11,7 @@ import { captureAssistantMessageOpening } from "~/lib/assistantTextSelection";
 import { responseContextRecord } from "~/lib/composerContextRecords";
 import { Button } from "../ui/button";
 import { ProposedPlanCard } from "./ProposedPlanCard";
+import { useMattrProposedPlanApprove } from "./useMattrPlanApproval.mattr";
 import { HtmlRenderFrame } from "./HtmlRenderFrame";
 import { McpAppFrame } from "./McpAppFrame";
 import { readResponseSubagents, useAssistantMessageText } from "../../state/entities";
@@ -342,11 +343,26 @@ export function ProposedPlanTimelineRow({
 }: {
   row: Extract<TimelineRow, { kind: "proposed-plan" }>;
 }) {
+  return <ProposedPlanTimelineRowBody key={row.proposedPlan.id} row={row} />;
+}
+
+function ProposedPlanTimelineRowBody({
+  row,
+}: {
+  row: Extract<TimelineRow, { kind: "proposed-plan" }>;
+}) {
   const ctx = use(TimelineRowCtx);
+  const { approve: mattrApprove, autoApproveEligible } = useMattrProposedPlanApprove(
+    row.proposedPlan,
+  );
 
   return (
     <div className="min-w-0 px-1 py-0.5">
       <ProposedPlanCard
+        key={row.proposedPlan.id}
+        planId={row.proposedPlan.id}
+        mattrApprove={mattrApprove}
+        mattrAutoApproveEligible={autoApproveEligible}
         planMarkdown={row.proposedPlan.planMarkdown}
         environmentId={ctx.activeThreadEnvironmentId}
         threadRef={ctx.threadRef ?? undefined}

@@ -315,6 +315,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             <Button
               size="icon-sm"
               variant="outline"
+              data-pending-question-action="previous"
               {...pointerFocusProps}
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
@@ -326,6 +327,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             <Button
               size="sm"
               variant="outline"
+              data-pending-question-action="previous"
               {...pointerFocusProps}
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
@@ -337,6 +339,8 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         {children}
         <button
           type="submit"
+          data-pending-question-action="advance"
+          data-voice-input-active={voiceInputActive ? "true" : undefined}
           className={cn(messageActionPillClassName, "h-8 sm:h-7", compact ? "px-3" : "px-4")}
           {...pointerFocusProps}
           onClick={(event) => {

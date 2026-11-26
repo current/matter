@@ -5,6 +5,7 @@
 @import "./composer-appearance.css";
 @import "./rareui-chat.css";
 @import "./tasks.css";
+@import "./questions-plan.css";
 
 /* Settings → Appearance → Scroll edge fade off (mattrComposerAppearance.ts): content runs straight
    to the top edge. A mask never affects layout, so turning it off moves nothing. */
