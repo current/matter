@@ -48,6 +48,7 @@ import * as PeerLinkRequests from "../../../peer/PeerLinkRequests.ts";
 import * as PeerLinks from "../../../peer/PeerLinks.ts";
 import * as RemoteDelegation from "../../../peer/RemoteDelegation.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import * as McpToolExposure from "../../McpToolExposure.ts";
 import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
 import * as ThreadMetadataMcpService from "../../ThreadMetadataMcpService.ts";
 
@@ -82,6 +83,7 @@ const OrchestratorCapabilitiesTool = Tool.make("orchestrator_capabilities", {
   dependencies,
 })
   .annotate(Tool.Title, "Get orchestration capabilities")
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD)
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true);
@@ -96,6 +98,7 @@ const DelegateTaskTool = Tool.make("delegate_task", {
   dependencies,
 })
   .annotate(Tool.Title, "Delegate a child task")
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD)
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
@@ -110,6 +113,7 @@ const TaskStatusTool = Tool.make("task_status", {
   dependencies,
 })
   .annotate(Tool.Title, "Get delegated task status")
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD)
   .annotate(Tool.Readonly, false)
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
@@ -125,6 +129,7 @@ const TaskCancelTool = Tool.make("task_cancel", {
   dependencies,
 })
   .annotate(Tool.Title, "Cancel delegated task")
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD)
   .annotate(Tool.Destructive, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
 
@@ -177,6 +182,7 @@ const ScheduleTaskTool = Tool.make("schedule_task", {
   dependencies,
 })
   .annotate(Tool.Title, "Schedule a task")
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD)
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 

@@ -18,6 +18,7 @@ const ToolSearchTool = Tool.make(McpToolExposure.TOOL_SEARCH, {
 })
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false)
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
 
 export const ToolSearchToolkit = Toolkit.make(ToolSearchTool);

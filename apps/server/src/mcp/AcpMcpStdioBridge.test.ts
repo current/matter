@@ -134,6 +134,58 @@ describe("AcpMcpStdioBridge", () => {
     ]);
   });
 
+  it("sends the session's tool exposure on every forwarded request", async () => {
+    const originalEnvironment = process.env;
+    using _environment = {
+      [Symbol.dispose]: () => {
+        process.env = originalEnvironment;
+      },
+    };
+    process.env = {
+      ...originalEnvironment,
+      T3_ACP_MCP_ENDPOINT: "http://127.0.0.1:1/mcp",
+      T3_ACP_MCP_AUTHORIZATION: "Bearer bridge-test",
+      T3_ACP_MCP_TOOL_EXPOSURE: "deferred",
+    };
+    const exposures: Array<string | null> = [];
+    using _fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      exposures.push(new Headers(init?.headers).get("t3-tool-exposure"));
+      const message = JSON.parse(String(init?.body)) as { id?: number };
+      if (message.id === undefined) return new Response(null, { status: 202 });
+      return Response.json({ jsonrpc: "2.0", id: message.id, result: {} });
+    });
+    using _output = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    using _stdin = vi
+      .spyOn(process, "stdin", "get")
+      .mockReturnValue(
+        NodeStream.Readable.from([
+          `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" })}\n`,
+          `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`,
+          `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })}\n`,
+          `${JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call" })}\n`,
+        ]) as never,
+      );
+
+    await runAcpMcpCliFastPath("acp-mcp-bridge", []);
+
+    expect(exposures).toEqual(["deferred", "deferred", "deferred", "deferred"]);
+  });
+
+  it.effect("sends no tool exposure unless the session asks for one", () =>
+    Effect.gen(function* () {
+      const { input, requests, bridge } = makeHarness(
+        () => new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} })),
+      );
+      const fiber = yield* Effect.forkChild(bridge);
+
+      input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`);
+      input.end();
+      yield* Fiber.join(fiber);
+
+      expect(requests[0]?.headers.has("t3-tool-exposure")).toBe(false);
+    }),
+  );
+
   it.effect("forwards requests and replays the session id and protocol version", () =>
     Effect.gen(function* () {
       const { input, written, requests, bridge } = makeHarness((request) => {

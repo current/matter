@@ -147,6 +147,27 @@ it.effect("only request_secret and send_to_user ask Claude Code to load them up 
   }).pipe(Effect.provide(layerAdvertisedTools)),
 );
 
+// agy loads other MCP tools on demand, which left a real session without delegate_task.
+it.effect("asks Antigravity to load the orchestration tools up front", () =>
+  Effect.gen(function* () {
+    const mcp = yield* McpServer.McpServer;
+    const alwaysLoad = mcp.tools
+      .filter(({ tool }) => tool._meta?.["antigravity/alwaysLoad"] === true)
+      .map(({ tool }) => tool.name)
+      .sort();
+    expect(alwaysLoad).toEqual([
+      "delegate_task",
+      "orchestrator_capabilities",
+      "schedule_task",
+      "t3_thread_launch",
+      "task_cancel",
+      "task_status",
+    ]);
+    const delegate = mcp.tools.find(({ tool }) => tool.name === "delegate_task")?.tool;
+    expect(delegate?.inputSchema.required).toContain("task");
+  }).pipe(Effect.provide(layerAdvertisedTools)),
+);
+
 // CI rejects a PR that raises any value above main's agentContextBudget.json, so growth
 // needs the agent-context-increase label. Lower the values when the text shrinks.
 it.effect("agent context matches the committed budget", () =>

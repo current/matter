@@ -647,25 +647,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
           currentValue: "high",
         });
         expect(carbon?.isDefault).toBeUndefined();
-        // A newly observed model immediately exposes its live thinking options without a manual refresh.
-        expect(carbon?.capabilities?.optionDescriptors?.[0]).toMatchObject({
-          id: "thought_level",
-          currentValue: "low",
-          options: [{ id: "low" }, { id: "medium" }, { id: "high" }],
-        });
-        // Subsequent live overrides on that model preserve its first recorded default.
-        yield* harness.provider.onConfigOptionsUpdated([
-          switchedToCarbon,
-          thinking("high", ["low", "medium", "high"]),
-        ]);
-        expect(
-          (yield* harness.provider.snapshot.getSnapshot).models.find(
-            (model) => model.slug === "carbon",
-          )?.capabilities?.optionDescriptors?.[0],
-        ).toMatchObject({
-          id: "thought_level",
-          currentValue: "low",
-        });
+        expect(carbon?.capabilities?.optionDescriptors).toEqual([]);
 
         // Updating an observed model's choices keeps its recorded default while still offered,
         // and falls back if the agent removes that default.
@@ -742,10 +724,9 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
         });
         expect(mergedCarbon?.isDefault).toBeUndefined();
         expect(mergedCarbon?.aliases).toBeUndefined();
-        // The resumed model records its observed live options while unobserved models keep cached defaults.
         expect(mergedCarbon?.capabilities?.optionDescriptors?.[0]).toMatchObject({
           id: "thought_level",
-          currentValue: "xhigh",
+          currentValue: "medium",
         });
 
         // A later authoritative session start replaces the cached default model.
@@ -772,6 +753,63 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
         expect(
           updatedAfterFresh.models.find((model) => model.slug === "carbon")?.aliases,
         ).toContain(ANTIGRAVITY_DEFAULT_MODEL);
+      }),
+  );
+
+  it.effect(
+    "does not record a thread's thinking level as a model default before the catalog probe",
+    () =>
+      Effect.gen(function* () {
+        const harness = yield* makeHarness();
+        yield* harness.initialize;
+        const thinking = (currentValue: string) =>
+          ({
+            id: "thought_level",
+            name: "Thinking Level",
+            category: "thought_level",
+            type: "select",
+            currentValue,
+            options: ["low", "medium", "high", "xhigh"].map((value) => ({ value, name: value })),
+          }) satisfies EffectAcpSchema.SessionConfigOption;
+        const models = {
+          ...modelConfig,
+          currentValue: "neon",
+          options: [
+            { value: "neon", name: "Neon" },
+            { value: "hydrogen", name: "Hydrogen" },
+          ],
+        } satisfies EffectAcpSchema.SessionConfigOption;
+        const onHydrogen = { ...models, currentValue: "hydrogen" };
+        const hydrogenLevel = Effect.map(
+          harness.provider.snapshot.getSnapshot,
+          (snapshot) =>
+            snapshot.models.find((model) => model.slug === "hydrogen")?.capabilities
+              ?.optionDescriptors,
+        );
+        yield* harness.provider.onSessionStarted(
+          {
+            ...started,
+            sessionSetupResult: {
+              sessionId: "session-race",
+              configOptions: [models, thinking("high")],
+            },
+          },
+          "/workspace",
+        );
+
+        // A thread switches to hydrogen at xhigh before startup probing has reached hydrogen.
+        yield* harness.provider.onConfigOptionsUpdated([onHydrogen, thinking("xhigh")]);
+        expect(yield* hydrogenLevel).toEqual([]);
+
+        // The probe then records hydrogen's real default, which later thread overrides keep.
+        yield* harness.provider.onConfigOptionsUpdated([onHydrogen, thinking("medium")], {
+          fromCatalogProbe: true,
+        });
+        yield* harness.provider.onConfigOptionsUpdated([onHydrogen, thinking("xhigh")]);
+        expect((yield* hydrogenLevel)?.[0]).toMatchObject({
+          id: "thought_level",
+          currentValue: "medium",
+        });
       }),
   );
 

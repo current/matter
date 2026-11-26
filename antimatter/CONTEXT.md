@@ -54,11 +54,11 @@ For web-only changes Chris can skip installs: with the installed mattr open, `no
 
 - How: the script runs Vite on 127.0.0.1:5799 pinned to the installed app's version and writes `~/.antimatter/live-ui.json` while it runs. `antimatter/liveUi.ts`, hooked once into `apps/desktop/src/electron/ElectronProtocol.ts`, checks that file and the server on every page load and proxies `t3code://app` to it, otherwise serves the bundled files.
 - Only renderer code reloads (`apps/web`, `packages/*` UI, `antimatter/` web code). Electron main, preload, Island windows and server changes still need `ship-local --install`, as do UI changes that depend on a newer server than the installed one.
-- Agents don't start it unasked: reloading the live window is Chris's call. Agents test in the dev window below.
+- It is the default for renderer/web-only UI work and prototypes: start it from your worktree with real data, chrome and icons, ask Chris to reload (never reload the live window yourself), and stop it before handing back. Use the dev window below only for a concrete reason: Electron main or preload, Island native windows, server changes.
 
 ## Testing UI changes
 
-Test in the separate **mattr (Dev)** desktop window, not the browser or the in-app preview panel:
+When Live UI can't show the change, test in the separate **mattr (Dev)** desktop window, not the browser or the in-app preview panel:
 
 - Start it from your own shell in the checkout you changed: `vp run dev:desktop` (if `vp` is not on PATH: `mise exec node@26.13.1 -- node_modules/.bin/vp run dev:desktop`). It runs beside the live app with its own data (`~/.antimatter/dev` in the main checkout, `<worktree>/.t3/userdata` in a linked worktree) and hot-reloads web changes.
 - Real chats: with the dev window stopped, `node apps/server/scripts/migrate-dev-db.ts --source ~/.antimatter/userdata/statev2.sqlite --base-dir <tmp>` makes a read-only, pruned copy of the live app's data (stopped threads only; running ones are skipped); copy `<tmp>/userdata/statev2.sqlite` over the dev data's `statev2.sqlite` (removing its `-wal`/`-shm`). Never point the dev window at `~/.antimatter/userdata` itself.
@@ -67,11 +67,10 @@ Test in the separate **mattr (Dev)** desktop window, not the browser or the in-a
 
 ## Proposing UI options
 
-When Chris asks for UI changes with options or prototypes, show a side-by-side comparison in the chat before building anything:
+When Chris asks for UI changes with options or prototypes, let him compare them in the real app before building the final version. No from-scratch HTML mockups of mattr surfaces; `html_render` is only for charts, data visuals and artifacts that are not the app.
 
-- One self-contained HTML page rendered inline with `html_preview` then `html_render` (theme CSS variables, no page background).
-- **Current** as the baseline next to each option (A, B, …), at the same scale with the same real copy and data.
-- Toggles for whatever changes the verdict: widths, states (idle / working / error), light and dark, empty vs. full.
+- Prototype in the real Electron shell through Live UI from a worktree, with real data, chrome and icons.
+- A lightweight live switcher flips between **Current** (the baseline) and each option (A, B, …), plus whatever changes the verdict: widths, states (idle / working / error), light and dark, empty vs. full.
 - Under each option: one line on what it changes, and small chips with the measurable trade-offs (space saved, clicks, items removed).
 - End with a recommendation. Build only the option Chris picks.
 
@@ -83,9 +82,9 @@ Our workflow is built for speed: parallelize with subagents whenever it gets the
 - One task per thread, one checkout per thread. `mattr.json` sets `defaultThreadEnvMode: "worktree"`, so new threads (composer, `t3_thread_launch`, scheduled tasks) start in their own worktree and branch beside the repo; `Setup Worktree` runs `vp i`, and each worktree gets its own dev data and ports. Threads sharing one checkout see each other's half-done edits: `check:changed` fails on files they didn't touch and commits pick up other work. Don't work in the main checkout (first line of `git worktree list`); it stays clean on `main` for landing and `ship-local`. Choose Local in the composer only for a few-line fix.
 - Found someone else's uncommitted changes in your checkout? Leave them alone: commit only your own paths (`git commit -- <paths>`) and judge `check:changed` by your own files.
 - Landing a worktree branch: commit, `git rebase main` (worktrees share the repo's branches), `vp run check:changed`, then `git -C <main checkout> merge --ff-only <branch>` and `git -C <main checkout> push origin main`. If the fast-forward fails, `main` moved: rebase and retry.
-- Inside one task, the lead plans, splits the work into packages that touch different files, and hands them out, following the account order in Chris's global instructions (Claude main subagents first, then `codex`, `codex-alt`, `claude-alt-2`; never `claude-alt` unless it is under pace — or whatever provider balance Chris asks for in the thread). Workers get absolute paths and a separate worktree (`isolation: "worktree"`), and never push.
+- Inside one task, the lead plans, splits the work into packages that touch different files, and hands them out, using Claude Opus 5.5 (Claude main subagents first, then `claude-alt-2`) and Antigravity (`delegate_task`). No Codex subagents in this project (`codex`, `codex-alt`); never `claude-alt` unless it is under pace — or whatever provider balance Chris asks for in the thread. Workers get absolute paths and a separate worktree (`isolation: "worktree"`), and never push.
 - **Always use `delegate_task` for Antigravity subagents** (never Antigravity's internal `invoke_subagent`), so every child runs as a native T3 child thread with live streaming and worktree isolation.
 - **Always use Opus (`claude-opus-5-5`) for Claude coding subagents** — never Sonnet for coding work (Sonnet only for tiny, menial non-coding chores).
-- The lead reviews each piece, merges into one branch, does one integrated pass in the dev window, then pushes.
-- UI options parallelize well: one worker per option mockup, the lead assembles the comparison page.
+- The lead reviews each piece, merges into one branch, does one integrated pass in Live UI (or the dev window when Live UI can't show it), then pushes.
+- UI options parallelize well: one worker per option variant, the lead wires them into the live switcher.
 - Work alone only when the task is a handful of tool calls or the pieces would edit the same files.

@@ -1036,7 +1036,8 @@ function isTerminalPlannerResponse(
 function isStepIdleAfterReport(
   step: Schema.Schema.Type<typeof TranscriptLine> | undefined,
 ): boolean {
-  if (step === undefined) return true;
+  // An unreadable, half-written or missing last step proves nothing; `idle` ends T3's wait.
+  if (step === undefined) return false;
   if (step.type === "SYSTEM_MESSAGE") return false;
   if (step.status !== undefined && SUBAGENT_RUNNING_STEP_STATUSES.has(step.status)) return false;
   return (step.tool_calls?.length ?? 0) === 0;
@@ -1050,27 +1051,22 @@ async function isDetachedChildIdle(input: {
   readonly swarmMembers: ReadonlyMap<string, DiskSwarmMember>;
 }): Promise<boolean> {
   const swarmMember = input.swarmMembers.get(input.childId);
-  if (swarmMember !== undefined) {
-    if (swarmMember.killed || swarmMember.parked) return true;
-    const subagent = await readDetachedSubagent(
-      input.profileRoot,
-      input.rootSessionId,
-      input.childId,
-    );
-    return subagent?.state === "SUBAGENT_STATE_KILLED" || input.reported.has(input.childId);
-  }
+  if (swarmMember?.killed || swarmMember?.parked) return true;
   const subagent = await readDetachedSubagent(
     input.profileRoot,
     input.rootSessionId,
     input.childId,
   );
-  if (subagent?.state !== undefined && subagent.state !== "SUBAGENT_STATE_ALIVE") {
-    return true;
-  }
+  // agy 1.5 records only ALIVE, KILLED and UNSPECIFIED; an unspecified state is not proof of exit.
+  if (subagent?.state === "SUBAGENT_STATE_KILLED") return true;
   if (await hasUnreadWakingInboxMessage(input.profileRoot, input.childId)) {
     return false;
   }
   const lastStep = await readLastTranscriptLine(input.profileRoot, input.childId);
+  if (swarmMember !== undefined) {
+    // Swarm workers message the coordinator mid-task, so only a report plus a final reply ends one.
+    return input.reported.has(input.childId) && isTerminalPlannerResponse(lastStep);
+  }
   if (input.reported.has(input.childId)) {
     return isStepIdleAfterReport(lastStep);
   }

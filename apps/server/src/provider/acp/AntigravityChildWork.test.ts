@@ -608,6 +608,100 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
     }),
   );
 
+  it.effect("keeps a child at work until its records prove it finished", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const profile = yield* fs.makeTempDirectoryScoped({ prefix: "t3-agy-unsure-" });
+      const swarmWorker = "44444444-4444-4000-8000-444444444444";
+      const write = (segments: ReadonlyArray<string>, body: string) => {
+        const file = path.join(profile, "antigravity-acp", "brain", ...segments);
+        return fs
+          .makeDirectory(path.dirname(file), { recursive: true })
+          .pipe(Effect.andThen(fs.writeFileString(file, body)));
+      };
+      const child = (conversationId: string, state: string, callId: string) =>
+        Effect.all([
+          write(
+            [ROOT, ".system_generated", "subagents", `${conversationId}.json`],
+            JSON.stringify({
+              conversationId,
+              subagentDescriptor: { typeName: "research", role: LAUNCH.role },
+              state,
+            }),
+          ),
+          write(
+            [conversationId, ".system_generated", "messages", "launch.json"],
+            JSON.stringify({
+              sender: ROOT,
+              content: LAUNCH.prompt,
+              sourceMetadata: {
+                tool: { conversationId: ROOT, toolCall: { id: callId, name: "invoke_subagent" } },
+              },
+            }),
+          ),
+        ]);
+      const transcript = (conversationId: string, body: string) =>
+        write([conversationId, ".system_generated", "logs", "transcript.jsonl"], body);
+      const reportToParent = (sender: string) =>
+        write(
+          [ROOT, ".system_generated", "messages", `${sender}.json`],
+          JSON.stringify({ id: sender, sender, content: "Progress update" }),
+        );
+      const idle = (conversationId: string) =>
+        areAntigravityChildrenIdle({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          conversationIds: [conversationId],
+        });
+
+      // An unspecified record state is not a dead child, even with no transcript yet.
+      yield* child(CHILD, "SUBAGENT_STATE_UNSPECIFIED", "call_unspecified");
+      expect(yield* idle(CHILD)).toBe(false);
+      expect(
+        yield* readAntigravityChildrenAtWork({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          toolCallIds: ["call_unspecified"],
+        }),
+      ).toEqual(["call_unspecified"]);
+
+      // Having reported proves nothing while the last step is missing or still being written.
+      yield* reportToParent(CHILD);
+      expect(yield* idle(CHILD)).toBe(false);
+      yield* transcript(CHILD, '{"step_index":3,"type":"PLANNER_RESP');
+      expect(yield* idle(CHILD)).toBe(false);
+      yield* transcript(
+        CHILD,
+        `${JSON.stringify({ step_index: 3, type: "PLANNER_RESPONSE", status: "DONE", content: "Done." })}\n`,
+      );
+      expect(yield* idle(CHILD)).toBe(true);
+
+      // A swarm worker that messaged the coordinator mid-task stays at work until its final reply.
+      yield* child(swarmWorker, "SUBAGENT_STATE_ALIVE", "call_swarm");
+      yield* write(
+        [ROOT, ".system_generated", "swarm", "members.json"],
+        JSON.stringify({
+          members: {
+            shard: { conversation_id: swarmWorker, role: "worker", wake_mode: "working" },
+          },
+        }),
+      );
+      yield* reportToParent(swarmWorker);
+      expect(yield* idle(swarmWorker)).toBe(false);
+      yield* transcript(
+        swarmWorker,
+        `${JSON.stringify({ step_index: 4, type: "SEND_MESSAGE", status: "DONE" })}\n`,
+      );
+      expect(yield* idle(swarmWorker)).toBe(false);
+      yield* transcript(
+        swarmWorker,
+        `${JSON.stringify({ step_index: 5, type: "PLANNER_RESPONSE", status: "DONE", content: "Shard done." })}\n`,
+      );
+      expect(yield* idle(swarmWorker)).toBe(true);
+    }),
+  );
+
   it.effect(
     "reads legacy disk-backed swarm worker transcripts and tracks working vs parked or killed members",
     () =>

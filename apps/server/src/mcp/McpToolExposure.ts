@@ -3,13 +3,17 @@ import * as Effect from "effect/Effect";
 
 export const TOOL_SEARCH = "tool_search";
 
-/** What a deferring client lists before it searches. Pi's extension declares the same three. */
+/** What a deferring client lists before it searches. */
 const DIRECT_TOOLS: ReadonlySet<string> = new Set([
   "orchestrator_capabilities",
   "delegate_task",
   "task_status",
+  "task_cancel",
   TOOL_SEARCH,
 ]);
+
+/** agy loads listed MCP tools on demand, so a turn can run without one, unless this marks it. */
+export const ANTIGRAVITY_ALWAYS_LOAD = { "antigravity/alwaysLoad": true } as const;
 
 const MAX_RESULTS = 10;
 // Sessions that ended are never reported here, so keep only the newest.

@@ -1586,6 +1586,13 @@ const openSessionWithRunningCommand = Effect.fn("openSessionWithRunningCommand")
   };
 });
 
+const FINISHED_CHILD_TRANSCRIPT = `${JSON.stringify({
+  step_index: 1,
+  type: "PLANNER_RESPONSE",
+  status: "DONE",
+  content: "Report sent to parent agent.",
+})}\n`;
+
 describe("AntigravityAdapterV2 work after the prompt ends", () => {
   // agy sets `IsDaemon` on a command it does not wait for. When it exits, the agent replies
   // with no prompt open.
@@ -2329,6 +2336,11 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
       assert.equal(opened.cancels(), 0, "a steer must not cancel the agent's subagents");
       assert.lengthOf(opened.prompts, 2);
       yield* write(records("mock-session-1", "messages"), "report.json", { sender: "child-1" });
+      yield* fileSystem.makeDirectory(records("child-1", "logs"), { recursive: true });
+      yield* fileSystem.writeFileString(
+        path.join(records("child-1", "logs"), "transcript.jsonl"),
+        FINISHED_CHILD_TRANSCRIPT,
+      );
       yield* send({
         sessionUpdate: "agent_message_chunk",
         content: { type: "text", text: "I'll have the footnotes checked too." },
@@ -2348,7 +2360,8 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
   );
 
   // Files as agy 1.5.12 wrote them: the launch sits in the child's inbox, and the child's report
-  // lands in the parent's inbox with no session update. Only the agent's own reply follows.
+  // lands in the parent's inbox, after its final step, with no session update. Only the agent's
+  // own reply follows.
   it.effect.each([
     { reports: "after the prompt ends", duringPrompt: false },
     { reports: "while the prompt runs", duringPrompt: true },
@@ -2374,7 +2387,15 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
       });
       const report = write(records("mock-session-1", "messages"), "report.json", {
         sender: "child-1",
-      });
+      }).pipe(
+        Effect.andThen(fileSystem.makeDirectory(records("child-1", "logs"), { recursive: true })),
+        Effect.andThen(
+          fileSystem.writeFileString(
+            path.join(records("child-1", "logs"), "transcript.jsonl"),
+            FINISHED_CHILD_TRANSCRIPT,
+          ),
+        ),
+      );
       if (duringPrompt) yield* report;
 
       const { usage, offers, send, startTurn, until, throughPromptSettled } =
@@ -3159,9 +3180,12 @@ describe("AntigravityAdapterV2 session system prompt", () => {
       }).pipe(Effect.provide(layerSession)),
   );
 
-  it.effect(
-    "moves T3 instructions into systemPrompt.append, defers HTTP MCP tools, and omits ACP shell fallback",
-    () =>
+  it.effect.each([
+    { transport: "HTTP", http: true, fallback: "omits" },
+    { transport: "the stdio bridge", http: false, fallback: "keeps" },
+  ])(
+    "moves T3 instructions into systemPrompt.append, defers MCP tools over $transport, and $fallback the ACP shell fallback",
+    ({ http }) =>
       Effect.gen(function* () {
         const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
         const fileSystem = yield* FileSystem.FileSystem;
@@ -3202,7 +3226,7 @@ describe("AntigravityAdapterV2 session system prompt", () => {
                   T3_ACP_ANTIGRAVITY: "1",
                   T3_ACP_AGENT_VERSION: "1.5.12",
                   T3_ACP_ANTIGRAVITY_SYSTEM_PROMPT_APPEND: "1",
-                  T3_ACP_MCP_HTTP: "1",
+                  ...(http ? { T3_ACP_MCP_HTTP: "1" } : {}),
                   T3_ACP_REQUEST_LOG_PATH: requestLog,
                   T3_ACP_HANG_PROMPT_FOREVER: "1",
                 },
@@ -3254,7 +3278,11 @@ describe("AntigravityAdapterV2 session system prompt", () => {
               branch: null,
               worktreePath: null,
               activeProviderThreadId: providerThread.id,
-              lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+              lineage: {
+                parentThreadId: null,
+                relationshipToParent: null,
+                rootThreadId: threadId,
+              },
               forkedFrom: null,
               createdAt: now,
               updatedAt: now,
@@ -3296,6 +3324,7 @@ describe("AntigravityAdapterV2 session system prompt", () => {
                     type?: string;
                     name?: string;
                     headers?: ReadonlyArray<{ name: string; value: string }>;
+                    env?: ReadonlyArray<{ name: string; value: string }>;
                   }>;
                 };
               },
@@ -3307,18 +3336,21 @@ describe("AntigravityAdapterV2 session system prompt", () => {
         assert.include(append, "## T3 Code interaction mode: Default");
         assert.include(append, "## T3 Code orchestration");
         assert.include(append, "## T3 Code browser");
-        assert.notInclude(append, "acp-mcp-call");
+        // A tool found by tool_search reaches agy's model on the next prompt; the shell fallback reaches it now.
+        if (http) assert.notInclude(append, "acp-mcp-call");
+        else assert.include(append, "acp-mcp-call");
         // User prompt stays clean without <t3_code_instructions> or <runtime_info>.
         assert.deepEqual(sentPrompt, [{ type: "text", text: "open a PR" }]);
-        // HTTP MCP server requests deferred tool exposure so only core tools + tool_search load eagerly.
-        const httpServer = sessionNew?.params?.mcpServers?.find(
-          (server) => server.type === "http" && server.name === "t3-code",
+        // Both transports ask for deferred exposure so only core tools + tool_search load eagerly.
+        const server = sessionNew?.params?.mcpServers?.find(
+          (candidate) => candidate.name === "t3-code",
         );
-        assert.isDefined(httpServer);
-        assert.isTrue(
-          httpServer?.headers?.some(
-            (header) => header.name === "t3-tool-exposure" && header.value === "deferred",
-          ),
+        assert.strictEqual(server?.type, http ? "http" : "stdio");
+        assert.deepInclude(
+          (http ? server?.headers : server?.env) ?? [],
+          http
+            ? { name: "t3-tool-exposure", value: "deferred" }
+            : { name: "T3_ACP_MCP_TOOL_EXPOSURE", value: "deferred" },
         );
       }).pipe(Effect.provide(layerSession)),
   );

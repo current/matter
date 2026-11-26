@@ -475,6 +475,8 @@ export interface AcpAdapterV2Flavor {
   readonly mcpOverHttp?: boolean;
   /** The agent has no tool search of its own, so T3 lists optional tools on demand. */
   readonly deferMcpTools?: boolean;
+  /** Defer over the stdio bridge too. Only for agents known to reread tools/list there. */
+  readonly deferStdioMcpTools?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -1165,6 +1167,7 @@ function acpMcpContext(
   self: SelfInvocation,
   mcpOverHttp: boolean | undefined,
   deferMcpTools: boolean | undefined,
+  deferStdioMcpTools: boolean | undefined,
   callLauncher: string | undefined,
 ): AcpMcpContext {
   if (session === undefined) {
@@ -1181,6 +1184,9 @@ function acpMcpContext(
           { name: "ELECTRON_RUN_AS_NODE", value: "1" },
           { name: "T3_ACP_MCP_ENDPOINT", value: session.endpoint },
           { name: "T3_ACP_MCP_AUTHORIZATION", value: session.authorizationHeader },
+          ...(deferStdioMcpTools === true
+            ? [{ name: "T3_ACP_MCP_TOOL_EXPOSURE", value: "deferred" }]
+            : []),
         ],
       },
     ],
@@ -1402,6 +1408,28 @@ function makeProviderThread(input: {
     createdAt: input.now,
     updatedAt: input.now,
   };
+}
+
+const SINGLE_FOLDER_WORKSPACE_NOTE = [
+  "<workspace_folders>",
+  "This project now has a single folder: your working directory. Earlier folder lists no longer apply.",
+  "</workspace_folders>",
+].join("\n");
+
+/**
+ * Workspace note for a session whose system prompt lists its first folders. Once a note has
+ * replaced that list, a return to it must be sent too, or the agent keeps the replaced list.
+ */
+export function acpWorkspaceInstructionsUpdate(input: {
+  readonly workspace: string;
+  readonly systemPromptWorkspace: string;
+  readonly lastRuntimeInstructions: string | undefined;
+}): string {
+  const replaced =
+    input.workspace !== input.systemPromptWorkspace ||
+    input.lastRuntimeInstructions?.includes("<workspace_folders>") === true;
+  if (!replaced) return "";
+  return input.workspace.length > 0 ? input.workspace : SINGLE_FOLDER_WORKSPACE_NOTE;
 }
 
 /** Stop reasons where the agent ended without finishing. ACP asks clients to show refusals. */
@@ -2285,13 +2313,27 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const readMcpContext = (threadId: ThreadId | null) =>
     threadId === null
       ? Effect.succeed(
-          acpMcpContext(undefined, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
+          acpMcpContext(
+            undefined,
+            self,
+            flavor.mcpOverHttp,
+            flavor.deferMcpTools,
+            flavor.deferStdioMcpTools,
+            callLauncher,
+          ),
         )
       : mcpSessions
           .read(threadId)
           .pipe(
             Effect.map((session) =>
-              acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
+              acpMcpContext(
+                session,
+                self,
+                flavor.mcpOverHttp,
+                flavor.deferMcpTools,
+                flavor.deferStdioMcpTools,
+                callLauncher,
+              ),
             ),
           );
   const driver = flavor.driver;
@@ -9771,15 +9813,20 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               : { previousState: previousInstructionState }),
             ...(systemPromptState === undefined ? {} : { systemPromptState }),
           });
+          const lastRuntimeInstructions = (yield* Ref.get(promptRuntimeInstructions)).get(
+            sessionId,
+          );
           let runtimeInstructions: string;
           if (carriesSystemInstructions) {
             const feedback =
               instructionState.hasT3Mcp && turnInput.agentFeedback !== undefined
                 ? AGENT_FEEDBACK_INSTRUCTIONS[turnInput.agentFeedback]
                 : "";
-            const workspace = buildWorkspaceInstructions(turnInput.runtimePolicy);
-            const workspaceDelta =
-              workspace !== sessionSystemPromptContext.workspaceText ? workspace : "";
+            const workspaceDelta = acpWorkspaceInstructionsUpdate({
+              workspace: buildWorkspaceInstructions(turnInput.runtimePolicy),
+              systemPromptWorkspace: sessionSystemPromptContext.workspaceText,
+              lastRuntimeInstructions,
+            });
             runtimeInstructions = [feedback, workspaceDelta]
               .filter((part) => part.length > 0)
               .join("\n\n");
@@ -9798,8 +9845,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const sendRuntimeInstructions =
             !isNativeSlashCommand &&
             runtimeInstructions.length > 0 &&
-            (compactionMarker !== undefined ||
-              (yield* Ref.get(promptRuntimeInstructions)).get(sessionId) !== runtimeInstructions);
+            (compactionMarker !== undefined || lastRuntimeInstructions !== runtimeInstructions);
           const promptText = flavor.buildAttachmentPrompt ? text.trim() : text;
           const prompt: Array<EffectAcpSchema.ContentBlock> =
             promptText.length > 0 ? [{ type: "text", text: promptText }] : [];

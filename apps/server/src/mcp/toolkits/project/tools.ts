@@ -39,6 +39,7 @@ import * as ThreadManagementService from "../../../orchestration-v2/ThreadManage
 import * as SourceControlRepositoryService from "../../../sourceControl/SourceControlRepositoryService.ts";
 import * as GitVcsDriver from "../../../vcs/GitVcsDriver.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import * as McpToolExposure from "../../McpToolExposure.ts";
 
 const shared = {
   success: Project,
@@ -191,7 +192,8 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
   ],
 })
   .annotate(Tool.Destructive, true)
-  .annotate(Tool.OpenWorld, true);
+  .annotate(Tool.OpenWorld, true)
+  .annotate(Tool.Meta, McpToolExposure.ANTIGRAVITY_ALWAYS_LOAD);
 
 export const ProjectToolkit = Toolkit.make(
   ThreadLaunchTool,

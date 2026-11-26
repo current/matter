@@ -263,6 +263,8 @@ export function makeAntigravityAcpAdapterFlavor(
     // Agents that advertise HTTP MCP skip the stdio bridge process; others keep stdio.
     mcpOverHttp: true,
     deferMcpTools: true,
+    // agy rereads tools/list on list_changed, which the bridge relays from tool_search.
+    deferStdioMcpTools: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     sessionCarriesSystemInstructions: antigravityAppendsSystemPrompt,
     ...(options.unsetOptionDefaults === undefined

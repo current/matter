@@ -71,13 +71,17 @@ function selectOptionValues(config: ThinkingConfig): ReadonlyArray<string> {
   );
 }
 
+/**
+ * A live session reports its thread's level, not the model's default. Until a fresh session or
+ * catalog probe records the default, record nothing so the registry keeps its cached one.
+ */
 function mergeLiveThinkingConfig(
   existing: ThinkingConfig | null | undefined,
   next: ThinkingConfig | null,
 ): ThinkingConfig | null | undefined {
-  if (existing === undefined) return next;
+  if (existing === undefined) return undefined;
   if (next === null) return null;
-  if (existing === null) return next;
+  if (existing === null) return undefined;
   return selectOptionValues(next).includes(existing.currentValue)
     ? { ...next, currentValue: existing.currentValue }
     : next;

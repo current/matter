@@ -874,19 +874,23 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
           ModelManifest.BUNDLED_MODEL_MANIFEST,
           ProviderDriverKind.make("antigravity"),
         );
-        const neon = bundled?.models.find((model) => model.slug === "gemini-4-neon");
-        expect(neon?.status).toBe("current");
-        expect(neon?.capabilities?.optionDescriptors?.[0]).toMatchObject({
-          id: "thought_level",
-          role: "reasoning",
-          currentValue: "high",
-          options: [
-            { id: "low" },
-            { id: "medium" },
-            { id: "high", isDefault: true },
-            { id: "xhigh" },
-          ],
-        });
+        // `antigravity-default` falls back to this slug, so it must stay on the flagship model.
+        expect(bundled?.defaultChatModel).toBe("gemini-4-neon");
+        for (const slug of ["gemini-4-neon", "gemini-4-hydrogen"]) {
+          const model = bundled?.models.find((entry) => entry.slug === slug);
+          expect(model?.status).toBe("current");
+          expect(model?.capabilities?.optionDescriptors?.[0]).toMatchObject({
+            id: "thought_level",
+            role: "reasoning",
+            currentValue: "high",
+            options: [
+              { id: "low" },
+              { id: "medium" },
+              { id: "high", isDefault: true },
+              { id: "xhigh" },
+            ],
+          });
+        }
 
         const h = yield* makeHarness({
           environment: [
