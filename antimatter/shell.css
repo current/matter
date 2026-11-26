@@ -52,7 +52,7 @@
      rim and above the card match (paired with MACOS_WINDOW_BUTTON_OPTICAL_Y_OFFSET in DesktopWindow). */
   [data-slot="sidebar-wrapper"] > [data-sidebar-control] > *,
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"]) .drag-region > *,
-  [data-slot="sidebar-inset"] [data-chat-header] > *,
+  [data-slot="sidebar-inset"] [data-chat-header] > :not([data-workspace-titlebar-controls]),
   [data-slot="sidebar-inset"] [data-workspace-page-header] > *,
   [data-slot="sidebar-inset"] [data-right-panel-tabbar] > *,
   [data-slot="sidebar-inset"] [data-workspace-titlebar-controls] > * {
