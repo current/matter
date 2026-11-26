@@ -10,14 +10,16 @@
 //   vp run check:changed                  compare against the closest merge base with any remote main
 //   vp run check:changed <ref>            compare against the merge base with <ref>
 //   vp run check:changed --concurrency 1  run the steps one at a time
+//   vp run check:changed --fix            format the changed files first
+//   vp run check:changed --fast           skip knip and browser tests while iterating
 //
 // Uncommitted and untracked files count. Affected packages come from
 // .github/scripts/ci-changes.cjs, the same mapping CI uses to gate its jobs.
 // The steps run side by side within a budget derived from the machine's cores
 // and available memory, and each prints its output when it finishes. A step
 // running past the timeout is killed with its process group and reported as
-// TIMEOUT. A rerun on exactly the files of the last passing run prints that
-// run's summary.
+// TIMEOUT. Each passing step is cached under the inputs it reads, so a rerun
+// skips the steps that already passed and runs only what failed or changed.
 import * as NodeCrypto from "node:crypto";
 import * as NodeOS from "node:os";
 
@@ -88,7 +90,7 @@ export const runSteps = Effect.fn("checkChanged.runSteps")(function* <R>(
         yield* Console.log(`\n> vp ${step.name}  ${outcome}  ${time}`);
         const output = Option.getOrUndefined(result)?.output.trimEnd();
         if (output) yield* Console.log(output);
-        return { name: step.name, outcome, time };
+        return { name: step.name, outcome, time, seconds };
       });
       const slots = Math.min(step.weight ?? 1, options.concurrency);
       const limited = Effect.acquireUseRelease(
@@ -102,11 +104,52 @@ export const runSteps = Effect.fn("checkChanged.runSteps")(function* <R>(
   );
 });
 
-const CacheEntry = Schema.fromJsonString(
-  Schema.Struct({ key: Schema.String, summary: Schema.Array(Schema.String) }),
+// Typecheck's workers leave up to half the budget to the steps beside it. Holding every
+// slot made it wait for knip to finish, and then made the tests wait for it.
+export const typecheckWorkers = (concurrency: number, packages: number, siblings: number) =>
+  Math.max(1, Math.min(packages, concurrency - Math.min(siblings, Math.floor(concurrency / 2))));
+
+// Passing steps by input key; see stepKey.
+const StepCache = Schema.fromJsonString(
+  Schema.Record(Schema.String, Schema.Struct({ name: Schema.String, seconds: Schema.Number })),
 );
-const decodeCacheEntry = Schema.decodeEffect(CacheEntry);
-const encodeCacheEntry = Schema.encodeEffect(CacheEntry);
+const decodeStepCache = Schema.decodeEffect(StepCache);
+const encodeStepCache = Schema.encodeEffect(StepCache);
+const STEP_CACHE_LIMIT = 200;
+
+// A step reads every changed and ignored input ("all"), or only the files a predicate picks.
+export type StepScope = "all" | ((file: string) => boolean);
+export interface InputSnapshot {
+  // Hash of the binary diff against the base: renames, deletions, and mode changes.
+  readonly diff: string;
+  // Content hash (or "missing" / the entry type) of each changed, untracked, and ignored input.
+  readonly files: ReadonlyMap<string, string>;
+}
+// Install state changes every tool version, so every key includes it.
+export const INSTALL_STATE = ["node_modules/.modules.yaml", "node_modules/.pnpm/lock.yaml"];
+
+// Files outside the base commit are the only inputs that can differ between two runs on one
+// base, so a key covers the base, the step's command, and the inputs in its scope.
+export const stepKey = (prefix: string, snapshot: InputSnapshot, id: string, scope: StepScope) => {
+  const hash = NodeCrypto.createHash("sha256");
+  hash.update(`${prefix}\0${id}\0`);
+  if (scope === "all") hash.update(snapshot.diff);
+  for (const [file, digest] of [...snapshot.files].sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )) {
+    if (scope === "all" || INSTALL_STATE.includes(file) || scope(file)) {
+      hash.update(`\0${file}\0${digest}`);
+    }
+  }
+  return hash.digest("hex");
+};
+
+// Files that change how the formatter or linter treats an unchanged file.
+const TOOL_CONFIG =
+  /(^|\/)(?:vite\.config\.[cm]?[jt]s|package\.json|tsconfig[^/]*\.json|\.editorconfig|\.gitignore|\.gitattributes|\.oxlintrc[^/]*|\.oxfmtrc[^/]*|\.prettierignore)$|^oxlint-plugin-t3code\//;
+// Files the TypeScript compiler can read; prose, styles, and images can't change a typecheck.
+const TYPECHECK_INPUT = /\.(?:[cm]?[jt]sx?|json[c5]?|astro)$/;
+const BROWSER_TEST = /\.browser\.test\.[cm]?[jt]sx?$/;
 const decodeRootPackageJson = Schema.decodeEffect(
   Schema.fromJsonString(
     Schema.Struct({
@@ -259,6 +302,8 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   readonly ref: Option.Option<string>;
   readonly concurrency: Option.Option<number>;
   readonly timeout: Option.Option<number>;
+  readonly fix: boolean;
+  readonly fast: boolean;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -296,58 +341,89 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   }
   yield* Console.log(`check:changed: ${files.length} files since ${base.slice(0, 12)} (${ref})`);
 
-  // Ignored generated sources, declarations, env files, and install state affect check results.
-  // Include them in the key, but skip large ignored folders that no check reads.
-  // Recompute after a passing run so edits made during it are never cached as passing.
-  const ci = Option.getOrElse(yield* Config.option(Config.String("CI")), () => "");
-  const inputKey = Effect.gen(function* () {
-    const hash = NodeCrypto.createHash("sha256");
-    // CI changes test behavior (vite.config.ts rejects .only under CI).
-    hash.update(`${process.version}\0${base}\0${ci}\0`);
-    hash.update(
-      yield* git(root, [
-        "diff",
-        "--binary",
-        "--no-renames",
-        "--no-ext-diff",
-        "--no-textconv",
-        base,
-        "--",
-      ]),
-    );
-    const ignored = yield* ignoredCheckInputs(root);
-    for (const file of [
-      // Raw bytes of changed files too: .gitattributes normalizes line endings in
-      // the diff, but the formatter reads the file as it is on disk.
-      ...(yield* changedFiles),
-      ...(yield* untrackedFiles),
-      ...ignored,
-      "node_modules/.modules.yaml",
-      "node_modules/.pnpm/lock.yaml",
-    ]) {
-      hash.update(`\0${file}\0`);
-      // Untracked nested repositories are listed as directories.
-      const info = yield* Effect.option(fs.stat(inRoot(file)));
-      if (Option.isSome(info) && info.value.type === "File") {
-        hash.update(yield* fs.readFile(inRoot(file)));
-      }
-    }
-    return hash.digest("hex");
-  });
-  const key = yield* inputKey;
-  const cachePath = inRoot("node_modules/.cache/check-changed.json");
-  // A missing or unreadable cache is a miss, never a failure.
-  const cached = yield* fs
-    .readFileString(cachePath)
-    .pipe(Effect.flatMap(decodeCacheEntry), Effect.option);
-  if (Option.isSome(cached) && cached.value.key === key) {
-    yield* Console.log("Nothing changed since the last passing run.\n");
-    for (const line of cached.value.summary) yield* Console.log(line);
-    return true;
-  }
-
   const present = yield* Effect.filter(files, (file) => fs.exists(inRoot(file)));
   const code = present.filter((file) => CODE.test(file));
+
+  // Output is piped, so keep the colors a terminal would get.
+  const env = process.stdout.isTTY ? { FORCE_COLOR: "1" } : {};
+  const vp = (args: ReadonlyArray<string>, cwd = root) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const [command, commandArgs] = vitePlusCommand(args, platform);
+        const handle = yield* spawner.spawn(
+          ChildProcess.make(command, commandArgs, {
+            cwd,
+            env,
+            extendEnv: true,
+            forceKillAfter: "5 seconds",
+          }),
+        );
+        const [output, exitCode] = yield* Effect.all(
+          [Stream.mkString(Stream.decodeText(handle.all)), handle.exitCode],
+          { concurrency: 2 },
+        );
+        return { ok: exitCode === 0, output };
+      }),
+    ).pipe(Effect.catch((error) => Effect.succeed({ ok: false, output: error.message })));
+
+  // Formatting first means a formatting slip never costs a second run. A failure here (a
+  // syntax error, say) is left for the format step to report.
+  if (input.fix && present.length > 0) {
+    const fixed = yield* vp(["fmt", "--no-error-on-unmatched-pattern", ...present]);
+    yield* Console.log(`> vp fmt (--fix)  ${fixed.ok ? "done" : "FAIL"}`);
+    if (!fixed.ok) yield* Console.log(fixed.output.trimEnd());
+  }
+
+  // Ignored generated sources, declarations, env files, and install state affect check results.
+  // Include them, but skip large ignored folders that no check reads. Raw bytes of changed
+  // files too: .gitattributes normalizes line endings in the diff, but the formatter reads the
+  // file as it is on disk. Taken again after the run so edits made during it are never cached.
+  const ci = Option.getOrElse(yield* Config.option(Config.String("CI")), () => "");
+  // CI changes test behavior (vite.config.ts rejects .only under CI).
+  const keyPrefix = `${process.version}\0${base}\0${ci}`;
+  const snapshot = Effect.gen(function* () {
+    const diff = yield* git(root, [
+      "diff",
+      "--binary",
+      "--no-renames",
+      "--no-ext-diff",
+      "--no-textconv",
+      base,
+      "--",
+    ]);
+    const digests = new Map<string, string>();
+    for (const file of [
+      ...(yield* changedFiles),
+      ...(yield* untrackedFiles),
+      ...(yield* ignoredCheckInputs(root)),
+      ...INSTALL_STATE,
+    ]) {
+      // Untracked nested repositories are listed as directories.
+      const info = yield* Effect.option(fs.stat(inRoot(file)));
+      digests.set(
+        file,
+        Option.isNone(info)
+          ? "missing"
+          : info.value.type === "File"
+            ? NodeCrypto.createHash("sha256")
+                .update(yield* fs.readFile(inRoot(file)))
+                .digest("hex")
+            : info.value.type,
+      );
+    }
+    return {
+      diff: NodeCrypto.createHash("sha256").update(diff).digest("hex"),
+      files: digests,
+    } satisfies InputSnapshot;
+  });
+  const before = yield* snapshot;
+  const changedSet = new Set(files);
+  const ignoredInputs = new Set(
+    [...before.files.keys()].filter(
+      (file) => !changedSet.has(file) && !INSTALL_STATE.includes(file),
+    ),
+  );
+
   const packages = readWorkspace();
   const { affected, outputs } = decide(files, packages, false);
 
@@ -366,7 +442,13 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   for (const test of docReaderTests(files)) tests.add(test);
   // It reads files other than the ones beside it, so no changed file selects it.
   if (affected.includes("t3")) tests.add("apps/server/src/provider/AgentContextBudget.test.ts");
-  const { vitestTests, nodeTests } = splitTests(tests);
+  const selected = splitTests(tests);
+  // --fast leaves the browser tests, which start Chromium, to the full run.
+  const skippedBrowserTests = input.fast
+    ? selected.vitestTests.filter((file) => BROWSER_TEST.test(file))
+    : [];
+  const vitestTests = selected.vitestTests.filter((file) => !skippedBrowserTests.includes(file));
+  const { nodeTests } = selected;
 
   // React Compiler coverage compiles every client source file, so run only the
   // changed files' cases, in one extra step: a -t filter in the main test step
@@ -404,9 +486,10 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   // knip:check cannot be scoped to a package. Any code change can leave a file,
   // export, or dependency unused (removing the last import of a helper does), so
   // it runs whenever code or a manifest changes.
-  const runKnip = files.some(
+  const knipInputChanged = files.some(
     (file) => CODE.test(file) || path.basename(file) === "package.json" || file === "knip.jsonc",
   );
+  const runKnip = knipInputChanged && !input.fast;
   // CI runs knip:check as a task that depends on one script per pass. The passes
   // do not depend on each other, so they run side by side here.
   const rootPackage = yield* fs
@@ -426,38 +509,15 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
 
   // A version bump can leave a patch unused, causing pnpm to reject the install
   // with ERR_PNPM_UNUSED_PATCH. Check it here as Release Smoke does in CI.
-  const runPatchCheck = files.some(
-    (file) =>
-      file === "pnpm-workspace.yaml" ||
-      file === "pnpm-lock.yaml" ||
-      file === ".pnpmfile.cjs" ||
-      file.startsWith("patches/") ||
-      file.startsWith("apps/mobile/deps/") ||
-      file.startsWith("apps/web/deps/") ||
-      path.basename(file) === "package.json",
-  );
-
-  // Output is piped, so keep the colors a terminal would get.
-  const env = process.stdout.isTTY ? { FORCE_COLOR: "1" } : {};
-  const vp = (args: ReadonlyArray<string>, cwd = root) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const [command, commandArgs] = vitePlusCommand(args, platform);
-        const handle = yield* spawner.spawn(
-          ChildProcess.make(command, commandArgs, {
-            cwd,
-            env,
-            extendEnv: true,
-            forceKillAfter: "5 seconds",
-          }),
-        );
-        const [output, exitCode] = yield* Effect.all(
-          [Stream.mkString(Stream.decodeText(handle.all)), handle.exitCode],
-          { concurrency: 2 },
-        );
-        return { ok: exitCode === 0, output };
-      }),
-    ).pipe(Effect.catch((error) => Effect.succeed({ ok: false, output: error.message })));
+  const isDependencyFile = (file: string) =>
+    file === "pnpm-workspace.yaml" ||
+    file === "pnpm-lock.yaml" ||
+    file === ".pnpmfile.cjs" ||
+    file.startsWith("patches/") ||
+    file.startsWith("apps/mobile/deps/") ||
+    file.startsWith("apps/web/deps/") ||
+    path.basename(file) === "package.json";
+  const runPatchCheck = files.some(isDependencyFile);
 
   // Resolve without the lockfile in a temp copy to preserve the working tree and lockfile.
   // Copy mobile modules too: they are file: dependencies, not workspace packages.
@@ -503,17 +563,92 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
     "packages/source-control-github",
   ].filter((dir) => files.some((file) => file.startsWith(`${dir}/`)));
   const filters = (names: ReadonlyArray<string>) => names.flatMap((name) => ["--filter", name]);
-  const typecheckWorkers = Math.min(concurrency, affected.length);
-  const command = (name: string, args: ReadonlyArray<string>) => ({ name, run: vp(args) });
   const compilerFiles = compilerApps.reduce((count, app) => count + app.names.length, 0);
+  const presentSet = new Set(present);
+  const codeSet = new Set(code);
 
-  const steps: Array<Step<never>> = [
-    ...(runPatchCheck ? [{ name: "unused patches", run: checkPatches }] : []),
+  interface PlannedStep {
+    readonly name: string;
+    // The command, as the cache sees it: typecheck's worker count is left out.
+    readonly id: ReadonlyArray<string>;
+    readonly scope: StepScope;
+    readonly serial?: boolean;
+    readonly run: (typecheckWorkers: number) => Step<never>;
+  }
+  const command = (
+    name: string,
+    args: ReadonlyArray<string>,
+    options: { scope?: StepScope; serial?: boolean } = {},
+  ): PlannedStep => ({
+    name,
+    id: args,
+    scope: options.scope ?? "all",
+    ...(options.serial ? { serial: true } : {}),
+    run: () => ({ name, run: vp(args), ...(options.serial ? { serial: true } : {}) }),
+  });
+
+  // In admission order: the quick per-file checks report first and free their slots within
+  // seconds, then the long steps start together so the slowest one sets the total.
+  const planned: Array<PlannedStep> = [
     ...(present.length > 0
-      ? [command("format", ["fmt", "--check", "--no-error-on-unmatched-pattern", ...present])]
+      ? [
+          command("format", ["fmt", "--check", "--no-error-on-unmatched-pattern", ...present], {
+            scope: (file) => presentSet.has(file) || TOOL_CONFIG.test(file),
+          }),
+        ]
       : []),
     ...(code.length > 0
-      ? [command("lint", ["lint", "--no-error-on-unmatched-pattern", ...code])]
+      ? [
+          command("lint", ["lint", "--no-error-on-unmatched-pattern", ...code], {
+            // Lint is not type-aware here, so it reads only the files it lints.
+            scope: (file) => codeSet.has(file) || TOOL_CONFIG.test(file),
+          }),
+        ]
+      : []),
+    ...(affected.length > 0
+      ? [
+          {
+            name: `typecheck (${affected.length} packages)`,
+            id: ["run", "typecheck", ...filters(affected)],
+            scope: (file: string) => TYPECHECK_INPUT.test(file) || ignoredInputs.has(file),
+            run: (workers: number) => ({
+              // `effect-tsgo tsrs --noEmit` writes nothing another package reads, so dependency
+              // order only made dependents wait: --parallel cut a contracts change from 13 s to 9 s.
+              name: `typecheck (${affected.length} packages)`,
+              run: vp([
+                "run",
+                "--cache",
+                "--parallel",
+                "--concurrency-limit",
+                String(workers),
+                ...filters(affected),
+                "typecheck",
+              ]),
+              weight: workers,
+            }),
+          } satisfies PlannedStep,
+        ]
+      : []),
+    // From the repo root, the root vite.config.ts hands each file to its package's config.
+    ...(vitestTests.length > 0
+      ? [
+          command(
+            `test (${vitestTests.length} files)`,
+            ["test", "run", "--passWithNoTests", ...vitestTests],
+            { serial: true },
+          ),
+        ]
+      : []),
+    ...(runPatchCheck
+      ? [
+          {
+            name: "unused patches",
+            id: ["unused patches"],
+            // It copies only the manifests, workspace, and patches into a temp dir.
+            scope: isDependencyFile,
+            run: () => ({ name: "unused patches", run: checkPatches }),
+          } satisfies PlannedStep,
+        ]
       : []),
     ...(runKnip
       ? knipPasses.map((args, index) => command(`knip ${index + 1}/${knipPasses.length}`, args))
@@ -521,38 +656,6 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
     ...graphql.map((dir) =>
       command(`graphql (${dir})`, ["run", "--filter", `./${dir}`, "generate", "--check"]),
     ),
-    ...(affected.length > 0
-      ? [
-          {
-            // `effect-tsgo tsrs --noEmit` writes nothing another package reads, so dependency order
-            // only made dependents wait: --parallel cut a contracts change from 13 s to 9 s.
-            ...command(`typecheck (${affected.length} packages)`, [
-              "run",
-              "--cache",
-              "--parallel",
-              "--concurrency-limit",
-              String(typecheckWorkers),
-              ...filters(affected),
-              "typecheck",
-            ]),
-            weight: typecheckWorkers,
-          },
-        ]
-      : []),
-    // From the repo root, the root vite.config.ts hands each file to its package's config.
-    ...(vitestTests.length > 0
-      ? [
-          {
-            ...command(`test (${vitestTests.length} files)`, [
-              "test",
-              "run",
-              "--passWithNoTests",
-              ...vitestTests,
-            ]),
-            serial: true,
-          },
-        ]
-      : []),
     ...(nodeTests.length > 0
       ? [
           command(`node --test (${nodeTests.length} files)`, [
@@ -565,25 +668,66 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       : []),
     ...(compilerApps.length > 0
       ? [
-          {
-            ...command(`react compiler (${compilerFiles} files)`, [
+          command(
+            `react compiler (${compilerFiles} files)`,
+            [
               "test",
               "run",
               ...compilerApps.map((app) => app.test),
               "-t",
               compilerApps.flatMap((app) => app.pattern).join("|"),
-            ]),
-            serial: true,
-          },
+            ],
+            { serial: true },
+          ),
         ]
       : []),
   ];
 
-  const results = yield* runSteps(steps, { concurrency, timeoutSeconds });
+  const cachePath = inRoot("node_modules/.cache/check-changed-steps.json");
+  // A missing or unreadable cache is a miss, never a failure.
+  const readCache = fs.readFileString(cachePath).pipe(
+    Effect.flatMap(decodeStepCache),
+    Effect.orElseSucceed((): Record<string, { name: string; seconds: number }> => ({})),
+  );
+  const cache = yield* readCache;
+  const keyOf = (snap: InputSnapshot, step: PlannedStep) =>
+    stepKey(keyPrefix, snap, step.id.join("\0"), step.scope);
+  const keys = planned.map((step) => keyOf(before, step));
+  const toRun = planned.filter((_, index) => cache[keys[index]!] === undefined);
+  for (const [index, step] of planned.entries()) {
+    const hit = cache[keys[index]!];
+    if (hit) {
+      yield* Console.log(
+        `\n> vp ${step.name}  cached  passed in ${hit.seconds.toFixed(1)}s before`,
+      );
+    }
+  }
+
+  // Serial steps run one at a time, so together they take one slot beside typecheck.
+  const siblings =
+    toRun.filter((step) => !step.name.startsWith("typecheck") && !step.serial).length +
+    (toRun.some((step) => step.serial) ? 1 : 0);
+  const workers = typecheckWorkers(concurrency, affected.length, siblings);
+  const ran = yield* runSteps(
+    toRun.map((step) => step.run(workers)),
+    { concurrency, timeoutSeconds },
+  );
+  const results = planned.map((step, index) => {
+    const result = ran.find((entry) => entry.name === step.name);
+    if (result) return { ...result, cached: false };
+    const hit = cache[keys[index]!]!;
+    return {
+      name: step.name,
+      outcome: "pass" as const,
+      time: `cached (${hit.seconds.toFixed(1)}s)`,
+      seconds: hit.seconds,
+      cached: true,
+    };
+  });
 
   const summary = ["check:changed summary"];
   for (const result of results) {
-    summary.push(`  ${result.outcome}  ${result.name}  ${result.time}`);
+    summary.push(`  ${result.cached ? "cached" : result.outcome}  ${result.name}  ${result.time}`);
   }
   if (results.some((result) => result.outcome === "TIMEOUT")) {
     summary.push(
@@ -600,22 +744,57 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   }).flatMap(([job, runs]) => (runs ? [job] : []));
   if (ciOnly.length > 0) summary.push(`  CI also runs: ${ciOnly.join(", ")}`);
   if (!runPatchCheck) summary.push("  unused patch check skipped: no dependency files changed");
-  if (!runKnip) summary.push("  knip skipped: no code or manifest changed");
+  if (!knipInputChanged) summary.push("  knip skipped: no code or manifest changed");
+  if (input.fast) {
+    const skipped = [
+      ...(knipInputChanged ? ["knip"] : []),
+      ...(skippedBrowserTests.length > 0
+        ? [`${skippedBrowserTests.length} browser test files`]
+        : []),
+    ];
+    summary.push(
+      skipped.length > 0
+        ? `  --fast skipped ${skipped.join(" and ")}: run check:changed without --fast before pushing`
+        : "  --fast skipped nothing for these changes",
+    );
+  }
+  if (results.some((result) => result.outcome === "FAIL" && result.name === "format")) {
+    summary.push("  format: run vp fmt on the changed files, or rerun with --fix");
+  }
+
+  // Cache each pass whose inputs did not change while it ran, failures elsewhere or not.
+  const after = yield* snapshot;
+  const passed = planned.flatMap((step, index) => {
+    const result = results[index]!;
+    return result.outcome === "pass" && !result.cached ? [{ step, index, result }] : [];
+  });
+  const stable = passed.filter(({ step, index }) => keyOf(after, step) === keys[index]);
+  if (stable.length < passed.length) {
+    const changed = passed.filter((entry) => !stable.includes(entry));
+    summary.push(
+      `  not cached, files changed during the run: ${changed.map(({ step }) => step.name).join(", ")}`,
+    );
+  }
   yield* Console.log(`\n${summary.join("\n")}`);
 
-  if (results.some((result) => result.outcome !== "pass")) return false;
-  if ((yield* inputKey) !== key) {
-    yield* Console.log("  pass not cached: files changed during the run");
-    return true;
+  if (stable.length > 0) {
+    // Merge into the newest cache, so a concurrent run's passes survive; write then rename,
+    // so a concurrent run never reads half a file.
+    const merged = { ...(yield* readCache) };
+    for (const { index, step, result } of stable) {
+      delete merged[keys[index]!];
+      merged[keys[index]!] = { name: step.name, seconds: result.seconds };
+    }
+    const kept = Object.fromEntries(Object.entries(merged).slice(-STEP_CACHE_LIMIT));
+    const temp = `${cachePath}.${process.pid}`;
+    yield* Effect.gen(function* () {
+      yield* fs.makeDirectory(path.dirname(cachePath), { recursive: true });
+      yield* fs.writeFileString(temp, yield* encodeStepCache(kept));
+      yield* fs.rename(temp, cachePath);
+    }).pipe(Effect.catch((error) => Console.warn(`  passes not cached: ${error.message}`)));
   }
-  // Write then rename, so a concurrent run never reads half a file.
-  const temp = `${cachePath}.${process.pid}`;
-  yield* Effect.gen(function* () {
-    yield* fs.makeDirectory(path.dirname(cachePath), { recursive: true });
-    yield* fs.writeFileString(temp, yield* encodeCacheEntry({ key, summary }));
-    yield* fs.rename(temp, cachePath);
-  }).pipe(Effect.catch((error) => Console.warn(`  pass not cached: ${error.message}`)));
-  return true;
+
+  return results.every((result) => result.outcome === "pass");
 });
 
 export const checkChangedCommand = Command.make(
@@ -636,6 +815,16 @@ export const checkChangedCommand = Command.make(
         "Seconds before a step is killed; also CHECK_CHANGED_TIMEOUT. Defaults to 900.",
       ),
       Flag.optional,
+    ),
+    fix: Flag.Boolean("fix").pipe(
+      Flag.withDescription("Format the changed files with vp fmt before checking them."),
+      Flag.withDefault(false),
+    ),
+    fast: Flag.Boolean("fast").pipe(
+      Flag.withDescription(
+        "Skip knip and browser tests while iterating. Not CI parity: run without it before pushing.",
+      ),
+      Flag.withDefault(false),
     ),
   },
   (input) =>

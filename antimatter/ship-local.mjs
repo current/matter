@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Builds and signs mattr locally like the nightly workflow, without waiting for GitHub; with
-// --install it swaps the app into /Applications and reopens it. Nothing is pushed or published.
-// Usage: node antimatter/ship-local.mjs [--install] [--ref main]
+// Builds and signs mattr like the nightly workflow, without GitHub; --install swaps it into /Applications.
+// Default: the unpacked .app, signed in place. --dmg adds CI's DMG, zip and manifest; --no-upstream skips the merge.
+// Usage: node antimatter/ship-local.mjs [--install] [--ref main] [--no-upstream] [--dmg] [--build-root <dir>]
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
@@ -13,17 +13,24 @@ import * as NodeUtil from "node:util";
 import { BUILD_ENV } from "./build-env.mjs";
 
 const { values } = NodeUtil.parseArgs({
+  allowNegative: true,
   options: {
     install: { type: "boolean", default: false },
     ref: { type: "string", default: "main" },
+    upstream: { type: "boolean", default: true },
+    dmg: { type: "boolean", default: false },
+    "build-root": { type: "string" },
     // Seconds between handing off and quitting the live app, so the caller can finish first.
     "quit-delay": { type: "string", default: "20" },
   },
 });
 
 const repoRoot = NodePath.resolve(import.meta.dirname, "..");
-// Kept between runs so installs and builds stay incremental.
-const buildRoot = NodePath.join(NodePath.dirname(repoRoot), "mattr-ship");
+// Kept between runs so installs and builds stay incremental: git clean below leaves ignored
+// files (dist, node_modules and their caches) in place.
+const buildRoot = NodePath.resolve(
+  values["build-root"] ?? NodePath.join(NodePath.dirname(repoRoot), "mattr-ship"),
+);
 const signingDir = NodePath.join(NodeOS.homedir(), ".antimatter-signing");
 const UPSTREAM_URL = "https://github.com/pingdotgg/t3code.git";
 const FORK_URL = "https://github.com/current/mattr.git";
@@ -118,14 +125,30 @@ function resolveVersion(upstreamTag) {
   return `${prefix}.${run}${String(count).padStart(2, "0")}`;
 }
 
-step("Finding the newest upstream nightly");
-const upstream = nightlyTags(UPSTREAM_URL)
-  .sort((a, b) => a.match[2].localeCompare(b.match[2]) || Number(a.match[3]) - Number(b.match[3]))
-  .at(-1);
-if (!upstream) throw new Error("No upstream nightly tag found.");
-const version = resolveVersion(upstream.tag);
 const mainSha = read("git", ["rev-parse", values.ref], { cwd: repoRoot });
-console.log(`${upstream.tag} + ${values.ref} ${mainSha.slice(0, 12)} → mattr ${version}`);
+let upstreamTag;
+if (values.upstream) {
+  step("Finding the newest upstream nightly");
+  upstreamTag = nightlyTags(UPSTREAM_URL)
+    .sort((a, b) => a.match[2].localeCompare(b.match[2]) || Number(a.match[3]) - Number(b.match[3]))
+    .at(-1)?.tag;
+  if (!upstreamTag) throw new Error("No upstream nightly tag found.");
+} else {
+  step(`Finding the upstream nightly ${values.ref} already contains`);
+  // The version follows the last upstream nightly merged into the ref, so the next CI
+  // release (which merges a newer one) still shows up as an update.
+  upstreamTag = read(
+    "git",
+    ["describe", "--tags", "--match", "v*-nightly.*", "--abbrev=0", mainSha],
+    {
+      cwd: repoRoot,
+    },
+  );
+}
+const version = resolveVersion(upstreamTag);
+console.log(
+  `${values.upstream ? `${upstreamTag} + ` : ""}${values.ref} ${mainSha.slice(0, 12)} → mattr ${version}${values.upstream ? "" : ` (no upstream merge; based on ${upstreamTag})`}`,
+);
 
 step(`Preparing the build checkout at ${buildRoot}`);
 if (!NodeFS.existsSync(NodePath.join(buildRoot, ".git"))) {
@@ -134,39 +157,74 @@ if (!NodeFS.existsSync(NodePath.join(buildRoot, ".git"))) {
 git(["reset", "--hard", "--quiet"]);
 git(["clean", "-fdq", "-e", "node_modules", "-e", ".t3"]);
 git(["checkout", "--quiet", "--detach", mainSha]);
-git([
-  "fetch",
-  "--quiet",
-  "--no-tags",
-  UPSTREAM_URL,
-  `refs/tags/${upstream.tag}:refs/tags/${upstream.tag}`,
-]);
-try {
+if (values.upstream) {
   git([
-    "-c",
-    "user.name=mattr-ship",
-    "-c",
-    "user.email=mattr-ship@localhost",
-    "merge",
+    "fetch",
     "--quiet",
-    "--no-edit",
-    upstream.tag,
+    "--no-tags",
+    UPSTREAM_URL,
+    `refs/tags/${upstreamTag}:refs/tags/${upstreamTag}`,
   ]);
-} catch {
-  const files = read("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: buildRoot });
-  git(["merge", "--abort"]);
-  throw new Error(
-    `Merging ${upstream.tag} into ${values.ref} conflicts in:\n${files}\nResolve it on main first.`,
-  );
+  try {
+    git([
+      "-c",
+      "user.name=mattr-ship",
+      "-c",
+      "user.email=mattr-ship@localhost",
+      "merge",
+      "--quiet",
+      "--no-edit",
+      upstreamTag,
+    ]);
+  } catch {
+    const files = read("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: buildRoot });
+    git(["merge", "--abort"]);
+    throw new Error(
+      `Merging ${upstreamTag} into ${values.ref} conflicts in:\n${files}\nResolve it on main first, ` +
+        `or rerun with --no-upstream to ship ${values.ref} without the newest upstream nightly.`,
+    );
+  }
 }
 
-step("Installing dependencies");
-mise(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], { cwd: buildRoot });
+// pnpm takes several seconds even when nothing changed, so skip it while every input it
+// reads (lockfile, workspace, manifests, patches) has the same git blob as the last install.
+const installInputs = read(
+  "git",
+  [
+    "ls-files",
+    "-s",
+    "--",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    ".pnpmfile.cjs",
+    "patches",
+    "apps/mobile/deps",
+    "apps/web/deps",
+    ":(glob)**/package.json",
+  ],
+  { cwd: buildRoot },
+);
+const installKey = NodeCrypto.createHash("sha256")
+  .update(`${NODE}\0${installInputs}`)
+  .digest("hex");
+const installStamp = NodePath.join(buildRoot, "node_modules/.mattr-ship-install");
+const installed =
+  NodeFS.existsSync(NodePath.join(buildRoot, "node_modules/.modules.yaml")) &&
+  NodeFS.existsSync(installStamp) &&
+  NodeFS.readFileSync(installStamp, "utf8") === installKey;
+if (installed) {
+  step("Dependencies unchanged since the last install");
+} else {
+  step("Installing dependencies");
+  NodeFS.rmSync(installStamp, { force: true });
+  mise(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], { cwd: buildRoot });
+  NodeFS.writeFileSync(installStamp, installKey);
+}
 
 const releaseDir = NodePath.join(buildRoot, "release-local");
 NodeFS.rmSync(releaseDir, { recursive: true, force: true });
 
-step("Building the macOS app");
+step(values.dmg ? "Building the macOS app, DMG and zip" : "Building the macOS app");
 mise(
   [
     "pnpm",
@@ -175,7 +233,8 @@ mise(
     "--platform",
     "mac",
     "--target",
-    "dmg",
+    // electron-builder spends minutes compressing a DMG and zip that a local install throws away.
+    values.dmg ? "dmg" : "dir",
     "--arch",
     "arm64",
     "--build-version",
@@ -185,6 +244,29 @@ mise(
   ],
   { cwd: buildRoot, env: { ...process.env, ...BUILD_ENV } },
 );
+
+let builtApp;
+if (!values.dmg) {
+  const appDir = NodePath.join(releaseDir, "mac-arm64");
+  const appName = NodeFS.readdirSync(appDir).find((name) => name.endsWith(".app"));
+  if (!appName) throw new Error(`No .app in ${appDir}`);
+  builtApp = NodePath.join(appDir, appName);
+  // electron-builder writes the updater's feed only for dmg and zip targets, so write the
+  // same file (as createBuildConfig's publish config) before signing seals Resources.
+  const [owner, repo] = BUILD_ENV.T3CODE_DESKTOP_UPDATE_REPOSITORY.split("/");
+  NodeFS.writeFileSync(
+    NodePath.join(builtApp, "Contents/Resources/app-update.yml"),
+    [
+      `owner: ${owner}`,
+      `repo: ${repo}`,
+      "provider: github",
+      "releaseType: prerelease",
+      "channel: nightly",
+      "updaterCacheDirName: t3code-updater",
+      "",
+    ].join("\n"),
+  );
+}
 
 step("Signing with the mattr certificate");
 const keychain = NodePath.join(NodeOS.tmpdir(), `mattr-ship-${process.pid}.keychain-db`);
@@ -238,8 +320,7 @@ try {
     "node",
     [
       NodePath.join(buildRoot, "antimatter/sign-mac-release.mjs"),
-      "--release-dir",
-      releaseDir,
+      ...(builtApp ? ["--app-path", builtApp] : ["--release-dir", releaseDir]),
       "--identity",
       identity,
       "--keychain",
@@ -253,14 +334,18 @@ try {
 }
 
 step("Checking the signed app");
-const zip = NodeFS.readdirSync(releaseDir).find((name) => name.endsWith(".zip"));
-if (!zip) throw new Error(`No zip in ${releaseDir}`);
 const stageDir = NodePath.join(buildRoot, "release-local-app");
 NodeFS.rmSync(stageDir, { recursive: true, force: true });
-run("ditto", ["-x", "-k", NodePath.join(releaseDir, zip), stageDir]);
-const appName = NodeFS.readdirSync(stageDir).find((name) => name.endsWith(".app"));
-const stagedApp = NodePath.join(stageDir, appName);
-run("codesign", ["--verify", "--deep", "--strict", stagedApp]);
+let stagedApp = builtApp;
+if (!stagedApp) {
+  // The zip is what the update button downloads, so check the app it unpacks to.
+  const zip = NodeFS.readdirSync(releaseDir).find((name) => name.endsWith(".zip"));
+  if (!zip) throw new Error(`No zip in ${releaseDir}`);
+  run("ditto", ["-x", "-k", NodePath.join(releaseDir, zip), stageDir]);
+  const appName = NodeFS.readdirSync(stageDir).find((name) => name.endsWith(".app"));
+  stagedApp = NodePath.join(stageDir, appName);
+  run("codesign", ["--verify", "--deep", "--strict", stagedApp]);
+}
 const plist = (key) =>
   read("/usr/libexec/PlistBuddy", [
     "-c",

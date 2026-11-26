@@ -21,8 +21,11 @@ import {
   docReaderTests,
   gitLines,
   ignoredCheckInputs,
+  INSTALL_STATE,
   runSteps,
   splitTests,
+  stepKey,
+  typecheckWorkers,
   type Step,
 } from "./check-changed.ts";
 import { decide, readWorkspace } from "../.github/scripts/ci-changes.cjs";
@@ -143,6 +146,90 @@ describe("check:changed", () => {
       );
     }),
   );
+
+  it("leaves typecheck up to half the budget's slots for the steps beside it", () => {
+    // Six slots, five sibling steps: typecheck gets three workers, not all six.
+    assert.strictEqual(typecheckWorkers(6, 30, 5), 3);
+    assert.strictEqual(typecheckWorkers(6, 2, 5), 2);
+    // Alone, it takes the whole budget.
+    assert.strictEqual(typecheckWorkers(6, 30, 0), 6);
+    assert.strictEqual(typecheckWorkers(16, 30, 2), 14);
+    assert.strictEqual(typecheckWorkers(1, 30, 5), 1);
+    assert.strictEqual(typecheckWorkers(2, 30, 5), 1);
+  });
+
+  it.effect("starts typecheck and tests beside the quick steps instead of after knip", () =>
+    Effect.gen(function* () {
+      const startedAt: Record<string, number> = {};
+      const step = (
+        name: string,
+        seconds: number,
+        options: { weight?: number; serial?: boolean } = {},
+      ): Step<never> => ({
+        name,
+        ...options,
+        run: Effect.gen(function* () {
+          startedAt[name] = (yield* Clock.currentTimeMillis) / 1000;
+          yield* Effect.sleep(`${seconds} seconds`);
+          return { ok: true, output: "" };
+        }),
+      });
+      const workers = typecheckWorkers(6, 20, 5);
+      const fiber = yield* runSteps(
+        [
+          step("format", 1),
+          step("lint", 2),
+          step("typecheck", 30, { weight: workers }),
+          step("test", 20, { serial: true }),
+          step("knip 1/2", 10),
+          step("knip 2/2", 10),
+        ],
+        { concurrency: 6, timeoutSeconds: 600 },
+      ).pipe(Effect.forkChild);
+      yield* TestClock.adjust("60 seconds");
+      yield* Fiber.join(fiber);
+
+      // Typecheck holding all six slots started it after both knip passes (10 s) and the
+      // tests after typecheck (40 s), for a 60 s run; now the run takes as long as typecheck.
+      assert.deepStrictEqual(startedAt, {
+        format: 0,
+        lint: 0,
+        typecheck: 0,
+        test: 0,
+        "knip 1/2": 1,
+        "knip 2/2": 2,
+      });
+    }),
+  );
+
+  it("keys a scoped step only on the inputs it reads", () => {
+    const snapshot = (files: Record<string, string>, diff = "diff") => ({
+      diff,
+      files: new Map(Object.entries(files)),
+    });
+    const base = { "a.ts": "1", "notes.md": "1", [INSTALL_STATE[0]!]: "1" };
+    const codeOnly = (file: string) => file.endsWith(".ts");
+    const key = (files: Record<string, string>, scope: "all" | typeof codeOnly, diff?: string) =>
+      stepKey("prefix", snapshot(files, diff), "step", scope);
+
+    assert.strictEqual(
+      key({ ...base, "notes.md": "2" }, codeOnly, "other diff"),
+      key(base, codeOnly),
+    );
+    assert.notStrictEqual(key({ ...base, "a.ts": "2" }, codeOnly), key(base, codeOnly));
+    assert.notStrictEqual(
+      key({ ...base, [INSTALL_STATE[0]!]: "2" }, codeOnly),
+      key(base, codeOnly),
+    );
+    assert.notStrictEqual(key({ ...base, "notes.md": "2" }, "all"), key(base, "all"));
+    assert.notStrictEqual(key(base, "all", "other diff"), key(base, "all"));
+    // Map order doesn't matter.
+    assert.strictEqual(
+      key({ "notes.md": "1", [INSTALL_STATE[0]!]: "1", "a.ts": "1" }, "all"),
+      key(base, "all"),
+    );
+    assert.notStrictEqual(stepKey("prefix", snapshot(base), "other step", "all"), key(base, "all"));
+  });
 
   it("runs the .github/scripts node:test files with node --test, not vitest", () => {
     assert.deepStrictEqual(
@@ -454,12 +541,17 @@ function launcherFixture() {
     root,
     source,
     write,
-    run(failStep = "") {
-      return NodeChildProcess.spawnSync(process.execPath, ["scripts/check-changed.ts", "HEAD"], {
-        cwd: root,
-        encoding: "utf8",
-        env: { ...env, TEMP: NodeOS.tmpdir(), RECORDS: records, FAIL_STEP: failStep },
-      });
+    run(failStep = "", args: ReadonlyArray<string> = []) {
+      for (const file of NodeFS.readdirSync(records)) NodeFS.rmSync(NodePath.join(records, file));
+      return NodeChildProcess.spawnSync(
+        process.execPath,
+        ["scripts/check-changed.ts", "HEAD", ...args],
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: { ...env, TEMP: NodeOS.tmpdir(), RECORDS: records, FAIL_STEP: failStep },
+        },
+      );
     },
     calls: (): Array<{ args: Array<string>; cwd: string }> =>
       NodeFS.readdirSync(records).map((file) =>
@@ -525,7 +617,88 @@ it.each(["install", "lint"])("reports a failing %s step with its output", (step)
   expect(result.stdout + result.stderr).toContain(`fixture stderr: ${step}`);
   expect(result.stdout).toContain(step === "install" ? "FAIL  unused patches" : "FAIL  lint");
   if (step === "lint") expect(result.stdout).toContain("pass  unused patches");
-  expect(
-    NodeFS.existsSync(NodePath.join(project.root, "node_modules/.cache/check-changed.json")),
-  ).toBe(false);
+  const cached = JSON.parse(
+    NodeFS.readFileSync(
+      NodePath.join(project.root, "node_modules/.cache/check-changed-steps.json"),
+      "utf8",
+    ),
+  );
+  const names = Object.values(cached).map((entry) => (entry as { name: string }).name);
+  expect(names).not.toContain(step === "install" ? "unused patches" : "lint");
+  expect(names).toContain("format");
+});
+
+it("reruns only the step that failed, then nothing once every step has passed", () => {
+  using project = launcherFixture();
+  project.write(project.source, "export const value = 2;\n");
+  expect(project.run("lint").status).toBe(1);
+  const passing = project.calls().filter(({ args }) => args[0] !== "lint").length;
+  expect(passing).toBeGreaterThan(2);
+
+  const rerun = project.run();
+  expect(rerun.status, rerun.stdout + rerun.stderr).toBe(0);
+  expect(project.calls().map(({ args }) => args[0])).toEqual(["lint"]);
+  expect(rerun.stdout).toContain("cached  format");
+  expect(rerun.stdout).toContain("pass  lint");
+
+  const third = project.run();
+  expect(third.status, third.stdout + third.stderr).toBe(0);
+  expect(project.calls()).toEqual([]);
+
+  // A change in a file the format and lint steps read runs them again.
+  project.write(project.source, "export const value = 3;\n");
+  expect(project.run().status).toBe(0);
+  const commands = project.calls().map(({ args }) => args[0]);
+  expect(commands).toContain("fmt");
+  expect(commands).toContain("lint");
+});
+
+it("skips knip and browser tests with --fast and says so", () => {
+  using project = launcherFixture();
+  const source = "packages/example/widget.ts";
+  project.write(source, "export const widget = 1;\n");
+  project.write("packages/example/widget.test.ts", "export {};\n");
+  project.write("packages/example/widget.browser.test.ts", "export {};\n");
+  const result = project.run("", ["--fast"]);
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const commands = project.calls().map(({ args }) => args);
+  expect(commands.some((args) => args.includes("knip"))).toBe(false);
+  expect(commands.find((args) => args[0] === "test")).toEqual([
+    "test",
+    "run",
+    "--passWithNoTests",
+    "packages/example/widget.test.ts",
+  ]);
+  expect(result.stdout).toContain(
+    "--fast skipped knip and 1 browser test files: run check:changed without --fast before pushing",
+  );
+
+  // The full run reuses the fast run's passes and adds what it skipped.
+  const full = project.run();
+  expect(full.status, full.stdout + full.stderr).toBe(0);
+  const fullCommands = project.calls().map(({ args }) => args);
+  expect(fullCommands.some((args) => args[0] === "lint")).toBe(false);
+  expect(fullCommands).toContainEqual(["exec", "knip", "--exports"]);
+  expect(fullCommands.find((args) => args[0] === "test")).toContain(
+    "packages/example/widget.browser.test.ts",
+  );
+});
+
+it("formats the changed files before checking them with --fix", () => {
+  using project = launcherFixture();
+  project.write(project.source, "export const value = 2;\n");
+  const result = project.run("", ["--fix"]);
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const formats = project
+    .calls()
+    .filter(({ args }) => args[0] === "fmt")
+    .map(({ args }) => args);
+  expect(formats).toContainEqual(["fmt", "--no-error-on-unmatched-pattern", project.source]);
+  expect(formats).toContainEqual([
+    "fmt",
+    "--check",
+    "--no-error-on-unmatched-pattern",
+    project.source,
+  ]);
+  expect(result.stdout).toContain("> vp fmt (--fix)  done");
 });
