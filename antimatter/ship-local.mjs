@@ -126,29 +126,48 @@ function resolveVersion(upstreamTag) {
 }
 
 const mainSha = read("git", ["rev-parse", values.ref], { cwd: repoRoot });
+const byNightlyOrder = (a, b) =>
+  a.match[2].localeCompare(b.match[2]) || Number(a.match[3]) - Number(b.match[3]);
 let upstreamTag;
 if (values.upstream) {
   step("Finding the newest upstream nightly");
-  upstreamTag = nightlyTags(UPSTREAM_URL)
-    .sort((a, b) => a.match[2].localeCompare(b.match[2]) || Number(a.match[3]) - Number(b.match[3]))
-    .at(-1)?.tag;
+  upstreamTag = nightlyTags(UPSTREAM_URL).sort(byNightlyOrder).at(-1)?.tag;
   if (!upstreamTag) throw new Error("No upstream nightly tag found.");
 } else {
   step(`Finding the upstream nightly ${values.ref} already contains`);
   // The version follows the last upstream nightly merged into the ref, so the next CI
-  // release (which merges a newer one) still shows up as an update.
-  upstreamTag = read(
-    "git",
-    ["describe", "--tags", "--match", "v*-nightly.*", "--abbrev=0", mainSha],
-    {
-      cwd: repoRoot,
-    },
+  // release (which merges a newer one) still shows up as an update. Fork release tags match
+  // the same pattern and are reachable from the ref too, so only upstream's own tags count.
+  const merged = new Set(
+    read("git", ["tag", "--merged", mainSha, "--list", "v*-nightly.*"], { cwd: repoRoot }).split(
+      "\n",
+    ),
   );
+  upstreamTag = nightlyTags(UPSTREAM_URL)
+    .filter((entry) => merged.has(entry.tag))
+    .sort(byNightlyOrder)
+    .at(-1)?.tag;
+  if (!upstreamTag) {
+    throw new Error(
+      `No upstream nightly tag is merged into ${values.ref}; run git fetch upstream --tags.`,
+    );
+  }
 }
 const version = resolveVersion(upstreamTag);
 console.log(
   `${values.upstream ? `${upstreamTag} + ` : ""}${values.ref} ${mainSha.slice(0, 12)} → mattr ${version}${values.upstream ? "" : ` (no upstream merge; based on ${upstreamTag})`}`,
 );
+
+// The build checkout is reset and cleaned, so never point it at a checkout someone works in.
+const mainCheckout = read("git", ["worktree", "list", "--porcelain"], { cwd: repoRoot })
+  .split("\n")[0]
+  .replace(/^worktree /, "");
+const realBuildRoot = NodeFS.existsSync(buildRoot) ? NodeFS.realpathSync(buildRoot) : buildRoot;
+if ([repoRoot, mainCheckout].some((dir) => NodeFS.realpathSync(dir) === realBuildRoot)) {
+  throw new Error(
+    `--build-root ${buildRoot} is a working checkout; pick a dedicated build directory.`,
+  );
+}
 
 step(`Preparing the build checkout at ${buildRoot}`);
 if (!NodeFS.existsSync(NodePath.join(buildRoot, ".git"))) {
