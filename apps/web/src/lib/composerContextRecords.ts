@@ -337,7 +337,7 @@ function responseContextLabel(text: string): string {
 
 /** One record per response, so replying to it again reuses the same reference. */
 export function responseContextRecord(
-  input: Pick<ResponseContextRecord, "citation" | "itemId"> & {
+  input: Pick<ResponseContextRecord, "citation" | "itemId" | "role"> & {
     readonly subagents: ReadonlyArray<{
       readonly threadId: ThreadId;
       readonly title: string;
@@ -350,6 +350,7 @@ export function responseContextRecord(
     kind: "response",
     contextId: toKindScopedComposerContextId("response", input.citation.messageId),
     label: responseContextLabel(input.citation.text),
+    ...(input.role !== undefined ? { role: input.role } : {}),
     citation: input.citation,
     itemId: input.itemId,
     ...(input.subagents.length > 0

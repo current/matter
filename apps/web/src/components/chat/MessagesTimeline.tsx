@@ -148,6 +148,7 @@ import {
   MattrTimelineActivityProvider,
   MattrWorkingTimelineRow,
 } from "./MattrAiStatusIndicator";
+import { useMattrMessageReveal } from "./mattrMessageReply.mattr";
 
 function timelineListStateFor(identity: string): {
   readonly identity: string;
@@ -875,6 +876,16 @@ const ConversationTimeline = memo(function ConversationTimeline({
     viewport: timelineViewportElement,
     onManualNavigation: navigateTimeline,
   });
+  useMattrMessageReveal({
+    threadRef: citationThreadRef,
+    rows,
+    listRef,
+    viewport: timelineViewportElement,
+    onManualNavigation: navigateTimeline,
+    hasMoreHistory: historyControls?.hasMoreHistory,
+    onLoadEarlier: historyControls?.onLoadEarlier,
+  });
+
   const [findListReady, setFindListReady] = useState(false);
   const handleListLoad = () => {
     onCitationListLoad();

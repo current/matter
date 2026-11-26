@@ -654,3 +654,211 @@ html[data-theme-id] [data-mattr-composer] {
     transition: none;
   }
 }
+
+/* In-chat Reply bar docked at the top of the prompt card, sent reply reference header
+   above user bubbles, and finite one-shot target highlight flash. */
+[data-mattr-composer] [data-mattr-reply-bar] {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--mc-card-line);
+  border-radius: 12px 12px 0 0;
+  background-color: var(--mc-rest);
+  font-size: 12px;
+  line-height: 1.35;
+  font-style: normal;
+}
+
+[data-mattr-composer]:has([data-mattr-reply-bar]) [data-chat-composer-body] {
+  padding-top: 11px;
+}
+
+[data-mattr-reply-bar-icon] {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--mc-icon, var(--muted-foreground));
+}
+
+[data-mattr-reply-bar-jump] {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  font-style: normal;
+  outline: none;
+}
+
+[data-mattr-reply-bar-jump]:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+[data-mattr-reply-bar-heading] {
+  flex: none;
+  font-weight: 500;
+  color: var(--mc-text, var(--foreground));
+  white-space: nowrap;
+  font-style: normal;
+}
+
+[data-mattr-reply-bar-sep] {
+  flex: none;
+  color: var(--mc-placeholder, var(--muted-foreground));
+}
+
+[data-mattr-reply-bar-excerpt] {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mc-tray, var(--muted-foreground));
+  font-style: normal;
+  transition: color 120ms ease;
+}
+
+[data-mattr-reply-bar-jump]:hover [data-mattr-reply-bar-excerpt] {
+  color: var(--mc-text, var(--foreground));
+}
+
+[data-mattr-reply-bar-dismiss] {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mc-icon, var(--muted-foreground));
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+[data-mattr-reply-bar-dismiss]:hover,
+[data-mattr-reply-bar-dismiss]:focus-visible {
+  background-color: var(--mc-hover, rgb(0 0 0 / 5%));
+  color: var(--mc-text, var(--foreground));
+}
+
+[data-mattr-reply-bar-dismiss]:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+[data-mattr-reply-bar-dismiss] svg {
+  width: 13px;
+  height: 13px;
+}
+
+[data-mattr-reply-header] {
+  display: inline-flex;
+  max-width: 80%;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  margin-inline-end: 4px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+  font-style: normal;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+[data-mattr-reply-header]:hover,
+[data-mattr-reply-header]:focus-visible {
+  background-color: rgb(0 0 0 / 4.5%);
+  color: var(--foreground);
+}
+
+.dark [data-mattr-reply-header]:hover,
+.dark [data-mattr-reply-header]:focus-visible {
+  background-color: rgb(255 255 255 / 6%);
+}
+
+[data-mattr-reply-header]:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+[data-mattr-reply-header-icon] {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  opacity: 0.78;
+}
+
+[data-mattr-reply-header-author] {
+  flex: none;
+  font-weight: 500;
+  white-space: nowrap;
+  font-style: normal;
+}
+
+[data-mattr-reply-header-sep] {
+  flex: none;
+  opacity: 0.45;
+}
+
+[data-mattr-reply-header-excerpt] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+  font-style: normal;
+}
+
+[data-message-id][data-mattr-reply-highlight="true"] [data-user-message-bubble],
+[data-message-id][data-message-role="assistant"][data-mattr-reply-highlight="true"] {
+  border-radius: 14px;
+  animation: mattr-reply-highlight-flash 1500ms ease-out 1 both;
+}
+
+@keyframes mattr-reply-highlight-flash {
+  0% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 65%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-mattr-reply-bar-excerpt],
+  [data-mattr-reply-bar-dismiss],
+  [data-mattr-reply-header] {
+    transition: none;
+  }
+
+  [data-message-id][data-mattr-reply-highlight="true"] [data-user-message-bubble],
+  [data-message-id][data-message-role="assistant"][data-mattr-reply-highlight="true"] {
+    animation: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 55%, transparent);
+  }
+}

@@ -69,6 +69,7 @@ every optional integration is **off by default** in settings → add-ons. disabl
 - **account fallback with exclusions** — automatically switches to another account with usage left when one runs out, with per-account exclusions (`fallbackExcludedInstanceIds`).
 - **multi-provider delegation** — when you ask for subagents or parallel work, agents spread the children across every signed-in subscription, favoring whichever has the most usage left; on by default, with a delegation pool you can trim in settings → threads.
 - **redesigned composer** — the prompt card sits in a shelf with the project, workspace and branch underneath; permissions on the left, a red send circle on the right.
+- **in-chat replies** — reply directly to any user or assistant message from its hover bar; an in-card reply banner shows who you are replying to (esc cancels when empty), and sent replies render a clickable reference header that jumps back and highlights the original message.
 - **composer predictions** — after each turn, the empty composer offers your likely next message in your own voice, for every provider; tab or → fills it in.
 - **stalled turn flags** — flags running turns with no agent activity for 10 minutes.
 - **multi-project delegation** — delegate tasks across local projects from one thread.

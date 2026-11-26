@@ -95,6 +95,8 @@ import {
   resolvePreviewAnnotationImage,
   userMessageFileLabel,
 } from "./TimelineUserMessageRow.logic";
+import { MattrSentReplyHeader, MattrUserReplyButton } from "./MattrComposerReplyBar.mattr";
+import { extractLeadingReplyReference } from "./mattrMessageReply.mattr";
 
 // Drawn inside the media so dark screenshots keep an edge on the dark background.
 const MEDIA_EDGE_CLASS_NAME =
@@ -374,6 +376,13 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
                 <RevertUserMessageButton turnCount={revertTurnCount} messageId={row.message.id} />
               )}
               <MessageCopyButton text={text} variant="ghost" />
+              <MattrUserReplyButton
+                messageId={row.message.id}
+                itemId={row.projectedItem?.sourceItemId}
+                rawText={text}
+                threadRef={ctx.threadRef}
+                onReply={ctx.onReplyToResponse}
+              />
               {promptLink !== null && (
                 <MessageCopyButton
                   text={promptLink}
@@ -508,6 +517,10 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     senderRef !== null &&
     (row.message.linkedSender === undefined || linkedSenderEnvironment !== null);
   const resolvedContext = resolveUserMessageContext({ ...row.message, text: userMessage.text });
+  const leadingReply = !folded
+    ? extractLeadingReplyReference(resolvedContext.text, resolvedContext.recordsById)
+    : null;
+  const bubbleText = leadingReply ? leadingReply.bodyText : resolvedContext.text;
   const previewImages = userImages.filter((image) => image.name.startsWith("preview-annotation-"));
   const revertTurnCount = row.revertTurnCount;
   const attachmentReferences = collectComposerContextReferences(resolvedContext.text).flatMap(
@@ -889,6 +902,13 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             variant="ghost"
           />
         )}
+        <MattrUserReplyButton
+          messageId={row.message.id}
+          itemId={row.projectedItem?.sourceItemId}
+          rawText={bubbleText}
+          threadRef={ctx.threadRef}
+          onReply={ctx.onReplyToResponse}
+        />
         {promptLink !== null && (
           <MessageCopyButton
             text={promptLink}
@@ -926,6 +946,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           intent={row.message.inputIntent}
           unread={row.projectedItem?.item.status === "pending"}
         />
+      ) : null}
+      {leadingReply ? (
+        <MattrSentReplyHeader record={leadingReply.record} currentThreadRef={ctx.threadRef} />
       ) : null}
       {mediaAboveText ? (
         <div className="flex max-w-[80%] justify-end">
@@ -975,7 +998,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           <div
             ref={folded ? revealFoldRef : undefined}
             hidden={folded && !expanded}
-            dir={markdownProseDirection(resolvedContext.text)}
+            dir={markdownProseDirection(bubbleText)}
             className={cn(
               folded && "px-3 pb-3",
               folded && !ctx.findActive && "max-h-96 overflow-auto",
@@ -1098,7 +1121,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             {fileCardsOnly || audioOnly ? null : (
               <div onCopyCapture={onBodyCopyCapture}>
                 <CollapsibleUserMessageBody
-                  text={resolvedContext.text}
+                  text={bubbleText}
                   renderContextReference={renderContextReference}
                   skills={ctx.skills}
                   markdownCwd={ctx.markdownCwd}

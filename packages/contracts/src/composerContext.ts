@@ -237,6 +237,8 @@ export type EnvironmentContextRecord = typeof EnvironmentContextRecord.Type;
 export const ResponseContextRecord = Schema.Struct({
   ...recordBase,
   kind: Schema.Literal("response"),
+  /** Author role of the message being replied to; absent means an assistant response. */
+  role: Schema.optional(Schema.Literals(["user", "assistant"])),
   /** Where the response is and how it starts, as the reader saw it. */
   citation: AssistantCitation,
   itemId: TurnItemId,

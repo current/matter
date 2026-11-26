@@ -55,7 +55,7 @@ import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime
 import * as Schema from "effect/Schema";
 import { formatComposerModelMention } from "@t3tools/client-runtime/composer-model-mentions";
 import { isPasteAsTextShortcut } from "@t3tools/client-runtime/text-paste";
-import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
 import { type FolderDropTarget, folderDropTarget, resolveDroppedFolderPath } from "./folderDrop";
 import { splitTransferredFiles } from "./workspaceFileDrop";
@@ -135,6 +135,7 @@ import {
   type MattrGooeySendAction,
   MattrVoiceModeIcon,
 } from "./MattrComposerParts.mattr";
+import { MattrComposerReplyBar } from "./MattrComposerReplyBar.mattr";
 import { useMattrGooeySendSetting } from "../../mattrGooeySend";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";
@@ -263,10 +264,8 @@ import { observeResize } from "~/lib/observeResize";
 const isEnvironmentRequestInvalidError = Schema.is(EnvironmentRequestInvalidError);
 import { toastManager } from "../ui/toast";
 import { m as resolveMessage } from "../../i18n/messages";
-import { BuildingIcon, PlayIcon, ReplyIcon } from "lucide-react";
+import { BuildingIcon, PlayIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { assistantCitationLabel } from "@t3tools/shared/assistantCitations";
-import { assistantCitationNavigation } from "../../lib/assistantCitationNavigation";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { useManagedPolicy } from "../../state/managedPolicy";
@@ -2582,6 +2581,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   // After /clear the next message starts a fresh session that cannot see what the suggestion refers to.
   const freshSessionArmed = useFreshSessionArmed(scopedThreadKey(routeThreadRef));
+  const replyTo = composerDraft?.replyTo ?? null;
   // Offered only where the default placeholder would show, so it never hides a pending question.
   const offeredPromptSuggestion =
     phase !== "running" &&
@@ -2589,12 +2589,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     !freshSessionArmed &&
     !speechInput.freezesEditor &&
     composerContextRecords.size === 0 &&
+    replyTo === null &&
     !isComposerApprovalState &&
     !activePendingProgress &&
     !projectSelectionRequired &&
     !showProviderUnavailable
       ? promptSuggestion
       : null;
+
+  const dismissComposerReply = () => setComposerDraftReplyTo(composerDraftTarget, null);
 
   const onComposerCommandKey = (key: string, event: KeyboardEvent, isTaskItem?: boolean) => {
     if (key === "Escape" && composerSendHeld && !event.isComposing) {
@@ -2639,6 +2642,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       submitComposer,
       promptSuggestion: offeredPromptSuggestion,
       dismissPromptSuggestion,
+      hasActiveReply: replyTo !== null,
+      dismissReply: dismissComposerReply,
     })(key, event, isTaskItem);
   };
 
@@ -2770,7 +2775,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   // An open question owns the space above the composer. Only a machine problem,
   // which is why an answer could not go through, stays beside it.
-  const replyTo = composerDraft?.replyTo ?? null;
   const draftRunsLocally = composerRunsDraftLocally({
     text: prompt,
     holdsOnlyText:
@@ -2786,43 +2790,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     codexFeedback: selectedProvider === "codex" && multipleModelSelections === null,
     freshSession: props.onFreshSession !== undefined,
   });
-  const replyBannerItems: readonly ComposerBannerStackItem[] = replyTo
-    ? [
-        {
-          id: "reply-to",
-          variant: "default",
-          icon: <ReplyIcon />,
-          title: replyTo.subagents
-            ? gt("Replying to {titles}", {
-                titles: replyTo.subagents.map((subagent) => subagent.title).join(", "),
-              })
-            : gt("Replying to", { $context: "banner title; the message being replied to follows" }),
-          description: (
-            <button
-              type="button"
-              className="cursor-pointer hover:text-foreground"
-              onClick={() => {
-                const { citation } = replyTo;
-                const source = readThreadShell(
-                  scopeThreadRef(citation.environmentId, citation.threadId),
-                );
-                void navigate(assistantCitationNavigation(citation, source));
-              }}
-            >
-              {assistantCitationLabel(replyTo.citation)}
-            </button>
-          ),
-          dismissLabel: gt("Cancel reply"),
-          onDismiss: () => setComposerDraftReplyTo(composerDraftTarget, null),
-        },
-      ]
-    : [];
   const bannerItems: readonly ComposerBannerStackItem[] =
     runtimeModeCeilingDenial === undefined || activePendingProgress
-      ? [...props.bannerItems, ...replyBannerItems]
+      ? props.bannerItems
       : [
           ...props.bannerItems,
-          ...replyBannerItems,
           {
             id: "managed-runtime-mode",
             variant: "warning",
@@ -3703,14 +3675,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       ref={composerFormRef}
       onSubmit={submitComposerStable}
       onKeyDown={(event) => {
-        if (
-          event.key === "Escape" &&
-          composerSendHeld &&
-          !event.defaultPrevented &&
-          !event.nativeEvent.isComposing
-        ) {
-          event.preventDefault();
-          cancelHeldSend();
+        if (event.key === "Escape" && !event.defaultPrevented && !event.nativeEvent.isComposing) {
+          if (composerSendHeld) {
+            event.preventDefault();
+            cancelHeldSend();
+          } else if (replyTo !== null && promptRef.current.length === 0) {
+            event.preventDefault();
+            dismissComposerReply();
+          }
         }
       }}
       onFocusCapture={(event) => {
@@ -3911,6 +3883,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   </button>
                 </CollapsedComposerStopAction>
               </div>
+            ) : null}
+
+            {replyTo && !hasBlockingComposerTopDrawer && !isComposerCollapsedMobile ? (
+              <MattrComposerReplyBar
+                replyTo={replyTo}
+                currentThreadRef={routeThreadRef}
+                onDismiss={dismissComposerReply}
+              />
             ) : null}
 
             <div

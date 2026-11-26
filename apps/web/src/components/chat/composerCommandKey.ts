@@ -100,6 +100,9 @@ export function composerCommandKeyHandler(input: {
   /** Predicted next prompt that Tab fills into an empty composer; Escape dismisses it. */
   readonly promptSuggestion: string | null;
   readonly dismissPromptSuggestion: () => void;
+  /** Active in-chat reply target; Escape dismisses it when the prompt is empty. */
+  readonly hasActiveReply?: boolean;
+  readonly dismissReply?: () => void;
 }) {
   const {
     keybindings,
@@ -139,6 +142,8 @@ export function composerCommandKeyHandler(input: {
     submitComposer,
     promptSuggestion,
     dismissPromptSuggestion,
+    hasActiveReply = false,
+    dismissReply,
   } = input;
 
   // The composer persists across threads. A recall from thread A must not
@@ -241,6 +246,10 @@ export function composerCommandKeyHandler(input: {
       if (event.isComposing || event.keyCode === 229) return false;
       if (!menuIsActive && promptSuggestion !== null && promptRef.current.length === 0) {
         dismissPromptSuggestion();
+        return true;
+      }
+      if (!menuIsActive && hasActiveReply && dismissReply && promptRef.current.length === 0) {
+        dismissReply();
         return true;
       }
       if (!menuIsActive) return false;

@@ -1,5 +1,5 @@
 import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/assistantInsights";
-import { MessageId, type TurnItemId } from "@t3tools/contracts";
+import { MessageId, TurnItemId } from "@t3tools/contracts";
 import { canForkProjectedAssistantItem } from "@t3tools/client-runtime/state/thread-workflows";
 import { agentWorkingDirectories } from "@t3tools/client-runtime/workspace-basename-lookup";
 import { T, useGT, useMessages } from "gt-react";
@@ -231,8 +231,11 @@ function AssistantMessageMeta({
       {projectedItem?.item.type === "assistant_message" ? (
         <AssistantForkButton projectedItem={projectedItem} />
       ) : null}
-      {!message.streaming && projectedItem ? (
-        <AssistantReplyButton message={message} itemId={projectedItem.sourceItemId} />
+      {!message.streaming ? (
+        <AssistantReplyButton
+          message={message}
+          itemId={projectedItem?.sourceItemId ?? TurnItemId.make(message.id)}
+        />
       ) : null}
       {!message.streaming && (
         <Tooltip>
@@ -274,6 +277,7 @@ function AssistantReplyButton({ message, itemId }: { message: ChatMessage; itemI
     if (!opening) return;
     onReplyToResponse(
       responseContextRecord({
+        role: "assistant",
         citation: { version: 1, ...threadRef, messageId: message.id, ...opening },
         itemId,
         subagents: readResponseSubagents(threadRef, itemId),
