@@ -219,20 +219,31 @@ function sendPromptWhenIdle<A>(
   turn: { readonly interrupted: boolean; readonly finalized: boolean },
   prompt: () => Effect.Effect<A, EffectAcpErrors.AcpError>,
   superseded: () => boolean = () => false,
+  // agy rejects a steer while its prompt waits on a question or approval; it goes out once answered.
+  awaitingAnswer: () => boolean = () => false,
 ): Effect.Effect<A, EffectAcpErrors.AcpError> {
   // A Stop or a prompt-steer can land during the wait, so both are rechecked before each resend.
   const stopped = () => turn.interrupted || turn.finalized || superseded();
+  const resendWhenIdle = (
+    error: EffectAcpErrors.AcpError,
+  ): Effect.Effect<A, EffectAcpErrors.AcpError> =>
+    Effect.sleep(ACP_BUSY_PROMPT_RETRY_INTERVAL).pipe(
+      Effect.andThen(
+        Effect.suspend(() =>
+          stopped()
+            ? Effect.fail(error)
+            : awaitingAnswer()
+              ? resendWhenIdle(error)
+              : sendPromptWhenIdle(turn, prompt, superseded, awaitingAnswer),
+        ),
+      ),
+    );
   return prompt().pipe(
     Effect.catchIf(
-      (error) => isAgentBusyPromptError(error) && !stopped(),
       (error) =>
-        Effect.sleep(ACP_BUSY_PROMPT_RETRY_INTERVAL).pipe(
-          Effect.andThen(
-            Effect.suspend(() =>
-              stopped() ? Effect.fail(error) : sendPromptWhenIdle(turn, prompt, superseded),
-            ),
-          ),
-        ),
+        !stopped() &&
+        (isAgentBusyPromptError(error) || (error._tag === "AcpRequestError" && awaitingAnswer())),
+      resendWhenIdle,
     ),
   );
 }
@@ -10849,6 +10860,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     flavor.promptFailure?.(failure) ??
                       makeProviderFailure({
                         cause: failure,
+                        ...(agentAnswered && error.success.errorMessage.trim() !== ""
+                          ? { message: error.success.errorMessage }
+                          : {}),
                         class: "provider_error",
                       }),
                   ).pipe(
@@ -11415,6 +11429,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                             { dispatched, released: releasedForSteer },
                           ),
                         superseded,
+                        () => agentRequests.size > 0,
                       ),
                     {
                       generation,

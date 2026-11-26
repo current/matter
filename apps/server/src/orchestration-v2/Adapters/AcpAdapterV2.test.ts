@@ -635,6 +635,8 @@ const makePromptInactivityHarness = Effect.fnUntraced(function* (input: {
   ) => AcpSessionRuntime.AcpSessionRuntime["Service"]["prompt"];
   readonly cancelled?: Deferred.Deferred<void>;
   readonly followAgentWorkState?: boolean;
+  /** Antigravity's shape: steers go out as prompts and open requests hold the agent. */
+  readonly steersWhileHoldingRequests?: boolean;
   readonly sessionScope?: Scope.Scope;
 }) {
   const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -650,6 +652,13 @@ const makePromptInactivityHarness = Effect.fnUntraced(function* (input: {
         ? {}
         : { watchPromptOutcome: input.watchPromptOutcome }),
       ...(input.followAgentWorkState === true ? { followAgentWorkState: true } : {}),
+      ...(input.steersWhileHoldingRequests === true
+        ? {
+            steersWithPrompt: () => true,
+            enablePostSettleContinuation: true,
+            wakeOnDetachedRequest: true,
+          }
+        : {}),
       makeRuntime: makeMockRuntime({
         childProcessSpawner,
         mockAgentPath: yield* bundledMockAgentPath,
@@ -668,7 +677,7 @@ const makePromptInactivityHarness = Effect.fnUntraced(function* (input: {
       }),
     },
     selfInvocation: yield* resolveSelfInvocation(),
-    ...(input.followAgentWorkState === true
+    ...(input.followAgentWorkState === true || input.steersWhileHoldingRequests === true
       ? { continuationRequests: { offer: () => Effect.void } }
       : {}),
   });
@@ -697,11 +706,33 @@ const makePromptInactivityHarness = Effect.fnUntraced(function* (input: {
         ),
       ),
     );
+  const steerTurn = (ordinal: number, text: string) =>
+    IdAllocator.IdAllocatorV2.pipe(
+      Effect.flatMap((idAllocator) =>
+        runtime.steerTurn({
+          threadId,
+          runId: RunId.make(`run:${threadId}:${ordinal}`),
+          providerThread,
+          providerTurnId: idAllocator.derive.providerTurn({
+            driver: ACP_TEST_DRIVER,
+            nativeTurnId: acpScopedNativeId(instanceId, `mock-session-1:turn:${ordinal}`),
+          }),
+          message: {
+            createdBy: "user",
+            creationSource: "web",
+            messageId: MessageId.make(`steer-${ordinal}`),
+            text,
+            attachments: [],
+          },
+        }),
+      ),
+    );
   return {
     runtime,
     natives,
     providerThread,
     startTurn,
+    steerTurn,
     /** A turn still running makes the next start fail, without waiting on time. */
     nextTurnRejected: (ordinal: number) =>
       startTurn(ordinal).pipe(
@@ -6454,6 +6485,66 @@ describe("AcpAdapterV2", () => {
       yield* Fiber.join(interrupt);
       assert.equal(terminal?.status, "interrupted");
       assert.equal(promptCalls, 2);
+    }).pipe(Effect.provide(layerTest)),
+  );
+
+  it.effect("resends a steer the agent refused while it waited on an approval", () =>
+    Effect.gen(function* () {
+      let promptCalls = 0;
+      const rejected = yield* Deferred.make<void>();
+      const harness = yield* makePromptInactivityHarness({
+        environment: () => ({ T3_ACP_EMIT_TOOL_CALLS: "1" }),
+        runtimeMode: "approval-required",
+        steersWhileHoldingRequests: true,
+        // agy refuses a prompt while its running prompt waits on an answer.
+        wrapPrompt: (prompt) => (payload, options) => {
+          promptCalls += 1;
+          if (promptCalls === 1) return prompt(payload, options);
+          if (promptCalls === 2) {
+            return Effect.gen(function* () {
+              if (options?.dispatched) yield* Deferred.succeed(options.dispatched, undefined);
+              yield* Deferred.succeed(rejected, undefined);
+              return yield* EffectAcpErrors.AcpRequestError.internalError("Prompt refused");
+            });
+          }
+          return Effect.gen(function* () {
+            if (options?.dispatched) yield* Deferred.succeed(options.dispatched, undefined);
+            return { stopReason: "end_turn" as const };
+          });
+        },
+      });
+      const terminal = yield* harness.terminals(1).pipe(Effect.forkScoped);
+      yield* harness.startTurn(1);
+      const pending = Option.getOrThrow(
+        yield* harness.runtime.events.pipe(
+          Stream.filter(
+            (event) =>
+              event.type === "runtime_request.updated" && event.runtimeRequest.status === "pending",
+          ),
+          Stream.runHead,
+        ),
+      );
+      if (pending.type !== "runtime_request.updated") {
+        return yield* Effect.die("Expected a pending approval");
+      }
+      yield* harness.steerTurn(1, "A delegated task finished");
+      yield* Deferred.await(rejected);
+      yield* TestClock.adjust("5 seconds");
+      assert.equal(promptCalls, 2, "no resend while the approval is open");
+      assert.isUndefined(terminal.pollUnsafe(), "the refused steer does not end the turn");
+
+      yield* harness.runtime.respondToRuntimeRequest({
+        requestId: pending.runtimeRequest.id,
+        decision: "accept",
+      });
+      // The answer releases the agent off the clock, so step it until the steer goes out again.
+      yield* Effect.yieldNow.pipe(
+        Effect.andThen(TestClock.adjust("1 second")),
+        Effect.repeat({ until: () => promptCalls >= 3, times: 60 }),
+      );
+      const [completed] = yield* Fiber.join(terminal);
+      assert.equal(completed?.status, "completed");
+      assert.equal(promptCalls, 3);
     }).pipe(Effect.provide(layerTest)),
   );
 

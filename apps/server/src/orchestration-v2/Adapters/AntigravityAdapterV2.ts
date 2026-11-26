@@ -12,6 +12,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Exit from "effect/Exit";
 import * as Semaphore from "effect/Semaphore";
+import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as EffectAcpErrors from "effect-acp/errors";
 
@@ -304,6 +305,9 @@ export function makeAntigravityAcpAdapterFlavor(
     preserveRuntimeOnSettledInterrupt: true,
     // `agy acp` reads a prompt sent mid-turn as a steer; cancel-and-restart killed its subagents.
     steersWithPrompt: antigravitySteersWithPrompt,
+    // A prompt agy refused can leave its earlier prompt open on a question no one can answer,
+    // and agy then refuses every prompt; a fresh process resumes the session cleanly.
+    restartRuntimeAfterPromptError: Schema.is(EffectAcpErrors.AcpRequestError),
     ...(options.onSessionEvent === undefined ? {} : { onSessionEvent: options.onSessionEvent }),
     applyModelSelection: Effect.fn("AntigravityAdapterV2.applyModelSelection")(function* ({
       runtime,
