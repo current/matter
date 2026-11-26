@@ -54,6 +54,7 @@ import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import { createJsonStringFieldReader } from "./voiceSentenceChunker.ts";
 import { sanitizeSpeechText } from "./VoiceTtsService.ts";
+import { capVoiceLaunchModel } from "./voiceLaunchModel.ts";
 import { hydrateVoiceWorkspaceContext } from "./voiceWorkspaceHydrator.ts";
 import {
   readSafeProjectFile,
@@ -1674,6 +1675,7 @@ const make = Effect.gen(function* () {
           modelSelection = settings.textGenerationModelSelection;
         }
       }
+      if (modelSelection !== null) modelSelection = capVoiceLaunchModel(modelSelection, providers);
 
       const defaultRuntimeMode: RuntimeMode =
         projectSettings?.defaultRuntimeMode ?? settings?.defaultRuntimeMode ?? "approval-required";

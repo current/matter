@@ -49,7 +49,11 @@ const DEFAULT_MACOS_VOICES = ["Samantha", "Alex", "Karen", "Daniel", "Moira"] as
 const DEEPGRAM_SPEAK_URL = "https://api.deepgram.com/v1/speak";
 const DEEPGRAM_LISTEN_URL = "https://api.deepgram.com/v1/listen";
 const ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech";
-const ELEVENLABS_STREAM_QUERY = "output_format=mp3_44100_64&optimize_streaming_latency=3";
+// ElevenLabs answers HTTP 400 when optimize_streaming_latency is sent with a v3 or v4 model.
+export const elevenLabsStreamUrl = (voice: string, model: ElevenLabsTtsModel) =>
+  `${ELEVENLABS_TTS_URL}/${encodeURIComponent(voice)}/stream?output_format=mp3_44100_64${
+    model === "eleven_flash_v2_5" ? "&optimize_streaming_latency=3" : ""
+  }`;
 const ELEVENLABS_VOICE_IDS = ELEVENLABS_PREMADE_VOICES.map((voice) => voice.id);
 const VOICE_SECRETS_FILENAME = "mattr-voice-secrets.json";
 const VOICE_CONFIG_FILENAME = "mattr-voice-config.json";
@@ -665,8 +669,7 @@ const make = Effect.gen(function* () {
     readonly model: ElevenLabsTtsModel;
     readonly voiceSettings: ElevenLabsVoiceSettings;
   }) {
-    const url = `${ELEVENLABS_TTS_URL}/${encodeURIComponent(input.voice)}/stream?${ELEVENLABS_STREAM_QUERY}`;
-    const request = HttpClientRequest.post(url).pipe(
+    const request = HttpClientRequest.post(elevenLabsStreamUrl(input.voice, input.model)).pipe(
       HttpClientRequest.setHeader("xi-api-key", input.apiKey),
       HttpClientRequest.setHeader("accept", "audio/mpeg"),
       HttpClientRequest.bodyJsonUnsafe({

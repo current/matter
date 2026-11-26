@@ -1402,7 +1402,7 @@ describe("VoiceTtsService ElevenLabs", () => {
       const [url, init] = upstream.mock.calls[0]!;
       assert.strictEqual(
         String(url),
-        "https://api.elevenlabs.io/v1/text-to-speech/SAz9YHcvj6GT2YYXdXww/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
+        "https://api.elevenlabs.io/v1/text-to-speech/SAz9YHcvj6GT2YYXdXww/stream?output_format=mp3_44100_64",
       );
       assert.strictEqual(new Headers(init?.headers).get("xi-api-key"), "xi-test-key");
       assert.deepStrictEqual(JSON.parse(String(init?.body)), {
@@ -1452,7 +1452,7 @@ describe("VoiceTtsService ElevenLabs", () => {
       const [secondUrl, secondInit] = upstream.mock.calls[1]!;
       assert.include(
         String(secondUrl),
-        "/text-to-speech/SAz9YHcvj6GT2YYXdXww/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
+        "/text-to-speech/SAz9YHcvj6GT2YYXdXww/stream?output_format=mp3_44100_64",
       );
       assert.strictEqual(JSON.parse(String(secondInit?.body)).model_id, "eleven_v4_turbo");
     }),
@@ -1587,7 +1587,7 @@ describe("VoiceTtsService ElevenLabs", () => {
         const [url, init] = upstream.mock.calls[0]!;
         assert.strictEqual(
           String(url),
-          "https://api.elevenlabs.io/v1/text-to-speech/MyCustomLibraryVoice1234/stream?output_format=mp3_44100_64&optimize_streaming_latency=3",
+          "https://api.elevenlabs.io/v1/text-to-speech/MyCustomLibraryVoice1234/stream?output_format=mp3_44100_64",
         );
         assert.deepStrictEqual(JSON.parse(String(init?.body)).voice_settings, {
           stability: 1,
