@@ -9,7 +9,10 @@ import { getTerminalFocusOwner } from "../lib/terminalFocus";
 
 const HOLD_THRESHOLD_MS = 300;
 
-function shouldFinishDictationOnRelease(mode: "auto" | "hold" | "toggle", elapsedMs: number) {
+export function shouldFinishDictationOnRelease(
+  mode: "auto" | "hold" | "toggle",
+  elapsedMs: number,
+) {
   return mode === "hold" || (mode === "auto" && elapsedMs >= HOLD_THRESHOLD_MS);
 }
 
@@ -45,6 +48,13 @@ type ShortcutInput = {
 
 // Several editors can bind the chord; the busy one, then the focused one, then the untargeted one wins.
 const shortcutTargets = new Map<symbol, () => ShortcutInput>();
+type ShortcutTarget = [symbol, () => ShortcutInput];
+
+const focusedTarget = (entries: ShortcutTarget[]) =>
+  entries.find(([, read]) => read().ownsFocus?.()) ??
+  entries.find(([, read]) => read().targetRef?.current?.contains(document.activeElement));
+
+const untargeted = ([, read]: ShortcutTarget) => !read().targetRef && !read().ownsFocus;
 
 function ownsShortcut(id: symbol) {
   const entries = [...shortcutTargets];
@@ -53,11 +63,45 @@ function ownsShortcut(id: symbol) {
     return phase !== "idle" && phase !== "error";
   });
   if (busy) return busy[0] === id;
-  const focused =
-    entries.find(([, read]) => read().ownsFocus?.()) ??
-    entries.find(([, read]) => read().targetRef?.current?.contains(document.activeElement));
+  const focused = focusedTarget(entries);
   if (focused) return focused[0] === id;
-  return entries.find(([, read]) => !read().targetRef && !read().ownsFocus)?.[0] === id;
+  return entries.find(untargeted)?.[0] === id;
+}
+
+let heldDictation: { id: symbol; starting: Promise<void> } | null = null;
+
+/** Starts dictation in the editor holding the keyboard, for a hold that began outside this page. */
+export function beginHeldDictation(): boolean {
+  const entries = [...shortcutTargets];
+  // The main composer registers without a targetRef, so its editor is found by its marker.
+  const target =
+    focusedTarget(entries) ??
+    (document.activeElement?.closest('[data-testid="composer-editor"]')
+      ? entries.find(untargeted)
+      : undefined);
+  if (!target) return false;
+  const [id, read] = target;
+  const { speech, disabled } = read();
+  if (disabled || !speech.available || speech.state.phase !== "idle") return false;
+  heldDictation = { id, starting: speech.start() };
+  return true;
+}
+
+export function endHeldDictation() {
+  const held = heldDictation;
+  heldDictation = null;
+  if (!held) return;
+  void held.starting.then(() => shortcutTargets.get(held.id)?.().speech.stop());
+}
+
+export function cancelHeldDictation() {
+  const held = heldDictation;
+  heldDictation = null;
+  if (!held) return;
+  const cancel = () => shortcutTargets.get(held.id)?.().speech.cancel();
+  cancel();
+  // The editor may not have rendered its ownership of a just-started session yet.
+  void held.starting.then(cancel);
 }
 
 const targetScope = (field: HTMLElement | null | undefined) =>

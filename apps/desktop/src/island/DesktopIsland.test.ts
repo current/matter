@@ -7,7 +7,8 @@ import {
   computeIslandPlacement,
 } from "../../../../antimatter/island/islandPlacement.ts";
 import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
-import { buildIslandWindowOptions } from "./DesktopIsland.ts";
+import { parseModifierMonitorLine } from "../../../../antimatter/island/MacControlTapMonitor.ts";
+import { buildIslandWindowOptions, resolveModifierEvent } from "./DesktopIsland.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
   type IslandSnapshot,
@@ -278,5 +279,46 @@ describe("shouldKeepIslandWindowAlive", () => {
         false,
       ),
     ).toBe(false);
+  });
+});
+
+describe("modifier tap and hold events", () => {
+  it("parses only the poller's event lines", () => {
+    expect(parseModifierMonitorLine("tap")).toBe("tap");
+    expect(parseModifierMonitorLine(" hold-start\r")).toBe("hold-start");
+    expect(parseModifierMonitorLine("hold-end")).toBe("hold-end");
+    expect(parseModifierMonitorLine("hold-cancel")).toBe("hold-cancel");
+    expect(parseModifierMonitorLine("ready")).toBeNull();
+    expect(parseModifierMonitorLine("tapped")).toBeNull();
+    expect(parseModifierMonitorLine("")).toBeNull();
+  });
+
+  it("keeps taps opening the Island whatever window has focus", () => {
+    expect(resolveModifierEvent("tap", false, false)).toEqual({ kind: "tap" });
+    expect(resolveModifierEvent("tap", false, true)).toEqual({ kind: "tap" });
+  });
+
+  it("dictates a hold only when it starts over the focused main window", () => {
+    expect(resolveModifierEvent("hold-start", false, true)).toEqual({
+      kind: "hold",
+      phase: "start",
+      holdActive: true,
+    });
+    expect(resolveModifierEvent("hold-end", true, false)).toEqual({
+      kind: "hold",
+      phase: "end",
+      holdActive: false,
+    });
+    expect(resolveModifierEvent("hold-cancel", true, true)).toEqual({
+      kind: "hold",
+      phase: "cancel",
+      holdActive: false,
+    });
+  });
+
+  it("ignores a hold that started elsewhere through its release", () => {
+    expect(resolveModifierEvent("hold-start", false, false)).toBeNull();
+    expect(resolveModifierEvent("hold-end", false, true)).toBeNull();
+    expect(resolveModifierEvent("hold-cancel", false, true)).toBeNull();
   });
 });

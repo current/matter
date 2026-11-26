@@ -2,7 +2,13 @@ import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { createRef, type RefObject } from "react";
 import { expect, it, vi } from "vite-plus/test";
 import { render } from "../../test/render";
-import { useDictationShortcut, type DictationKeyHandlers } from "./useDictationShortcut";
+import {
+  beginHeldDictation,
+  cancelHeldDictation,
+  endHeldDictation,
+  useDictationShortcut,
+  type DictationKeyHandlers,
+} from "./useDictationShortcut";
 
 const settings = vi.hoisted(() => ({ mode: "hold" as "hold" | "auto" | "toggle" }));
 vi.mock("../hooks/useSettings", () => ({ useClientSettings: () => settings.mode }));
@@ -260,3 +266,97 @@ it.each([
     expect(preview.cancel).toHaveBeenCalledTimes(previewRecords ? 1 : 0);
   },
 );
+
+const focus = (element: unknown) => {
+  if (!(element instanceof HTMLElement)) throw new Error("expected a focusable editor");
+  element.focus();
+};
+
+it("dictates a hold into the focused editor only, finishing once recording has started", async () => {
+  const replySpeech = actions(true);
+  const commentSpeech = actions(true);
+  let finishStart!: () => void;
+  const startup = new Promise<void>((resolve) => {
+    finishStart = resolve;
+  });
+  commentSpeech.start.mockReturnValue(startup);
+  const replyRef = createRef<HTMLTextAreaElement>();
+  const commentRef = createRef<HTMLTextAreaElement>();
+  await using screen = await render(
+    <>
+      <Probe speech={replySpeech} targetRef={replyRef} />
+      <Probe speech={commentSpeech} targetRef={commentRef} />
+      <textarea aria-label="Reply" ref={replyRef} />
+      <textarea aria-label="Comment" ref={commentRef} />
+    </>,
+  );
+  focus(screen.getByRole("textbox", { name: "Comment" }).element());
+
+  expect(beginHeldDictation()).toBe(true);
+  endHeldDictation();
+  expect(commentSpeech.stop).not.toHaveBeenCalled();
+  finishStart();
+  await startup;
+
+  expect(commentSpeech.start).toHaveBeenCalledOnce();
+  expect(commentSpeech.stop).toHaveBeenCalledOnce();
+  expect(replySpeech.start).not.toHaveBeenCalled();
+});
+
+it("never starts a hold without a focused, idle editor that can dictate", async () => {
+  const unfocused = actions(true);
+  const unavailable = actions(false);
+  const unfocusedRef = createRef<HTMLTextAreaElement>();
+  const unavailableRef = createRef<HTMLTextAreaElement>();
+  await using screen = await render(
+    <>
+      <Probe speech={unfocused} />
+      <Probe speech={unavailable} targetRef={unavailableRef} />
+      <Probe speech={actions(true)} targetRef={unfocusedRef} />
+      <textarea aria-label="Search" />
+      <textarea aria-label="Unavailable" ref={unavailableRef} />
+      <textarea aria-label="Elsewhere" ref={unfocusedRef} />
+    </>,
+  );
+  focus(screen.getByRole("textbox", { name: "Search" }).element());
+  expect(beginHeldDictation()).toBe(false);
+  focus(screen.getByRole("textbox", { name: "Unavailable" }).element());
+  expect(beginHeldDictation()).toBe(false);
+  endHeldDictation();
+  expect(unfocused.start).not.toHaveBeenCalled();
+  expect(unavailable.start).not.toHaveBeenCalled();
+  expect(unfocused.stop).not.toHaveBeenCalled();
+});
+
+it("finds the main composer, which registers without a target, through its focused editor", async () => {
+  const composer = actions(true);
+  await using screen = await render(
+    <>
+      <Probe speech={composer} />
+      <div contentEditable aria-label="Message" role="textbox" data-testid="composer-editor" />
+    </>,
+  );
+  focus(screen.getByRole("textbox", { name: "Message" }).element());
+  expect(beginHeldDictation()).toBe(true);
+  expect(composer.start).toHaveBeenCalledOnce();
+  cancelHeldDictation();
+  await composer.start.mock.results[0]?.value;
+  expect(composer.cancel).toHaveBeenCalled();
+  expect(composer.stop).not.toHaveBeenCalled();
+  endHeldDictation();
+  expect(composer.stop).not.toHaveBeenCalled();
+});
+
+it("leaves a busy editor's recording alone when a hold begins", async () => {
+  const speech = recording();
+  const fieldRef = createRef<HTMLTextAreaElement>();
+  await using screen = await render(
+    <>
+      <Probe speech={speech} targetRef={fieldRef} />
+      <textarea aria-label="Reply" ref={fieldRef} />
+    </>,
+  );
+  focus(screen.getByRole("textbox", { name: "Reply" }).element());
+  expect(beginHeldDictation()).toBe(false);
+  expect(speech.start).not.toHaveBeenCalled();
+});

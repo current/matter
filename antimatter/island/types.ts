@@ -234,7 +234,13 @@ export type IslandAction =
   | { readonly type: "assistant-clear-history" }
   | { readonly type: "open-voice-settings" }
   | { readonly type: "open-island-settings" }
-  | { readonly type: "close-panel" };
+  | { readonly type: "close-panel" }
+  | {
+      readonly type: "composer-dictation-hold";
+      readonly phase: ComposerDictationHoldPhase;
+    };
+
+export type ComposerDictationHoldPhase = "start" | "end" | "cancel";
 
 export interface DesktopIslandBridge {
   readonly syncSnapshot: (snapshot: IslandSnapshot) => Promise<void>;

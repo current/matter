@@ -13,9 +13,19 @@ const MODIFIER_FLAG_MASK: Record<MacSingleTapModifier, number> = {
 // All standard modifier flags (Shift | Control | Option | Command)
 const ALL_MODIFIERS_MASK = 0x20000 | 0x40000 | 0x80000 | 0x100000;
 
+const MODIFIER_EVENTS = ["tap", "hold-start", "hold-end", "hold-cancel"] as const;
+
+export type MacModifierEvent = (typeof MODIFIER_EVENTS)[number];
+
+export function parseModifierMonitorLine(line: string): MacModifierEvent | null {
+  const message = line.trim();
+  return MODIFIER_EVENTS.find((event) => event === message) ?? null;
+}
+
 // Polls CGEventSourceFlagsState + CGEventSourceSecondsSinceLastEventType without Accessibility permissions.
-// Fires "tap" only when the target modifier is pressed alone, held < 450ms, and released with no other
-// keys or mouse clicks occurring in between (so Ctrl+C, Ctrl+Tab, etc. never trigger).
+// "tap": the modifier pressed alone <= 450ms with no other key or click in between (Ctrl+C never fires).
+// A clean press held past that window prints "hold-start", then "hold-end" on a clean release or
+// "hold-cancel" once another key, modifier or click arrives, so holds never change what a tap is.
 const POLLER_SCRIPT = `
 ObjC.import("AppKit");
 $.NSApplication.sharedApplication.setActivationPolicy($.NSApplicationActivationPolicyProhibited);
@@ -25,8 +35,10 @@ function run(argv) {
   const targetMask = Number(argv[0]);
   const allMask = Number(argv[1]);
   const otherMask = allMask & ~targetMask;
+  const tapMax = 0.45;
   let held = false;
   let dirty = false;
+  let holding = false;
   let downAt = 0;
   console.log("ready");
   while ($.getppid() !== 1) {
@@ -43,19 +55,30 @@ function run(argv) {
         const elapsed = now - downAt;
         const sinceKey = $.CGEventSourceSecondsSinceLastEventType(1, 10);
         const sinceClick = $.CGEventSourceSecondsSinceLastEventType(1, 1);
-        if (otherDown || sinceKey < elapsed || sinceClick < elapsed || elapsed > 0.5) {
+        if (otherDown || sinceKey < elapsed || sinceClick < elapsed) {
           dirty = true;
+          if (holding) {
+            holding = false;
+            console.log("hold-cancel");
+          }
+        } else if (!holding && elapsed > tapMax) {
+          holding = true;
+          console.log("hold-start");
         }
       }
     } else if (held) {
       const elapsed = now - downAt;
       const sinceKey = $.CGEventSourceSecondsSinceLastEventType(1, 10);
       const sinceClick = $.CGEventSourceSecondsSinceLastEventType(1, 1);
-      if (!dirty && elapsed >= 0.02 && elapsed <= 0.45 && sinceKey >= elapsed && sinceClick >= elapsed) {
+      const clean = !dirty && sinceKey >= elapsed && sinceClick >= elapsed;
+      if (holding) {
+        console.log(clean ? "hold-end" : "hold-cancel");
+      } else if (clean && elapsed >= 0.02 && elapsed <= tapMax) {
         console.log("tap");
       }
       held = false;
       dirty = false;
+      holding = false;
     }
     delay(0.025);
   }
@@ -64,7 +87,7 @@ function run(argv) {
 
 export function startMacSingleTapModifierMonitor(
   modifier: MacSingleTapModifier,
-  onTap: () => void,
+  onEvent: (event: MacModifierEvent) => void,
   onFailure?: (error: Error) => void,
 ): Promise<() => void> {
   const targetMask = MODIFIER_FLAG_MASK[modifier];
@@ -108,9 +131,10 @@ export function startMacSingleTapModifierMonitor(
           resolve(stop);
           continue;
         }
-        if (message !== "tap" || !settled || stopped) continue;
+        const event = parseModifierMonitorLine(message);
+        if (!event || !settled || stopped) continue;
         try {
-          onTap();
+          onEvent(event);
         } catch {}
       }
     });

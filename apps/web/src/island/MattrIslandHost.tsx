@@ -28,6 +28,11 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readAppleSpeechLocales, resolveAppleSpeechLocale } from "../speech/appleSpeech";
 import { runEnvironmentSpeech } from "../speech/runEnvironmentSpeech";
 import {
+  beginHeldDictation,
+  cancelHeldDictation,
+  endHeldDictation,
+} from "../speech/useDictationShortcut";
+import {
   useEnvironmentSpeechInput,
   useVoiceTranscriptionDestination,
 } from "../speech/useEnvironmentSpeechInput";
@@ -1017,6 +1022,12 @@ export function MattrIslandHost() {
       }
       case "close-panel":
         return;
+      case "composer-dictation-hold": {
+        if (action.phase === "start") beginHeldDictation();
+        else if (action.phase === "end") endHeldDictation();
+        else cancelHeldDictation();
+        return;
+      }
     }
   });
 

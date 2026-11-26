@@ -101,7 +101,8 @@ export function TextFieldSpeechControls({
           size="compact"
           shortcutLabel={speech.shortcutLabel}
           disabled={disabled}
-          onStart={() => void speech.start()}
+          onStart={speech.start}
+          onStop={() => void speech.stop()}
         />
       ) : null}
       <VoiceInputSetup

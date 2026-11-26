@@ -5,7 +5,10 @@ import * as Layer from "effect/Layer";
 import * as Electron from "electron";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
-import { startMacSingleTapModifierMonitor } from "../../../../antimatter/island/MacControlTapMonitor.ts";
+import {
+  startMacSingleTapModifierMonitor,
+  type MacModifierEvent,
+} from "../../../../antimatter/island/MacControlTapMonitor.ts";
 import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
 import {
   ISLAND_WINDOW_WIDTH,
@@ -24,6 +27,7 @@ import {
   ISLAND_FOCUS_WINDOW_CHANNEL,
   ISLAND_SET_MOUSE_PASSTHROUGH_CHANNEL,
   ISLAND_SNAPSHOT_CHANNEL,
+  type ComposerDictationHoldPhase,
   type IslandAction,
   type IslandDisplayMetrics,
   type IslandSettings,
@@ -71,6 +75,34 @@ export function buildIslandWindowOptions(
   };
 }
 
+/**
+ * A modifier hold dictates into the focused composer only when it starts over the main window;
+ * otherwise the whole hold is ignored, and taps keep opening the Island.
+ */
+export function resolveModifierEvent(
+  event: MacModifierEvent,
+  holdActive: boolean,
+  mainWindowFocused: boolean,
+):
+  | { readonly kind: "tap" }
+  | {
+      readonly kind: "hold";
+      readonly phase: ComposerDictationHoldPhase;
+      readonly holdActive: boolean;
+    }
+  | null {
+  switch (event) {
+    case "tap":
+      return { kind: "tap" };
+    case "hold-start":
+      return mainWindowFocused ? { kind: "hold", phase: "start", holdActive: true } : null;
+    case "hold-end":
+      return holdActive ? { kind: "hold", phase: "end", holdActive: false } : null;
+    case "hold-cancel":
+      return holdActive ? { kind: "hold", phase: "cancel", holdActive: false } : null;
+  }
+}
+
 export class DesktopIsland extends Context.Service<
   DesktopIsland,
   {
@@ -115,6 +147,7 @@ export const layer = Layer.effect(
     let mainWebContentsId: number | null = null;
     let stopModifierMonitor: (() => void) | null = null;
     let registeredGlobalShortcut: string | null = null;
+    let modifierHoldActive = false;
 
     const clearPendingHide = () => {
       pendingHide = false;
@@ -305,7 +338,24 @@ export const layer = Layer.effect(
       }
     };
 
+    const onModifierEvent = (event: MacModifierEvent) => {
+      const mainWindow = findMainWindow();
+      const resolved = resolveModifierEvent(
+        event,
+        modifierHoldActive,
+        mainWindow !== null && Electron.BrowserWindow.getFocusedWindow() === mainWindow,
+      );
+      if (!resolved) return;
+      if (resolved.kind === "tap") {
+        triggerFromGlobalShortcut();
+        return;
+      }
+      modifierHoldActive = resolved.holdActive;
+      sendToMainRenderer({ type: "composer-dictation-hold", phase: resolved.phase });
+    };
+
     const stopShortcuts = () => {
+      if (modifierHoldActive) onModifierEvent("hold-cancel");
       if (stopModifierMonitor) {
         stopModifierMonitor();
         stopModifierMonitor = null;
@@ -324,11 +374,7 @@ export const layer = Layer.effect(
       if (!settings.enabled || settings.shortcut === "off") return;
 
       if (isMac && (settings.shortcut === "control" || settings.shortcut === "option")) {
-        void startMacSingleTapModifierMonitor(
-          settings.shortcut,
-          () => triggerFromGlobalShortcut(),
-          () => undefined,
-        )
+        void startMacSingleTapModifierMonitor(settings.shortcut, onModifierEvent, () => undefined)
           .then((stop) => {
             if (!currentSettings.enabled || currentSettings.shortcut !== settings.shortcut) {
               stop();

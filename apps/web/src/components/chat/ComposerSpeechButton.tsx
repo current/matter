@@ -5,8 +5,10 @@ import { useEffect, useState, type PointerEvent, type ReactElement } from "react
 
 import { VoiceInputErrorPill } from "./VoiceInputErrorPill";
 import { VoiceInputPill, VoiceWaveform } from "./VoiceInputPill";
+import { useClientSettings } from "~/hooks/useSettings";
 import { m, type MessageResolver } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
+import { shouldFinishDictationOnRelease } from "~/speech/useDictationShortcut";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -119,11 +121,36 @@ export function ComposerSpeechButton(props: {
   disabled?: boolean;
   /** Compact matches the `xs` buttons beside text-field editors. */
   size?: "default" | "compact";
-  onStart(): void;
+  /** Return the start promise so a released hold can finish once recording begins. */
+  onStart(): void | Promise<void>;
+  /** Finishes a press held past the dictation hold threshold. */
+  onStop?(): void;
 }) {
   const gt = useGT();
+  const mode = useClientSettings((settings) => settings.voiceShortcutMode);
   if (props.state.phase !== "idle") return null;
   const label = gt("Start voice input");
+
+  const startHold = (event: PointerEvent) => {
+    keepFocus(event);
+    if (props.disabled || event.button !== 0) return;
+    const { onStop } = props;
+    const startedAt = performance.now();
+    const starting = Promise.resolve(props.onStart());
+    // The recording pill replaces this button once dictation starts, so the release is heard on window.
+    const release = (releaseEvent: globalThis.PointerEvent | FocusEvent) => {
+      if ("pointerId" in releaseEvent && releaseEvent.pointerId !== event.pointerId) return;
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+      window.removeEventListener("blur", release);
+      if (onStop && shouldFinishDictationOnRelease(mode, performance.now() - startedAt)) {
+        void starting.then(onStop);
+      }
+    };
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    window.addEventListener("blur", release);
+  };
 
   return (
     <ShortcutTooltip label={label} shortcut={props.shortcutLabel}>
@@ -133,9 +160,10 @@ export function ComposerSpeechButton(props: {
         variant="ghost"
         aria-label={label}
         disabled={props.disabled}
-        onPointerDown={keepFocus}
-        onClick={() => {
-          if (!props.disabled) props.onStart();
+        onPointerDown={startHold}
+        onClick={(event) => {
+          // Pointer clicks already started on pointerdown; keyboard and assistive clicks have no detail.
+          if (event.detail === 0 && !props.disabled) void props.onStart();
         }}
         className="shrink-0"
       >
