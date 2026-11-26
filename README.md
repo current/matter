@@ -41,7 +41,7 @@ Matter tracks [`pingdotgg/t3code`](https://github.com/pingdotgg/t3code) nightly 
 ### zero outbound telemetry
 
 - PostHog (`ingest.t3.codes`), Axiom relay OTLP tracing, and mobile `expo-observe` crash reporting are hard-disabled across server, web, desktop, and mobile.
-- `Matter connect` relay, local logs, resource monitoring, and any user-configured OTLP export remain intact.
+- Matter Connect relay, local logs, resource monitoring, and any user-configured OTLP export remain intact.
 
 ### dynamic island & hands-free voice
 
