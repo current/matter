@@ -19,7 +19,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { fetchClaudeCloudStatus, openClaudeCloudDialog } from "../../../addons/claudeCloudApi";
 import { useMattrApiConfig } from "../../../addons/mattrApi";
 import { useEnabledBotProviderAddons, useIsAddonEnabled } from "../../../addons/useAddonRegistry";
-import { setVoiceAssistantModalOpen } from "../../../island/voiceAssistantStore";
+import { setVoiceModeOpen } from "../../../island/voiceAssistantStore";
 import { useDesktopUpdateState } from "../../../state/desktopUpdate";
 import {
   useEnvironmentProviders,
@@ -197,7 +197,7 @@ export function MattrBrandMenu({ onNavigate }: { onNavigate: () => void }) {
           <MattrMenuItem
             icon={<RadioIcon aria-hidden />}
             label={gt("Voice Mode")}
-            onClick={() => go(() => setVoiceAssistantModalOpen(true))}
+            onClick={() => go(() => setVoiceModeOpen(true))}
           />
         ) : null}
         <div className="mfs-menu-sep" />
