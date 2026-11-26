@@ -33,8 +33,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
           ConfigProvider.layer(
             ConfigProvider.fromUnknown({
               T3CODE_TELEMETRY_ENABLED: true,
-              T3CODE_POSTHOG_KEY: "phc_test_key",
-              T3CODE_POSTHOG_HOST: "http://localhost",
+              T3CODE_TELEMETRY_KEY: "phc_test_key",
+              T3CODE_TELEMETRY_HOST: "http://localhost",
             }),
           ),
         ),
@@ -91,4 +91,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AnalyticsService
       yield* Scope.close(scope, Exit.void);
     }),
   );
+});
+
+it("reports a WSL distro by its family, never by a name its user chose", () => {
+  assert.equal(AnalyticsService.wslDistroFamily("Ubuntu-24.04"), "Ubuntu");
+  assert.equal(AnalyticsService.wslDistroFamily("openSUSE-Tumbleweed"), "openSUSE");
+  assert.equal(AnalyticsService.wslDistroFamily("Acme-Client-Secret-Ubuntu"), "other");
+  assert.equal(AnalyticsService.wslDistroFamily("  "), undefined);
 });

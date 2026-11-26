@@ -36,6 +36,7 @@ import {
   describeAntigravitySubagentLaunches,
   readAntigravityChildrenAtWork,
   readAntigravityPendingReply,
+  readAntigravitySubagentTranscript,
 } from "../../provider/acp/AntigravityChildWork.ts";
 import { watchAntigravityChildActivity } from "../../provider/acp/AntigravityChildActivity.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
@@ -48,6 +49,7 @@ import {
   antigravityCommandOutlivesPrompt,
   antigravitySubagentOutput,
   classifyAntigravitySubagentToolCall,
+  extractAntigravityElicitationForm,
   extractAntigravityUserInputQuestion,
   makeAntigravityReadRepair,
   makeAntigravityUpdateStepsPlans,
@@ -115,7 +117,7 @@ export interface AntigravityAdapterV2Options {
 
 /**
  * Native subagent tools report no child session ids, so children stay read-only and their work
- * streams from the child transcripts (`watchNativeSubagent`). Only permission prompts carry the
+ * streams from the child transcripts (`readSubagentTranscript`). Only permission prompts carry the
  * launch; NativeChildWorkQuery matches their ids by this text.
  */
 const extractAntigravitySubagentUpdate: NonNullable<AcpAdapterV2Flavor["extractSubagentUpdate"]> = (
@@ -337,6 +339,7 @@ export function makeAntigravityAcpAdapterFlavor(
         respond: (answers) => makeAntigravityUserInputResponse(request, answers),
       };
     },
+    extractElicitationForm: extractAntigravityElicitationForm,
     normalizeToolCall: normalizeAntigravityToolCall,
     extractSubagentUpdate: extractAntigravitySubagentUpdate,
     supportsImagePrompts: true,
@@ -358,14 +361,37 @@ export function makeAntigravityAcpAdapterFlavor(
               rootSessionId: sessionId,
               toolCallIds: nativeTaskIds,
             }),
-          watchNativeSubagent: (input) =>
-            watchAntigravityChildActivity({
+          // Upstream's transcript reader projects child work; mattr's watcher only adds its idle proof.
+          watchNativeSubagent: (input) => {
+            const watcher = watchAntigravityChildActivity({
               profileDirectory,
               rootSessionId: input.sessionId,
               nativeTaskId: input.nativeTaskId,
               title: input.title,
               prompt: input.prompt,
               siblings: input.siblings,
+            });
+            return {
+              poll: watcher.poll.pipe(Effect.as(undefined)),
+              ...(watcher.isIdle === undefined ? {} : { isIdle: watcher.isIdle }),
+            };
+          },
+          readSubagentTranscript: ({
+            sessionId,
+            nativeTaskId,
+            childSessionId,
+            launch,
+            siblings,
+            finalize,
+          }) =>
+            readAntigravitySubagentTranscript({
+              profileDirectory,
+              rootSessionId: sessionId,
+              nativeTaskId,
+              childSessionId,
+              launch,
+              siblings,
+              finalize,
             }),
           hasPendingReply: (sessionId: string) =>
             readAntigravityPendingReply({

@@ -4,6 +4,7 @@ import { ChatCanvasContext } from "./ChatCanvasContext";
 import type { ChatCanvasPreview } from "./chatCanvasLayout";
 import {
   resolveChatCanvasModel,
+  selectCanvasMeasurements,
   type ChatCanvasStore,
   type RightPanelWidthTransition,
 } from "./canvasStore";
@@ -77,10 +78,13 @@ export function ChatCanvas({
   preview,
   composerOverlayElement,
   detailsCardTopInset = 0,
+  rightPanelOpen,
   children,
   ...props
 }: Omit<ComponentProps<"div">, "className" | "style" | "ref"> & {
   store: ChatCanvasStore;
+  /** Beside the canvas, so it decides which remembered width the first layout uses. */
+  rightPanelOpen: boolean;
   /** The thread whose details card sits on the canvas; other threads' measurements are stale. */
   threadRef: ScopedThreadRef | null;
   /** The thread's mini player while it renders on this canvas. */
@@ -92,7 +96,7 @@ export function ChatCanvas({
   const widthProbeRef = useRef<HTMLDivElement | null>(null);
   const htmlPreviewWidthProbeRef = useRef<HTMLDivElement | null>(null);
   const [timelineElement, registerTimeline] = useState<HTMLElement | null>(null);
-  const measurements = useStore(store, (state) => state.measurements);
+  const measurements = useStore(store, (state) => selectCanvasMeasurements(state, rightPanelOpen));
   const detailsCardMeasurement = useStore(store, (state) => state.detailsCardMeasurement);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- observes canvas, find bar and timeline resizes and writes the measurements to the canvas store
   useLayoutEffect(() => {
@@ -133,28 +137,31 @@ export function ChatCanvas({
       const canvasBounds = element.getBoundingClientRect();
       const findBarBounds = findBar?.getBoundingClientRect();
       const styles = getComputedStyle(probe);
-      store.getState().setMeasurements({
-        findBar:
-          detailsCardTopInset > 0
-            ? {
-                left: findBarBounds ? findBarBounds.left - canvasBounds.left : 0,
-                right: findBarBounds ? findBarBounds.right - canvasBounds.left : 0,
-                bottom: findBarBounds ? findBarBounds.bottom - canvasBounds.top : 0,
-              }
-            : null,
-        width,
-        narrowestWidth: transitionWidths?.narrowestWidth ?? width,
-        rightPanelTransition: transitionWidths?.rightPanelTransition ?? null,
-        height: element.clientHeight,
-        padding: Number.parseFloat(styles.paddingLeft),
-        maxChatWidth: Number.parseFloat(styles.width),
-        maxHtmlPreviewWidth: Number.parseFloat(getComputedStyle(htmlPreviewProbe).width),
-        minChatWidth: Number.parseFloat(styles.minWidth),
-        composerHeight: composerOverlayElement?.getBoundingClientRect().height ?? 0,
-        timelineGutter: timelineElement
-          ? (timelineElement.offsetWidth - timelineElement.clientWidth) / 2
-          : 0,
-      });
+      store.getState().setMeasurements(
+        {
+          findBar:
+            detailsCardTopInset > 0
+              ? {
+                  left: findBarBounds ? findBarBounds.left - canvasBounds.left : 0,
+                  right: findBarBounds ? findBarBounds.right - canvasBounds.left : 0,
+                  bottom: findBarBounds ? findBarBounds.bottom - canvasBounds.top : 0,
+                }
+              : null,
+          width,
+          narrowestWidth: transitionWidths?.narrowestWidth ?? width,
+          rightPanelTransition: transitionWidths?.rightPanelTransition ?? null,
+          height: element.clientHeight,
+          padding: Number.parseFloat(styles.paddingLeft),
+          maxChatWidth: Number.parseFloat(styles.width),
+          maxHtmlPreviewWidth: Number.parseFloat(getComputedStyle(htmlPreviewProbe).width),
+          minChatWidth: Number.parseFloat(styles.minWidth),
+          composerHeight: composerOverlayElement?.getBoundingClientRect().height ?? 0,
+          timelineGutter: timelineElement
+            ? (timelineElement.offsetWidth - timelineElement.clientWidth) / 2
+            : 0,
+        },
+        rightPanelOpen,
+      );
     };
     measure();
     const animationRoot = element.closest<HTMLElement>("[data-panel-animations]");
@@ -178,7 +185,7 @@ export function ChatCanvas({
       animationRoot?.removeEventListener("transitionrun", onTransitionRun);
       stopObserving();
     };
-  }, [store, composerOverlayElement, timelineElement, detailsCardTopInset]);
+  }, [store, composerOverlayElement, timelineElement, detailsCardTopInset, rightPanelOpen]);
   // mattr: with the Topbar Ribbon on, the details card only opens as a popover.
   const mattrThreadRibbon = useMattrThreadRibbonEnabled();
   const detailsCardInlineOpen =

@@ -266,6 +266,7 @@ function DesktopCanvasHarness() {
       <div style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}>
         <ChatCanvas
           store={store}
+          rightPanelOpen={false}
           threadRef={threadRef}
           preview={null}
           composerOverlayElement={null}

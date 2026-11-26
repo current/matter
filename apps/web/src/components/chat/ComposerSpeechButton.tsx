@@ -1,4 +1,5 @@
 import type { VoiceInputState } from "@t3tools/client-runtime/voice-input";
+import { speechModelDownloadPercent } from "@t3tools/shared/speech";
 import { msg, useGT, useMessages } from "gt-react";
 import { CheckIcon, XIcon } from "lucide-react";
 import { useEffect, useState, type PointerEvent, type ReactElement } from "react";
@@ -13,7 +14,7 @@ import { cn } from "~/lib/utils";
 import { shouldFinishDictationOnRelease } from "~/speech/useDictationShortcut";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 type DownloadProgress = { downloaded: number; total: number } | null;
 
@@ -35,7 +36,10 @@ export function resolveSpeechPresentation(
         status: progress
           ? resolve(
               msg("Downloading model {percent}%", {
-                percent: Math.round((progress.downloaded / Math.max(1, progress.total)) * 100),
+                percent: speechModelDownloadPercent(
+                  progress.downloaded,
+                  Math.max(1, progress.total),
+                ),
               }),
             )
           : resolve(msg("Starting…")),
@@ -107,13 +111,15 @@ function ShortcutTooltip(props: {
   children: ReactElement;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger render={props.children} />
-      <TooltipPopup side="top">
-        {props.label}
-        {props.shortcut ? ` (${props.shortcut})` : ""}
-      </TooltipPopup>
-    </Tooltip>
+    <SharedTooltipTrigger
+      render={props.children}
+      label={
+        <>
+          {props.label}
+          {props.shortcut ? ` (${props.shortcut})` : ""}
+        </>
+      }
+    />
   );
 }
 

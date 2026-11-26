@@ -162,6 +162,43 @@ describe("AntigravityAdapterV2 flavor", () => {
       outcome: { outcome: "selected", optionId: "opt-dev" },
     });
   });
+
+  it("shows each ask_question question as the question body, not the generic form message", () => {
+    // agy's ask_question puts each question in its field's title, with no description,
+    // and a generic count in the form message.
+    const choice = (title: string) => ({
+      type: "string",
+      title,
+      oneOf: [
+        { const: "npm", title: "npm" },
+        { const: "pnpm", title: "pnpm" },
+      ],
+    });
+    const form = flavor.extractElicitationForm?.({
+      sessionId: "session-1",
+      mode: "form",
+      message: "The agent has 2 questions.",
+      requestedSchema: {
+        type: "object",
+        properties: {
+          q0: choice("Which package manager should this new TypeScript project use?"),
+          q0_other: { type: "string", title: "Other" },
+          q1: choice("Which package manager should the docs site use?"),
+          q1_other: { type: "string", title: "Other" },
+        },
+      },
+    } as EffectAcpSchema.CreateElicitationRequest);
+    assert.deepEqual(
+      form?.questions.map((question) => question.question),
+      [
+        "Which package manager should this new TypeScript project use?",
+        "Which package manager should the docs site use?",
+      ],
+    );
+    for (const question of form?.questions ?? []) {
+      assert.notStrictEqual(question.header, question.question);
+    }
+  });
 });
 
 const layerSession = Layer.mergeAll(
@@ -473,7 +510,7 @@ describe("AntigravityAdapterV2 client file system", () => {
         readTextFile: true,
         writeTextFile: false,
       });
-      assert.equal(initialize?.params?.clientInfo?.name, "zed");
+      assert.equal(initialize?.params?.clientInfo?.name, "t3-code");
       assert.isUndefined(writeTextFile);
       if (readTextFile === undefined) {
         return yield* Effect.die("Antigravity sessions must serve client file reads");
@@ -2406,7 +2443,9 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
           event.type === "subagent.updated" ? [event.subagent.status] : [],
         );
       const prompt = yield* throughPromptSettled;
-      assert.equal(statuses(prompt).at(-1), duringPrompt ? "idle" : "running");
+      // mattr's idle proof reads the child's last transcript step, so a child that reported during
+      // the prompt may turn idle just after the reply closes; the run's end checks it below.
+      if (!duringPrompt) assert.equal(statuses(prompt).at(-1), "running");
       if (!duringPrompt) {
         yield* TestClock.adjust("10 minutes");
         yield* report;
@@ -2490,10 +2529,6 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
 
         // First poll proves child-1 and sees it is still running.
         yield* TestClock.adjust("2 seconds");
-        yield* until(
-          (event) =>
-            event.type === "subagent.updated" && event.subagent.progress === "Read README.md",
-        );
 
         // Child finishes its report without any parent usage_update arriving yet.
         yield* write(
@@ -2528,102 +2563,351 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
       }).pipe(Effect.provide(layerSession)),
   );
 
-  // agy reports no child session for `invoke_subagent`, so the child's work streams from its
-  // transcript into the child thread and the parent's subagent row.
-  it.effect("streams a detached subagent's transcript into its child thread", () =>
-    Effect.gen(function* () {
-      const fileSystem = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const profile = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-antigravity-kids-" });
-      const records = (conversationId: string, kind: string) =>
-        path.join(profile, "antigravity-acp", "brain", conversationId, ".system_generated", kind);
-      const write = (directory: string, name: string, value: string) =>
-        fileSystem
-          .makeDirectory(directory, { recursive: true })
-          .pipe(Effect.andThen(fileSystem.writeFileString(path.join(directory, name), value)));
-      const transcript = (lines: ReadonlyArray<unknown>) =>
-        write(
-          records("child-1", "logs"),
-          "transcript.jsonl",
-          lines.map((line) => JSON.stringify(line)).join("\n") + "\n",
-        );
-      const reading = {
-        step_index: 1,
-        type: "PLANNER_RESPONSE",
-        status: "DONE",
-        content: "Checking the tests.",
-        tool_calls: [{ name: "run_command", args: { CommandLine: '"vp test"' } }],
-      };
-      yield* write(records("mock-session-1", "subagents"), "child-1.json", "{}");
-      yield* write(
-        records("child-1", "messages"),
-        "launch.json",
-        JSON.stringify({
+  it.effect(
+    "projects Antigravity subagent transcript thinking, typed tools, and assistant reply live and keeps them when Idle",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "t3-antigravity-subagent-live-",
+        });
+        const records = (conversationId: string, kind: string) =>
+          path.join(profile, "antigravity-acp", "brain", conversationId, ".system_generated", kind);
+        const writeJson = (directory: string, name: string, value: unknown) =>
+          fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(
+              Effect.andThen(
+                fileSystem.writeFileString(path.join(directory, name), JSON.stringify(value)),
+              ),
+            );
+        const writeTranscript = (lines: ReadonlyArray<unknown>) => {
+          const directory = records("child-1", "logs");
+          return fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(
+              Effect.andThen(
+                fileSystem.writeFileString(
+                  path.join(directory, "transcript.jsonl"),
+                  `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`,
+                ),
+              ),
+            );
+        };
+
+        yield* writeJson(records("mock-session-1", "subagents"), "child-1.json", {
+          conversationId: "child-1",
+          subagentDescriptor: { role: "Codebase Researcher" },
+        });
+        yield* writeJson(records("child-1", "messages"), "launch.json", {
           sender: "mock-session-1",
-          sourceMetadata: { tool: { toolCall: { id: "call_research", name: "invoke_subagent" } } },
-        }),
-      );
-      yield* transcript([reading]);
+          content: "Read README.md",
+          sourceMetadata: {
+            tool: { toolCall: { id: "call_research", name: "invoke_subagent" } },
+          },
+        });
+        // While running, the child has written thinking, a completed read_file, an edit_file, and a running command.
+        yield* writeTranscript([
+          { step_index: 0, type: "SYSTEM_MESSAGE", status: "DONE", content: "Read README.md" },
+          {
+            step_index: 1,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            thinking: "Checking README.md and applying the fix.",
+            tool_calls: [
+              { name: "read_file", args: { Path: '"/project/README.md"' } },
+              {
+                name: "edit_file",
+                args: {
+                  Path: '"/project/README.md"',
+                  Target: '"old"',
+                  Replacement: '"new"',
+                },
+              },
+              {
+                name: "run_command",
+                args: { CommandLine: '"pnpm test"', toolSummary: '"Run tests"' },
+              },
+            ],
+          },
+          {
+            step_index: 2,
+            type: "GENERIC",
+            status: "DONE",
+            content: "Created At: 2026-11-26T02:00:00+01:00\n1: old line",
+          },
+          {
+            step_index: 3,
+            type: "GENERIC",
+            status: "DONE",
+            content: "Updated README.md",
+          },
+        ]);
 
-      const { usage, send, startTurn, until, throughPromptSettled } =
-        yield* openSessionWithRunningCommand({}, profile);
-      yield* startTurn(1, false);
-      const prompt = yield* throughPromptSettled;
-      const parentThreadId = ThreadId.make("thread-antigravity-wake");
-      const childItems = (events: ReadonlyArray<ProviderAdapter.ProviderAdapterV2Event>) =>
-        events.flatMap((event) =>
-          event.type === "turn_item.updated" && event.turnItem.threadId !== parentThreadId
-            ? [event.turnItem]
-            : [],
+        const { usage, send, startTurn, until, throughPromptSettled } =
+          yield* openSessionWithRunningCommand({}, profile);
+        yield* startTurn(1, false);
+        const promptEvents = yield* throughPromptSettled;
+
+        const childThread = promptEvents.find((event) => event.type === "app_thread.created");
+        assert.isDefined(childThread);
+        const childThreadId =
+          childThread?.type === "app_thread.created" ? childThread.appThread.id : undefined;
+        assert.isDefined(childThreadId);
+
+        // Give the live transcript follower a poll tick while the subagent is still running.
+        yield* TestClock.adjust("1 second");
+
+        // Now the child completes its command, writes its final assistant reply, and reports back to parent.
+        yield* writeTranscript([
+          { step_index: 0, type: "SYSTEM_MESSAGE", status: "DONE", content: "Read README.md" },
+          {
+            step_index: 1,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            thinking: "Checking README.md and applying the fix.",
+            tool_calls: [
+              { name: "read_file", args: { Path: '"/project/README.md"' } },
+              {
+                name: "edit_file",
+                args: {
+                  Path: '"/project/README.md"',
+                  Target: '"old"',
+                  Replacement: '"new"',
+                },
+              },
+              {
+                name: "run_command",
+                args: { CommandLine: '"pnpm test"', toolSummary: '"Run tests"' },
+              },
+            ],
+          },
+          {
+            step_index: 2,
+            type: "GENERIC",
+            status: "DONE",
+            content: "Created At: 2026-11-26T02:00:00+01:00\n1: old line",
+          },
+          {
+            step_index: 3,
+            type: "GENERIC",
+            status: "DONE",
+            content: "Updated README.md",
+          },
+          {
+            step_index: 4,
+            type: "GENERIC",
+            status: "DONE",
+            content: "All tests passed.",
+          },
+          {
+            step_index: 5,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            content: "Updated README.md and verified all tests pass.",
+          },
+        ]);
+        yield* writeJson(records("mock-session-1", "messages"), "report.json", {
+          sender: "child-1",
+        });
+        yield* send({
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "The researcher finished." },
+        });
+        yield* send(usage);
+        yield* TestClock.adjust("3 seconds");
+        const tailEvents = yield* until((event) => event.type === "turn.terminal");
+        const allEvents = [...promptEvents, ...tailEvents];
+
+        const childItemsById = new Map<
+          string,
+          Extract<ProviderAdapter.ProviderAdapterV2Event, { type: "turn_item.updated" }>["turnItem"]
+        >();
+        for (const event of allEvents) {
+          if (event.type === "turn_item.updated" && event.turnItem.threadId === childThreadId) {
+            childItemsById.set(String(event.turnItem.id), event.turnItem);
+          }
+        }
+        const childItems = [...childItemsById.values()].toSorted((a, b) => a.ordinal - b.ordinal);
+        assert.deepEqual(
+          childItems.map((item) => item.type),
+          [
+            "user_message",
+            "reasoning",
+            "dynamic_tool",
+            "file_change",
+            "command_execution",
+            "assistant_message",
+          ],
         );
-      const rowProgress = (event: ProviderAdapter.ProviderAdapterV2Event) =>
-        event.type === "turn_item.updated" && event.turnItem.type === "subagent"
-          ? event.turnItem.progress
-          : undefined;
+        const reasoning = childItems[1];
+        assert.equal(
+          reasoning?.type === "reasoning" ? reasoning.text : null,
+          "Checking README.md and applying the fix.",
+        );
+        const readItem = childItems[2];
+        assert.equal(readItem?.type === "dynamic_tool" ? readItem.toolName : null, "Read");
+        assert.equal(readItem?.type === "dynamic_tool" ? readItem.output : null, "1: old line");
+        const fileChange = childItems[3];
+        assert.equal(
+          fileChange?.type === "file_change" ? fileChange.fileName : null,
+          "/project/README.md",
+        );
+        assert.include(
+          fileChange?.type === "file_change" ? (fileChange.diffStr ?? "") : "",
+          "-old",
+        );
+        assert.include(
+          fileChange?.type === "file_change" ? (fileChange.diffStr ?? "") : "",
+          "+new",
+        );
+        const command = childItems[4];
+        assert.equal(command?.type === "command_execution" ? command.input : null, "pnpm test");
+        assert.equal(
+          command?.type === "command_execution" ? command.output : null,
+          "All tests passed.",
+        );
+        assert.equal(command?.status, "completed");
+        const assistant = childItems[5];
+        assert.equal(
+          assistant?.type === "assistant_message" ? assistant.text : null,
+          "Updated README.md and verified all tests pass.",
+        );
 
-      yield* TestClock.adjust("2 seconds");
-      const live = [...prompt, ...(yield* until((event) => rowProgress(event) === "Run vp test"))];
-      assert.isTrue(
-        live.some(
-          (event) => event.type === "subagent.updated" && event.subagent.progress === "Run vp test",
-        ),
-      );
-      const runningTool = childItems(live).find((item) => item.type === "dynamic_tool");
-      assert.equal(runningTool?.title, "Run vp test");
-      assert.equal(runningTool?.status, "running");
-      assert.include(
-        childItems(live).flatMap((item) => (item.type === "assistant_message" ? [item.text] : [])),
-        "Checking the tests.",
-      );
+        const lastSubagent = allEvents.findLast((event) => event.type === "subagent.updated");
+        assert.equal(
+          lastSubagent?.type === "subagent.updated" ? lastSubagent.subagent.status : null,
+          "idle",
+        );
+        assert.equal(
+          lastSubagent?.type === "subagent.updated" ? lastSubagent.subagent.result : null,
+          "Updated README.md and verified all tests pass.",
+        );
+      }).pipe(Effect.provide(layerSession)),
+  );
 
-      yield* transcript([
-        reading,
-        { step_index: 2, type: "RUN_COMMAND", status: "DONE", content: "12 passed" },
-        { step_index: 3, type: "PLANNER_RESPONSE", status: "DONE", content: "All 12 tests pass." },
-      ]);
-      yield* write(
-        records("mock-session-1", "messages"),
-        "report.json",
-        JSON.stringify({ sender: "child-1" }),
-      );
-      yield* send({
-        sessionUpdate: "agent_message_chunk",
-        content: { type: "text", text: "The researcher reported." },
-      });
-      yield* send(usage);
-      yield* TestClock.adjust("3 seconds");
-      const rest = yield* until((event) =>
-        childItems([event]).some(
-          (item) => item.type === "assistant_message" && item.text === "All 12 tests pass.",
-        ),
-      );
-      const all = childItems([...live, ...rest]);
-      const tools = all.filter((item) => item.type === "dynamic_tool");
-      assert.deepEqual([...new Set(tools.map((item) => item.id))].length, 1, "one row per call");
-      const finalTool = tools.at(-1);
-      assert.equal(finalTool?.status, "completed");
-      assert.equal(finalTool?.type === "dynamic_tool" ? finalTool.output : undefined, "12 passed");
-    }).pipe(Effect.provide(layerSession)),
+  it.effect(
+    "captures a subagent's closing assistant reply written shortly after send_message marks it Idle",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "t3-antigravity-subagent-trailing-",
+        });
+        const records = (conversationId: string, kind: string) =>
+          path.join(profile, "antigravity-acp", "brain", conversationId, ".system_generated", kind);
+        const writeJson = (directory: string, name: string, value: unknown) =>
+          fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(
+              Effect.andThen(
+                fileSystem.writeFileString(path.join(directory, name), JSON.stringify(value)),
+              ),
+            );
+        const writeTranscript = (lines: ReadonlyArray<unknown>) => {
+          const directory = records("child-1", "logs");
+          return fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(
+              Effect.andThen(
+                fileSystem.writeFileString(
+                  path.join(directory, "transcript.jsonl"),
+                  `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`,
+                ),
+              ),
+            );
+        };
+
+        yield* writeJson(records("mock-session-1", "subagents"), "child-1.json", {
+          conversationId: "child-1",
+          subagentDescriptor: { role: "Rich Format Tester" },
+        });
+        yield* writeJson(records("child-1", "messages"), "launch.json", {
+          sender: "mock-session-1",
+          content: "Format a markdown summary",
+          sourceMetadata: {
+            tool: { toolCall: { id: "call_research", name: "invoke_subagent" } },
+          },
+        });
+        const preReplySteps = [
+          {
+            step_index: 0,
+            type: "SYSTEM_MESSAGE",
+            status: "DONE",
+            content: "Format a markdown summary",
+          },
+          {
+            step_index: 1,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            tool_calls: [{ name: "send_message", args: { Message: '"Done!"' } }],
+          },
+          { step_index: 2, type: "GENERIC", status: "DONE", content: "Message sent." },
+        ];
+        yield* writeTranscript(preReplySteps);
+        yield* writeJson(records("mock-session-1", "messages"), "report.json", {
+          sender: "child-1",
+        });
+
+        const { startTurn, until, throughPromptSettled, session, providerThread } =
+          yield* openSessionWithRunningCommand({}, profile);
+        const runKeepsIngesting = session.hasPendingBackgroundWorkForThread!(providerThread);
+        yield* startTurn(1, false);
+        const promptEvents = yield* throughPromptSettled;
+        const childThread = promptEvents.find((event) => event.type === "app_thread.created");
+        const childThreadId =
+          childThread?.type === "app_thread.created" ? childThread.appThread.id : undefined;
+        assert.isDefined(childThreadId);
+
+        // Child became Idle as soon as report.json landed, before its closing PLANNER_RESPONSE flushed.
+        const idleSubagent = promptEvents.findLast((event) => event.type === "subagent.updated");
+        assert.equal(
+          idleSubagent?.type === "subagent.updated" ? idleSubagent.subagent.status : null,
+          "idle",
+        );
+        // The run reads this probe once the root ends; it must already hold the drain at Idle.
+        assert.isTrue(yield* runKeepsIngesting);
+
+        // Closing reply lands in transcript.jsonl after Idle.
+        yield* writeTranscript([
+          ...preReplySteps,
+          {
+            step_index: 3,
+            type: "PLANNER_RESPONSE",
+            status: "DONE",
+            content: "## Summary\n\n| Check | Status |\n| --- | --- |\n| Diff | Passed |",
+          },
+        ]);
+        yield* TestClock.adjust("2 seconds");
+        const trailingEvents = yield* until(
+          (event) =>
+            event.type === "turn_item.updated" &&
+            event.turnItem.threadId === childThreadId &&
+            event.turnItem.type === "assistant_message",
+        );
+        const assistantItem = trailingEvents.findLast(
+          (event) =>
+            event.type === "turn_item.updated" &&
+            event.turnItem.threadId === childThreadId &&
+            event.turnItem.type === "assistant_message",
+        );
+        assert.equal(
+          assistantItem?.type === "turn_item.updated" &&
+            assistantItem.turnItem.type === "assistant_message"
+            ? assistantItem.turnItem.text
+            : null,
+          "## Summary\n\n| Check | Status |\n| --- | --- |\n| Diff | Passed |",
+        );
+        // The drain ends with a subagent event, so the run re-checks and stops ingesting.
+        let pending = true;
+        for (let attempt = 0; attempt < 2 && pending; attempt += 1) {
+          yield* until((event) => event.type === "subagent.updated");
+          pending = yield* runKeepsIngesting;
+        }
+        assert.isFalse(pending);
+      }).pipe(Effect.provide(layerSession)),
   );
 
   it.effect("ends a continuation run whose replayed reply launched a subagent", () =>
@@ -3154,7 +3438,7 @@ describe("AntigravityAdapterV2 mattr Goal mode", () => {
 });
 
 describe("AntigravityAdapterV2 session system prompt", () => {
-  it.effect.each(["1.5.0"])(
+  it.effect.each(["1.5.1"])(
     "carries PR linking once per turn on %s, which does not advertise a system prompt append",
     (agentVersion) =>
       Effect.gen(function* () {

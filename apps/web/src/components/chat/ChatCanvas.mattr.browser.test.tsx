@@ -99,6 +99,7 @@ function Harness({
             >
               <ChatCanvas
                 store={store}
+                rightPanelOpen={rightPanelOpen}
                 threadRef={THREAD_REF}
                 preview={null}
                 composerOverlayElement={null}

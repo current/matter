@@ -2,6 +2,7 @@ import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
   createChatCanvasStore,
+  selectCanvasMeasurements,
   resolveChatCanvasModel,
   type ChatCanvasMeasurements,
 } from "./canvasStore";
@@ -73,23 +74,26 @@ describe("chat canvas model", () => {
 
   it("keeps state identity when a measurement repeats", () => {
     const store = createChatCanvasStore();
-    store.getState().setMeasurements(measurements(1400));
+    store.getState().setMeasurements(measurements(1400), false);
     const before = store.getState();
-    store.getState().setMeasurements(measurements(1400));
+    store.getState().setMeasurements(measurements(1400), false);
     store.getState().measureDetailsCard({ threadRef, width: 280, fullContentHeight: 300 });
     const measured = store.getState();
     store.getState().measureDetailsCard({ threadRef, width: 280, fullContentHeight: 300 });
     expect(measured.measurements).toBe(before.measurements);
     expect(store.getState()).toBe(measured);
-    store.getState().setMeasurements({ ...measurements(1400), narrowestWidth: 900 });
+    store.getState().setMeasurements({ ...measurements(1400), narrowestWidth: 900 }, false);
     expect(store.getState().measurements.narrowestWidth).toBe(900);
     expect(store.getState()).not.toBe(measured);
     const withTransition = store.getState();
-    store.getState().setMeasurements({
-      ...measurements(1400),
-      narrowestWidth: 900,
-      rightPanelTransition: { startWidth: 900, endWidth: 1400 },
-    });
+    store.getState().setMeasurements(
+      {
+        ...measurements(1400),
+        narrowestWidth: 900,
+        rightPanelTransition: { startWidth: 900, endWidth: 1400 },
+      },
+      false,
+    );
     expect(store.getState()).not.toBe(withTransition);
   });
 
@@ -181,5 +185,19 @@ describe("chat canvas model", () => {
     expect(model.detailsCardMode).toBe("inline");
     expect(model.detailsCardPlacement?.pinnedLeft).toBeUndefined();
     expect(model.detailsCardPlacement?.x).toBe(1200 - 280 - 12);
+  });
+
+  it("lays out with the width last measured for the right panel's state", () => {
+    const store = createChatCanvasStore();
+    store.getState().setMeasurements(measurements(1400), false);
+    expect(selectCanvasMeasurements(store.getState(), true).width).toBe(1400);
+    store.getState().setMeasurements(measurements(860), true);
+    store.getState().setMeasurements(measurements(1400), false);
+    const closed = store.getState();
+    expect(selectCanvasMeasurements(closed, true).width).toBe(860);
+    store.getState().setMeasurements(measurements(860), true);
+    expect(selectCanvasMeasurements(store.getState(), true)).toBe(
+      selectCanvasMeasurements(closed, true),
+    );
   });
 });
