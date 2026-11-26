@@ -4,6 +4,7 @@ import { render } from "../../test/render";
 import "../index.css";
 import "../../../../antimatter/stream-animation.css";
 
+import { STREAM_DOT_CLASS } from "./chat/MattrStreamDot";
 import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "./chat/mattrStreamHast";
 import { setLocalStorageItem } from "../hooks/useLocalStorage";
 import { MATTR_STREAM_ANIMATION_STORAGE_KEY, MattrStreamAnimation } from "../mattrStreamAnimation";
@@ -185,5 +186,89 @@ describe("ChatMarkdown streaming text animation", () => {
     const struckWord = screen.container.querySelector<HTMLElement>(`del .${STREAM_WORD_CLASS}`);
     expect(struckWord).not.toBeNull();
     expect(getComputedStyle(struckWord!).display).toBe("inline");
+  });
+
+  describe("RareUI", () => {
+    const dots = (container: HTMLElement) =>
+      container.querySelectorAll<HTMLElement>(`.${STREAM_DOT_CLASS}`);
+
+    it("lands words in bursts behind one gliding dot, keeping settled words mounted", async () => {
+      using _mode = streamMode("rareui");
+      await using screen = await render(message("The quick brown ", true));
+      const { container, rerender } = screen;
+      expect(markdownRoot(container).dataset.mattrStream).toBe("rareui");
+      const settled = words(container);
+      expect(settled.map((node) => node.textContent)).toEqual(["The", "quick", "brown"]);
+      expect(dots(container)).toHaveLength(1);
+      expect(caret(container)).toBeNull();
+      const names = getComputedStyle(settled[0]!).animationName;
+      expect(names).toBe("mattr-stream-sharpen, mattr-stream-fade");
+
+      await rerender(message("The quick brown fox jumps over the lazy dog and keeps going ", true));
+      // Words arrive paced, not all at once, and the dot glides after them along the line.
+      expect(words(container).length).toBeLessThan(12);
+      const gliding = () =>
+        Array.from(dots(container)).some((dot) =>
+          dot
+            .getAnimations()
+            .some(
+              (animation) =>
+                (animation.effect as KeyframeEffect).getKeyframes()[0]?.translate !== undefined,
+            ),
+        );
+      await expect.poll(gliding).toBe(true);
+      await expect.poll(() => words(container).length, { timeout: 5000 }).toBe(12);
+      const next = words(container);
+      settled.forEach((node, index) => expect(next[index]).toBe(node));
+      expect(dots(container)).toHaveLength(1);
+      expect(dots(container)[0]!.previousElementSibling?.textContent).toBe("going");
+
+      await rerender(message("The quick brown fox jumps over the lazy dog and keeps going", false));
+      expect(words(container)).toHaveLength(0);
+      expect(dots(container)).toHaveLength(0);
+      expect(markdownRoot(container).dataset.mattrStream).toBeUndefined();
+    });
+
+    it("never shows half a word, then snaps to the full text when the stream ends", async () => {
+      using _mode = streamMode("rareui");
+      await using screen = await render(message("Whole words onl", true));
+      const { container, rerender } = screen;
+      await expect.poll(() => words(container).length).toBe(2);
+      expect(container.textContent).not.toContain("onl");
+
+      await rerender(message("Whole words only", false));
+      expect(container.textContent).toContain("Whole words only");
+      expect(words(container)).toHaveLength(0);
+    });
+
+    it("keeps links, inline code and code blocks rendering while streaming", async () => {
+      using _mode = streamMode("rareui");
+      await using screen = await render(
+        message(
+          "See [the docs](https://example.com) and `inline()` code.\n\n```ts\nconst a = 1;\n```\n\nAfter the block ",
+          true,
+        ),
+      );
+      const { container } = screen;
+      const link = container.querySelector("a");
+      expect(link?.textContent).toBe("the docs");
+      expect(link?.getAttribute("href")).toBe("https://example.com");
+      expect(
+        Array.from(container.querySelectorAll("code")).some(
+          (code) => code.textContent === "inline()" && code.classList.contains(STREAM_WORD_CLASS),
+        ),
+      ).toBe(true);
+      expect(container.querySelector("pre")?.textContent).toContain("const a = 1;");
+      expect(dots(container)).toHaveLength(1);
+      expect(dots(container)[0]!.closest("p")?.textContent).toContain("After the block");
+    });
+
+    it("renders a finished message with no word spans and no dot", async () => {
+      using _mode = streamMode("rareui");
+      await using screen = await render(message("Finished reply, nothing moving.", false));
+      expect(words(screen.container)).toHaveLength(0);
+      expect(dots(screen.container)).toHaveLength(0);
+      expect(markdownRoot(screen.container).dataset.mattrStream).toBeUndefined();
+    });
   });
 });

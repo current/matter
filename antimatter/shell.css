@@ -2,6 +2,7 @@
 @import "./timeline-sidebar.css";
 @import "./stream-animation.css";
 @import "./composer.css";
+@import "./rareui-chat.css";
 
 /* mattr shell: the window is a frame, like a browser's. Its top row holds the traffic lights and
    the sidebar's titlebar row; each page is an inset card below it, and the sidebar only takes

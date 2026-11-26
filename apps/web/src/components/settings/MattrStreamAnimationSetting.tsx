@@ -4,13 +4,16 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useGT, useMessages } from "gt-react";
 import * as Schema from "effect/Schema";
 
+import { MattrStreamDot } from "../chat/MattrStreamDot";
 import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "../chat/mattrStreamHast";
 import {
   DEFAULT_MATTR_STREAM_ANIMATION,
   MATTR_STREAM_ANIMATIONS,
   MattrStreamAnimation,
+  useBurstPacedText,
   usePacedText,
   useMattrStreamAnimationSetting,
+  wholeWordEnds,
 } from "../../mattrStreamAnimation";
 import { Button } from "../ui/button";
 import { RadioGroup } from "../ui/radio-group";
@@ -68,6 +71,7 @@ function StreamPreview({
   readonly reducedMotion: boolean;
 }) {
   const [arrived, setArrived] = useState(reducedMotion ? sample.length : 0);
+  const [arrivalsDone, setArrivalsDone] = useState(reducedMotion);
   const [streaming, setStreaming] = useState(!reducedMotion);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- replays a timed sample stream; the timers end with the sample.
@@ -79,11 +83,23 @@ function StreamPreview({
       at += ARRIVAL_DELAYS_MS[index] ?? 90;
       timers.push(setTimeout(() => setArrived(length), at));
     });
-    timers.push(setTimeout(() => setStreaming(false), at + TURN_END_DELAY_MS));
+    timers.push(setTimeout(() => setArrivalsDone(true), at));
     return () => timers.forEach(clearTimeout);
   }, [sample, reducedMotion]);
 
-  const visible = usePacedText(sample.slice(0, arrived), streaming && animation === "typewriter");
+  const paced = usePacedText(sample.slice(0, arrived), streaming && animation === "typewriter");
+  const visible = useBurstPacedText(paced, streaming && animation === "rareui");
+  // RareUI's bursts can trail the sample, so its turn ends once they have caught up.
+  const caughtUp = animation !== "rareui" || visible.length >= (wholeWordEnds(sample).at(-1) ?? 0);
+  const turnEnding = streaming && arrivalsDone && caughtUp;
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the sample turn ends on a timer, a moment after its last words, as a provider's does.
+  useEffect(() => {
+    if (!turnEnding) return;
+    const timer = setTimeout(() => setStreaming(false), TURN_END_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [turnEnding]);
+
   // Like the chat: word spans only while streaming, then the same text renders plain.
   const live = streaming && animation !== "instant";
   const caret = live && (animation === "blur" || animation === "typewriter");
@@ -96,6 +112,7 @@ function StreamPreview({
       <p className="col-start-1 row-start-1 m-0" data-mattr-stream={live ? animation : undefined}>
         {renderTokens(visible, live)}
         {caret ? <span aria-hidden className={STREAM_CARET_CLASS} /> : null}
+        {live && animation === "rareui" ? <MattrStreamDot /> : null}
       </p>
     </div>
   );

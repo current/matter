@@ -1,0 +1,313 @@
+/* RareUI's Inline AI Status (rareui.com/components/aistatus), adapted for the live working row
+   (Settings → Appearance → AI status). Loops run only while a turn works and its row is on
+   screen: they follow `--visible-animation-state` from observeVisibleAnimation, and the row
+   unmounts when the turn ends. SVG internals repaint on the main thread, so loops are stepped
+   to about 30fps per keyframe segment, as upstream's shimmer is. Swaps play once. Reduced motion shows the end state. */
+
+.mattr-ais-icon svg {
+  overflow: visible;
+}
+
+/* Static shapes are each icon's resting frame; `.mattr-ais-loop` adds the motion. */
+.mattr-ais-sparkle,
+.mattr-ais-twinkle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.mattr-ais-bar {
+  stroke-dasharray: 9 20;
+}
+.mattr-ais-pen {
+  transform: translate(12.5px, 19px);
+}
+
+.mattr-ais-loop {
+  animation-play-state: var(--visible-animation-state, paused) !important;
+}
+.mattr-ais-sparkle.mattr-ais-loop {
+  animation: mattr-ais-sparkle 2.4s steps(36) infinite;
+}
+.mattr-ais-twinkle.mattr-ais-loop {
+  animation: mattr-ais-twinkle 1.2s steps(18) infinite;
+}
+.mattr-ais-lens.mattr-ais-loop {
+  animation: mattr-ais-lens 2s steps(15) infinite;
+}
+.mattr-ais-bar.mattr-ais-loop {
+  animation: mattr-ais-bar 0.9s steps(14) infinite both;
+}
+.mattr-ais-bar.mattr-ais-loop:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mattr-ais-bar.mattr-ais-loop:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.mattr-ais-ink.mattr-ais-loop {
+  animation: mattr-ais-ink 2.4s steps(3) infinite;
+}
+.mattr-ais-pen.mattr-ais-loop {
+  animation: mattr-ais-pen 2.4s steps(3) infinite;
+}
+.mattr-ais-check {
+  stroke-dasharray: 1 2;
+  animation: mattr-ais-check 600ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+}
+
+/* Label, detail and icon swaps: RareUI's springs as one-shot curves. The leaving copy sits
+   on top of the new one so the row measures only the new label. */
+.mattr-ais-text-in {
+  animation: mattr-ais-text-in 500ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+.mattr-ais-text-out {
+  animation: mattr-ais-text-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.mattr-ais-icon-in {
+  animation: mattr-ais-icon-in 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.mattr-ais-icon-out {
+  animation: mattr-ais-icon-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.mattr-ais-row {
+  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes mattr-ais-sparkle {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(45deg) scale(0.8);
+  }
+  100% {
+    transform: rotate(90deg) scale(1);
+  }
+}
+@keyframes mattr-ais-twinkle {
+  0%,
+  100% {
+    transform: scale(0.4);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes mattr-ais-lens {
+  0%,
+  100% {
+    transform: translate(0, -2px);
+  }
+  25% {
+    transform: translate(2px, 0);
+  }
+  50% {
+    transform: translate(0, 2px);
+  }
+  75% {
+    transform: translate(-2px, 0);
+  }
+}
+@keyframes mattr-ais-bar {
+  0%,
+  100% {
+    stroke-dasharray: 4 20;
+  }
+  50% {
+    stroke-dasharray: 14 20;
+  }
+}
+@keyframes mattr-ais-check {
+  from {
+    stroke-dasharray: 0 2;
+  }
+}
+@keyframes mattr-ais-text-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+@keyframes mattr-ais-text-out {
+  to {
+    transform: translateY(-8px);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+@keyframes mattr-ais-icon-in {
+  from {
+    transform: scale(0.5) rotate(-30deg);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+@keyframes mattr-ais-icon-out {
+  to {
+    transform: scale(0.5) rotate(30deg);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+/* The pen draws a wave, holds it, and lifts back to the start; points sit at eased arc length
+   so the tip stays on the ink (RareUI's WAVE_X / WAVE_Y / WAVE_PROGRESS). */
+@keyframes mattr-ais-ink {
+  0% {
+    stroke-dasharray: 0 2;
+    opacity: 1;
+  }
+  3.5% {
+    stroke-dasharray: 0.007 2;
+  }
+  7% {
+    stroke-dasharray: 0.028 2;
+  }
+  10.5% {
+    stroke-dasharray: 0.061 2;
+  }
+  14% {
+    stroke-dasharray: 0.104 2;
+  }
+  17.5% {
+    stroke-dasharray: 0.156 2;
+  }
+  21% {
+    stroke-dasharray: 0.216 2;
+  }
+  24.5% {
+    stroke-dasharray: 0.282 2;
+  }
+  28% {
+    stroke-dasharray: 0.352 2;
+  }
+  31.5% {
+    stroke-dasharray: 0.425 2;
+  }
+  35% {
+    stroke-dasharray: 0.5 2;
+  }
+  38.5% {
+    stroke-dasharray: 0.575 2;
+  }
+  42% {
+    stroke-dasharray: 0.648 2;
+  }
+  45.5% {
+    stroke-dasharray: 0.718 2;
+  }
+  49% {
+    stroke-dasharray: 0.784 2;
+  }
+  52.5% {
+    stroke-dasharray: 0.844 2;
+  }
+  56% {
+    stroke-dasharray: 0.896 2;
+  }
+  59.5% {
+    stroke-dasharray: 0.939 2;
+  }
+  63% {
+    stroke-dasharray: 0.972 2;
+  }
+  66.5% {
+    stroke-dasharray: 0.993 2;
+  }
+  70% {
+    stroke-dasharray: 1 2;
+  }
+  85% {
+    stroke-dasharray: 1 2;
+    opacity: 1;
+    animation-timing-function: steps(11);
+  }
+  to {
+    stroke-dasharray: 1 2;
+    opacity: 0;
+  }
+}
+@keyframes mattr-ais-pen {
+  0% {
+    transform: translate(3px, 19px);
+  }
+  3.5% {
+    transform: translate(3.05px, 18.88px);
+  }
+  7% {
+    transform: translate(3.18px, 18.58px);
+  }
+  10.5% {
+    transform: translate(3.42px, 18.1px);
+  }
+  14% {
+    transform: translate(3.78px, 17.51px);
+  }
+  17.5% {
+    transform: translate(4.42px, 17px);
+  }
+  21% {
+    transform: translate(5.26px, 17.36px);
+  }
+  24.5% {
+    transform: translate(5.83px, 18.25px);
+  }
+  28% {
+    transform: translate(6.29px, 19.29px);
+  }
+  31.5% {
+    transform: translate(6.84px, 20.33px);
+  }
+  35% {
+    transform: translate(7.76px, 21.02px);
+  }
+  38.5% {
+    transform: translate(8.67px, 20.32px);
+  }
+  42% {
+    transform: translate(9.22px, 19.27px);
+  }
+  45.5% {
+    transform: translate(9.68px, 18.24px);
+  }
+  49% {
+    transform: translate(10.25px, 17.35px);
+  }
+  52.5% {
+    transform: translate(11.09px, 17px);
+  }
+  56% {
+    transform: translate(11.72px, 17.52px);
+  }
+  59.5% {
+    transform: translate(12.09px, 18.11px);
+  }
+  63% {
+    transform: translate(12.33px, 18.6px);
+  }
+  66.5% {
+    transform: translate(12.46px, 18.9px);
+  }
+  70% {
+    transform: translate(12.5px, 19px);
+  }
+  85% {
+    transform: translate(12.5px, 19px);
+    animation-timing-function: steps(11);
+  }
+  to {
+    transform: translate(3px, 19px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mattr-ais,
+  .mattr-ais * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .mattr-ais-text-out,
+  .mattr-ais-icon-out {
+    display: none;
+  }
+}

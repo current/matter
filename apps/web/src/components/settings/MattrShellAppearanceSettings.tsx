@@ -22,6 +22,7 @@ import { cn, isMacPlatform } from "../../lib/utils";
 import { MattrSidebarLayoutSetting } from "../sidebar/mattr/MattrSidebarLayoutSetting";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { MattrAiStatusSetting } from "./MattrAiStatusSetting";
 import { MattrIconPackSetting } from "./MattrIconPackSetting";
 import { MattrStreamAnimationSetting } from "./MattrStreamAnimationSetting";
 import { MattrUiFontSetting } from "./MattrUiFontSetting";
@@ -419,6 +420,7 @@ export function MattrShellAppearanceSettings() {
       <MattrSidebarLayoutSetting />
       <MattrUiFontSetting />
       <MattrIconPackSetting />
+      <MattrAiStatusSetting />
       <MattrStreamAnimationSetting />
     </>
   );

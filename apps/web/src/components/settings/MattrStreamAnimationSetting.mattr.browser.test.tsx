@@ -104,12 +104,19 @@ describe("streaming text animation store", () => {
 });
 
 describe("MattrStreamAnimationSetting", () => {
-  it("lists all five modes and saves a pick", async () => {
+  it("lists all six modes and saves a pick", async () => {
     using _mode = streamMode("instant");
     await using _screen = await render(<MattrStreamAnimationSetting />, { router: false });
     const options = page.getByRole("radio");
     await expect.poll(() => options.elements().length).toBe(MATTR_STREAM_ANIMATIONS.length);
-    for (const name of ["Instant", "Blur Reveal", "Soft Fade", "Rise & Settle", "Smooth Pace"]) {
+    for (const name of [
+      "Instant",
+      "Blur Reveal",
+      "Soft Fade",
+      "Rise & Settle",
+      "Smooth Pace",
+      "RareUI",
+    ]) {
       await expect.element(page.getByRole("radio", { name: new RegExp(`^${name}`) })).toBeVisible();
     }
     await expect.element(page.getByRole("radio", { name: /^Instant/ })).toBeChecked();
@@ -134,6 +141,25 @@ describe("MattrStreamAnimationSetting", () => {
 
     await userEvent.click(page.getByRole("button", { name: "Replay preview" }));
     await expect.poll(() => live()?.dataset.mattrStream).toBe("blur");
+  });
+
+  it("saves RareUI and previews it with bursts behind a gliding dot, then rests plain", async () => {
+    using _mode = streamMode("instant");
+    await using screen = await render(<MattrStreamAnimationSetting />, { router: false });
+    const rareui = page.getByRole("radio", { name: /^RareUI/ });
+    await userEvent.click(rareui);
+    await expect.element(rareui).toBeChecked();
+    expect(localStorage.getItem(MATTR_STREAM_ANIMATION_STORAGE_KEY)).toBe(JSON.stringify("rareui"));
+
+    const live = () => screen.container.querySelector<HTMLElement>("[data-mattr-stream]");
+    const dot = () => screen.container.querySelector(".mattr-stream-dot");
+    await expect.poll(() => live()?.dataset.mattrStream).toBe("rareui");
+    await expect.poll(() => dot()).not.toBeNull();
+    await expect.poll(() => screen.container.querySelector(".mattr-sw")).not.toBeNull();
+    await expect.poll(() => live(), { timeout: 10_000 }).toBeNull();
+    expect(dot()).toBeNull();
+    expect(screen.container.querySelector(".mattr-sw")).toBeNull();
+    expect(screen.container.querySelector(".mattr-stream-caret")).toBeNull();
   });
 
   it("splits the sample into arrivals that end at the whole text", () => {

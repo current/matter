@@ -8,7 +8,17 @@ import {
   splitStreamWords,
 } from "./components/chat/mattrStreamHast";
 import type { MarkdownIslandOptions } from "./components/chat/markdownIslands";
-import { advancePacedCursor, pacedVisibleLength } from "./mattrStreamAnimation";
+import * as Schema from "effect/Schema";
+
+import { STREAM_DOT_TAG } from "./components/chat/MattrStreamDot";
+import {
+  type BurstPace,
+  MattrStreamAnimation,
+  advanceBurstPacer,
+  advancePacedCursor,
+  pacedVisibleLength,
+  wholeWordEnds,
+} from "./mattrStreamAnimation";
 
 const text = (value: string) => ({ type: "text" as const, value });
 const element = (tagName: string, children: Element["children"], properties = {}): Element => ({
@@ -79,6 +89,115 @@ describe("Smooth Pace cursor", () => {
     expect(pacedVisibleLength(sample, 2)).toBe("Hello".length);
     expect(pacedVisibleLength(sample, 7.4)).toBe("Hello brave".length);
     expect(pacedVisibleLength(sample, 99)).toBe(sample.length);
+  });
+});
+
+const isStreamAnimation = Schema.is(MattrStreamAnimation);
+
+/** A repeatable random source: a small linear congruential generator. */
+function seeded(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 1664525 + 1013904223) % 4294967296;
+    return state / 4294967296;
+  };
+}
+
+/** Steps the burst pacer frame by frame and records each chunk it lands. */
+function landings(text: string, frames: number, random: () => number, frameMs = 16) {
+  const ends = wholeWordEnds(text);
+  let pace: BurstPace = { words: 0, wait: 0 };
+  const chunks: Array<{ words: number; at: number }> = [];
+  for (let frame = 1; frame <= frames && pace.words < ends.length; frame++) {
+    const next = advanceBurstPacer(pace, text, ends, frameMs, random);
+    if (next.words > pace.words)
+      chunks.push({ words: next.words - pace.words, at: frame * frameMs });
+    pace = next;
+  }
+  return { ends, chunks, pace };
+}
+
+describe("RareUI burst pacer", () => {
+  it("is a saved streaming text mode", () => {
+    expect(isStreamAnimation("rareui")).toBe(true);
+  });
+
+  it("counts whole words only, and a last word once it ends a sentence", () => {
+    expect(wholeWordEnds("Hello brave wor")).toEqual([5, 11]);
+    expect(wholeWordEnds("Hello brave world ")).toEqual([5, 11, 17]);
+    expect(wholeWordEnds("Hello brave world.")).toEqual([5, 11, 18]);
+    expect(wholeWordEnds("")).toEqual([]);
+    const cjk = wholeWordEnds("日本語のテストを実行します。");
+    expect(cjk.length).toBeGreaterThan(1);
+    expect(cjk.at(-1)).toBe("日本語のテストを実行します。".length);
+  });
+
+  it("lands uneven chunks of whole words after uneven gaps", () => {
+    const text = `${Array.from({ length: 12 }, (_, index) => `word${index}`).join(" ")} `;
+    const { ends, chunks } = landings(text, 2000, seeded(7));
+    expect(chunks.reduce((sum, chunk) => sum + chunk.words, 0)).toBe(ends.length);
+    expect(new Set(chunks.map((chunk) => chunk.words)).size).toBeGreaterThan(1);
+    expect(Math.max(...chunks.map((chunk) => chunk.words))).toBeLessThanOrEqual(3);
+    const gaps = chunks.slice(1).map((chunk, index) => chunk.at - chunks[index]!.at);
+    expect(new Set(gaps).size).toBeGreaterThan(1);
+  });
+
+  it("pauses longer after a sentence than a clause, and longer after a clause than a word", () => {
+    const ends = [3];
+    const text = (tail: string) => `abc${tail} next`;
+    const wait = (tail: string) =>
+      advanceBurstPacer({ words: 0, wait: 0 }, text(tail), [ends[0]! + tail.length], 0, () => 0)
+        .wait;
+    expect(wait(".")).toBeGreaterThan(wait(","));
+    expect(wait(",")).toBeGreaterThan(wait(""));
+    expect(wait(".") - wait("")).toBeCloseTo(240);
+  });
+
+  it("catches up on a large backlog in bigger, quicker chunks", () => {
+    const text = `${Array.from({ length: 400 }, (_, index) => `w${index}`).join(" ")} `;
+    const fast = landings(text, 100_000, seeded(3));
+    expect(fast.pace.words).toBe(400);
+    expect(fast.chunks[0]!.words).toBeGreaterThan(3);
+    // 400 words at 8 a second would take 50s; the backlog drains far faster.
+    expect(fast.chunks.at(-1)!.at).toBeLessThan(20_000);
+  });
+
+  it("trails fast steady output by a few words, not a paragraph", () => {
+    for (const wordsPerSecond of [30, 60, 100]) {
+      const random = seeded(wordsPerSecond);
+      const all = `${Array.from({ length: 1200 }, (_, index) => `w${index}`).join(" ")} `;
+      let pace: BurstPace = { words: 0, wait: 0 };
+      let worst = 0;
+      for (let frame = 1; frame <= 600; frame++) {
+        const arrived = Math.min(1200, Math.floor((frame * 16 * wordsPerSecond) / 1000));
+        const text = `${all.split(" ").slice(0, arrived).join(" ")} `;
+        const ends = wholeWordEnds(text);
+        pace = advanceBurstPacer(pace, text, ends, 16, random);
+        if (frame > 120) worst = Math.max(worst, ends.length - pace.words);
+      }
+      expect(worst).toBeLessThanOrEqual(25);
+    }
+  });
+
+  it("never passes the arrived text and holds a word that is still arriving", () => {
+    const text = "One two thr";
+    const ends = wholeWordEnds(text);
+    let pace: BurstPace = { words: 0, wait: 0 };
+    for (let frame = 0; frame < 500; frame++) {
+      pace = advanceBurstPacer(pace, text, ends, 16, seeded(frame));
+      expect(ends[pace.words - 1] ?? 0).toBeLessThanOrEqual(text.length);
+    }
+    expect(pace.words).toBe(2);
+    expect(text.slice(0, ends[pace.words - 1])).toBe("One two");
+    // Fewer words than it had (a replaced message) clamps rather than overruns.
+    expect(advanceBurstPacer({ words: 9, wait: 50 }, text, ends, 16, Math.random).words).toBe(2);
+  });
+
+  it("caps time owed after a stall, so a hidden tab releases one chunk rather than all", () => {
+    const text = `${Array.from({ length: 30 }, (_, index) => `w${index}`).join(" ")} `;
+    const ends = wholeWordEnds(text);
+    const after = advanceBurstPacer({ words: 0, wait: 100 }, text, ends, 60_000, () => 0.5);
+    expect(after.words).toBeLessThan(ends.length);
   });
 });
 
@@ -171,5 +290,23 @@ describe("mattrStreamHast", () => {
     expect(hasCaret(mattrStreamHast(tree(), baseOptions, "typewriter", true)[0])).toBe(true);
     expect(hasCaret(mattrStreamHast(tree(), baseOptions, "fade", true)[0])).toBe(false);
     expect(hasCaret(mattrStreamHast(tree(), baseOptions, "blur", false)[0])).toBe(false);
+  });
+
+  it("rides RareUI's dot as a component island after the last word of the live block", () => {
+    const tree = root(element("p", [text("Gliding dot")]));
+    const [rendered, options] = mattrStreamHast(tree, baseOptions, "rareui", true);
+    const paragraph = rendered.children[0] as Element;
+    const dot = paragraph.children.at(-1) as Element;
+    expect(dot.tagName).toBe(STREAM_DOT_TAG);
+    expect(options.isIsland(dot)).toBe(true);
+    expect(Object.hasOwn(options.components, STREAM_DOT_TAG)).toBe(true);
+    expect(hasCaret(rendered)).toBe(false);
+    // Same options object per base, so rendered blocks stay cached.
+    expect(mattrStreamHast(tree, baseOptions, "rareui", true)[1]).toBe(options);
+    const [settled] = mattrStreamHast(tree, baseOptions, "rareui", false);
+    expect((settled.children[0] as Element).children.at(-1)).not.toHaveProperty(
+      "tagName",
+      STREAM_DOT_TAG,
+    );
   });
 });
