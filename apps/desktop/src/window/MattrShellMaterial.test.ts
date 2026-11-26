@@ -7,6 +7,7 @@ import {
   applyWindowShellMaterial,
   cleanupWindowShellMaterial,
   DEFAULT_SHELL_APPEARANCE,
+  LIQUID_GLASS_EDGE_CONSTRAINTS,
   type MacShellNative,
   setMacShellNativeForTests,
   shellMaterialOptions,
@@ -210,6 +211,17 @@ describe("MattrShellMaterial", () => {
       cleanupWindowShellMaterial(window);
     }),
   );
+
+  it("extends Liquid Glass past every window edge so its rim never draws a second corner", () => {
+    const outward = { topAnchor: -1, leadingAnchor: -1, bottomAnchor: 1, trailingAnchor: 1 };
+    assert.sameMembers(
+      LIQUID_GLASS_EDGE_CONSTRAINTS.map(([anchor]) => anchor),
+      Object.keys(outward),
+    );
+    for (const [anchor, constant] of LIQUID_GLASS_EDGE_CONSTRAINTS) {
+      assert.isAtLeast(constant * outward[anchor], 16, anchor);
+    }
+  });
 
   it("derives native options from the persisted shell settings", () => {
     const options = shellMaterialOptions(

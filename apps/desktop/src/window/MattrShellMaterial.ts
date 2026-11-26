@@ -49,8 +49,18 @@ interface WindowMaterialState {
 
 const NS_WINDOW_BELOW = -1;
 const NS_GLASS_EFFECT_STYLE: Record<ShellGlassStyle, number> = { regular: 0, clear: 1 };
-const MACOS_LIQUID_GLASS_CORNER_RADIUS = 16;
 const DEFAULT_BLUR_RADIUS = 38;
+
+// NSGlassEffectView draws a specular rim along its own rounded edge. Flush with the content view
+// at 16pt it sat inside the window's own 10pt corner as a second, mismatched corner. Square and
+// past every window edge, only its body shows and the window's rounded clip draws the one corner.
+const LIQUID_GLASS_EDGE_OUTSET = 24;
+export const LIQUID_GLASS_EDGE_CONSTRAINTS = [
+  ["topAnchor", -LIQUID_GLASS_EDGE_OUTSET],
+  ["leadingAnchor", -LIQUID_GLASS_EDGE_OUTSET],
+  ["bottomAnchor", LIQUID_GLASS_EDGE_OUTSET],
+  ["trailingAnchor", LIQUID_GLASS_EDGE_OUTSET],
+] as const;
 
 const windowStates = new WeakMap<Electron.BrowserWindow, WindowMaterialState>();
 let macNativePromise: Promise<MacShellNative | null> | undefined;
@@ -81,6 +91,11 @@ function loadMacShellNative(): Promise<MacShellNative | null> {
       open({
         library: "mattr-appkit-shell-material",
         path: "/System/Library/Frameworks/AppKit.framework/AppKit",
+      });
+      const coreFoundation = "mattr-corefoundation-shell-material";
+      open({
+        library: coreFoundation,
+        path: "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
       });
       let skyLight: string | null = "mattr-skylight-shell-material";
       try {
@@ -158,6 +173,69 @@ function loadMacShellNative(): Promise<MacShellNative | null> {
         });
       };
       const nsWindowOf = (contentView: bigint): bigint => msg0(contentView, "window");
+      const matchWindowServerCornerRadius = (
+        nsWindow: bigint,
+        connection: number,
+        windowNumber: number,
+        match: boolean,
+      ): void => {
+        if (skyLight === null) return;
+        const cornerRadiusSelector = sel("_cornerRadius");
+        const responds = load({
+          library: objc,
+          funcName: "objc_msgSend",
+          retType: DataType.Boolean,
+          paramsType: [DataType.BigInt, DataType.BigInt, DataType.BigInt],
+          paramsValue: [nsWindow, sel("respondsToSelector:"), cornerRadiusSelector],
+        });
+        if (match && !responds) return;
+        const transaction = load({
+          library: skyLight,
+          funcName: "SLSTransactionCreate",
+          retType: DataType.BigInt,
+          paramsType: [DataType.I32],
+          paramsValue: [connection],
+        }).valueOf();
+        if (transaction === 0n) return;
+        if (match) {
+          const cornerRadius = load({
+            library: objc,
+            funcName: "objc_msgSend",
+            retType: DataType.Double,
+            paramsType: [DataType.BigInt, DataType.BigInt],
+            paramsValue: [nsWindow, cornerRadiusSelector],
+          });
+          load({
+            library: skyLight,
+            funcName: "SLSTransactionSetWindowCornerRadius",
+            retType: DataType.Void,
+            paramsType: [DataType.BigInt, DataType.I32, DataType.Double],
+            paramsValue: [transaction, windowNumber, cornerRadius],
+          });
+        } else {
+          load({
+            library: skyLight,
+            funcName: "SLSTransactionClearWindowCornerRadius",
+            retType: DataType.Void,
+            paramsType: [DataType.BigInt, DataType.I32],
+            paramsValue: [transaction, windowNumber],
+          });
+        }
+        load({
+          library: skyLight,
+          funcName: "SLSTransactionCommit",
+          retType: DataType.Void,
+          paramsType: [DataType.BigInt, DataType.I32],
+          paramsValue: [transaction, 0],
+        });
+        load({
+          library: coreFoundation,
+          funcName: "CFRelease",
+          retType: DataType.Void,
+          paramsType: [DataType.BigInt],
+          paramsValue: [transaction],
+        });
+      };
 
       const native: MacShellNative = {
         setWindowClear: (contentView) => {
@@ -176,7 +254,7 @@ function loadMacShellNative(): Promise<MacShellNative | null> {
           const glassView = allocated === 0n ? 0n : msg0(allocated, "init");
           if (glassView === 0n) return null;
           msgBool(glassView, "setTranslatesAutoresizingMaskIntoConstraints:", false);
-          msgDouble(glassView, "setCornerRadius:", MACOS_LIQUID_GLASS_CORNER_RADIUS);
+          msgDouble(glassView, "setCornerRadius:", 0);
           load({
             library: objc,
             funcName: "objc_msgSend",
@@ -196,11 +274,22 @@ function loadMacShellNative(): Promise<MacShellNative | null> {
               0n,
             ],
           });
-          for (const anchor of ["topAnchor", "bottomAnchor", "leadingAnchor", "trailingAnchor"]) {
+          for (const [anchor, constant] of LIQUID_GLASS_EDGE_CONSTRAINTS) {
             const viewAnchor = msg0(glassView, anchor);
             const parentAnchor = msg0(contentView, anchor);
             if (viewAnchor === 0n || parentAnchor === 0n) continue;
-            const constraint = msgPtr(viewAnchor, "constraintEqualToAnchor:", parentAnchor);
+            const constraint = load({
+              library: objc,
+              funcName: "objc_msgSend",
+              retType: DataType.BigInt,
+              paramsType: [DataType.BigInt, DataType.BigInt, DataType.BigInt, DataType.Double],
+              paramsValue: [
+                viewAnchor,
+                sel("constraintEqualToAnchor:constant:"),
+                parentAnchor,
+                constant,
+              ],
+            }).valueOf();
             if (constraint !== 0n) msgBool(constraint, "setActive:", true);
           }
           return glassView;
@@ -263,7 +352,14 @@ function loadMacShellNative(): Promise<MacShellNative | null> {
             paramsType: [DataType.I32, DataType.I64, DataType.I32],
             paramsValue: [connection, windowNumber, Math.round(radius)],
           });
-          return error === 0;
+          if (error !== 0) return false;
+          // The blur fills the WindowServer's own corner (~4pt unless set) while the content keeps
+          // the window's 10pt corner, so the backdrop leaked between them as a second corner.
+          tryNative(() => {
+            matchWindowServerCornerRadius(nsWindow, connection, windowNumber, radius > 0);
+            return true;
+          });
+          return true;
         },
       };
       return native;
