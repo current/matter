@@ -223,7 +223,7 @@ export function buildIslandHtml(): string {
     transition: background-color 120ms, border-color 120ms, color 120ms; }
   .zone b, .zone span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .zone b { color: var(--fg); font-weight: 500; }
-  .zone.is-over { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.7); color: var(--fg); }
+  .zone.is-over { background: rgba(255,255,255,0.12); border-style: solid; border-color: rgba(255,255,255,0.35); color: var(--fg); }
   .zone.is-disabled { opacity: 0.35; }
   .zone-hint { color: var(--subtle); font-size: 11.5px; text-align: center; margin-top: 8px; }
 </style>
@@ -399,7 +399,7 @@ export function buildIslandHtml(): string {
   function rightWingHtml(w) {
     switch (w.kind) {
       case "listening": return { key: "listening", html: '<canvas id="wave"></canvas>' };
-      case "needs-you": return { key: "needs", html: '<span class="amber"><i></i>' + (w.count > 1 ? '<span class="count">' + w.count + "</span>" : "") + "</span>" };
+      case "needs-you": return { key: "needs", html: '<span class="amber"><i></i><span class="count">' + w.count + "</span></span>" };
       case "failed": return { key: "failed", html: '<span class="bang">!</span>' };
       case "running-many": return { key: "many:" + w.count, html: '<span class="count">' + w.count + "</span>" };
       case "running": {

@@ -262,6 +262,16 @@ describe("island mode and Open card", () => {
       pill: true,
     });
   });
+
+  it("keeps the shell on whole points when the notch is fractional", () => {
+    const running = M.deriveWing(
+      makeIslandSnapshot({ recentThreads: [makeIslandThread({ status: "running" })] }),
+      0,
+    );
+    const wideNotch = { ...NOTCH, notchWidth: 353.5 };
+    expect(M.shellGeometry("collapsed", running, wideNotch, 0).width).toBe(426);
+    expect(M.shellGeometry("open", running, wideNotch, 200).width).toBe(426);
+  });
 });
 
 describe("auto-peek", () => {

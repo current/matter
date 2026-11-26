@@ -589,7 +589,7 @@ export function islandModelRuntime() {
     }
     if (mode === "collapsed") {
       return {
-        width: notchW + current.wingWidth * 2,
+        width: Math.round(notchW + current.wingWidth * 2),
         height: notchH,
         ear: pill ? 0 : 8,
         bottomRadius: pill ? notchH / 2 : 10,
@@ -598,7 +598,8 @@ export function islandModelRuntime() {
     }
     const width = mode === "peek" ? PEEK_WIDTH : OPEN_WIDTH;
     return {
-      width: Math.max(width, notchW + current.wingWidth * 2),
+      // Whole points, so the shoulder arcs meet the body edge without a half-pixel kink.
+      width: Math.round(Math.max(width, notchW + current.wingWidth * 2)),
       height: notchH + Math.max(0, contentHeight),
       ear: pill ? 0 : 18,
       bottomRadius: 24,
