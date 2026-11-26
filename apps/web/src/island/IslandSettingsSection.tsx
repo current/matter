@@ -30,7 +30,7 @@ import {
 } from "./islandSettingsStore";
 import {
   buildVoiceSpeakOptions,
-  setVoiceAssistantModalOpen,
+  setVoiceModeOpen,
   syncVoiceTtsPreferencesToServer,
 } from "./voiceAssistantStore";
 import type { IslandShortcutMode } from "../../../../antimatter/island/types";
@@ -632,7 +632,7 @@ export function IslandSettingsSection() {
               type="button"
               size="xs"
               variant="outline"
-              onClick={() => setVoiceAssistantModalOpen(true)}
+              onClick={() => setVoiceModeOpen(true)}
             >
               <RadioIcon className="size-3.5" />
               <T>Open Voice Mode</T>

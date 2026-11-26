@@ -90,10 +90,7 @@ import {
   UserPlusIcon,
   WorkflowIcon,
 } from "lucide-react";
-import {
-  setVoiceAssistantModalOpen,
-  toggleVoiceAssistantHandsFree,
-} from "../island/voiceAssistantStore";
+import { setVoiceModeOpen, toggleVoiceAssistantHandsFree } from "../island/voiceAssistantStore";
 import { openClaudeCloudDialog } from "../addons/claudeCloudApi";
 import { useIsAddonEnabled } from "../addons/useAddonRegistry";
 import { openThreadFind } from "./chat/threadFindStore";
@@ -1842,7 +1839,7 @@ function OpenCommandPaletteDialog(props: {
     title: gt("Open Voice Mode"),
     icon: <RadioIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
-      setVoiceAssistantModalOpen(true);
+      setVoiceModeOpen(true);
     },
   });
 

@@ -18,7 +18,7 @@ import { updateIslandSettings, updateVoiceAssistantSettings } from "../island/is
 import {
   registerHostBridge,
   resetVoiceAssistantStoreForTests,
-  setVoiceAssistantModalOpen,
+  setVoiceModeOpen,
   submitVoiceAssistantUtterance,
   toggleVoiceAssistantHandsFree,
 } from "../island/voiceAssistantStore";
@@ -247,8 +247,8 @@ describe("web Voice Mode audio cue trigger points", () => {
     });
 
     try {
-      setVoiceAssistantModalOpen(true);
-      setVoiceAssistantModalOpen(true); // idempotent, should not double-fire
+      setVoiceModeOpen(true, { autoStartHandsFree: false });
+      setVoiceModeOpen(true, { autoStartHandsFree: false }); // idempotent, should not double-fire
       expect(played).toEqual(["voice-mode-open"]);
 
       await submitVoiceAssistantUtterance("what is running?", {
@@ -264,7 +264,7 @@ describe("web Voice Mode audio cue trigger points", () => {
       });
       expect(played).toEqual(["voice-mode-open", "voice-mode-thinking"]);
 
-      setVoiceAssistantModalOpen(false);
+      setVoiceModeOpen(false);
       expect(played).toEqual(["voice-mode-open", "voice-mode-thinking", "voice-mode-close"]);
     } finally {
       unregister();
@@ -333,12 +333,12 @@ describe("web Voice Mode audio cue trigger points", () => {
     });
 
     try {
-      setVoiceAssistantModalOpen(true);
+      setVoiceModeOpen(true, { autoStartHandsFree: false });
       await submitVoiceAssistantUtterance("check status", {
         modeOverride: "voice-mode",
         speakOverride: false,
       });
-      setVoiceAssistantModalOpen(false);
+      setVoiceModeOpen(false);
       expect(played).toEqual(["voice-mode-open", "voice-mode-close"]);
     } finally {
       unregister();

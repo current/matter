@@ -10,7 +10,7 @@ import {
 
 import { useIsAddonEnabled } from "../../../addons/useAddonRegistry";
 import { useDesktopUpdateState } from "../../../state/desktopUpdate";
-import { setVoiceAssistantModalOpen } from "../../../island/voiceAssistantStore";
+import { setVoiceModeOpen } from "../../../island/voiceAssistantStore";
 import { cn } from "../../../lib/utils";
 import {
   useIssuesSupported,
@@ -150,7 +150,7 @@ export function MattrStatusLine() {
               {voiceEnabled ? (
                 <>
                   <MenuSeparator />
-                  <MenuItem onClick={() => go(() => setVoiceAssistantModalOpen(true))}>
+                  <MenuItem onClick={() => go(() => setVoiceModeOpen(true))}>
                     <RadioIcon />
                     {gt("Voice Mode")}
                   </MenuItem>

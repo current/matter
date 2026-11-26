@@ -12,7 +12,7 @@ import {
 import { useMattrApiConfig } from "../../../addons/mattrApi";
 import { useEnabledBotProviderAddons, useIsAddonEnabled } from "../../../addons/useAddonRegistry";
 import { contextMenuSourceOf } from "../../../contextMenuSource";
-import { setVoiceAssistantModalOpen } from "../../../island/voiceAssistantStore";
+import { setVoiceModeOpen } from "../../../island/voiceAssistantStore";
 import { cn } from "../../../lib/utils";
 import { formatRelativeTime } from "../../../timestampFormat";
 import { BotAvatar } from "../../bots/BotAvatarRenderer";
@@ -357,7 +357,7 @@ export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" }) {
     <MattrTip label={gt("Voice Mode")} side={variant === "pill" ? "top" : "bottom"}>
       <button
         type="button"
-        onClick={() => setVoiceAssistantModalOpen(true)}
+        onClick={() => setVoiceModeOpen(true)}
         aria-label={gt("Voice Mode")}
         className={cn(
           "inline-flex shrink-0 cursor-pointer items-center justify-center outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",

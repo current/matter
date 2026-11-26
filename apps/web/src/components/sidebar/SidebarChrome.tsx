@@ -5,7 +5,7 @@ import {
   RadioIcon,
   SettingsIcon,
 } from "lucide-react";
-import { setVoiceAssistantModalOpen } from "../../island/voiceAssistantStore";
+import { setVoiceModeOpen } from "../../island/voiceAssistantStore";
 import type { ReactNode } from "react";
 import { T, useGT } from "gt-react";
 import { memo } from "react";
@@ -335,7 +335,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu({
               label={gt("Voice Mode")}
               onClick={() => {
                 closeMobileSidebar();
-                setVoiceAssistantModalOpen(true);
+                setVoiceModeOpen(true);
               }}
               compact={hasUndoNotice}
             />

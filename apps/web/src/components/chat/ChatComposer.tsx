@@ -152,7 +152,9 @@ import { useDictationSubmissionShortcut } from "../../speech/useDictationSubmiss
 import { useEnvironmentSpeechInput } from "../../speech/useEnvironmentSpeechInput";
 import { ComposerSpeechButton, ComposerSpeechRecordingPill } from "./ComposerSpeechButton";
 import { ComposerVoiceModeButton } from "./ComposerVoiceModeButton";
+import { MattrVoiceModeBar } from "../../island/MattrVoiceModeBar";
 import { openThreadVoiceMode } from "../../island/voiceAssistantStore";
+import { useIsVoiceModeHost, voiceModeThreadKey } from "../../island/voiceModeHost";
 import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection";
 import { shortcutLabelForCommand, type ShortcutMatchContext } from "../../keybindings";
 import {
@@ -2035,6 +2037,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     attachmentTargetKey,
     submissionBlocked,
   );
+  const voiceModeHostKey =
+    routeKind === "server" && activeThreadId !== null
+      ? voiceModeThreadKey(environmentId, activeThreadId)
+      : null;
+  const voiceModeHere = useIsVoiceModeHost(voiceModeHostKey, !backgroundThread);
   const handleOpenThreadVoiceModeStable = useStableCallback(() => {
     if (routeKind !== "server" || activeThreadId === null) return;
     openThreadVoiceMode({
@@ -3751,8 +3758,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           data-inline-resting-controls="true"
           className={composerProviderState.composerFrameClassName}
         >
+          {voiceModeHere ? (
+            <MattrVoiceModeBar variant="composer" hostThreadKey={voiceModeHostKey} />
+          ) : null}
           <div
             ref={composerSurfaceRef}
+            hidden={voiceModeHere}
             data-chat-composer-surface="true"
             data-chat-composer-mobile-collapsed={isComposerCollapsedMobile ? "true" : "false"}
             className={cn(

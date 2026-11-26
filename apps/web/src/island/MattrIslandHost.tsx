@@ -44,7 +44,8 @@ import {
 import { useAtomCommand } from "../state/use-atom-command";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { resolveThreadRouteTarget } from "../threadRoutes";
-import { MattrVoiceModeModal } from "./MattrVoiceModeModal";
+import { MattrVoiceModeBar } from "./MattrVoiceModeBar";
+import { useHasVoiceModeHost } from "./voiceModeHost";
 import { VoiceBriefingCoordinator } from "./VoiceBriefingCoordinator";
 import { EMPTY_ISLAND_THREAD_PREVIEW, summarizeThreadProjection } from "./islandThreadActivity";
 import { useIslandSettings } from "./islandSettingsStore";
@@ -52,7 +53,7 @@ import {
   bargeInVoiceAssistant,
   clearVoiceAssistantHistory,
   registerHostBridge,
-  setVoiceAssistantModalOpen,
+  setVoiceModeOpen,
   setVoiceAssistantMode,
   submitVoiceAssistantUtterance,
   toIslandVoiceAssistantState,
@@ -137,6 +138,7 @@ export function MattrIslandHost() {
   const islandBridge = window.desktopBridge?.island;
   const settings = useIslandSettings();
   const assistantState = useVoiceAssistantState();
+  const hasVoiceModeHost = useHasVoiceModeHost();
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -250,7 +252,7 @@ export function MattrIslandHost() {
 
   const needsLiveShells =
     Boolean(islandBridge && settings.enabled) ||
-    assistantState.modalOpen ||
+    assistantState.sessionOpen ||
     assistantState.handsFreeActive;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to connected environment thread shells for Island & Voice Mode snapshots
@@ -980,7 +982,7 @@ export function MattrIslandHost() {
       }
       case "assistant-open-voice-mode-modal": {
         window.focus();
-        setVoiceAssistantModalOpen(true);
+        setVoiceModeOpen(true);
         return;
       }
       case "assistant-clear-history": {
@@ -1103,34 +1105,13 @@ export function MattrIslandHost() {
   return (
     <>
       <VoiceBriefingCoordinator />
-      <MattrVoiceModeModal
-        activeThreads={recentThreads}
-        pendingApprovals={pendingApprovals}
-        pendingUserInputs={pendingUserInputs}
-        voiceLevel={speech.level}
-        onApprove={(approval, decision) => {
-          void respondToApproval({
-            environmentId: EnvironmentId.make(approval.environmentId),
-            input: {
-              threadId: ThreadId.make(approval.threadId),
-              requestId: RuntimeRequestId.make(approval.requestId),
-              decision: decision as ProviderApprovalDecision,
-            },
-          });
-        }}
-        onOpenThread={(environmentId, threadId) => {
-          void navigate({
-            to: "/$environmentId/$threadId",
-            params: {
-              environmentId: EnvironmentId.make(environmentId),
-              threadId: ThreadId.make(threadId),
-            },
-          });
-        }}
-        onOpenSettings={() => {
-          void navigate({ to: "/settings/general", hash: "mattr-voice-assistant" });
-        }}
-      />
+      {assistantState.sessionOpen && !hasVoiceModeHost ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+          <div className="w-full max-w-2xl">
+            <MattrVoiceModeBar variant="floating" />
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

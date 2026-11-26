@@ -43,7 +43,7 @@ export interface VoiceAssistantThreadScope {
 }
 
 export interface VoiceAssistantStoreState extends IslandVoiceAssistantState {
-  readonly modalOpen: boolean;
+  readonly sessionOpen: boolean;
   readonly inputLevel: number;
   /** Active thread when Voice Mode is launched from inside a thread; null means all workspace. */
   readonly scopedThread: VoiceAssistantThreadScope | null;
@@ -272,7 +272,7 @@ function createInitialState(): VoiceAssistantStoreState {
     activeBriefingLabel: null,
     pendingBriefingCount: 0,
     error: null,
-    modalOpen: false,
+    sessionOpen: false,
     scopedThread: null,
     originThread: null,
   };
@@ -1181,6 +1181,15 @@ export function useVoiceAssistantState(): VoiceAssistantStoreState {
   );
 }
 
+/** Re-renders only when the selected slice changes; the full state emits at audio-level rate. */
+export function useVoiceAssistantSelector<T>(select: (state: VoiceAssistantStoreState) => T): T {
+  return useSyncExternalStore(
+    subscribeVoiceAssistantState,
+    () => select(state),
+    () => select(state),
+  );
+}
+
 export function registerHostBridge(bridge: VoiceAssistantHostBridge): () => void {
   hostBridge = bridge;
   if (ttsPlayer) {
@@ -1203,18 +1212,46 @@ export function setVoiceAssistantMode(mode: IslandVoicePanelMode): void {
   emit({ mode });
 }
 
-export function setVoiceAssistantModalOpen(open: boolean): void {
+function routedThreadScope(): VoiceAssistantThreadScope | null {
+  const context = hostBridge?.getWorkspaceContext();
+  if (!context?.activeEnvironmentId || !context.activeThreadId) return null;
+  const thread = context.threads.find(
+    (candidate) =>
+      candidate.environmentId === context.activeEnvironmentId &&
+      candidate.threadId === context.activeThreadId,
+  );
+  return {
+    environmentId: context.activeEnvironmentId,
+    threadId: context.activeThreadId,
+    title: thread?.title || m(msg("Untitled thread")),
+  };
+}
+
+/**
+ * Opens Voice Mode in the chat on screen (scoped to the routed thread, else all workspace) and
+ * starts listening; closing ends the hands-free session too.
+ */
+export function setVoiceModeOpen(
+  open: boolean,
+  options?: { readonly autoStartHandsFree?: boolean },
+): void {
   if (open) {
-    const wasOpen = state.modalOpen;
-    if (wasOpen && state.scopedThread === null && state.originThread === null) return;
-    emit({ modalOpen: true, scopedThread: null, originThread: null });
-    if (!wasOpen) {
-      playMattrAudioCue("voice-mode-open");
+    if (state.sessionOpen) return;
+    const scope = routedThreadScope();
+    if (scope !== null) {
+      openThreadVoiceMode(scope, options);
+      return;
+    }
+    emit({ sessionOpen: true, mode: "voice-mode", scopedThread: null, originThread: null });
+    playMattrAudioCue("voice-mode-open");
+    if (options?.autoStartHandsFree !== false && hostBridge !== null && !state.handsFreeActive) {
+      void startHandsFree();
     }
     return;
   }
-  if (!state.modalOpen) return;
-  emit({ modalOpen: false });
+  if (!state.sessionOpen) return;
+  stopHandsFree({ silent: true });
+  emit({ sessionOpen: false });
   playMattrAudioCue("voice-mode-close");
 }
 
@@ -1226,12 +1263,12 @@ export function openThreadVoiceMode(
   scope: VoiceAssistantThreadScope,
   options?: { readonly autoStartHandsFree?: boolean },
 ): void {
-  const wasOpen = state.modalOpen;
+  const wasOpen = state.sessionOpen;
   const switchingScope =
     state.scopedThread?.environmentId !== scope.environmentId ||
     state.scopedThread?.threadId !== scope.threadId;
   emit({
-    modalOpen: true,
+    sessionOpen: true,
     mode: "voice-mode",
     scopedThread: scope,
     originThread: scope,
@@ -1375,7 +1412,7 @@ async function startVadCapture(): Promise<void> {
 async function startHandsFree(): Promise<void> {
   if (state.handsFreeActive && vadCapture?.isActive()) return;
 
-  const playOpenCue = !state.modalOpen;
+  const playOpenCue = !state.sessionOpen;
   vadCapture?.stop();
   emit({
     handsFreeActive: true,
@@ -1495,7 +1532,7 @@ async function startHandsFree(): Promise<void> {
 }
 
 function stopHandsFree(options?: { readonly silent?: boolean }): void {
-  const playCloseCue = !options?.silent && state.handsFreeActive && !state.modalOpen;
+  const playCloseCue = !options?.silent && state.handsFreeActive && !state.sessionOpen;
   userSpeaking = false;
   if (vadCapture) {
     vadCapture.stop();

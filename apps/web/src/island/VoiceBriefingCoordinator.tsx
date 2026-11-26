@@ -166,7 +166,7 @@ export function VoiceBriefingCoordinator() {
 
   const active =
     settings.voiceAssistant.proactiveBriefings &&
-    (assistantState.handsFreeActive || assistantState.modalOpen);
+    (assistantState.handsFreeActive || assistantState.sessionOpen);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to environment thread shells to emit proactive voice briefings while voice mode is active
   useEffect(() => {

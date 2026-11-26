@@ -24,7 +24,7 @@ import {
   openThreadVoiceMode,
   registerHostBridge,
   resetVoiceAssistantStoreForTests,
-  setVoiceAssistantModalOpen as setModalOpen,
+  setVoiceModeOpen,
   setVoiceAssistantMode as setMode,
   setVoiceAssistantScopedThread,
   submitQuickBriefing,
@@ -223,8 +223,8 @@ describe("voiceAssistantStore", () => {
       createTtsPlayer: () => fakeTts,
     });
 
+    setVoiceModeOpen(true, { autoStartHandsFree: false });
     setMode("assistant");
-    setModalOpen(true);
 
     const response = await submitUtterance("open the auth thread");
     expect(response?.route).toBe("assistant");
@@ -242,7 +242,7 @@ describe("voiceAssistantStore", () => {
 
     const state = getVoiceAssistantState();
     expect(state.phase).toBe("idle");
-    expect(state.modalOpen).toBe(true);
+    expect(state.sessionOpen).toBe(true);
     expect(state.lastReply).toBe("Opened Fix auth tests.");
     expect(state.lastToolResults).toHaveLength(1);
     expect(state.recentTurns).toHaveLength(2);
@@ -1324,7 +1324,7 @@ describe("in-thread voice mode scoping", () => {
     );
 
     expect(getVoiceAssistantState()).toMatchObject({
-      modalOpen: true,
+      sessionOpen: true,
       mode: "voice-mode",
       scopedThread: {
         environmentId: "env-2",
@@ -1364,10 +1364,10 @@ describe("in-thread voice mode scoping", () => {
     expect(getVoiceAssistantState().recentTurns).toEqual([]);
     expect(getVoiceAssistantState().scopedThread?.threadId).toBe("thread-88");
 
-    // Global entry points clear any thread scope cleanly.
-    setModalOpen(false);
-    setModalOpen(true);
-    expect(getVoiceAssistantState().scopedThread).toBeNull();
-    expect(getVoiceAssistantState().originThread).toBeNull();
+    // Global entry points open in the chat on screen.
+    setVoiceModeOpen(false);
+    setVoiceModeOpen(true, { autoStartHandsFree: false });
+    expect(getVoiceAssistantState().scopedThread?.threadId).toBe("thread-1");
+    expect(getVoiceAssistantState().originThread?.threadId).toBe("thread-1");
   });
 });
