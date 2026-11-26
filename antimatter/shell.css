@@ -25,7 +25,12 @@
 
   .dark [data-slot="sidebar-wrapper"] {
     --mattr-frame: #111313;
-    --mattr-canvas: color-mix(in srgb, var(--card) 60%, var(--background));
+    /* A soft near-black card instead of true black, so it sits in the gray frame without a hard
+       edge; raised surfaces (composer, details card) lift one step above it. */
+    --mattr-canvas: #141414;
+    --card: #1c1c1c;
+    --popover: #1c1c1c;
+    --surface-raised: #1c1c1c;
   }
 
   /* Only a faint rim at the card's edge, like a dark browser's page. */
