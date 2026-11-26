@@ -95,12 +95,12 @@ export function buildIslandHtml(): string {
     display: flex; align-items: center; pointer-events: none;
   }
   .wing { width: var(--wing-w); height: 100%; display: flex; align-items: center; justify-content: center;
-    transition: width var(--shell-dur) var(--shell-ease); }
-  .gap { width: var(--notch-w); height: 100%; }
+    transition: width var(--shell-dur) var(--shell-ease), transform var(--shell-dur) var(--shell-ease); }
+  .gap { width: var(--notch-w); height: 100%; flex: none; transition: width var(--shell-dur) var(--shell-ease); }
   .wing > * { flex: none; }
   .glyph { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg); }
   .glyph svg { width: 16px; height: 16px; fill: currentColor; }
-  .glyph.monogram { flex: none; font-weight: 600; font-size: 10px; line-height: 1; border-radius: 4px; background: rgba(255,255,255,0.16); }
+  .glyph.monogram { flex: none; font-weight: 600; font-size: 9.5px; line-height: 1; border-radius: 4px; background: none; border: 1.25px solid rgba(255,255,255,0.55); }
   .ring { width: 16px; height: 16px; }
   .ring circle { fill: none; stroke-width: 2.25; }
   .dots { display: flex; gap: 3px; }
@@ -111,6 +111,7 @@ export function buildIslandHtml(): string {
   .amber i { width: 8px; height: 8px; border-radius: 4px; background: var(--amber); }
   .amber .count { color: var(--amber); font-size: 12px; }
   .bang { color: var(--red); font-weight: 800; font-size: 15px; }
+  .check.is-done svg { transform: translateY(1px); }
   .check svg { width: 15px; height: 15px; stroke: var(--fg); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   #wave { width: 56px; height: 24px; display: block; }
   .swap-in { animation: island-swap var(--island-dur-morph) var(--island-ease-morph) both; }
@@ -152,7 +153,7 @@ export function buildIslandHtml(): string {
   .btn.primary:hover { background: rgba(255,255,255,0.86); }
   .btn.small { height: 24px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
   .btn kbd { font: inherit; font-weight: 450; opacity: 0.5; margin-left: 5px; }
-  .btn kbd.sym { font-family: "SF Pro Text", -apple-system, "Apple Symbols", sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 1px; opacity: 0.45; }
+  .btn kbd.sym { font-family: "SF Pro Text", -apple-system, "Apple Symbols", sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 0; opacity: 0.6; }
   .btn.primary[disabled] { background: var(--surface); color: var(--subtle); }
   .btn.primary[disabled]:hover { background: var(--surface); }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
@@ -168,9 +169,9 @@ export function buildIslandHtml(): string {
     padding: 8px 10px; color: var(--fg); white-space: pre-wrap; word-break: break-word; display: -webkit-box;
     -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .muted { color: var(--muted); }
-  .reason { color: var(--muted); font-size: 12px; margin: 6px 2px 0; text-wrap: pretty; }
+  .reason { color: var(--muted); font-size: 12px; margin: 6px 2px 0; text-wrap: balance; }
   .options { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: 248px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
-  .options.has-more { mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), rgba(0,0,0,0.3)); }
+  .options.has-more { mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent); }
   .option { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; text-align: left; }
   .option:hover { background: var(--surface); }
   .option.is-picked { background: var(--surface-hover); }
@@ -178,9 +179,9 @@ export function buildIslandHtml(): string {
     justify-content: center; font-size: 11px; font-weight: 560; background: var(--surface); color: var(--muted); }
   .option.is-picked .letter { background: #fff; color: #000; }
   .option .desc { color: var(--muted); font-size: 12px; }
-  .steps { margin: 2px 2px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-  .steps li { display: flex; gap: 8px; color: var(--fg); }
-  .steps li::before { content: ""; width: 12px; height: 12px; margin-top: 2px; border-radius: 4px; flex: none; border: 1.5px solid var(--subtle); }
+  .steps { margin: 2px 2px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; line-height: 18px; }
+  .steps li { display: flex; align-items: flex-start; gap: 10px; color: var(--fg); }
+  .steps li::before { content: ""; width: 6px; height: 6px; margin: 6px 0 0 1px; border-radius: 50%; flex: none; border: 1.25px solid var(--subtle); }
   .steps .more { color: var(--subtle); }
   .steps .more::before { visibility: hidden; }
   input.custom, textarea#draft {
@@ -207,7 +208,7 @@ export function buildIslandHtml(): string {
   .chip button { width: 18px; height: 18px; border-radius: 5px; color: var(--muted); }
   .chip button:hover { background: var(--surface-hover); color: var(--fg); }
   .composer-foot { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-  .composer-foot .hint { flex: 1; color: var(--subtle); font-size: 11.5px; }
+  .composer-foot .hint { flex: 1; padding-left: 2px; color: var(--subtle); font-size: 11.5px; }
   .icon-btn { width: 28px; height: 28px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface); }
   .icon-btn:hover { background: var(--surface-hover); }
   .icon-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -215,11 +216,12 @@ export function buildIslandHtml(): string {
   .icon-btn.send:hover { background: #d93f44; }
   .icon-btn.send[disabled] { background: var(--surface); color: var(--subtle); }
   .icon-btn.is-on, .icon-btn.is-on:hover { background: rgba(229,72,77,0.22); color: #ff6b6f; }
-  .zones { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr); gap: 6px; }
+  .zones { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
   .zone { height: 74px; border-radius: 14px; border: 1.5px dashed rgba(255,255,255,0.22); display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 0 10px; text-align: center; color: var(--muted);
     transition: background-color 120ms, border-color 120ms, color 120ms; }
-  .zone b { color: var(--fg); font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zone b, .zone span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zone b { color: var(--fg); font-weight: 500; }
   .zone.is-over { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.7); color: var(--fg); }
   .zone.is-disabled { opacity: 0.35; }
   .zone-hint { color: var(--subtle); font-size: 11.5px; text-align: center; margin-top: 8px; }
@@ -243,6 +245,7 @@ export function buildIslandHtml(): string {
   const panelInner = document.getElementById("panel-inner");
   const wingLeft = document.getElementById("wing-left");
   const wingRight = document.getElementById("wing-right");
+  const gapEl = document.querySelector("#wings .gap");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   let metrics = { hasNotch: true, notchWidth: 200, notchHeight: 32, windowWidth: 520 };
@@ -267,6 +270,7 @@ export function buildIslandHtml(): string {
   let needsKey = null;
   let glanceIndex = 0;
   let draft = "";
+  let dictationHeld = false;
   let lastSyncedDraft = "";
   let draftRevision = -1;
   let files = [];
@@ -409,7 +413,7 @@ export function buildIslandHtml(): string {
         const lit = w.step % 3;
         return { key: "dots:" + lit, html: '<span class="dots">' + [0, 1, 2].map((i) => "<i" + (i === lit ? ' class="on"' : "") + "></i>").join("") + "</span>" };
       }
-      case "done": return { key: "done", html: '<span class="check">' + CHECK_SVG + "</span>" };
+      case "done": return { key: "done", html: '<span class="check is-done">' + CHECK_SVG + "</span>" };
       default: return { key: "", html: "" };
     }
   }
@@ -584,10 +588,10 @@ export function buildIslandHtml(): string {
       (listening ? '<div id="voice-preview" aria-live="polite"></div>' : "") + "</div>" +
       (chips ? '<div class="chips">' + chips + "</div>" : "") +
       (notice ? '<div class="reason">' + esc(notice) + "</div>" : "") +
-      '<div class="composer-foot"><span class="hint">Tab target · ⌃ hold to dictate · ↵ send</span>' +
+      '<div class="composer-foot"><span class="hint">Tab target · ' + (dictationHeld ? "release ⌃ to stop" : "⌃ hold to dictate") + " · ↵ send</span>" +
       '<button class="icon-btn' + (listening ? " is-on" : "") + '" data-action="mic" title="Dictate">' + MIC_SVG + "</button>" +
       '<button class="icon-btn send" data-action="send" title="Send"' + (canSend ? "" : " disabled") + ">" + SEND_SVG + "</button></div>";
-    return { key: "prompt:" + targetLabel(target) + ":" + parsed.interactionMode + ":" + chips + ":" + listening + ":" + canSend + ":" + notice, html, prompt: true };
+    return { key: "prompt:" + targetLabel(target) + ":" + parsed.interactionMode + ":" + chips + ":" + listening + ":" + canSend + ":" + notice + ":" + dictationHeld, html, prompt: true };
   }
 
   function glanceStatus(thread) {
@@ -620,7 +624,7 @@ export function buildIslandHtml(): string {
     const zone = (id, label, sub, enabled) =>
       '<div class="zone' + (dropZone === id ? " is-over" : "") + (enabled ? "" : " is-disabled") + '" data-zone="' + id + '"><b>' + esc(label) + "</b><span>" + esc(sub) + "</span></div>";
     const html = '<div class="zones">' +
-      zone("thread", threadTitle ? "→ " + threadTitle : "Active thread", "Attach here", Boolean(threadTarget)) +
+      zone("thread", "This thread", threadTitle ? "→ " + threadTitle : "None open", Boolean(threadTarget)) +
       zone("new-thread", "New thread", "Start with it", Boolean(snapshot && snapshot.canStartThread)) +
       zone("task", "New task", "Save for later", Boolean(snapshot && snapshot.canCreateTask)) +
       '</div><div class="zone-hint">Drop to attach, then add a note before sending.</div>';
@@ -706,12 +710,12 @@ export function buildIslandHtml(): string {
     preview.innerHTML = prefix + esc(committed) + (committed && tentative ? " " : "") + '<span class="tentative">' + esc(tentative) + "</span>";
   }
 
-  // A long list stops halfway through a row, so the cut itself shows there is more to scroll.
+  // A long list shows whole rows plus 40% of the next one, faded out, so it reads as scrollable.
   function fitOptions(options) {
-    const limit = 248;
+    const limit = 272;
     if (options.scrollHeight > limit) {
-      const cut = [...options.children].find((o) => o.offsetTop - options.offsetTop + o.offsetHeight > limit);
-      if (cut) options.style.maxHeight = Math.round(cut.offsetTop - options.offsetTop + Math.min(26, cut.offsetHeight / 2)) + "px";
+      const next = [...options.children].find((o) => o.offsetTop - options.offsetTop + o.offsetHeight > limit);
+      if (next) options.style.maxHeight = Math.round(next.offsetTop - options.offsetTop + next.offsetHeight * 0.4) + "px";
     }
     markOptionsOverflow(options);
   }
@@ -749,6 +753,7 @@ export function buildIslandHtml(): string {
     root.setProperty("--notch-w", metrics.notchWidth + "px");
     root.setProperty("--notch-h", metrics.notchHeight + "px");
     root.setProperty("--content-w", (mode === "peek" ? 360 : 420) + "px");
+    placeWings(g, wing);
     if (key === lastGeometryKey) return;
     lastGeometryKey = key;
     const spring = springFor(previousMode, mode, previousWingWidth !== wing.wingWidth);
@@ -764,6 +769,21 @@ export function buildIslandHtml(): string {
     previousMode = mode;
     previousWingWidth = wing.wingWidth;
     if (mode === "hidden" && (reducedMotion.matches || !metrics.hasNotch)) scheduleIdleNotice();
+  }
+
+  // Expanded, the wing icons ride the shell's spring out to the card's content edges, like the
+  // expanded Dynamic Island; collapsed, they sit beside the camera. Pill screens close the gap.
+  const WING_INSET = { peek: 22, glance: 22, needs: 16 };
+  function placeWings(g, wing) {
+    const expanded = mode === "peek" || mode === "open";
+    const gapW = g.pill && expanded ? 0 : metrics.notchWidth;
+    gapEl.style.width = gapW + "px";
+    const inset = WING_INSET[lastPanelKey.split(":")[0]] || 14;
+    for (const [el, side] of [[wingLeft, -1], [wingRight, 1]]) {
+      const child = el.firstElementChild;
+      const shift = expanded && child ? side * (g.width / 2 - inset - gapW / 2 - wing.wingWidth / 2 - child.offsetWidth / 2) : 0;
+      el.style.transform = shift ? "translateX(" + shift.toFixed(1) + "px)" : "";
+    }
   }
 
   let idleNoticeTimer = 0;
@@ -835,6 +855,7 @@ export function buildIslandHtml(): string {
     open = false;
     openReason = null;
     wantsPrompt = false;
+    dictationHeld = false;
     needsDeferred = false;
     dropActive = false;
     dropZone = null;
@@ -1233,6 +1254,7 @@ export function buildIslandHtml(): string {
     if (command.type === "dictation-hold") {
       if (!open) return;
       wantsPrompt = true;
+      dictationHeld = command.phase === "start";
       if (command.phase === "start") { syncDraft(draft, true); bridge.sendAction({ type: "voice-start" }); }
       else bridge.sendAction({ type: command.phase === "end" ? "voice-stop" : "voice-cancel" });
       render();
