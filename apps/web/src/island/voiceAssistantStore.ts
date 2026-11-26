@@ -53,6 +53,8 @@ export interface VoiceAssistantStoreState extends IslandVoiceAssistantState {
 
 export interface VoiceAssistantHostBridge {
   readonly getWorkspaceContext: () => VoiceWorkspaceContext;
+  /** The thread the main window is showing, if any; Voice Mode opens there. */
+  readonly getRoutedThread?: () => VoiceAssistantThreadScope | null;
   readonly executeClientAction: (action: VoiceAssistantClientAction) => Promise<void> | void;
   readonly transcribePcm: (pcm16k: Float32Array, sampleRate: 16000) => Promise<string>;
   readonly getApiBaseUrlAndHeaders: () => Promise<VoiceTtsApiConfig> | VoiceTtsApiConfig;
@@ -1224,18 +1226,7 @@ export function setVoiceAssistantMode(mode: IslandVoicePanelMode): void {
 }
 
 function routedThreadScope(): VoiceAssistantThreadScope | null {
-  const context = hostBridge?.getWorkspaceContext();
-  if (!context?.activeEnvironmentId || !context.activeThreadId) return null;
-  const thread = context.threads.find(
-    (candidate) =>
-      candidate.environmentId === context.activeEnvironmentId &&
-      candidate.threadId === context.activeThreadId,
-  );
-  return {
-    environmentId: context.activeEnvironmentId,
-    threadId: context.activeThreadId,
-    title: thread?.title || m(msg("Untitled thread")),
-  };
+  return hostBridge?.getRoutedThread?.() ?? null;
 }
 
 /**

@@ -32,6 +32,7 @@ import {
   syncVoiceTtsPreferencesToServer,
   toggleVoiceAssistantHandsFree,
   tryFastPathIntent,
+  type VoiceAssistantThreadScope,
   type VoiceChunkPlayer,
 } from "./voiceAssistantStore";
 import {
@@ -1321,12 +1322,18 @@ describe("in-thread voice mode scoping", () => {
       isSpeaking: () => false,
     };
 
+    let routedThread: VoiceAssistantThreadScope | null = {
+      environmentId: "env-1",
+      threadId: "thread-1",
+      title: "Routed thread",
+    };
     registerHostBridge({
       getWorkspaceContext: () =>
         makeContext({
           activeEnvironmentId: "env-1",
           activeThreadId: "thread-1",
         }),
+      getRoutedThread: () => routedThread,
       executeClientAction: vi.fn(),
       transcribePcm: vi.fn(async () => ""),
       getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773", headers: {} }),
@@ -1384,10 +1391,17 @@ describe("in-thread voice mode scoping", () => {
     expect(getVoiceAssistantState().recentTurns).toEqual([]);
     expect(getVoiceAssistantState().scopedThread?.threadId).toBe("thread-88");
 
-    // Global entry points open in the chat on screen.
+    // Global entry points open in the chat on screen, not the last scoped or most recent thread.
     setVoiceModeOpen(false);
     setVoiceModeOpen(true, { autoStartHandsFree: false });
     expect(getVoiceAssistantState().scopedThread?.threadId).toBe("thread-1");
     expect(getVoiceAssistantState().originThread?.threadId).toBe("thread-1");
+
+    // Off a thread route (new thread, settings) it opens unscoped.
+    setVoiceModeOpen(false);
+    routedThread = null;
+    setVoiceModeOpen(true, { autoStartHandsFree: false });
+    expect(getVoiceAssistantState().scopedThread).toBeNull();
+    expect(getVoiceAssistantState().originThread).toBeNull();
   });
 });

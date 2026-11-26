@@ -17,13 +17,14 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { msg } from "gt-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { resolveSidebarThreadStatus } from "../components/Sidebar.logic";
 import { useClientSettings } from "../hooks/useSettings";
 import { useStableCallback } from "../hooks/useStableCallback";
 import { useTheme } from "../hooks/useTheme";
 import { m } from "../i18n/messages";
-import { newMessageId } from "../lib/utils";
+import { cn, newMessageId } from "../lib/utils";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readAppleSpeechLocales, resolveAppleSpeechLocale } from "../speech/appleSpeech";
 import { runEnvironmentSpeech } from "../speech/runEnvironmentSpeech";
@@ -65,6 +66,7 @@ import {
   toggleVoiceAssistantHandsFree,
   toggleVoiceAssistantMute,
   useVoiceAssistantState,
+  type VoiceAssistantThreadScope,
 } from "./voiceAssistantStore";
 import { buildVoiceApiConfig } from "./voiceApiConfig";
 import { encodeWav16k } from "./voiceModeAudio";
@@ -145,6 +147,8 @@ export function MattrIslandHost() {
   const settings = useIslandSettings();
   const assistantState = useVoiceAssistantState();
   const hasVoiceModeHost = useHasVoiceModeHost();
+  const floatingVoiceMode = assistantState.sessionOpen && !hasVoiceModeHost;
+  const [pageCard, setPageCard] = useState<HTMLElement | null>(null);
   const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -610,6 +614,27 @@ export function MattrIslandHost() {
     },
   );
 
+  const getRoutedThread = useStableCallback((): VoiceAssistantThreadScope | null => {
+    if (routeTarget?.kind !== "server" || routeThreadKey === null) return null;
+    const { environmentId, threadId } = routeTarget.threadRef;
+    const title = shellsByKey.get(routeThreadKey)?.title;
+    return { environmentId, threadId, title: title || m(msg("Untitled thread")) };
+  });
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- finds the visible page card (outside this tree) for the floating Voice Mode bar
+  useEffect(() => {
+    if (!floatingVoiceMode) return;
+    const frame = requestAnimationFrame(() =>
+      setPageCard(
+        Array.from(document.querySelectorAll<HTMLElement>('main[data-slot="sidebar-inset"]')).find(
+          (main) => main.checkVisibility(),
+        ) ?? null,
+      ),
+    );
+    return () => cancelAnimationFrame(frame);
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- each route mounts its own page card
+  }, [floatingVoiceMode, location.pathname]);
+
   // Register live host bridge for VoiceAssistantStore (hands-free Voice Mode + Assistant + Briefings)
   const buildWorkspaceContext = useStableCallback((): VoiceWorkspaceContext => {
     const scoped = assistantState.scopedThread;
@@ -851,6 +876,7 @@ export function MattrIslandHost() {
   useEffect(() => {
     return registerHostBridge({
       getWorkspaceContext: buildWorkspaceContext,
+      getRoutedThread,
       executeClientAction: executeAssistantClientAction,
       transcribePcm,
       getApiBaseUrlAndHeaders,
@@ -858,6 +884,7 @@ export function MattrIslandHost() {
     });
   }, [
     buildWorkspaceContext,
+    getRoutedThread,
     executeAssistantClientAction,
     transcribePcm,
     getApiBaseUrlAndHeaders,
@@ -1098,13 +1125,21 @@ export function MattrIslandHost() {
   return (
     <>
       <VoiceBriefingCoordinator />
-      {assistantState.sessionOpen && !hasVoiceModeHost ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-          <div className="w-full max-w-2xl">
-            <MattrVoiceModeBar variant="floating" />
-          </div>
-        </div>
-      ) : null}
+      {floatingVoiceMode
+        ? createPortal(
+            <div
+              className={cn(
+                "pointer-events-none inset-x-0 bottom-4 z-40 flex justify-end px-6",
+                pageCard ? "absolute" : "fixed",
+              )}
+            >
+              <div className="w-full max-w-xl">
+                <MattrVoiceModeBar variant="floating" />
+              </div>
+            </div>,
+            pageCard ?? document.body,
+          )
+        : null}
     </>
   );
 }
