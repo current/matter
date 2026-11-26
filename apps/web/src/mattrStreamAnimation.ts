@@ -75,7 +75,7 @@ export const MATTR_STREAM_ANIMATIONS: ReadonlyArray<{
   {
     id: "rareui",
     name: msg("RareUI", { $context: "streaming text animation; a component library name" }),
-    description: msg("Words land in uneven bursts and sharpen from a blur behind a gliding dot", {
+    description: msg("Words land in uneven bursts and sharpen from a blur", {
       $context: "streaming text animation",
     }),
   },

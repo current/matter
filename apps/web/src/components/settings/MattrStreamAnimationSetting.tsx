@@ -4,7 +4,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useGT, useMessages } from "gt-react";
 import * as Schema from "effect/Schema";
 
-import { MattrStreamDot } from "../chat/MattrStreamDot";
 import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "../chat/mattrStreamHast";
 import {
   DEFAULT_MATTR_STREAM_ANIMATION,
@@ -112,7 +111,6 @@ function StreamPreview({
       <p className="col-start-1 row-start-1 m-0" data-mattr-stream={live ? animation : undefined}>
         {renderTokens(visible, live)}
         {caret ? <span aria-hidden className={STREAM_CARET_CLASS} /> : null}
-        {live && animation === "rareui" ? <MattrStreamDot /> : null}
       </p>
     </div>
   );

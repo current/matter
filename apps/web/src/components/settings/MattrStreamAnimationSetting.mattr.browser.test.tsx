@@ -143,7 +143,7 @@ describe("MattrStreamAnimationSetting", () => {
     await expect.poll(() => live()?.dataset.mattrStream).toBe("blur");
   });
 
-  it("saves RareUI and previews it with bursts behind a gliding dot, then rests plain", async () => {
+  it("saves RareUI and previews it in bursts with no dot or caret, then rests plain", async () => {
     using _mode = streamMode("instant");
     await using screen = await render(<MattrStreamAnimationSetting />, { router: false });
     const rareui = page.getByRole("radio", { name: /^RareUI/ });
@@ -154,8 +154,9 @@ describe("MattrStreamAnimationSetting", () => {
     const live = () => screen.container.querySelector<HTMLElement>("[data-mattr-stream]");
     const dot = () => screen.container.querySelector(".mattr-stream-dot");
     await expect.poll(() => live()?.dataset.mattrStream).toBe("rareui");
-    await expect.poll(() => dot()).not.toBeNull();
     await expect.poll(() => screen.container.querySelector(".mattr-sw")).not.toBeNull();
+    expect(dot()).toBeNull();
+    expect(screen.container.querySelector(".mattr-stream-caret")).toBeNull();
     await expect.poll(() => live(), { timeout: 10_000 }).toBeNull();
     expect(dot()).toBeNull();
     expect(screen.container.querySelector(".mattr-sw")).toBeNull();

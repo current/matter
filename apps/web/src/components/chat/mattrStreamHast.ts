@@ -1,9 +1,7 @@
 import type { Element, ElementContent, Root } from "hast";
-import type { Components } from "hast-util-to-jsx-runtime";
 
 import type { MattrAnimatedStream } from "../../mattrStreamAnimation";
 import type { MarkdownIslandOptions } from "./markdownIslands";
-import { MattrStreamDot, STREAM_DOT_TAG } from "./MattrStreamDot";
 
 /** Each word of streamed prose; CSS animates it once, when React first mounts it. */
 export const STREAM_WORD_CLASS = "mattr-sw";
@@ -89,22 +87,7 @@ function wordElement(value: string): Element {
   return node;
 }
 
-// RareUI's dot renders through its component, which glides it to each new position.
-const dotNodes = new WeakSet<Element>();
-
-type CaretKind = "caret" | "dot";
-
-function caretElement(kind: CaretKind): Element {
-  if (kind === "dot") {
-    const node: Element = {
-      type: "element",
-      tagName: STREAM_DOT_TAG,
-      properties: {},
-      children: [],
-    };
-    dotNodes.add(node);
-    return node;
-  }
+function caretElement(): Element {
   return {
     type: "element",
     tagName: "span",
@@ -171,12 +154,12 @@ function lastContentIndex(children: ReadonlyArray<ElementContent>): number {
 }
 
 /** The tree with a caret after its last word, or null when the text ends in a block like code. */
-function withCaret<T extends Root | Element>(node: T, kind: CaretKind): T | null {
+function withCaret<T extends Root | Element>(node: T): T | null {
   const index = lastContentIndex(node.children as ElementContent[]);
   const last = node.children[index];
   if (last?.type === "element" && !wordNodes.has(last) && last.tagName !== "code") {
     if (!rebuiltNodes.has(last) || !CARET_CONTAINERS.has(last.tagName)) return null;
-    const inner = withCaret(last, kind);
+    const inner = withCaret(last);
     if (!inner) return null;
     const children = node.children.slice() as ElementContent[];
     children[index] = inner;
@@ -184,7 +167,7 @@ function withCaret<T extends Root | Element>(node: T, kind: CaretKind): T | null
   }
   if (node.type !== "element" || !CARET_HOSTS.has(node.tagName) || last === undefined) return null;
   const children = node.children.slice(0, index + 1) as ElementContent[];
-  children.push(caretElement(kind));
+  children.push(caretElement());
   return rebuilt(node, children);
 }
 
@@ -195,12 +178,7 @@ function streamIslandOptions(base: MarkdownIslandOptions): MarkdownIslandOptions
   if (!options) {
     options = {
       ...base,
-      // The dot's tag is not an HTML element, so the intrinsic-keyed Components type can't name it.
-      components: { ...base.components, [STREAM_DOT_TAG]: MattrStreamDot } as Partial<Components>,
-      isIsland: (node) =>
-        wordNodes.has(node) ||
-        dotNodes.has(node) ||
-        (!rebuiltNodes.has(node) && base.isIsland(node)),
+      isIsland: (node) => wordNodes.has(node) || (!rebuiltNodes.has(node) && base.isIsland(node)),
     };
     optionsByBase.set(base, options);
   }
@@ -208,14 +186,10 @@ function streamIslandOptions(base: MarkdownIslandOptions): MarkdownIslandOptions
 }
 
 // One rebuilt tree per parsed tree, so a block that hasn't changed renders from React's cache.
-const treesBySource = new WeakMap<Root, { caret: CaretKind | null; tree: Root }>();
+const treesBySource = new WeakMap<Root, { caret: boolean; tree: Root }>();
 
-/** What rides the end of the live text in each mode, if anything. */
-const CARET_BY_ANIMATION: Partial<Record<MattrAnimatedStream, CaretKind>> = {
-  blur: "caret",
-  typewriter: "caret",
-  rareui: "dot",
-};
+/** Modes with a caret riding the end of the live text. */
+const CARET_ANIMATIONS: ReadonlySet<MattrAnimatedStream> = new Set(["blur", "typewriter"]);
 
 /**
  * The tree and island options for one block of a streaming message. Without an animation it
@@ -228,12 +202,12 @@ export function mattrStreamHast(
   liveBlock: boolean,
 ): [Root, MarkdownIslandOptions] {
   if (animation === null) return [tree, options];
-  const caret = (liveBlock && CARET_BY_ANIMATION[animation]) || null;
+  const caret = liveBlock && CARET_ANIMATIONS.has(animation);
   const cached = treesBySource.get(tree);
   if (cached?.caret === caret) return [cached.tree, streamIslandOptions(options)];
   const split = splitChildren(tree.children as ElementContent[], options.isIsland);
   let next: Root = split ? rebuilt(tree, split) : tree;
-  if (caret) next = withCaret(next, caret) ?? next;
+  if (caret) next = withCaret(next) ?? next;
   treesBySource.set(tree, { caret, tree: next });
   return [next, streamIslandOptions(options)];
 }

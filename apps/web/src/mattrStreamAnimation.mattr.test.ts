@@ -10,7 +10,6 @@ import {
 import type { MarkdownIslandOptions } from "./components/chat/markdownIslands";
 import * as Schema from "effect/Schema";
 
-import { STREAM_DOT_TAG } from "./components/chat/MattrStreamDot";
 import {
   type BurstPace,
   MattrStreamAnimation,
@@ -292,21 +291,16 @@ describe("mattrStreamHast", () => {
     expect(hasCaret(mattrStreamHast(tree(), baseOptions, "blur", false)[0])).toBe(false);
   });
 
-  it("rides RareUI's dot as a component island after the last word of the live block", () => {
-    const tree = root(element("p", [text("Gliding dot")]));
+  it("ends RareUI's live block on its last word, with no dot or caret", () => {
+    const tree = root(element("p", [text("No dot")]));
     const [rendered, options] = mattrStreamHast(tree, baseOptions, "rareui", true);
     const paragraph = rendered.children[0] as Element;
-    const dot = paragraph.children.at(-1) as Element;
-    expect(dot.tagName).toBe(STREAM_DOT_TAG);
-    expect(options.isIsland(dot)).toBe(true);
-    expect(Object.hasOwn(options.components, STREAM_DOT_TAG)).toBe(true);
+    const last = paragraph.children.at(-1) as Element;
+    expect(classesOf(last)).toContain(STREAM_WORD_CLASS);
+    expect(last.children).toEqual([text("dot")]);
     expect(hasCaret(rendered)).toBe(false);
+    expect(options.components).toBe(baseOptions.components);
     // Same options object per base, so rendered blocks stay cached.
     expect(mattrStreamHast(tree, baseOptions, "rareui", true)[1]).toBe(options);
-    const [settled] = mattrStreamHast(tree, baseOptions, "rareui", false);
-    expect((settled.children[0] as Element).children.at(-1)).not.toHaveProperty(
-      "tagName",
-      STREAM_DOT_TAG,
-    );
   });
 });

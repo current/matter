@@ -4,7 +4,6 @@ import { render } from "../../test/render";
 import "../index.css";
 import "../../../../antimatter/stream-animation.css";
 
-import { STREAM_DOT_CLASS } from "./chat/MattrStreamDot";
 import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "./chat/mattrStreamHast";
 import { setLocalStorageItem } from "../hooks/useLocalStorage";
 import { MATTR_STREAM_ANIMATION_STORAGE_KEY, MattrStreamAnimation } from "../mattrStreamAnimation";
@@ -190,38 +189,28 @@ describe("ChatMarkdown streaming text animation", () => {
 
   describe("RareUI", () => {
     const dots = (container: HTMLElement) =>
-      container.querySelectorAll<HTMLElement>(`.${STREAM_DOT_CLASS}`);
+      container.querySelectorAll<HTMLElement>(".mattr-stream-dot");
 
-    it("lands words in bursts behind one gliding dot, keeping settled words mounted", async () => {
+    it("lands words in bursts with no dot or caret, keeping settled words mounted", async () => {
       using _mode = streamMode("rareui");
       await using screen = await render(message("The quick brown ", true));
       const { container, rerender } = screen;
       expect(markdownRoot(container).dataset.mattrStream).toBe("rareui");
       const settled = words(container);
       expect(settled.map((node) => node.textContent)).toEqual(["The", "quick", "brown"]);
-      expect(dots(container)).toHaveLength(1);
+      expect(dots(container)).toHaveLength(0);
       expect(caret(container)).toBeNull();
       const names = getComputedStyle(settled[0]!).animationName;
       expect(names).toBe("mattr-stream-sharpen, mattr-stream-fade");
 
       await rerender(message("The quick brown fox jumps over the lazy dog and keeps going ", true));
-      // Words arrive paced, not all at once, and the dot glides after them along the line.
+      // Words arrive paced, not all at once.
       expect(words(container).length).toBeLessThan(12);
-      const gliding = () =>
-        Array.from(dots(container)).some((dot) =>
-          dot
-            .getAnimations()
-            .some(
-              (animation) =>
-                (animation.effect as KeyframeEffect).getKeyframes()[0]?.translate !== undefined,
-            ),
-        );
-      await expect.poll(gliding).toBe(true);
       await expect.poll(() => words(container).length, { timeout: 5000 }).toBe(12);
       const next = words(container);
       settled.forEach((node, index) => expect(next[index]).toBe(node));
-      expect(dots(container)).toHaveLength(1);
-      expect(dots(container)[0]!.previousElementSibling?.textContent).toBe("going");
+      expect(dots(container)).toHaveLength(0);
+      expect(caret(container)).toBeNull();
 
       await rerender(message("The quick brown fox jumps over the lazy dog and keeps going", false));
       expect(words(container)).toHaveLength(0);
@@ -259,8 +248,9 @@ describe("ChatMarkdown streaming text animation", () => {
         ),
       ).toBe(true);
       expect(container.querySelector("pre")?.textContent).toContain("const a = 1;");
-      expect(dots(container)).toHaveLength(1);
-      expect(dots(container)[0]!.closest("p")?.textContent).toContain("After the block");
+      expect(container.textContent).toContain("After the block");
+      expect(dots(container)).toHaveLength(0);
+      expect(caret(container)).toBeNull();
     });
 
     it("renders a finished message with no word spans and no dot", async () => {
