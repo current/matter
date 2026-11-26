@@ -2,6 +2,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   AntigravitySettings,
+  defaultInstanceIdForDriver,
   type ModelSelection,
   ProviderDriverKind,
   ProviderSetupError,
@@ -40,6 +41,7 @@ import { makeAntigravityAuth, type AntigravityAuth } from "../AntigravityAuth.ts
 import * as AntigravityInstallation from "../AntigravityInstallation.ts";
 import { brokenRuntimeError } from "../providerCompatibility.ts";
 import * as AntigravityUsage from "./AntigravityUsage.ts";
+import * as MattrAntigravityQuota from "./MattrAntigravityQuota.ts";
 import {
   antigravityAuthConfigIssue,
   antigravityAuthLabel,
@@ -244,6 +246,7 @@ export const AntigravityDriver: ProviderDriver<
       {
         readonly executable: AntigravityInstallation.AntigravityExecutable;
         readonly spawn: AcpSessionRuntime.AcpSpawnInput;
+        readonly runtimeTempDirectory: string;
       },
       AcpErrors.AcpError | ProviderSetupError,
       Scope.Scope
@@ -313,6 +316,7 @@ export const AntigravityDriver: ProviderDriver<
       );
       return {
         executable,
+        runtimeTempDirectory,
         spawn: buildAntigravityAcpSpawnInput({
           installation: executable,
           profile,
@@ -376,6 +380,8 @@ export const AntigravityDriver: ProviderDriver<
               runtime.setMode(antigravitySessionMode(modeId, modeState)),
             ),
           ),
+        prompt: (payload, options) =>
+          runtime.prompt(payload, options).pipe(Effect.ensuring(quota.afterTurn)),
         start: () =>
           startCompatible().pipe(
             Effect.tapError((cause): Effect.Effect<void> =>
@@ -590,9 +596,31 @@ export const AntigravityDriver: ProviderDriver<
       };
     });
 
+    const quota = yield* MattrAntigravityQuota.makeMattrAntigravityQuota({
+      reports:
+        enabled &&
+        auth.authMethod === "oauth-personal" &&
+        instanceId === defaultInstanceIdForDriver(DRIVER),
+      unsupported: enabled && auth.authMethod !== "oauth-personal",
+      readUsage: Effect.gen(function* () {
+        const { spawn, runtimeTempDirectory } = yield* prepareSpawn(
+          directories.runtimeTemp,
+          processEnvironment,
+        );
+        return yield* MattrAntigravityQuota.runAntigravityUsageCommand({
+          command: spawn.command,
+          env: spawn.env,
+          cwd: runtimeTempDirectory,
+          logFile: path.join(runtimeTempDirectory, "usage.log"),
+        });
+      }).pipe(
+        Effect.scoped,
+        Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+      ),
+    });
     const provider = yield* makeAntigravityProvider(settings, {
       environment: processEnvironment,
-      stampIdentity: classifyModels,
+      stampIdentity: (draft) => classifyModels(draft).pipe(Effect.flatMap(quota.attach)),
       probe,
       auth: { type: auth.authMethod, label: antigravityAuthLabel(auth.authMethod) },
       ...(rememberedRuntimeModes ? { rememberedRuntimeModes } : {}),
@@ -621,6 +649,12 @@ export const AntigravityDriver: ProviderDriver<
           }),
       ),
     );
+    const snapshot = yield* quota.start(provider.snapshot, {
+      canPoll: Effect.all([
+        host.shouldRunBackgroundWork({ type: "provider-status" }),
+        host.shouldRunBackgroundWork({ type: "provider-status", instanceId }),
+      ]).pipe(Effect.map(([generic, instance]) => generic || instance)),
+    });
     const defaultModel = currentCatalog.pipe(Effect.map((catalog) => catalog?.defaultChatModel));
     const unsetOptionDefaults = Effect.fn("AntigravityDriver.unsetOptionDefaults")(function* (
       modelSelection: ModelSelection,
@@ -750,7 +784,7 @@ export const AntigravityDriver: ProviderDriver<
       displayName,
       accentColor,
       enabled,
-      snapshot: provider.snapshot,
+      snapshot,
       snapshotForCwd: (cwd) =>
         !enabled
           ? provider.snapshot.getSnapshot
