@@ -148,10 +148,14 @@ const make = Effect.gen(function* () {
       .pipe(Effect.option);
     if (Option.isNone(snapshot)) return;
     const readiness = predictionReadiness(snapshot.value.projection, runId);
-    if (!readiness.ready) return;
+    if (!readiness.ready) {
+      return yield* Effect.annotateCurrentSpan("mattr.prediction.outcome", readiness.reason);
+    }
     const routes = yield* runner.routes({ threadInstanceId });
     const primary = routes[0];
-    if (primary === undefined) return;
+    if (primary === undefined) {
+      return yield* Effect.annotateCurrentSpan("mattr.prediction.outcome", "no-route");
+    }
     const key = predictionCacheKey(threadId, runId, primary.model);
     const text = cache.has(key)
       ? (cache.get(key) ?? null)
@@ -160,6 +164,11 @@ const make = Effect.gen(function* () {
           Effect.map(Option.getOrNull),
           Effect.tap((result) => Effect.sync(() => cache.set(key, result))),
         );
+    // Records why nothing showed: the predictor often answers null on purpose.
+    yield* Effect.annotateCurrentSpan(
+      "mattr.prediction.outcome",
+      text === null ? "empty" : "offered",
+    );
     if (text !== null) yield* publish(threadId, { runId, text });
   });
 
