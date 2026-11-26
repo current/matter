@@ -26,6 +26,14 @@ it.layer(NodeServices.layer)("MatterProjectFile", (it) => {
       }),
     );
 
+    it.effect("reads the legacy mattr.json before t3.json when there is no matter.json", () =>
+      Effect.gen(function* () {
+        const files = { "mattr.json": "legacy", "t3.json": "old" }; // legacy names
+        const { fileSystem, at } = yield* projectDir(files);
+        expect(yield* readProjectFileString(fileSystem, at)).toBe("legacy");
+      }),
+    );
+
     it.effect("reads t3.json when the project has no matter.json", () =>
       Effect.gen(function* () {
         const { fileSystem, at } = yield* projectDir({ "t3.json": "old" });
@@ -74,6 +82,16 @@ it.layer(NodeServices.layer)("MatterProjectFile", (it) => {
           allowMissing: true,
         });
         expect(result).toMatchObject({ relativePath: "matter.json", contents: "new" });
+      }),
+    );
+
+    it.effect("answers matter.json and t3.json reads from the legacy mattr.json", () =>
+      Effect.gen(function* () {
+        const legacy = readFrom({ "mattr.json": "legacy" });
+        for (const relativePath of ["matter.json", "t3.json"]) {
+          const result = yield* legacy({ cwd: "/repo", relativePath, allowMissing: true });
+          expect(result).toMatchObject({ relativePath: "mattr.json", contents: "legacy" });
+        }
       }),
     );
 
