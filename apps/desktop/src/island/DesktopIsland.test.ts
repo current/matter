@@ -7,7 +7,12 @@ import {
   computeIslandPlacement,
 } from "../../../../antimatter/island/islandPlacement.ts";
 import { shouldKeepIslandWindowAlive } from "../../../../antimatter/island/islandVisibility.ts";
-import { parseModifierMonitorLine } from "../../../../antimatter/island/MacControlTapMonitor.ts";
+import {
+  MODIFIER_POLLER_SCRIPT,
+  MODIFIER_TAP_MAX_SECONDS,
+  parseModifierMonitorLine,
+  type MacModifierEvent,
+} from "../../../../antimatter/island/MacControlTapMonitor.ts";
 import { buildIslandWindowOptions, resolveModifierEvent } from "./DesktopIsland.ts";
 import {
   DEFAULT_ISLAND_SETTINGS,
@@ -320,5 +325,123 @@ describe("modifier tap and hold events", () => {
     expect(resolveModifierEvent("hold-start", false, false)).toBeNull();
     expect(resolveModifierEvent("hold-end", false, true)).toBeNull();
     expect(resolveModifierEvent("hold-cancel", false, true)).toBeNull();
+  });
+
+  it("handles instant hold-start -> quick hold-cancel -> tap without leaving hold active", () => {
+    const started = resolveModifierEvent("hold-start", false, true);
+    expect(started).toEqual({ kind: "hold", phase: "start", holdActive: true });
+    const cancelled = resolveModifierEvent(
+      "hold-cancel",
+      started?.kind === "hold" && started.holdActive,
+      true,
+    );
+    expect(cancelled).toEqual({ kind: "hold", phase: "cancel", holdActive: false });
+    expect(resolveModifierEvent("tap", false, true)).toEqual({ kind: "tap" });
+    // Unfocused quick tap ignores hold-start & hold-cancel, still opens Island on tap.
+    expect(resolveModifierEvent("hold-start", false, false)).toBeNull();
+    expect(resolveModifierEvent("hold-cancel", false, false)).toBeNull();
+    expect(resolveModifierEvent("tap", false, false)).toEqual({ kind: "tap" });
+  });
+
+  it("emits hold-start at 0ms, cancels quick taps (<=220ms) into tap, ends real holds (>220ms), and cancels chords", () => {
+    const CTRL = 0x40000;
+    const SHIFT = 0x20000;
+    const ALL = 0x20000 | 0x40000 | 0x80000 | 0x100000;
+
+    type Frame = {
+      readonly nowMs: number;
+      readonly flags: number;
+      readonly sinceKey?: number;
+      readonly sinceClick?: number;
+    };
+
+    const runPoller = (frames: ReadonlyArray<Frame>): MacModifierEvent[] => {
+      let index = 0;
+      const logs: string[] = [];
+      const fake$ = {
+        NSApplication: {
+          sharedApplication: { setActivationPolicy: () => {} },
+        },
+        NSApplicationActivationPolicyProhibited: 2,
+        getppid: () => (index < frames.length ? 42 : 1),
+        CGEventSourceFlagsState: () => frames[index]!.flags,
+        CGEventSourceSecondsSinceLastEventType: (_stateId: number, eventType: number) => {
+          const frame = frames[index]!;
+          return eventType === 10 ? (frame.sinceKey ?? 10) : (frame.sinceClick ?? 10);
+        },
+      };
+      const fakeDate = { now: () => frames[index]!.nowMs };
+      const fakeConsole = { log: (msg: string) => logs.push(msg) };
+      const runFn = new Function(
+        "ObjC",
+        "$",
+        "Date",
+        "console",
+        "delay",
+        `${MODIFIER_POLLER_SCRIPT}\nreturn run;`,
+      )({ import: () => {} }, fake$, fakeDate, fakeConsole, () => {
+        index += 1;
+      }) as (argv: string[]) => string;
+      runFn([String(CTRL), String(ALL)]);
+      expect(logs[0]).toBe("ready");
+      return logs
+        .slice(1)
+        .map(parseModifierMonitorLine)
+        .filter((event): event is MacModifierEvent => event !== null);
+    };
+
+    expect(MODIFIER_TAP_MAX_SECONDS).toBe(0.22);
+
+    // 1. Clean keydown emits hold-start immediately (0ms), and a quick tap (100ms <= 220ms) emits hold-cancel then tap.
+    expect(
+      runPoller([
+        { nowMs: 1000, flags: CTRL },
+        { nowMs: 1040, flags: CTRL },
+        { nowMs: 1100, flags: 0 },
+      ]),
+    ).toEqual(["hold-start", "hold-cancel", "tap"]);
+
+    // 2. Real dictation hold (300ms > 220ms) emits hold-start at t=0ms then hold-end on release.
+    expect(
+      runPoller([
+        { nowMs: 1000, flags: CTRL },
+        { nowMs: 1150, flags: CTRL },
+        { nowMs: 1300, flags: 0 },
+      ]),
+    ).toEqual(["hold-start", "hold-end"]);
+
+    // 3. Ctrl+C (key pressed while held) cancels immediately and never taps or ends.
+    expect(
+      runPoller([
+        { nowMs: 1000, flags: CTRL },
+        { nowMs: 1060, flags: CTRL, sinceKey: 0.01 },
+        { nowMs: 1120, flags: 0, sinceKey: 0.07 },
+      ]),
+    ).toEqual(["hold-start", "hold-cancel"]);
+
+    // 4. Ctrl+Click (mouse click while held) cancels immediately.
+    expect(
+      runPoller([
+        { nowMs: 1000, flags: CTRL },
+        { nowMs: 1080, flags: CTRL, sinceClick: 0.02 },
+        { nowMs: 1140, flags: 0, sinceClick: 0.08 },
+      ]),
+    ).toEqual(["hold-start", "hold-cancel"]);
+
+    // 5. Shift+Ctrl (another modifier already down on keydown) never starts a hold or tap.
+    expect(
+      runPoller([
+        { nowMs: 1000, flags: CTRL | SHIFT },
+        { nowMs: 1100, flags: SHIFT },
+      ]),
+    ).toEqual([]);
+
+    // 6. Sub-15ms bounce cancels hold without firing a tap.
+    expect(
+      runPoller([
+        { nowMs: 1000, flags: CTRL },
+        { nowMs: 1010, flags: 0 },
+      ]),
+    ).toEqual(["hold-start", "hold-cancel"]);
   });
 });

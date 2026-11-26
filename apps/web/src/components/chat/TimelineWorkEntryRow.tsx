@@ -82,6 +82,7 @@ import {
   sliceThoughtPreviewSource,
   thoughtPreviewMarkdown,
 } from "./TimelineWorkEntryRow.logic";
+import { rebrandTimelineServerText } from "./mattrRebrandTimelineText";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
   const rawThreadId = threadReadTargetId(entry);
@@ -357,7 +358,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? resetTime
         ? gt("Usage limit reached. Retry after {resetTime}.", { resetTime })
         : gt("Usage limit reached.")
-      : workEntry.label;
+      : rebrandTimelineServerText(workEntry.label);
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&
@@ -391,7 +392,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       >
         {!warning ? (
           <p className="ms-7 whitespace-pre-wrap break-words py-1 text-sm leading-relaxed text-foreground/80">
-            {failureItem.failure.message}
+            {rebrandTimelineServerText(failureItem.failure.message)}
           </p>
         ) : null}
         {verificationUrl !== undefined ? (
@@ -440,12 +441,18 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
-  const previewText =
+  const rawPreviewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
         ? gt("Thinking")
         : gt("Thought")
       : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot, m));
+  const previewText =
+    workEntry.itemType === "notification" ||
+    workEntry.itemType === "system_notice" ||
+    workEntry.itemType === "error"
+      ? rebrandTimelineServerText(rawPreviewText)
+      : rawPreviewText;
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)

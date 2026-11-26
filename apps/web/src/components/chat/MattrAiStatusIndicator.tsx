@@ -1,6 +1,6 @@
 /* oxlint-disable shadcn/no-unknown-classes -- the `mattr-ais*` classes come from the fork stylesheet antimatter/rareui-chat.css, which loads outside Tailwind. */
 import { use, useEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
-import { useMessages } from "gt-react";
+import { useGT, useMessages } from "gt-react";
 
 import { observeResize } from "~/lib/observeResize";
 import { tickTextContent } from "~/lib/tickTextContent";
@@ -9,7 +9,9 @@ import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import {
   MATTR_AI_STATUS_PHASES,
   MattrAiStatusPhaseCtx,
+  MattrThinkingCoordinationCtx,
   deriveMattrAiStatusPhase,
+  deriveMattrThinkingCoordination,
   type MattrAiStatusIcon,
   useMattrAiStatusStyle,
 } from "../../mattrAiStatus";
@@ -20,7 +22,7 @@ import {
   type TimelineRowActivityState,
 } from "./timelineRowContext";
 import { ActivityShimmerOverlay } from "./TimelineRowParts";
-import { WorkingTimelineRow } from "./TimelineWorkGroupRows";
+import { ThinkingTimelineRow, WorkingTimelineRow } from "./TimelineWorkGroupRows";
 import { formatWorkingTimerNow } from "./TimelineWorkGroupRows.logic";
 
 const AIS = {
@@ -52,9 +54,22 @@ export function MattrTimelineActivityProvider({
           preparingWorktree: value.isPreparingWorktree,
         })
       : "thinking";
+  const thinkingCoordination = deriveMattrThinkingCoordination(rows, {
+    awaitingUser: value.awaitingUser,
+    isPreparingWorktree: value.isPreparingWorktree,
+    isCompacting: value.isCompacting,
+    backgroundWorktreeSetup: value.backgroundWorktreeSetup !== null,
+    providerStarting: value.providerStarting !== null,
+    providerStartingLabel: value.providerStartingLabel !== null,
+    liveAnswerPreview: value.liveAnswerPreview !== null,
+  });
   return (
     <TimelineRowActivityCtx value={value}>
-      <MattrAiStatusPhaseCtx value={phase}>{children}</MattrAiStatusPhaseCtx>
+      <MattrAiStatusPhaseCtx value={phase}>
+        <MattrThinkingCoordinationCtx value={thinkingCoordination}>
+          {children}
+        </MattrThinkingCoordinationCtx>
+      </MattrAiStatusPhaseCtx>
     </TimelineRowActivityCtx>
   );
 }
@@ -67,11 +82,69 @@ export function MattrWorkingTimelineRow({
 }) {
   const [style] = useMattrAiStatusStyle();
   const { backgroundWorktreeSetup } = use(TimelineRowActivityCtx);
-  // Upstream's row also carries the background setup chip; keep it whole while that runs.
-  if (style === "default" || backgroundWorktreeSetup !== null) {
+  const { thinkingRowOwnsStatus } = use(MattrThinkingCoordinationCtx);
+  // Upstream's row keeps the background setup chip, and stays a calm elapsed timer when a lower
+  // thinking row (e.g. below a reply or steer) already owns the live RareUI status.
+  if (style === "default" || backgroundWorktreeSetup !== null || thinkingRowOwnsStatus) {
     return <WorkingTimelineRow row={row} />;
   }
   return <RareUiWorkingRow row={row} />;
+}
+
+/** The live thinking row: upstream's brain row in Default mode, or RareUI's animated status. */
+export function MattrThinkingTimelineRow({
+  row,
+}: {
+  row: Extract<TimelineRow, { kind: "thinking" }>;
+}) {
+  const [style] = useMattrAiStatusStyle();
+  const ctx = use(TimelineRowCtx);
+  const gt = useGT();
+  const m = useMessages();
+  const {
+    isCompacting,
+    isPreparingWorktree,
+    liveAnswerPreview,
+    providerStartingLabel,
+    providerStarting,
+  } = use(TimelineRowActivityCtx);
+  const { suppressPlainThinkingRow } = use(MattrThinkingCoordinationCtx);
+
+  if (style === "default" || isPreparingWorktree || isCompacting || providerStarting !== null) {
+    return <ThinkingTimelineRow row={row} />;
+  }
+
+  const isPlainThinking =
+    row.groupId === undefined &&
+    row.label === undefined &&
+    providerStartingLabel === null &&
+    liveAnswerPreview === null;
+  if (suppressPlainThinkingRow && isPlainThinking) {
+    return null;
+  }
+
+  // A failed group keeps this disclosure while an approval waits, but nothing is thinking then.
+  const live = ctx.pendingApprovals.size === 0;
+  const label =
+    (providerStartingLabel === null ? null : m(providerStartingLabel)) ??
+    row.label ??
+    liveAnswerPreview ??
+    gt("Thinking");
+  const icon: MattrAiStatusIcon = row.label !== undefined ? "analyzing" : "thinking";
+  const status = <MattrAiStatus icon={icon} label={label} active={live} />;
+
+  const { groupId } = row;
+  if (groupId === undefined) return status;
+  return (
+    <button
+      type="button"
+      className="group/live-work flex min-h-6 w-full max-w-full cursor-pointer items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+      aria-expanded={row.expanded === true}
+      onClick={() => ctx.onToggleWorkGroup(groupId, row.id)}
+    >
+      {status}
+    </button>
+  );
 }
 
 function RareUiWorkingRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
@@ -174,7 +247,7 @@ export function MattrAiStatus({
       data-active={active || undefined}
       className={cn(
         AIS.root,
-        "flex h-6 w-fit min-w-0 items-center gap-1.5 px-1 text-sm leading-relaxed",
+        "flex h-6 w-fit max-w-full min-w-0 items-center gap-1.5 px-1 text-sm leading-relaxed",
         className,
       )}
     >

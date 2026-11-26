@@ -9,12 +9,19 @@ import {
   MattrAiStatusPhaseCtx,
   MattrAiStatusStyle,
   type MattrAiStatusPhase,
+  deriveMattrThinkingCoordination,
   readMattrAiStatusStyle,
 } from "../../mattrAiStatus";
-import { MattrAiStatus, MattrWorkingTimelineRow } from "./MattrAiStatusIndicator";
+import {
+  MattrAiStatus,
+  MattrThinkingTimelineRow,
+  MattrTimelineActivityProvider,
+  MattrWorkingTimelineRow,
+} from "./MattrAiStatusIndicator";
 import {
   TimelineRowActivityCtx,
   TimelineRowCtx,
+  type TimelineRow,
   type TimelineRowActivityState,
   type TimelineRowSharedState,
 } from "./timelineRowContext";
@@ -37,7 +44,11 @@ const activity = {
   liveAnswerPreview: null,
 } satisfies TimelineRowActivityState;
 
-const shared = { activeThreadEnvironmentId: "env-test" } as unknown as TimelineRowSharedState;
+const shared = {
+  activeThreadEnvironmentId: "env-test",
+  pendingApprovals: new Map(),
+  onToggleWorkGroup: vi.fn(),
+} as unknown as TimelineRowSharedState;
 
 function WorkingRow({ phase }: { phase: MattrAiStatusPhase }) {
   return (
@@ -166,5 +177,156 @@ describe("MattrAiStatus", () => {
     const statusRule = reducedRules.find((rule) => rule.startsWith(".mattr-ais, .mattr-ais *"));
     expect(statusRule).toMatch(/animation: [^;]*none !important/);
     expect(statusRule).toContain("transition: none !important");
+  });
+});
+
+describe("MattrThinkingTimelineRow and working/thinking coordination", () => {
+  const workingRow: Extract<TimelineRow, { kind: "working" }> = {
+    kind: "working",
+    id: "working-indicator-row",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const plainThinkingRow: Extract<TimelineRow, { kind: "thinking" }> = {
+    kind: "thinking",
+    id: "live-activity-row",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const steerMessageRow = {
+    kind: "message",
+    id: "steer-msg-1",
+    createdAt: "2026-01-01T00:01:00.000Z",
+    message: {
+      id: "steer-msg-1",
+      role: "user",
+      text: "follow up steer",
+      streaming: false,
+      createdAt: "2026-01-01T00:01:00.000Z",
+      updatedAt: "2026-01-01T00:01:00.000Z",
+    },
+  } as unknown as TimelineRow;
+
+  it("suppresses the redundant plain thinking row right beneath the working row at turn start", async () => {
+    using _style = aiStatusStyle("rareui");
+    const rows: ReadonlyArray<TimelineRow> = [workingRow, plainThinkingRow];
+    expect(
+      deriveMattrThinkingCoordination(rows, {
+        awaitingUser: false,
+        isPreparingWorktree: false,
+        isCompacting: false,
+        backgroundWorktreeSetup: false,
+        providerStarting: false,
+        providerStartingLabel: false,
+        liveAnswerPreview: false,
+      }),
+    ).toEqual({ suppressPlainThinkingRow: true, thinkingRowOwnsStatus: false });
+
+    await using screen = await render(
+      <TimelineRowCtx value={shared}>
+        <MattrTimelineActivityProvider value={activity} rows={rows}>
+          <MattrWorkingTimelineRow row={workingRow} />
+          <MattrThinkingTimelineRow row={plainThinkingRow} />
+        </MattrTimelineActivityProvider>
+      </TimelineRowCtx>,
+      { router: false },
+    );
+
+    const statuses = screen.container.querySelectorAll(".mattr-ais");
+    expect(statuses.length).toBe(1);
+    expect((statuses[0] as HTMLElement).dataset.mattrAiStatus).toBe("thinking");
+    expect(screen.container.querySelectorAll('[data-slot="mattr-ai-status-label"]').length).toBe(1);
+  });
+
+  it("renders a single RareUI Thinking row below a steered message while keeping the top row calm", async () => {
+    using _style = aiStatusStyle("rareui");
+    const rows: ReadonlyArray<TimelineRow> = [workingRow, steerMessageRow, plainThinkingRow];
+    expect(
+      deriveMattrThinkingCoordination(rows, {
+        awaitingUser: false,
+        isPreparingWorktree: false,
+        isCompacting: false,
+        backgroundWorktreeSetup: false,
+        providerStarting: false,
+        providerStartingLabel: false,
+        liveAnswerPreview: false,
+      }),
+    ).toEqual({ suppressPlainThinkingRow: false, thinkingRowOwnsStatus: true });
+
+    await using screen = await render(
+      <TimelineRowCtx value={shared}>
+        <MattrTimelineActivityProvider value={activity} rows={rows}>
+          <div data-testid="top-working">
+            <MattrWorkingTimelineRow row={workingRow} />
+          </div>
+          <div data-testid="bottom-thinking">
+            <MattrThinkingTimelineRow row={plainThinkingRow} />
+          </div>
+        </MattrTimelineActivityProvider>
+      </TimelineRowCtx>,
+      { router: false },
+    );
+
+    const top = screen.container.querySelector('[data-testid="top-working"]')!;
+    const bottom = screen.container.querySelector('[data-testid="bottom-thinking"]')!;
+    await expect.poll(() => top.textContent).toMatch(/Working for \d/);
+    expect(top.querySelector(".mattr-ais")).toBeNull();
+    const bottomStatus = bottom.querySelector<HTMLElement>(".mattr-ais");
+    expect(bottomStatus).not.toBeNull();
+    expect(bottomStatus?.dataset.mattrAiStatus).toBe("thinking");
+    expect(
+      bottom.querySelector('[data-slot="mattr-ai-status-label"]')?.firstChild?.textContent,
+    ).toBe("Thinking");
+  });
+
+  it("uses RareUI analyzing status for subagent-wait thinking rows and keeps failed-group disclosure clickable", async () => {
+    using _style = aiStatusStyle("rareui");
+    const onToggleWorkGroup = vi.fn();
+    const toggleRow: Extract<TimelineRow, { kind: "thinking" }> = {
+      kind: "thinking",
+      id: "live-activity-row",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      label: "Waiting on 2 subagents",
+      groupId: "group-failed",
+      expanded: false,
+    };
+    const rows: ReadonlyArray<TimelineRow> = [workingRow, toggleRow];
+
+    await using screen = await render(
+      <TimelineRowCtx value={{ ...shared, onToggleWorkGroup }}>
+        <MattrTimelineActivityProvider value={activity} rows={rows}>
+          <MattrThinkingTimelineRow row={toggleRow} />
+        </MattrTimelineActivityProvider>
+      </TimelineRowCtx>,
+      { router: false },
+    );
+
+    const status = screen.container.querySelector<HTMLElement>(".mattr-ais");
+    expect(status?.dataset.mattrAiStatus).toBe("analyzing");
+    expect(
+      screen.container.querySelector('[data-slot="mattr-ai-status-label"]')?.firstChild
+        ?.textContent,
+    ).toBe("Waiting on 2 subagents");
+    const button = screen.container.querySelector("button");
+    expect(button).not.toBeNull();
+    button?.click();
+    expect(onToggleWorkGroup).toHaveBeenCalledWith("group-failed", "live-activity-row");
+  });
+
+  it("leaves Default mode completely unchanged with upstream Working and Thinking rows", async () => {
+    using _style = aiStatusStyle("default");
+    const rows: ReadonlyArray<TimelineRow> = [workingRow, steerMessageRow, plainThinkingRow];
+
+    await using screen = await render(
+      <TimelineRowCtx value={shared}>
+        <MattrTimelineActivityProvider value={activity} rows={rows}>
+          <MattrWorkingTimelineRow row={workingRow} />
+          <MattrThinkingTimelineRow row={plainThinkingRow} />
+        </MattrTimelineActivityProvider>
+      </TimelineRowCtx>,
+      { router: false },
+    );
+
+    expect(screen.container.querySelector(".mattr-ais")).toBeNull();
+    await expect.poll(() => screen.container.textContent).toMatch(/Working for \d/);
+    expect(screen.container.textContent).toContain("Thinking");
   });
 });

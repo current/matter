@@ -118,7 +118,6 @@ import {
 import { TimelineRowTimestamp, ActivityShimmerOverlay } from "./TimelineRowParts";
 import {
   WorkGroupSection,
-  ThinkingTimelineRow,
   LiveWorkEntryTimelineRow,
   WorkGroupToggleTimelineRow,
 } from "./TimelineWorkGroupRows";
@@ -144,7 +143,11 @@ import { useThreadFindPositionReader } from "./useThreadFindPositionReader";
 import { ThreadActivityAnnouncer } from "./ThreadActivityAnnouncer";
 import { useStableHandoffRuns, useIncrementalTimelineRows, useStableRows } from "./useTimelineRows";
 import { useClientSettings } from "../../hooks/useSettings";
-import { MattrTimelineActivityProvider, MattrWorkingTimelineRow } from "./MattrAiStatusIndicator";
+import {
+  MattrThinkingTimelineRow,
+  MattrTimelineActivityProvider,
+  MattrWorkingTimelineRow,
+} from "./MattrAiStatusIndicator";
 
 function timelineListStateFor(identity: string): {
   readonly identity: string;
@@ -1728,7 +1731,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
           ) : null}
           {row.kind === "work-live" ? <LiveWorkEntryTimelineRow row={row} /> : null}
           {row.kind === "work-toggle" ? <WorkGroupToggleTimelineRow row={row} /> : null}
-          {row.kind === "thinking" ? <ThinkingTimelineRow row={row} /> : null}
+          {row.kind === "thinking" ? <MattrThinkingTimelineRow row={row} /> : null}
         </WorkLogBlock>
       ) : null}
       {row.kind === "turn-fold" ? <TurnFoldTimelineRow key={row.id} row={row} /> : null}

@@ -172,3 +172,66 @@ export function deriveMattrAiStatusPhase(
 }
 
 export const MattrAiStatusPhaseCtx = createContext<MattrAiStatusPhase>("thinking");
+
+export interface MattrThinkingCoordination {
+  /** Plain thinking row sits directly under the working row, which already renders RareUI Thinking. */
+  readonly suppressPlainThinkingRow: boolean;
+  /** A visible thinking row owns the live status (e.g. below a reply/steer or with custom content). */
+  readonly thinkingRowOwnsStatus: boolean;
+}
+
+const DEFAULT_THINKING_COORDINATION: MattrThinkingCoordination = {
+  suppressPlainThinkingRow: false,
+  thinkingRowOwnsStatus: false,
+};
+
+/**
+ * Coordinates the top working row and bottom thinking row in RareUI mode so a turn never shows
+ * duplicate "Thinking" indicators (at turn start, or above and below a reply / steer).
+ */
+export function deriveMattrThinkingCoordination(
+  rows: ReadonlyArray<TimelineRow>,
+  activity: {
+    readonly awaitingUser: boolean;
+    readonly isPreparingWorktree: boolean;
+    readonly isCompacting: boolean;
+    readonly backgroundWorktreeSetup: boolean;
+    readonly providerStarting: boolean;
+    readonly providerStartingLabel: boolean;
+    readonly liveAnswerPreview: boolean;
+  },
+): MattrThinkingCoordination {
+  if (activity.isPreparingWorktree || activity.isCompacting) {
+    return DEFAULT_THINKING_COORDINATION;
+  }
+  const thinkingIndex = rows.findLastIndex((row) => row.kind === "thinking");
+  if (thinkingIndex < 0) return DEFAULT_THINKING_COORDINATION;
+  const thinkingRow = rows[thinkingIndex];
+  if (thinkingRow?.kind !== "thinking") return DEFAULT_THINKING_COORDINATION;
+  // While waiting on user input/approval, the top row shows "Needs your input", not "Thinking".
+  if (activity.awaitingUser) return DEFAULT_THINKING_COORDINATION;
+
+  const isPlainThinking =
+    thinkingRow.groupId === undefined &&
+    thinkingRow.label === undefined &&
+    !activity.providerStarting &&
+    !activity.providerStartingLabel &&
+    !activity.liveAnswerPreview;
+
+  const workingIndex = rows.findIndex((row) => row.kind === "working");
+  const workingRow = workingIndex >= 0 ? rows[workingIndex] : undefined;
+  const immediatelyFollowsWorking =
+    workingRow?.kind === "working" &&
+    !workingRow.compacting &&
+    !activity.backgroundWorktreeSetup &&
+    thinkingIndex === workingIndex + 1;
+
+  if (isPlainThinking && immediatelyFollowsWorking) {
+    return { suppressPlainThinkingRow: true, thinkingRowOwnsStatus: false };
+  }
+  return { suppressPlainThinkingRow: false, thinkingRowOwnsStatus: true };
+}
+
+export const MattrThinkingCoordinationCtx = createContext<MattrThinkingCoordination>(
+  DEFAULT_THINKING_COORDINATION,
+);

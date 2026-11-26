@@ -3,6 +3,7 @@ import * as NodePath from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
 import { rebrandCopy, rebrandSource, rebrandTerminologyText } from "./rebrand";
+import { rebrandTimelineServerText } from "../apps/web/src/components/chat/mattrRebrandTimelineText";
 
 const REPO_ROOT = NodePath.resolve(import.meta.dirname, "..");
 
@@ -133,6 +134,33 @@ describe("antimatter/rebrand", () => {
       "/repo/apps/web/src/components/files/BinaryViewer.tsx",
     );
     expect(zipViewer).toBe(`gt("Archive contents"); gt("Back to archive");`);
+
+    const streamAnimations = rebrandSource(
+      `name: msg("Rise & Settle", { $context: "streaming text animation" }),\ndescription: msg("New words settle in from a soft blur, with a caret", { $context: "streaming text animation" }),`,
+      "/repo/apps/web/src/mattrStreamAnimation.ts",
+    );
+    expect(streamAnimations).toContain('msg("Rise & Settle"');
+    expect(streamAnimations).toContain('msg("New words settle in from a soft blur, with a caret"');
+  });
+
+  it("rebrands server-emitted timeline summaries, notices, and errors at display time", () => {
+    expect(rebrandTimelineServerText("T3 Code restarted and resumed this turn")).toBe(
+      "mattr restarted and resumed this turn",
+    );
+    expect(rebrandTimelineServerText("T3 Code restarted and stopped background work")).toBe(
+      "mattr restarted and stopped background work",
+    );
+    expect(
+      rebrandTimelineServerText(
+        "T3 Code stopped watching pull request #12 because the T3 Code server cannot use the host.",
+      ),
+    ).toBe("mattr stopped watching pull request #12 because the mattr server cannot use the host.");
+    expect(
+      rebrandTimelineServerText("T3 Code could not start this turn. Install T3 Code for GitHub."),
+    ).toBe("mattr could not start this turn. Install T3 Code for GitHub.");
+    expect(rebrandTimelineServerText("The agent runtime exited and stopped background work")).toBe(
+      "The agent runtime exited and stopped background work",
+    );
   });
 
   it("injects server error rebranding into translatable.ts", () => {
@@ -161,6 +189,10 @@ describe("antimatter/rebrand", () => {
 
     for (const root of roots) {
       for (const file of walkSourceFiles(root)) {
+        // Streaming text animation copy uses "Rise & Settle" / "settle in", not thread settlement.
+        if (/\/(mattrStreamAnimation\.ts|MattrStreamAnimationSetting\.tsx)$/.test(file)) {
+          continue;
+        }
         const raw = NodeFS.readFileSync(file, "utf8");
         const transformed = rebrandSource(raw, file);
 

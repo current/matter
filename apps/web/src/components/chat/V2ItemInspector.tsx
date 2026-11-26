@@ -28,6 +28,7 @@ import { getSyntaxHighlighterPromise } from "../../lib/syntaxHighlighting";
 import { useTurnItemDetail } from "../../state/queries";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { Button } from "../ui/button";
+import { rebrandTimelineServerText } from "./mattrRebrandTimelineText";
 import ChatMarkdown from "../ChatMarkdown";
 import { ChatMarkdownAssetImage } from "./ChatMarkdownMedia";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
@@ -454,9 +455,17 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
             .join("\n\n")}
         />
       ) : null}
-      {item.type === "notification" ? <StructuredValue value={item.detail} /> : null}
-      {item.type === "system_notice" ? <StructuredValue value={item.message} /> : null}
-      {item.type === "error" ? <StructuredValue value={item.failure.message} /> : null}
+      {item.type === "notification" ? (
+        <StructuredValue
+          value={item.detail === undefined ? undefined : rebrandTimelineServerText(item.detail)}
+        />
+      ) : null}
+      {item.type === "system_notice" ? (
+        <StructuredValue value={rebrandTimelineServerText(item.message)} />
+      ) : null}
+      {item.type === "error" ? (
+        <StructuredValue value={rebrandTimelineServerText(item.failure.message)} />
+      ) : null}
       {item.type === "todo_list" ? (
         <StructuredValue
           value={item.steps

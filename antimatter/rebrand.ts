@@ -49,6 +49,7 @@ const rebrandProjectFile = (text: string) =>
 
 const CLIENT_SOURCE = /\/(apps\/web\/src|packages\/[^/]+\/src)\//;
 const ZIP_OR_PROJECT_FILE = /\/(components\/files\/|zip\/|ProjectSettingsPanel\.tsx$)/;
+const STREAM_ANIMATION_FILE = /\/(mattrStreamAnimation\.ts|MattrStreamAnimationSetting\.tsx)$/;
 const PROJECT_ARCHIVE_PHRASE = /\b(?:un)?archiv(?:e|ed|ing)\s+projects?\b/i;
 
 const ARCHIVE_TO_HIDE: ReadonlyArray<readonly [RegExp, string]> = [
@@ -97,6 +98,7 @@ const ICU_SETTLED_PLACEHOLDER = "\uE000SETTLED_VAR\uE001";
 
 export interface RebrandTerminologyOptions {
   readonly skipArchiveToHide?: boolean;
+  readonly skipSettleToArchive?: boolean;
   readonly isSettingsNavTitle?: boolean;
 }
 
@@ -120,16 +122,18 @@ export function rebrandTerminologyText(
     }
   }
 
-  // Keep ICU placeholder variables such as `{settled}/{count} agent` intact.
-  const hasSettledPlaceholder = result.includes("{settled}");
-  if (hasSettledPlaceholder) {
-    result = result.replaceAll("{settled}", ICU_SETTLED_PLACEHOLDER);
-  }
-  for (const [pattern, replacement] of SETTLE_TO_ARCHIVE) {
-    result = result.replace(pattern, replacement);
-  }
-  if (hasSettledPlaceholder) {
-    result = result.replaceAll(ICU_SETTLED_PLACEHOLDER, "{settled}");
+  if (!options.skipSettleToArchive) {
+    // Keep ICU placeholder variables such as `{settled}/{count} agent` intact.
+    const hasSettledPlaceholder = result.includes("{settled}");
+    if (hasSettledPlaceholder) {
+      result = result.replaceAll("{settled}", ICU_SETTLED_PLACEHOLDER);
+    }
+    for (const [pattern, replacement] of SETTLE_TO_ARCHIVE) {
+      result = result.replace(pattern, replacement);
+    }
+    if (hasSettledPlaceholder) {
+      result = result.replaceAll(ICU_SETTLED_PLACEHOLDER, "{settled}");
+    }
   }
 
   return result;
@@ -241,6 +245,7 @@ function __mattrRebrandServerError(text: string): string {
 /** Rewrites user-facing copy in TS/TSX source without touching code identifiers, keys, or routes. */
 export function rebrandTerminologyInSource(code: string, filePath: string): string {
   const isZipOrProjectFile = ZIP_OR_PROJECT_FILE.test(filePath);
+  const isStreamAnimationFile = STREAM_ANIMATION_FILE.test(filePath);
   const isSettingsSearch = /\/settingsSearch\.ts$/.test(filePath);
 
   let next = code.replace(
@@ -254,6 +259,7 @@ export function rebrandTerminologyInSource(code: string, filePath: string): stri
       const inner = literal.slice(1, -1);
       const replaced = rebrandTerminologyText(inner, {
         skipArchiveToHide: isZipOrProjectFile || isProjectContext,
+        skipSettleToArchive: isStreamAnimationFile,
         isSettingsNavTitle,
       });
       if (replaced === inner) return full;
@@ -264,7 +270,10 @@ export function rebrandTerminologyInSource(code: string, filePath: string): stri
   if (filePath.endsWith(".tsx")) {
     next = next.replace(JSX_T_ELEMENT, (full, open: string, body: string, close: string) => {
       const replaced = rewriteJsxTextSegments(body, (segment) =>
-        rebrandTerminologyText(segment, { skipArchiveToHide: isZipOrProjectFile }),
+        rebrandTerminologyText(segment, {
+          skipArchiveToHide: isZipOrProjectFile,
+          skipSettleToArchive: isStreamAnimationFile,
+        }),
       );
       return replaced === body ? full : `${open}${replaced}${close}`;
     });

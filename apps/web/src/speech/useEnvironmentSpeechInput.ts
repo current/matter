@@ -562,11 +562,15 @@ export function useEnvironmentSpeechInput(input: HookInput) {
     freezesEditor: voiceInputBlocksSubmission(state),
     start,
     submitAfterDictation,
-    stop: useStableCallback(() => (owns && session ? session.stop() : Promise.resolve())),
+    stop: useStableCallback(() => {
+      const ownsLive = owns || session?.ownerKey === latestRef.current.input.ownerKey;
+      return ownsLive && session ? session.stop() : Promise.resolve();
+    }),
     cancel: useStableCallback(() => {
       startRequestRef.current += 1;
       setSetup(INITIAL_SETUP);
-      if (owns) session?.cancel();
+      // Session ownership updates synchronously on start(), before React commits `owns`.
+      if (owns || session?.ownerKey === latestRef.current.input.ownerKey) session?.cancel();
     }),
     skipPostProcessing: useStableCallback(() => {
       if (owns) session?.skipPostProcessing();

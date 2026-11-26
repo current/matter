@@ -360,3 +360,41 @@ it("leaves a busy editor's recording alone when a hold begins", async () => {
   expect(beginHeldDictation()).toBe(false);
   expect(speech.start).not.toHaveBeenCalled();
 });
+
+it("does not let a cancelled quick tap's late startup resolution cancel a subsequent dictation hold", async () => {
+  const speech = actions(true);
+  let resolveFirstStart!: () => void;
+  let resolveSecondStart!: () => void;
+  const firstStart = new Promise<void>((resolve) => {
+    resolveFirstStart = resolve;
+  });
+  const secondStart = new Promise<void>((resolve) => {
+    resolveSecondStart = resolve;
+  });
+  speech.start.mockReturnValueOnce(firstStart).mockReturnValueOnce(secondStart);
+  const fieldRef = createRef<HTMLTextAreaElement>();
+  await using screen = await render(
+    <>
+      <Probe speech={speech} targetRef={fieldRef} />
+      <textarea aria-label="Composer" ref={fieldRef} />
+    </>,
+  );
+  focus(screen.getByRole("textbox", { name: "Composer" }).element());
+
+  // Quick tap: hold-start -> hold-cancel before firstStart settles.
+  expect(beginHeldDictation()).toBe(true);
+  cancelHeldDictation();
+  expect(speech.cancel).toHaveBeenCalledTimes(1);
+
+  // Immediately begin a real dictation hold before firstStart settles.
+  expect(beginHeldDictation()).toBe(true);
+  resolveFirstStart();
+  await firstStart;
+  expect(speech.cancel).toHaveBeenCalledTimes(1);
+
+  // Releasing the second hold still stops cleanly once secondStart resolves.
+  endHeldDictation();
+  resolveSecondStart();
+  await secondStart;
+  expect(speech.stop).toHaveBeenCalledOnce();
+});

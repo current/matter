@@ -68,7 +68,8 @@ function ownsShortcut(id: symbol) {
   return entries.find(untargeted)?.[0] === id;
 }
 
-let heldDictation: { id: symbol; starting: Promise<void> } | null = null;
+let heldGeneration = 0;
+let heldDictation: { id: symbol; generation: number; starting: Promise<void> } | null = null;
 
 /** Starts dictation in the editor holding the keyboard, for a hold that began outside this page. */
 export function beginHeldDictation(): boolean {
@@ -83,7 +84,8 @@ export function beginHeldDictation(): boolean {
   const [id, read] = target;
   const { speech, disabled } = read();
   if (disabled || !speech.available || speech.state.phase !== "idle") return false;
-  heldDictation = { id, starting: speech.start() };
+  const generation = ++heldGeneration;
+  heldDictation = { id, generation, starting: speech.start() };
   return true;
 }
 
@@ -91,17 +93,23 @@ export function endHeldDictation() {
   const held = heldDictation;
   heldDictation = null;
   if (!held) return;
-  void held.starting.then(() => shortcutTargets.get(held.id)?.().speech.stop());
+  void held.starting.then(() => {
+    if (heldGeneration === held.generation) return shortcutTargets.get(held.id)?.().speech.stop();
+  });
 }
 
 export function cancelHeldDictation() {
   const held = heldDictation;
   heldDictation = null;
   if (!held) return;
+  const cancelGeneration = ++heldGeneration;
   const cancel = () => shortcutTargets.get(held.id)?.().speech.cancel();
   cancel();
-  // The editor may not have rendered its ownership of a just-started session yet.
-  void held.starting.then(cancel);
+  // The editor may not have rendered its ownership of a just-started session yet; guard by
+  // generation so a quick tap's late startup settlement never cancels a subsequent hold.
+  void held.starting.then(() => {
+    if (heldGeneration === cancelGeneration) cancel();
+  });
 }
 
 const targetScope = (field: HTMLElement | null | undefined) =>
