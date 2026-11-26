@@ -131,6 +131,7 @@ import * as CommandOutputHub from "./orchestration-v2/CommandOutputHub.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
 import * as McpSignIn from "./mcpApps/McpSignIn.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
+import * as MattrComposerPredictions from "./mattr/composerPredictions/MattrComposerPredictions.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
 import * as DocumentText from "./provider/DocumentText.ts";
@@ -1510,6 +1511,9 @@ export const layerWsRpc = (
       const commandOutputHub = yield* CommandOutputHub.CommandOutputHub;
       const threadViewers = yield* ThreadViewers.ThreadViewers;
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const mattrComposerPredictions = yield* Effect.serviceOption(
+        MattrComposerPredictions.MattrComposerPredictions,
+      );
       const scheduledTasks = yield* ScheduledTasks.ScheduledTaskService;
       const workflows = yield* Workflows.Workflows;
       const workflowDefinitions = yield* WorkflowRuntime.WorkflowDefinitions;
@@ -2406,7 +2410,9 @@ export const layerWsRpc = (
             ),
           ),
         [ORCHESTRATION_V2_WS_METHODS.subscribePromptSuggestion]: (input) =>
-          providerSessionManager.subscribePromptSuggestion(input.threadId),
+          Option.isSome(mattrComposerPredictions)
+            ? mattrComposerPredictions.value.subscribe(input.threadId)
+            : providerSessionManager.subscribePromptSuggestion(input.threadId),
         [WS_METHODS.workflowsSubscribe]: (input) =>
           input.changes === true ? workflows.watch : Workflows.wholeLists(workflows.watch),
         [WS_METHODS.workflowsCounts]: (_input) => workflows.counts,

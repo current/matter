@@ -189,6 +189,8 @@ export interface ComposerPromptEditorProps {
   placeholder: string;
   /** Rendered after the placeholder text, such as a key hint. */
   placeholderSuffix?: ReactNode;
+  /** mattr: rendered instead of the placeholder text, which stays the accessible placeholder. */
+  placeholderContent?: ReactNode;
   ariaLabel?: string | undefined;
   suggestionListId?: string | undefined;
   activeSuggestionId?: string | undefined;
@@ -997,6 +999,7 @@ function ComposerPromptEditorTiptapInner(
     className,
     placeholderClassName,
     placeholderSuffix,
+    placeholderContent,
     onChange,
     onVisibleSelectionChange,
     onCommandKeyDown,
@@ -2064,7 +2067,7 @@ function ComposerPromptEditorTiptapInner(
                   placeholderClassName,
                 )}
               >
-                {placeholder}
+                {placeholderContent ?? placeholder}
                 {placeholderSuffix}
               </div>
             ) : null}

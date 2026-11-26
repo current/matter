@@ -66,6 +66,7 @@ every optional integration is **off by default** in settings → add-ons. disabl
 ### fork extras
 
 - **account fallback with exclusions** — automatically switches to another account with usage left when one runs out, with per-account exclusions (`fallbackExcludedInstanceIds`).
+- **composer predictions** — after each turn, the empty composer offers your likely next message in your own voice, for every provider; tab or → fills it in.
 - **stalled turn flags** — flags running turns with no agent activity for 10 minutes.
 - **multi-project delegation** — delegate tasks across local projects from one thread.
 - **phone pairing & iOS sideloading** — Tailscale HTTPS pairing links serve mattr's bundled web UI and installable PWA directly; free Apple ID iOS builds work out of the box via `T3CODE_IOS_PERSONAL_TEAM=1`.

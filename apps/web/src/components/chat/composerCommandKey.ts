@@ -19,6 +19,7 @@ import {
 } from "../../composer-logic";
 import { type PendingUserInput } from "../../session-logic";
 import { promptSuggestionToAccept } from "./usePromptSuggestion";
+import { isPredictionAcceptKey } from "./promptPrediction.mattr";
 import {
   type EnvironmentContextRecord,
   type PreviewAnnotationPayload,
@@ -268,7 +269,7 @@ export function composerCommandKeyHandler(input: {
     }
     const acceptedSuggestion = promptSuggestionToAccept(promptSuggestion, promptRef.current);
     if (
-      key === "Tab" &&
+      isPredictionAcceptKey(key) &&
       acceptedSuggestion !== null &&
       !menuIsActive &&
       !event.shiftKey &&

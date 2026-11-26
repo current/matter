@@ -59,6 +59,7 @@ import * as CloudSpeech from "./speech/CloudSpeech.ts";
 import { speechHttpApiLayer } from "./speech/http.ts";
 import { speechStreamRouteLayer } from "./speech/stream.ts";
 import * as VoiceAssistantService from "./voiceAssistant/VoiceAssistantService.ts";
+import * as MattrComposerPredictions from "./mattr/composerPredictions/MattrComposerPredictions.ts";
 import * as VoiceTtsService from "./voiceAssistant/VoiceTtsService.ts";
 import { layerMattrAddonsAndBots } from "./bots/botsHttp.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
@@ -925,7 +926,9 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerBrowserStream.routeLayer,
     PreviewTunnel.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
-    Ws.layer,
+    Ws.layer.pipe(
+      Layer.provide(MattrComposerPredictions.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+    ),
     speechStreamRouteLayer,
     ServerHttp.layerVoiceAssistantRoutes.pipe(
       Layer.provide(VoiceAssistantService.layer),

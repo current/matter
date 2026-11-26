@@ -78,6 +78,7 @@ import {
 } from "@t3tools/provider-core/server/subagentProjection";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import { withoutNativePromptSuggestions } from "../mattr/composerPredictions/nativePromptSuggestions.ts";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 // Without native resume, a released session comes back as a summary of the thread, so it stays longer.
@@ -538,12 +539,14 @@ export const layerWithOptions = (
       const installationGate = yield* ProviderInstallationGate.ProviderInstallationGate;
       // Labs flag, read live: Codex per turn (its shared session outlives a toggle), Claude per query.
       // Unreadable settings keep it off.
-      const promptSuggestionsEnabled = Option.isNone(serverSettings)
-        ? Effect.succeed(false)
-        : serverSettings.value.getSettings.pipe(
-            Effect.map((settings) => settings.promptSuggestionsEnabled),
-            Effect.orElseSucceed(() => false),
-          );
+      const promptSuggestionsEnabled = withoutNativePromptSuggestions(
+        Option.isNone(serverSettings)
+          ? Effect.succeed(false)
+          : serverSettings.value.getSettings.pipe(
+              Effect.map((settings) => settings.promptSuggestionsEnabled),
+              Effect.orElseSucceed(() => false),
+            ),
+      );
       // Read per turn, so the feedback instruction follows the setting without a restart.
       const agentFeedbackMode = Option.isNone(serverSettings)
         ? Effect.succeed("off" as const)

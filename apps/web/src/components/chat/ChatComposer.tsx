@@ -280,7 +280,6 @@ import {
   resolveProviderSlashCommandsForCwd,
 } from "@t3tools/client-runtime/providerSkills";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { Kbd } from "../ui/kbd";
 import { useSoftwareKeyboardOpen } from "../../hooks/useSoftwareKeyboardOpen";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { usePanelAnimationSettings } from "../../panelAnimations";
@@ -310,6 +309,7 @@ import { HELD_COMPOSER_SEND_BANNER_ID } from "./ComposerHeldSendBanner";
 import { ComposerControlsBar } from "./ComposerControlsBar";
 import { composerCommandKeyHandler } from "./composerCommandKey";
 import { promptSuggestionToAccept, usePromptSuggestion } from "./usePromptSuggestion";
+import { PromptPredictionGhost } from "./PromptPredictionGhost.mattr";
 import { useFreshSessionArmed } from "./freshSessionArms";
 
 function consumePasteAsTextShortcut(deadline: { current: number }): boolean {
@@ -4006,25 +4006,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               ? gt("Enable a provider in Settings to send a message")
                               : (offeredPromptSuggestion ?? m(DEFAULT_COMPOSER_PLACEHOLDER))
                     }
-                    placeholderSuffix={
+                    placeholderContent={
                       offeredPromptSuggestion !== null ? (
-                        // The placeholder ignores pointer events so clicks reach the editor; only this hint opts back in.
-                        <button
-                          type="button"
-                          tabIndex={-1}
-                          aria-label={gt("Use suggested prompt")}
-                          className="pointer-events-auto ml-2 inline-flex cursor-pointer rounded align-[1px] [&:hover_kbd]:text-foreground"
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={() => {
+                        <PromptPredictionGhost
+                          text={offeredPromptSuggestion}
+                          onAccept={() => {
                             const accepted = promptSuggestionToAccept(
                               offeredPromptSuggestion,
                               promptRef.current,
                             );
                             if (accepted !== null) applyPromptReplacementStable(0, 0, accepted);
                           }}
-                        >
-                          <Kbd variant="outline">⇥ Tab</Kbd>
-                        </button>
+                        />
                       ) : undefined
                     }
                     disabled={

@@ -2,7 +2,6 @@ import type { EnvironmentId, OrchestrationV2Run, RunId } from "@t3tools/contract
 import { useSyncExternalStore } from "react";
 
 import type { Thread } from "../../types";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useServerConfigs } from "../../state/entities";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useEnvironmentQuery } from "../../state/query";
@@ -67,11 +66,9 @@ export function usePromptSuggestion(
 ): { readonly suggestion: string | null; readonly dismiss: () => void } {
   // Older servers decode the missing setting as false, so true also proves the method exists.
   const enabled = useServerConfigs().get(environmentId)?.settings.promptSuggestionsEnabled === true;
-  // Suggestions target keyboard and mouse setups, so skip devices with no mouse or trackpad at all.
-  const hasFinePointer = useMediaQuery("(any-pointer: fine)");
   const { data } = useEnvironmentQuery(
     // A local draft has no run, and so no suggestion, until its first send.
-    enabled && hasFinePointer && thread?.latestRun
+    enabled && thread?.latestRun
       ? orchestrationEnvironment.v2.promptSuggestion({
           environmentId,
           input: { threadId: thread.id },
