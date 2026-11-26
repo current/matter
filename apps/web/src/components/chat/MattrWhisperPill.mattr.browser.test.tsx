@@ -118,7 +118,7 @@ describe("MattrWhisperPill", () => {
     await expect.element(screen.getByText("29m")).toBeVisible();
     const element = screen.container.querySelector<HTMLElement>("[data-mattr-whisper-pill]")!;
     expect(element.getBoundingClientRect().height).toBe(28);
-    expect(getComputedStyle(element).borderRadius).toBe("999px");
+    expect(getComputedStyle(element).borderRadius).toBe("10px");
     expect(getComputedStyle(element).fontStyle).toBe("normal");
     const avatars = screen.container.querySelectorAll<HTMLElement>("[data-mattr-whisper-avatar]");
     expect(Array.from(avatars, (avatar) => avatar.style.zIndex)).toEqual(["3", "2", "1"]);
@@ -195,7 +195,7 @@ describe("MattrWhisperPill", () => {
     );
     await expect.element(screen.getByText(":5173")).toBeVisible();
     const pill = screen.container.querySelector<HTMLElement>("[data-mattr-whisper-pill]")!;
-    expect(getComputedStyle(pill).backgroundColor).toBe("rgb(26, 27, 30)");
+    expect(getComputedStyle(pill).backgroundColor).toBe("rgb(28, 28, 28)");
   });
 
   it("clears popover state when transitioning from active to idle so future runs stay closed", async () => {
