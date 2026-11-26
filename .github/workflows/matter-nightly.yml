@@ -18,6 +18,9 @@ on:
         type: boolean
         default: false
 
+# Keep one active run plus at most one pending run: GitHub automatically cancels
+# an older pending run when a newer push arrives, without killing an in-progress
+# release mid-publish or racing version numbers.
 concurrency:
   group: matter-nightly
   cancel-in-progress: false
@@ -30,6 +33,7 @@ permissions:
 env:
   UPSTREAM: pingdotgg/t3code
   GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
 
 jobs:
   plan:
@@ -41,10 +45,6 @@ jobs:
       upstream_tag: ${{ steps.plan.outputs.upstream_tag }}
       version: ${{ steps.plan.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-
       # Upstream's own workflows need T3's private runners and secrets. Keep
       # only this one running in the fork.
       - name: Disable upstream workflows
@@ -68,7 +68,7 @@ jobs:
             echo "No upstream nightly found." >&2
             exit 1
           fi
-          main_sha=$(git rev-parse HEAD)
+          main_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')
           marker="antimatter-build: ${upstream_tag} ${main_sha}"
 
           releases=$(gh release list --limit 100 --json tagName --jq '.[].tagName')
@@ -87,11 +87,13 @@ jobs:
           # Matter versions extend upstream's run number with two digits, so
           # 0.1.12-nightly.20261124.5209 becomes ...520901, ...520902 for
           # rebuilds, and the next upstream nightly (5210 -> 521001) is newer.
+          # Use max+1 rather than count+1 so pruning old releases never collides.
           base=${upstream_tag#v}
           prefix=${base%.*}
           run=${base##*.}
-          count=$(printf '%s\n' "$releases" | grep -c "^v${prefix//./\\.}\\.${run}[0-9][0-9]$" || true)
-          version=$(printf '%s.%s%02d' "$prefix" "$run" "$((count + 1))")
+          last_build=$(printf '%s\n' "$releases" | sed -nE "s/^v${prefix//./\\.}\\.${run}([0-9]{2})$/\1/p" | sort -n | tail -n1)
+          next_build=$((10#${last_build:-0} + 1))
+          version=$(printf '%s.%s%02d' "$prefix" "$run" "$next_build")
 
           echo "Building ${version} from ${upstream_tag} and main ${main_sha}."
           {
@@ -100,32 +102,74 @@ jobs:
             echo "version=${version}"
           } >> "$GITHUB_OUTPUT"
 
+      # Optional dead-man's-switch ping (e.g. Healthchecks.io) so Chris notices if
+      # GitHub stops triggering pushes and cron schedules altogether.
+      - name: Ping CI heartbeat
+        if: vars.MATTER_CI_HEARTBEAT_URL != ''
+        env:
+          HEARTBEAT_URL: ${{ vars.MATTER_CI_HEARTBEAT_URL }}
+        run: curl -fsS --max-time 10 "$HEARTBEAT_URL" >/dev/null || true
+
+      - name: Notify on plan failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          title="Matter: nightly build failed"
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body=$(printf 'The Matter nightly `plan` job failed on `%s`.\n\nRun: %s\n' "$GITHUB_SHA" "$url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --body "$body" || true
+          else
+            gh issue create --title "$title" --body "$body" || true
+          fi
+
   build:
     name: Build ${{ needs.plan.outputs.version }}
     needs: plan
     if: needs.plan.outputs.build == 'true'
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 30
     env:
       VERSION: ${{ needs.plan.outputs.version }}
       UPSTREAM_TAG: ${{ needs.plan.outputs.upstream_tag }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
+      # Single-branch shallow fetch (14 days) skips 500+ stale branches, tags, and
+      # the vendored .repos/ tree; Merge below unshallows if the merge base is older.
+      - name: Checkout main
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --shallow-since="14 days ago" origin "refs/heads/main:refs/remotes/origin/main" || \
+            git fetch --no-tags --depth=200 origin "refs/heads/main:refs/remotes/origin/main"
+          git sparse-checkout set --no-cone '/*' '!/.repos/'
+          git -c checkout.workers=0 checkout -B main refs/remotes/origin/main
 
       - name: Merge upstream nightly
         id: merge
+        env:
+          GIT_TERMINAL_PROMPT: "0"
         run: |
           set -euo pipefail
           echo "main_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git config user.name "matter-bot"
           git config user.email "matter-bot@users.noreply.github.com"
-          git fetch --no-tags "https://github.com/${UPSTREAM}.git" "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+          git fetch --no-tags --shallow-since="14 days ago" "https://github.com/${UPSTREAM}.git" "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}" || \
+            git fetch --no-tags --depth=200 "https://github.com/${UPSTREAM}.git" "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+          if ! git merge-base HEAD "${UPSTREAM_TAG}" >/dev/null 2>&1; then
+            echo "Merge base is older than 14 days; unshallowing main and ${UPSTREAM_TAG}..."
+            if [[ -f .git/shallow ]]; then
+              git fetch --no-tags --unshallow origin "refs/heads/main:refs/remotes/origin/main"
+            fi
+            git fetch --no-tags "https://github.com/${UPSTREAM}.git" "refs/tags/${UPSTREAM_TAG}:refs/tags/${UPSTREAM_TAG}"
+          fi
           if ! git merge --no-edit "${UPSTREAM_TAG}"; then
             files=$(git diff --name-only --diff-filter=U)
             git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
             title="Matter: merge conflict with ${UPSTREAM_TAG}"
             body=$(printf 'Merging upstream `%s` into `main` conflicts in:\n\n```\n%s\n```\n\nResolve it locally: `git fetch upstream --tags && git merge %s`, then push main. Builds resume on the push.\n' "$UPSTREAM_TAG" "$files" "$UPSTREAM_TAG")
             if [[ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]]; then
@@ -137,6 +181,34 @@ jobs:
 
       - name: Setup dependencies
         uses: ./.github/actions/setup-ci-deps
+        with:
+          install-args: --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/web... --filter=@t3tools/scripts...
+
+      - name: Resolve cache keys
+        id: cache_keys
+        run: |
+          set -euo pipefail
+          echo "electron=$(jq -r '.dependencies.electron' apps/desktop/package.json)" >> "$GITHUB_OUTPUT"
+          echo "macos=$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache resource monitor
+        id: resource_monitor_cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: native/resource-monitor/target/aarch64-apple-darwin/release/t3-resource-monitor
+          key: resource-monitor-aarch64-apple-darwin-${{ hashFiles('.cargo/config.toml', 'native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/build.rs', 'native/resource-monitor/src/**') }}
+
+      - name: Cache Electron binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/electron
+          key: electron-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache_keys.outputs.electron }}
+
+      - name: Cache SF Symbols extraction
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/node_modules/.vite/mattr-sf-symbols.json
+          key: sf-symbols-v1-${{ steps.cache_keys.outputs.macos }}-${{ hashFiles('matter/icons/sf-symbol-map.ts', 'matter/icons/extract-sf-symbols.swift') }}
 
       - name: Import signing certificate
         env:
@@ -162,23 +234,67 @@ jobs:
           echo "MATTER_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
           echo "MATTER_IDENTITY=$identity" >> "$GITHUB_ENV"
 
-      - name: Build macOS app
+      # build:desktop:bundle skips compiling t3-apple-speech (which dist:desktop:artifact
+      # compiles once for staging), and T3CODE_WEB_SOURCEMAP=false skips .map files that
+      # electron-builder strips from app.asar. On a Rust cache miss, cargo runs in parallel.
+      - name: Build bundles and native helpers
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          APP_VERSION: ${{ needs.plan.outputs.version }}
+          T3CODE_WEB_SOURCEMAP: "false"
           T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
           T3CODE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
           T3CODE_CLERK_JWT_TEMPLATE: ${{ vars.CLERK_JWT_TEMPLATE }}
           T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ vars.CLERK_CLI_OAUTH_CLIENT_ID }}
           T3CODE_RELAY_URL: ${{ vars.RELAY_URL }}
+          BUILD_RESOURCE_MONITOR: ${{ steps.resource_monitor_cache.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          node scripts/update-release-package-versions.ts "$VERSION"
+          cargo_pid=""
+          trap 'if [[ -n "$cargo_pid" ]]; then kill "$cargo_pid" 2>/dev/null || true; fi' EXIT
+          if [[ "$BUILD_RESOURCE_MONITOR" == "true" ]]; then
+            cargo build --locked --release \
+              --manifest-path native/resource-monitor/Cargo.toml \
+              --target aarch64-apple-darwin &
+            cargo_pid=$!
+          fi
+          vp run build:desktop:bundle
+          if [[ -n "$cargo_pid" ]]; then
+            wait "$cargo_pid"
+            cargo_pid=""
+          fi
+
+      # Build only the unpacked .app (--target dir) so electron-builder does not
+      # spend ~2 minutes compressing an unsigned DMG and zip that signing replaces.
+      - name: Package macOS app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: "true"
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          T3CODE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+          T3CODE_CLERK_JWT_TEMPLATE: ${{ vars.CLERK_JWT_TEMPLATE }}
+          T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ vars.CLERK_CLI_OAUTH_CLIENT_ID }}
+          T3CODE_RELAY_URL: ${{ vars.RELAY_URL }}
+          pnpm_config_prefer_offline: "true"
         run: |
           vp run dist:desktop:artifact \
-            --platform mac --target dmg --arch arm64 \
-            --build-version "$VERSION" --verbose
+            --platform mac --target dir --arch arm64 \
+            --build-version "$VERSION" --skip-build --verbose
 
-      - name: Sign with the Matter certificate
+      - name: Sign and package with the Matter certificate
         run: |
+          set -euo pipefail
           security unlock-keychain -p "$MATTER_KEYCHAIN_PASSWORD" "$MATTER_KEYCHAIN"
-          node matter/sign-mac-release.mjs --release-dir release --identity "$MATTER_IDENTITY" --keychain "$MATTER_KEYCHAIN"
+          app_path=$(ls -d release/mac-arm64/*.app | head -n1)
+          test -n "$app_path"
+          node matter/sign-mac-release.mjs \
+            --app-path "$app_path" \
+            --package-dir release \
+            --version "$VERSION" \
+            --arch arm64 \
+            --update-repo "${{ github.repository }}" \
+            --identity "$MATTER_IDENTITY" \
+            --keychain "$MATTER_KEYCHAIN"
 
       - name: Publish release
         env:
@@ -201,12 +317,37 @@ jobs:
             --notes-file "$RUNNER_TEMP/notes.md" \
             release/*.zip release/*.dmg release/*.blockmap release/*-mac.yml
 
-      - name: Prune old releases
+      - name: Prune old releases and close resolved failure issues
+        env:
+          MAIN_SHA: ${{ steps.merge.outputs.main_sha }}
         run: |
           gh release list --limit 100 --json tagName --jq '.[15:][].tagName' |
           while read -r tag; do
             gh release delete "$tag" --yes --cleanup-tag || true
           done
+          for title in "Matter: nightly build failed" "Matter: merge conflict with ${UPSTREAM_TAG}"; do
+            gh issue list --state open --search "$title in:title" --json number --jq '.[].number' |
+            while read -r num; do
+              gh issue close "$num" --comment "Resolved by v${VERSION} (${MAIN_SHA:0:12})." || true
+            done
+          done
+
+      - name: Notify on build failure
+        if: failure() && steps.merge.outputs.conflict != 'true'
+        env:
+          MAIN_SHA: ${{ steps.merge.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          title="Matter: nightly build failed"
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          sha="${MAIN_SHA:-$GITHUB_SHA}"
+          body=$(printf 'Building Matter `%s` (upstream `%s`, main `%s`) failed.\n\nRun: %s\n' "$VERSION" "$UPSTREAM_TAG" "${sha:0:12}" "$url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --body "$body" || true
+          else
+            gh issue create --title "$title" --body "$body" || true
+          fi
 
       - name: Remove signing keychain
         if: always()
