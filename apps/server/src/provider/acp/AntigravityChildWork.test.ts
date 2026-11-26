@@ -608,19 +608,19 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
     }),
   );
 
-  it.effect("keeps a child at work until its records prove it finished", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const profile = yield* fs.makeTempDirectoryScoped({ prefix: "t3-agy-unsure-" });
-      const swarmWorker = "44444444-4444-4000-8000-444444444444";
-      const write = (segments: ReadonlyArray<string>, body: string) => {
-        const file = path.join(profile, "antigravity-acp", "brain", ...segments);
-        return fs
-          .makeDirectory(path.dirname(file), { recursive: true })
-          .pipe(Effect.andThen(fs.writeFileString(file, body)));
-      };
-      const child = (conversationId: string, state: string, callId: string) =>
+  const unsureChildren = Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const profile = yield* fs.makeTempDirectoryScoped({ prefix: "t3-agy-unsure-" });
+    const write = (segments: ReadonlyArray<string>, body: string) => {
+      const file = path.join(profile, "antigravity-acp", "brain", ...segments);
+      return fs
+        .makeDirectory(path.dirname(file), { recursive: true })
+        .pipe(Effect.andThen(fs.writeFileString(file, body)));
+    };
+    return {
+      profile,
+      child: (conversationId: string, state: string, callId: string) =>
         Effect.all([
           write(
             [ROOT, ".system_generated", "subagents", `${conversationId}.json`],
@@ -640,65 +640,119 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
               },
             }),
           ),
-        ]);
-      const transcript = (conversationId: string, body: string) =>
-        write([conversationId, ".system_generated", "logs", "transcript.jsonl"], body);
-      const reportToParent = (sender: string) =>
+        ]),
+      swarm: (conversationId: string) =>
+        write(
+          [ROOT, ".system_generated", "swarm", "members.json"],
+          JSON.stringify({
+            members: {
+              shard: { conversation_id: conversationId, role: "worker", wake_mode: "working" },
+            },
+          }),
+        ),
+      transcript: (conversationId: string, body: string) =>
+        write([conversationId, ".system_generated", "logs", "transcript.jsonl"], body),
+      reportToParent: (sender: string) =>
         write(
           [ROOT, ".system_generated", "messages", `${sender}.json`],
           JSON.stringify({ id: sender, sender, content: "Progress update" }),
-        );
-      const idle = (conversationId: string) =>
+        ),
+      idle: (conversationId: string) =>
         areAntigravityChildrenIdle({
           profileDirectory: profile,
           rootSessionId: ROOT,
           conversationIds: [conversationId],
-        });
-
-      // An unspecified record state is not a dead child, even with no transcript yet.
-      yield* child(CHILD, "SUBAGENT_STATE_UNSPECIFIED", "call_unspecified");
-      expect(yield* idle(CHILD)).toBe(false);
-      expect(
-        yield* readAntigravityChildrenAtWork({
+        }),
+      atWork: (toolCallIds: ReadonlyArray<string>) =>
+        readAntigravityChildrenAtWork({
           profileDirectory: profile,
           rootSessionId: ROOT,
-          toolCallIds: ["call_unspecified"],
+          toolCallIds,
         }),
-      ).toEqual(["call_unspecified"]);
+    };
+  });
+  const line = (step: object) => `${JSON.stringify(step)}\n`;
 
-      // Having reported proves nothing while the last step is missing or still being written.
-      yield* reportToParent(CHILD);
-      expect(yield* idle(CHILD)).toBe(false);
-      yield* transcript(CHILD, '{"step_index":3,"type":"PLANNER_RESP');
-      expect(yield* idle(CHILD)).toBe(false);
-      yield* transcript(
+  it.effect("keeps a child at work until its records prove it finished", () =>
+    Effect.gen(function* () {
+      const disk = yield* unsureChildren;
+      const swarmWorker = "44444444-4444-4000-8000-444444444444";
+
+      // An unspecified record state is not a dead child, even with no transcript yet.
+      yield* disk.child(CHILD, "SUBAGENT_STATE_UNSPECIFIED", "call_unspecified");
+      expect(yield* disk.idle(CHILD)).toBe(false);
+      expect(yield* disk.atWork(["call_unspecified"])).toEqual(["call_unspecified"]);
+
+      // Having reported proves nothing while the last step is still being written or still working.
+      yield* disk.transcript(CHILD, '{"step_index":3,"type":"PLANNER_RESP');
+      yield* disk.reportToParent(CHILD);
+      expect(yield* disk.idle(CHILD)).toBe(false);
+      yield* disk.transcript(
         CHILD,
-        `${JSON.stringify({ step_index: 3, type: "PLANNER_RESPONSE", status: "DONE", content: "Done." })}\n`,
+        line({
+          step_index: 3,
+          type: "PLANNER_RESPONSE",
+          status: "RUNNING",
+          tool_calls: [{ name: "run_command" }],
+        }),
       );
-      expect(yield* idle(CHILD)).toBe(true);
+      expect(yield* disk.idle(CHILD)).toBe(false);
+      yield* disk.transcript(
+        CHILD,
+        line({ step_index: 4, type: "PLANNER_RESPONSE", status: "DONE", content: "Done." }),
+      );
+      expect(yield* disk.idle(CHILD)).toBe(true);
 
       // A swarm worker that messaged the coordinator mid-task stays at work until its final reply.
-      yield* child(swarmWorker, "SUBAGENT_STATE_ALIVE", "call_swarm");
-      yield* write(
-        [ROOT, ".system_generated", "swarm", "members.json"],
-        JSON.stringify({
-          members: {
-            shard: { conversation_id: swarmWorker, role: "worker", wake_mode: "working" },
-          },
+      yield* disk.child(swarmWorker, "SUBAGENT_STATE_ALIVE", "call_swarm");
+      yield* disk.swarm(swarmWorker);
+      yield* disk.transcript(
+        swarmWorker,
+        line({ step_index: 4, type: "SEND_MESSAGE", status: "DONE" }),
+      );
+      yield* disk.reportToParent(swarmWorker);
+      expect(yield* disk.idle(swarmWorker)).toBe(false);
+      yield* disk.transcript(swarmWorker, '{"step_index":5,"type":"PLANNER_RESPONSE","sta');
+      expect(yield* disk.idle(swarmWorker)).toBe(false);
+      yield* disk.transcript(
+        swarmWorker,
+        line({ step_index: 5, type: "PLANNER_RESPONSE", status: "DONE", content: "Shard done." }),
+      );
+      expect(yield* disk.idle(swarmWorker)).toBe(true);
+    }),
+  );
+
+  it.effect("lets a reported child go when its transcript can never be read", () =>
+    Effect.gen(function* () {
+      const disk = yield* unsureChildren;
+      const garbled = "55555555-5555-4000-8000-555555555555";
+      const oversized = "66666666-6666-4000-8000-666666666666";
+      const swarmWorker = "77777777-7777-4000-8000-777777777777";
+
+      yield* disk.child(CHILD, "SUBAGENT_STATE_ALIVE", "call_missing");
+      yield* disk.child(garbled, "SUBAGENT_STATE_ALIVE", "call_garbled");
+      yield* disk.child(oversized, "SUBAGENT_STATE_ALIVE", "call_oversized");
+      yield* disk.child(swarmWorker, "SUBAGENT_STATE_ALIVE", "call_swarm");
+      yield* disk.swarm(swarmWorker);
+      yield* disk.transcript(garbled, "not a transcript step\n");
+      yield* disk.transcript(
+        oversized,
+        line({
+          step_index: 1,
+          type: "PLANNER_RESPONSE",
+          status: "DONE",
+          content: "x".repeat(300 * 1024),
         }),
       );
-      yield* reportToParent(swarmWorker);
-      expect(yield* idle(swarmWorker)).toBe(false);
-      yield* transcript(
-        swarmWorker,
-        `${JSON.stringify({ step_index: 4, type: "SEND_MESSAGE", status: "DONE" })}\n`,
-      );
-      expect(yield* idle(swarmWorker)).toBe(false);
-      yield* transcript(
-        swarmWorker,
-        `${JSON.stringify({ step_index: 5, type: "PLANNER_RESPONSE", status: "DONE", content: "Shard done." })}\n`,
-      );
-      expect(yield* idle(swarmWorker)).toBe(true);
+      const calls = ["call_missing", "call_garbled", "call_oversized", "call_swarm"];
+      expect(yield* disk.atWork(calls)).toHaveLength(4);
+
+      // Nothing on disk can change these answers, so a report must end the wait.
+      for (const conversationId of [CHILD, garbled, oversized, swarmWorker]) {
+        yield* disk.reportToParent(conversationId);
+        expect(yield* disk.idle(conversationId)).toBe(true);
+      }
+      expect(yield* disk.atWork(calls)).toEqual([]);
     }),
   );
 

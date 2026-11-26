@@ -473,7 +473,10 @@ export interface AcpAdapterV2Flavor {
     EffectAcpSchema.InitializeRequest["clientCapabilities"]
   >["_meta"];
   readonly mcpOverHttp?: boolean;
-  /** The agent has no tool search of its own, so T3 lists optional tools on demand. */
+  /**
+   * T3 lists only core tools and `tool_search` (Copilot has no tool search of its own). agy
+   * 1.3.3+ also loads tools on demand unless `tools/list` marks them `antigravity/alwaysLoad`.
+   */
   readonly deferMcpTools?: boolean;
   /** Defer over the stdio bridge too. Only for agents known to reread tools/list there. */
   readonly deferStdioMcpTools?: boolean;

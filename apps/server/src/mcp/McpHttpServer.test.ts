@@ -2280,7 +2280,10 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
           failureMode: "return",
         });
       const OptionalToolkit = Toolkit.make(
-        tool("delegate_task", "Delegates a task."),
+        tool("delegate_task", "Delegates a task.").annotate(
+          Tool.Meta,
+          Context.getUnsafe(OrchestratorToolkit.tools.delegate_task.annotations, Tool.Meta),
+        ),
         tool("preview_open", "Opens a browser preview."),
         tool("schedule_task", "Schedules a task."),
       );
@@ -2348,14 +2351,16 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
                     .find((message) => message.id === 2),
                 ),
               );
-          return {
-            listed: rpc("tools/list", {}).pipe(
-              Effect.map((body) =>
-                (body as { result: { tools: ReadonlyArray<{ name: string }> } }).result.tools
-                  .map((listed) => listed.name)
-                  .sort(),
-              ),
+          const tools = rpc("tools/list", {}).pipe(
+            Effect.map(
+              (body) =>
+                (body as { result: { tools: ReadonlyArray<{ name: string; _meta?: unknown }> } })
+                  .result.tools,
             ),
+          );
+          return {
+            tools,
+            listed: tools.pipe(Effect.map((listed) => listed.map((entry) => entry.name).sort())),
             call: (name: string, args: object) =>
               rpc("tools/call", { name, arguments: args }).pipe(
                 Effect.map((body) => (body as { result: { structuredContent?: unknown } }).result),
@@ -2366,6 +2371,11 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
       const deferring = yield* session("deferringToken", true);
       const other = yield* session("otherToken", false);
       expect(yield* deferring.listed).toEqual(["delegate_task", "tool_search"]);
+      // agy loads unmarked tools on demand, so the mark must reach the wire.
+      expect((yield* deferring.tools).map(({ name, _meta }) => [name, _meta]).sort()).toEqual([
+        ["delegate_task", { "antigravity/alwaysLoad": true }],
+        ["tool_search", { "antigravity/alwaysLoad": true }],
+      ]);
       expect(yield* other.listed).toEqual(["delegate_task", "preview_open", "schedule_task"]);
       // Unlisted tools stay callable.
       expect((yield* deferring.call("schedule_task", {})).structuredContent).toEqual({});

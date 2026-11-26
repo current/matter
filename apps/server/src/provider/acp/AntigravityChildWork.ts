@@ -947,23 +947,35 @@ async function hasUnreadWakingInboxMessage(
   return false;
 }
 
-async function readLastTranscriptLine(
+type LastTranscriptStep =
+  | { readonly kind: "step"; readonly step: Schema.Schema.Type<typeof TranscriptLine> }
+  /** An unterminated last line: agy is still writing it. */
+  | { readonly kind: "writing" }
+  /** No transcript, or a finished last line too long or too new to decode. Waiting won't help. */
+  | { readonly kind: "unknowable" };
+
+const WRITING: LastTranscriptStep = { kind: "writing" };
+const UNKNOWABLE: LastTranscriptStep = { kind: "unknowable" };
+
+async function readLastTranscriptStep(
   profileRoot: string,
   sessionId: string,
-): Promise<Schema.Schema.Type<typeof TranscriptLine> | undefined> {
+): Promise<LastTranscriptStep> {
   const transcript = await antigravityManagedPath(
     profileRoot,
     ["antigravity-acp", "brain", sessionId, ".system_generated", "logs", "transcript.jsonl"],
     "file",
   );
-  if (transcript === undefined) return undefined;
+  if (transcript === undefined) return UNKNOWABLE;
   const handle = await NodeFSP.open(
     transcript.path,
     NodeFS.constants.O_RDONLY | (NodeFS.constants.O_NOFOLLOW ?? 0),
   );
   try {
     const stat = await handle.stat();
-    if (!stat.isFile() || stat.size === 0) return undefined;
+    if (!stat.isFile() || stat.size === 0) return UNKNOWABLE;
+    // agy ends every line with a newline, so an unterminated tail is a write in progress.
+    let undecodable = UNKNOWABLE;
     for (const byteCap of [PENDING_REPLY_TAIL_BYTES, TRANSCRIPT_BYTE_CAP]) {
       const start = Math.max(0, stat.size - byteCap);
       const buffer = Buffer.alloc(stat.size - start);
@@ -972,20 +984,29 @@ async function readLastTranscriptLine(
       while (end > 0 && (buffer[end - 1] === 0x0a || buffer[end - 1] === 0x0d)) {
         end -= 1;
       }
+      if (bytesRead > 0 && end === bytesRead) undecodable = WRITING;
       if (end === 0) {
-        if (start === 0) return undefined;
+        if (start === 0) return UNKNOWABLE;
         continue;
       }
       const trimmed = buffer.subarray(0, end);
       const lastNewline = trimmed.lastIndexOf(0x0a);
       if (lastNewline === -1 && start > 0) continue;
-      const line = trimmed.toString("utf8", lastNewline + 1);
-      return Option.getOrUndefined(decodeTranscriptLine(line));
+      const step = decodeTranscriptLine(trimmed.toString("utf8", lastNewline + 1));
+      return Option.isSome(step) ? { kind: "step", step: step.value } : undecodable;
     }
-    return undefined;
+    return undecodable;
   } finally {
     await handle.close();
   }
+}
+
+async function readLastTranscriptLine(
+  profileRoot: string,
+  sessionId: string,
+): Promise<Schema.Schema.Type<typeof TranscriptLine> | undefined> {
+  const last = await readLastTranscriptStep(profileRoot, sessionId);
+  return last.kind === "step" ? last.step : undefined;
 }
 
 /**
@@ -1022,22 +1043,24 @@ const SUBAGENT_RUNNING_STEP_STATUSES: ReadonlySet<string> = new Set([
   "GENERATING",
 ]);
 
-function isTerminalPlannerResponse(
-  step: Schema.Schema.Type<typeof TranscriptLine> | undefined,
-): boolean {
+function isTerminalPlannerResponse(last: LastTranscriptStep): boolean {
+  if (last.kind !== "step") return false;
+  const { step } = last;
   return (
-    step !== undefined &&
     step.type === "PLANNER_RESPONSE" &&
     step.status === "DONE" &&
     (step.tool_calls?.length ?? 0) === 0
   );
 }
 
-function isStepIdleAfterReport(
-  step: Schema.Schema.Type<typeof TranscriptLine> | undefined,
-): boolean {
-  // An unreadable, half-written or missing last step proves nothing; `idle` ends T3's wait.
-  if (step === undefined) return false;
+/**
+ * After a report, a line still being written means more work; a transcript that can never be
+ * read leaves the report as the only proof, so it must not hold T3's wait open forever.
+ */
+function isStepIdleAfterReport(last: LastTranscriptStep, terminalReplyOnly: boolean): boolean {
+  if (last.kind !== "step") return last.kind === "unknowable";
+  if (terminalReplyOnly) return isTerminalPlannerResponse(last);
+  const { step } = last;
   if (step.type === "SYSTEM_MESSAGE") return false;
   if (step.status !== undefined && SUBAGENT_RUNNING_STEP_STATUSES.has(step.status)) return false;
   return (step.tool_calls?.length ?? 0) === 0;
@@ -1062,15 +1085,13 @@ async function isDetachedChildIdle(input: {
   if (await hasUnreadWakingInboxMessage(input.profileRoot, input.childId)) {
     return false;
   }
-  const lastStep = await readLastTranscriptLine(input.profileRoot, input.childId);
-  if (swarmMember !== undefined) {
-    // Swarm workers message the coordinator mid-task, so only a report plus a final reply ends one.
-    return input.reported.has(input.childId) && isTerminalPlannerResponse(lastStep);
-  }
+  const lastStep = await readLastTranscriptStep(input.profileRoot, input.childId);
   if (input.reported.has(input.childId)) {
-    return isStepIdleAfterReport(lastStep);
+    // Swarm workers message the coordinator mid-task, so only a final reply ends one.
+    return isStepIdleAfterReport(lastStep, swarmMember !== undefined);
   }
-  return isTerminalPlannerResponse(lastStep);
+  // Without a report, only a final reply proves an ordinary child finished.
+  return swarmMember === undefined && isTerminalPlannerResponse(lastStep);
 }
 
 /**

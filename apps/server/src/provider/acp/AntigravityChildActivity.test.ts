@@ -181,6 +181,31 @@ it.layer(NodeServices.layer)("watchAntigravityChildActivity", (it) => {
     }),
   );
 
+  it.effect("frees a reported child whose transcript stops being readable", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const { profile, transcriptPath } = yield* makeProfile({ steps: autoApproved });
+      const watcher = watchAntigravityChildActivity({
+        profileDirectory: profile,
+        rootSessionId: ROOT,
+        nativeTaskId: `${ROOT}:1`,
+        title: null,
+        prompt: "Readme check",
+        siblings: () => [],
+      });
+      expect(yield* watcher.poll).toBeDefined();
+      const inbox = `${profile}/antigravity-acp/brain/${ROOT}/.system_generated/messages`;
+      yield* fs.makeDirectory(inbox, { recursive: true });
+      yield* fs.writeFileString(`${inbox}/report.json`, JSON.stringify({ sender: CHILD }));
+
+      yield* fs.writeFileString(transcriptPath, '{"step_index":4,"type":"PLANNER_RE');
+      expect(yield* watcher.isIdle!).toBe(false);
+      // A finished line agy's records can't decode will never change, so it must not wedge the turn.
+      yield* fs.writeFileString(transcriptPath, '{"step_index":4,"type":7}\n');
+      expect(yield* watcher.isIdle!).toBe(true);
+    }),
+  );
+
   it.effect("reports nothing until the parent's record proves the children", () =>
     Effect.gen(function* () {
       const { profile } = yield* makeProfile({ steps: () => [] });
