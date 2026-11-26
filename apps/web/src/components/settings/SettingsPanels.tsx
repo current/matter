@@ -512,6 +512,14 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.shellMaterial !== DEFAULT_UNIFIED_SETTINGS.shellMaterial
       ? [gt("Shell material")]
       : []),
+    ...(settings.shellTransparency !== DEFAULT_UNIFIED_SETTINGS.shellTransparency
+      ? [gt("Shell transparency")]
+      : []),
+    ...(settings.shellBlur !== DEFAULT_UNIFIED_SETTINGS.shellBlur ? [gt("Blur amount")] : []),
+    ...(settings.shellGlassStyle !== DEFAULT_UNIFIED_SETTINGS.shellGlassStyle
+      ? [gt("Glass style")]
+      : []),
+    ...(settings.shellColor !== DEFAULT_UNIFIED_SETTINGS.shellColor ? [gt("Shell color")] : []),
     ...(settings.shellGrain !== DEFAULT_UNIFIED_SETTINGS.shellGrain ? [gt("Shell grain")] : []),
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme
       ? [gt("Diff colors")]
@@ -745,6 +753,10 @@ export function useSettingsRestore(onRestored?: () => void) {
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       shellMaterial: DEFAULT_UNIFIED_SETTINGS.shellMaterial,
       shellGrain: DEFAULT_UNIFIED_SETTINGS.shellGrain,
+      shellTransparency: DEFAULT_UNIFIED_SETTINGS.shellTransparency,
+      shellBlur: DEFAULT_UNIFIED_SETTINGS.shellBlur,
+      shellGlassStyle: DEFAULT_UNIFIED_SETTINGS.shellGlassStyle,
+      shellColor: DEFAULT_UNIFIED_SETTINGS.shellColor,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,

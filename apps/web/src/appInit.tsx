@@ -108,7 +108,9 @@ function startClientAppearance(): void {
     }
     if (
       previous?.shellMaterial !== settings.shellMaterial ||
-      previous?.shellGrain !== settings.shellGrain
+      previous?.shellGrain !== settings.shellGrain ||
+      previous?.shellTransparency !== settings.shellTransparency ||
+      previous?.shellColor !== settings.shellColor
     ) {
       applyMattrShellAppearance(root, settings);
     }

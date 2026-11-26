@@ -11,6 +11,7 @@
     "../../scripts/lib",
     "../../antimatter/rebrand.ts",
     "../../antimatter/liveUi.ts",
+    "../../antimatter/shellTint.ts",
     "../../antimatter/island/types.ts",
     "../../antimatter/island/siriWaveShaders.ts",
     "../../antimatter/island/MacControlTapMonitor.ts",

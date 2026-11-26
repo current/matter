@@ -1,58 +1,96 @@
-import type { ShellMaterial } from "@t3tools/contracts";
+import {
+  type ClientSettings,
+  DEFAULT_CLIENT_SETTINGS,
+  type ShellGlassStyle,
+  type ShellMaterial,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import type * as Electron from "electron";
 
-interface MacObjcBridge {
-  readonly objcGetClass: (name: string) => bigint;
-  readonly sel: (name: string) => bigint;
-  readonly msg0: (obj: bigint, selector: string) => bigint;
-  readonly msg1Ptr: (obj: bigint, selector: string, arg: bigint) => bigint;
-  readonly msg1Bool: (obj: bigint, selector: string, arg: boolean) => void;
-  readonly msg1I64: (obj: bigint, selector: string, arg: number) => void;
-  readonly msg1Double: (obj: bigint, selector: string, arg: number) => void;
-  readonly msgAddSubview: (
-    parent: bigint,
-    subview: bigint,
-    positioning: number,
-    relativeTo: bigint,
-  ) => void;
+import {
+  type ShellGlassTint,
+  shellBlurRadius,
+  shellGlassTint,
+} from "../../../../antimatter/shellTint.ts";
+
+// Native seam (tests swap it). Blur uses SkyLight's CGSSetWindowBackgroundBlurRadius, as iTerm2
+// and Ghostty do: NSVisualEffectView materials have a fixed blur no slider can move. Liquid Glass
+// is AppKit's NSGlassEffectView (macOS 26+), configured through its public style and tintColor.
+export interface MacShellNative {
+  readonly setWindowClear: (contentView: bigint) => void;
+  readonly createGlassView: (contentView: bigint) => bigint | null;
+  readonly setGlassStyle: (glassView: bigint, style: ShellGlassStyle) => void;
+  readonly setGlassTint: (glassView: bigint, tint: ShellGlassTint | null) => void;
+  readonly removeGlassView: (glassView: bigint) => void;
+  /** False when the private blur call is unavailable, so the caller falls back to vibrancy. */
+  readonly setBackgroundBlurRadius: (contentView: bigint, radius: number) => boolean;
+}
+
+export interface WindowShellMaterialOptions {
+  readonly material: ShellMaterial;
+  readonly solidBackgroundColor: string;
+  readonly platform: NodeJS.Platform;
+  /** Native blur radius in points for the Blur material. */
+  readonly blurRadius?: number;
+  readonly glassStyle?: ShellGlassStyle;
+  readonly glassTint?: ShellGlassTint | null;
 }
 
 interface WindowMaterialState {
   glassView: bigint | null;
+  glassStyle: ShellGlassStyle | null;
+  glassTintKey: string | null;
+  blurRadius: number;
   hasVibrancy: boolean;
   hasWindowsMaterial: boolean;
-  nonOpaque: boolean;
+  latestOptions: WindowShellMaterialOptions | null;
+  reapplyOnShow: boolean;
 }
 
 const NS_WINDOW_BELOW = -1;
-const NS_GLASS_EFFECT_STYLE_REGULAR = 0;
+const NS_GLASS_EFFECT_STYLE: Record<ShellGlassStyle, number> = { regular: 0, clear: 1 };
 const MACOS_LIQUID_GLASS_CORNER_RADIUS = 16;
+const DEFAULT_BLUR_RADIUS = 38;
 
 const windowStates = new WeakMap<Electron.BrowserWindow, WindowMaterialState>();
-let macObjcBridgePromise: Promise<MacObjcBridge | null> | undefined;
+let macNativePromise: Promise<MacShellNative | null> | undefined;
 
 function getWindowState(window: Electron.BrowserWindow): WindowMaterialState {
   let state = windowStates.get(window);
   if (!state) {
     state = {
       glassView: null,
+      glassStyle: null,
+      glassTintKey: null,
+      blurRadius: 0,
       hasVibrancy: false,
       hasWindowsMaterial: false,
-      nonOpaque: false,
+      latestOptions: null,
+      reapplyOnShow: false,
     };
     windowStates.set(window, state);
   }
   return state;
 }
 
-function loadMacObjcBridge(): Promise<MacObjcBridge | null> {
-  return (macObjcBridgePromise ??= import("ffi-rs")
+function loadMacShellNative(): Promise<MacShellNative | null> {
+  return (macNativePromise ??= import("ffi-rs")
     .then(({ DataType, load, open }) => {
       const objc = "mattr-objc-shell-material";
-      const appKit = "mattr-appkit-shell-material";
       open({ library: objc, path: "/usr/lib/libobjc.A.dylib" });
-      open({ library: appKit, path: "/System/Library/Frameworks/AppKit.framework/AppKit" });
+      open({
+        library: "mattr-appkit-shell-material",
+        path: "/System/Library/Frameworks/AppKit.framework/AppKit",
+      });
+      let skyLight: string | null = "mattr-skylight-shell-material";
+      try {
+        open({
+          library: skyLight,
+          path: "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight",
+        });
+      } catch {
+        skyLight = null;
+      }
 
       const selectors = new Map<string, bigint>();
       const sel = (name: string): bigint => {
@@ -68,61 +106,77 @@ function loadMacObjcBridge(): Promise<MacObjcBridge | null> {
         selectors.set(name, registered);
         return registered;
       };
+      const getClass = (name: string): bigint =>
+        load({
+          library: objc,
+          funcName: "objc_getClass",
+          retType: DataType.BigInt,
+          paramsType: [DataType.String],
+          paramsValue: [name],
+        }).valueOf();
+      const msg0 = (obj: bigint, selector: string): bigint =>
+        load({
+          library: objc,
+          funcName: "objc_msgSend",
+          retType: DataType.BigInt,
+          paramsType: [DataType.BigInt, DataType.BigInt],
+          paramsValue: [obj, sel(selector)],
+        }).valueOf();
+      const msgPtr = (obj: bigint, selector: string, arg: bigint): bigint =>
+        load({
+          library: objc,
+          funcName: "objc_msgSend",
+          retType: DataType.BigInt,
+          paramsType: [DataType.BigInt, DataType.BigInt, DataType.BigInt],
+          paramsValue: [obj, sel(selector), arg],
+        }).valueOf();
+      const msgBool = (obj: bigint, selector: string, arg: boolean): void => {
+        load({
+          library: objc,
+          funcName: "objc_msgSend",
+          retType: DataType.Void,
+          paramsType: [DataType.BigInt, DataType.BigInt, DataType.Boolean],
+          paramsValue: [obj, sel(selector), arg],
+        });
+      };
+      const msgI64 = (obj: bigint, selector: string, arg: number): void => {
+        load({
+          library: objc,
+          funcName: "objc_msgSend",
+          retType: DataType.Void,
+          paramsType: [DataType.BigInt, DataType.BigInt, DataType.I64],
+          paramsValue: [obj, sel(selector), arg],
+        });
+      };
+      const msgDouble = (obj: bigint, selector: string, arg: number): void => {
+        load({
+          library: objc,
+          funcName: "objc_msgSend",
+          retType: DataType.Void,
+          paramsType: [DataType.BigInt, DataType.BigInt, DataType.Double],
+          paramsValue: [obj, sel(selector), arg],
+        });
+      };
+      const nsWindowOf = (contentView: bigint): bigint => msg0(contentView, "window");
 
-      const bridge: MacObjcBridge = {
-        objcGetClass: (name) =>
-          load({
-            library: objc,
-            funcName: "objc_getClass",
-            retType: DataType.BigInt,
-            paramsType: [DataType.String],
-            paramsValue: [name],
-          }).valueOf(),
-        sel,
-        msg0: (obj, selector) =>
-          load({
-            library: objc,
-            funcName: "objc_msgSend",
-            retType: DataType.BigInt,
-            paramsType: [DataType.BigInt, DataType.BigInt],
-            paramsValue: [obj, sel(selector)],
-          }).valueOf(),
-        msg1Ptr: (obj, selector, arg) =>
-          load({
-            library: objc,
-            funcName: "objc_msgSend",
-            retType: DataType.BigInt,
-            paramsType: [DataType.BigInt, DataType.BigInt, DataType.BigInt],
-            paramsValue: [obj, sel(selector), arg],
-          }).valueOf(),
-        msg1Bool: (obj, selector, arg) => {
-          load({
-            library: objc,
-            funcName: "objc_msgSend",
-            retType: DataType.Void,
-            paramsType: [DataType.BigInt, DataType.BigInt, DataType.Boolean],
-            paramsValue: [obj, sel(selector), arg],
-          });
+      const native: MacShellNative = {
+        setWindowClear: (contentView) => {
+          const nsWindow = nsWindowOf(contentView);
+          if (nsWindow === 0n) return;
+          msgBool(nsWindow, "setOpaque:", false);
+          const nsColor = getClass("NSColor");
+          const clearColor = nsColor === 0n ? 0n : msg0(nsColor, "clearColor");
+          if (clearColor !== 0n) msgPtr(nsWindow, "setBackgroundColor:", clearColor);
+          msg0(nsWindow, "invalidateShadow");
         },
-        msg1I64: (obj, selector, arg) => {
-          load({
-            library: objc,
-            funcName: "objc_msgSend",
-            retType: DataType.Void,
-            paramsType: [DataType.BigInt, DataType.BigInt, DataType.I64],
-            paramsValue: [obj, sel(selector), arg],
-          });
-        },
-        msg1Double: (obj, selector, arg) => {
-          load({
-            library: objc,
-            funcName: "objc_msgSend",
-            retType: DataType.Void,
-            paramsType: [DataType.BigInt, DataType.BigInt, DataType.Double],
-            paramsValue: [obj, sel(selector), arg],
-          });
-        },
-        msgAddSubview: (parent, subview, positioning, relativeTo) => {
+        createGlassView: (contentView) => {
+          const glassClass = getClass("NSGlassEffectView");
+          if (glassClass === 0n) return null;
+          const allocated = msg0(glassClass, "alloc");
+          const glassView = allocated === 0n ? 0n : msg0(allocated, "init");
+          if (glassView === 0n) return null;
+          msgBool(glassView, "setTranslatesAutoresizingMaskIntoConstraints:", false);
+          msgDouble(glassView, "setCornerRadius:", MACOS_LIQUID_GLASS_CORNER_RADIUS);
           load({
             library: objc,
             funcName: "objc_msgSend",
@@ -135,18 +189,91 @@ function loadMacObjcBridge(): Promise<MacObjcBridge | null> {
               DataType.BigInt,
             ],
             paramsValue: [
-              parent,
+              contentView,
               sel("addSubview:positioned:relativeTo:"),
-              subview,
-              positioning,
-              relativeTo,
+              glassView,
+              NS_WINDOW_BELOW,
+              0n,
             ],
           });
+          for (const anchor of ["topAnchor", "bottomAnchor", "leadingAnchor", "trailingAnchor"]) {
+            const viewAnchor = msg0(glassView, anchor);
+            const parentAnchor = msg0(contentView, anchor);
+            if (viewAnchor === 0n || parentAnchor === 0n) continue;
+            const constraint = msgPtr(viewAnchor, "constraintEqualToAnchor:", parentAnchor);
+            if (constraint !== 0n) msgBool(constraint, "setActive:", true);
+          }
+          return glassView;
+        },
+        setGlassStyle: (glassView, style) => {
+          msgI64(glassView, "setStyle:", NS_GLASS_EFFECT_STYLE[style]);
+        },
+        setGlassTint: (glassView, tint) => {
+          if (tint === null) {
+            msgPtr(glassView, "setTintColor:", 0n);
+            return;
+          }
+          const nsColor = getClass("NSColor");
+          if (nsColor === 0n) return;
+          const color = load({
+            library: objc,
+            funcName: "objc_msgSend",
+            retType: DataType.BigInt,
+            paramsType: [
+              DataType.BigInt,
+              DataType.BigInt,
+              DataType.Double,
+              DataType.Double,
+              DataType.Double,
+              DataType.Double,
+            ],
+            paramsValue: [
+              nsColor,
+              sel("colorWithSRGBRed:green:blue:alpha:"),
+              tint.red,
+              tint.green,
+              tint.blue,
+              tint.alpha,
+            ],
+          }).valueOf();
+          if (color !== 0n) msgPtr(glassView, "setTintColor:", color);
+        },
+        removeGlassView: (glassView) => {
+          msg0(glassView, "removeFromSuperview");
+          msg0(glassView, "release");
+        },
+        setBackgroundBlurRadius: (contentView, radius) => {
+          if (skyLight === null) return false;
+          const nsWindow = nsWindowOf(contentView);
+          if (nsWindow === 0n) return false;
+          // A deferred NSWindow has no WindowServer number until it is first shown.
+          const windowNumber = Number(msg0(nsWindow, "windowNumber"));
+          if (windowNumber <= 0) return false;
+          const connection = load({
+            library: skyLight,
+            funcName: "CGSMainConnectionID",
+            retType: DataType.I32,
+            paramsType: [],
+            paramsValue: [],
+          });
+          const error = load({
+            library: skyLight,
+            funcName: "CGSSetWindowBackgroundBlurRadius",
+            retType: DataType.I32,
+            paramsType: [DataType.I32, DataType.I64, DataType.I32],
+            paramsValue: [connection, windowNumber, Math.round(radius)],
+          });
+          return error === 0;
         },
       };
-      return bridge;
+      return native;
     })
     .catch(() => null));
+}
+
+/** Swaps the native bridge; tests pass a recorder, `undefined` restores the real one. */
+export function setMacShellNativeForTests(native: MacShellNative | null | undefined): void {
+  macNativePromise = native === undefined ? undefined : Promise.resolve(native);
 }
 
 function readNativeContentViewPointer(window: Electron.BrowserWindow): bigint | null {
@@ -157,74 +284,8 @@ function readNativeContentViewPointer(window: Electron.BrowserWindow): bigint | 
   return pointer === 0n ? null : pointer;
 }
 
-function detachMacGlassView(bridge: MacObjcBridge, state: WindowMaterialState): void {
-  if (state.glassView === null) return;
-  try {
-    bridge.msg0(state.glassView, "removeFromSuperview");
-    bridge.msg0(state.glassView, "release");
-  } catch {
-    // Ignore native teardown failures if the window is already disposing.
-  }
-  state.glassView = null;
-}
-
-function setMacWindowOpaque(
-  bridge: MacObjcBridge,
-  window: Electron.BrowserWindow,
-  opaque: boolean,
-): void {
-  const contentView = readNativeContentViewPointer(window);
-  if (contentView === null) return;
-  const nsWindow = bridge.msg0(contentView, "window");
-  if (nsWindow === 0n) return;
-  bridge.msg1Bool(nsWindow, "setOpaque:", opaque);
-  if (!opaque) {
-    const nsColorClass = bridge.objcGetClass("NSColor");
-    if (nsColorClass !== 0n) {
-      const clearColor = bridge.msg0(nsColorClass, "clearColor");
-      if (clearColor !== 0n) {
-        bridge.msg1Ptr(nsWindow, "setBackgroundColor:", clearColor);
-      }
-    }
-  }
-  bridge.msg0(nsWindow, "invalidateShadow");
-}
-
-function attachMacLiquidGlassView(
-  bridge: MacObjcBridge,
-  window: Electron.BrowserWindow,
-  state: WindowMaterialState,
-): boolean {
-  const contentView = readNativeContentViewPointer(window);
-  if (contentView === null) return false;
-  const glassClass = bridge.objcGetClass("NSGlassEffectView");
-  if (glassClass === 0n) return false;
-
-  setMacWindowOpaque(bridge, window, false);
-  state.nonOpaque = true;
-
-  if (state.glassView === null) {
-    const allocated = bridge.msg0(glassClass, "alloc");
-    const glassView = allocated === 0n ? 0n : bridge.msg0(allocated, "init");
-    if (glassView === 0n) return false;
-    bridge.msg1Bool(glassView, "setTranslatesAutoresizingMaskIntoConstraints:", false);
-    bridge.msg1I64(glassView, "setStyle:", NS_GLASS_EFFECT_STYLE_REGULAR);
-    bridge.msg1Double(glassView, "setCornerRadius:", MACOS_LIQUID_GLASS_CORNER_RADIUS);
-    bridge.msgAddSubview(contentView, glassView, NS_WINDOW_BELOW, 0n);
-    for (const anchor of ["topAnchor", "bottomAnchor", "leadingAnchor", "trailingAnchor"]) {
-      const viewAnchor = bridge.msg0(glassView, anchor);
-      const parentAnchor = bridge.msg0(contentView, anchor);
-      if (viewAnchor !== 0n && parentAnchor !== 0n) {
-        const constraint = bridge.msg1Ptr(viewAnchor, "constraintEqualToAnchor:", parentAnchor);
-        if (constraint !== 0n) {
-          bridge.msg1Bool(constraint, "setActive:", true);
-        }
-      }
-    }
-    state.glassView = glassView;
-  }
-
-  return true;
+function glassTintKey(tint: ShellGlassTint | null): string {
+  return tint === null ? "none" : `${tint.red},${tint.green},${tint.blue},${tint.alpha}`;
 }
 
 function setVibrancySafe(window: Electron.BrowserWindow, vibrancy: "under-window" | null): boolean {
@@ -242,26 +303,136 @@ function setWindowsMaterialSafe(
   return true;
 }
 
+function tryNative(call: () => boolean): boolean {
+  try {
+    return call();
+  } catch {
+    return false;
+  }
+}
+
+function isNativeIdle(state: WindowMaterialState | undefined): boolean {
+  return (
+    state === undefined ||
+    (state.glassView === null &&
+      state.blurRadius === 0 &&
+      !state.hasVibrancy &&
+      !state.hasWindowsMaterial)
+  );
+}
+
+async function applyMacMaterial(
+  window: Electron.BrowserWindow,
+  state: WindowMaterialState,
+  options: WindowShellMaterialOptions,
+): Promise<void> {
+  const { material } = options;
+  const contentView = readNativeContentViewPointer(window);
+  const native = contentView === null ? null : await loadMacShellNative();
+  if (window.isDestroyed()) return;
+
+  // Tear down whatever the new material doesn't use.
+  if (material !== "liquid-glass" && state.glassView !== null) {
+    if (native) {
+      try {
+        native.removeGlassView(state.glassView);
+      } catch {
+        // The window may already be disposing.
+      }
+    }
+    state.glassView = null;
+    state.glassStyle = null;
+    state.glassTintKey = null;
+  }
+  if (material !== "blur" && state.blurRadius !== 0) {
+    if (native && contentView !== null) {
+      tryNative(() => native.setBackgroundBlurRadius(contentView, 0));
+    }
+    state.blurRadius = 0;
+  }
+
+  // The macOS BrowserWindow is always transparent: CSS paints the frame (solid or translucent)
+  // and the inset card, so the window backing stays clear for every material.
+  window.setBackgroundColor("#00000000");
+
+  if (material === "blur") {
+    const radius = options.blurRadius ?? DEFAULT_BLUR_RADIUS;
+    if (
+      native &&
+      contentView !== null &&
+      tryNative(() => native.setBackgroundBlurRadius(contentView, radius))
+    ) {
+      state.blurRadius = radius;
+      if (state.hasVibrancy) {
+        setVibrancySafe(window, null);
+        state.hasVibrancy = false;
+      }
+      return;
+    }
+  }
+
+  if (material === "liquid-glass" && native && contentView !== null) {
+    const configured = tryNative(() => {
+      if (state.glassView === null) {
+        native.setWindowClear(contentView);
+        state.glassView = native.createGlassView(contentView);
+      }
+      if (state.glassView === null) return false;
+      const style = options.glassStyle ?? "regular";
+      if (state.glassStyle !== style) {
+        native.setGlassStyle(state.glassView, style);
+        state.glassStyle = style;
+      }
+      const tint = options.glassTint ?? null;
+      const tintKey = glassTintKey(tint);
+      if (state.glassTintKey !== tintKey) {
+        native.setGlassTint(state.glassView, tint);
+        state.glassTintKey = tintKey;
+      }
+      return true;
+    });
+    if (configured) {
+      if (state.hasVibrancy) {
+        setVibrancySafe(window, null);
+        state.hasVibrancy = false;
+      }
+      return;
+    }
+  }
+
+  // Blur without the WindowServer call, or Liquid Glass before macOS 26: frosted vibrancy.
+  const wantsVibrancy = material === "blur" || material === "liquid-glass";
+  if (wantsVibrancy && !state.hasVibrancy) {
+    state.hasVibrancy = setVibrancySafe(window, "under-window");
+  } else if (!wantsVibrancy && state.hasVibrancy) {
+    setVibrancySafe(window, null);
+    state.hasVibrancy = false;
+  }
+}
+
+// The main window is created hidden, before the WindowServer knows it, so the blur call fails and
+// Blur falls back to vibrancy; apply once more on first show with whatever was last requested.
+function scheduleReapplyOnShow(window: Electron.BrowserWindow, state: WindowMaterialState): void {
+  if (state.reapplyOnShow || state.latestOptions?.material !== "blur") return;
+  if (typeof window.isVisible !== "function" || typeof window.once !== "function") return;
+  if (window.isVisible()) return;
+  state.reapplyOnShow = true;
+  window.once("show", () => {
+    state.reapplyOnShow = false;
+    const latest = state.latestOptions;
+    if (latest === null || window.isDestroyed() || windowStates.get(window) !== state) return;
+    void applyMacMaterial(window, state, latest).catch(() => undefined);
+  });
+}
+
 export function applyWindowShellMaterial(
   window: Electron.BrowserWindow,
-  options: {
-    readonly material: ShellMaterial;
-    readonly solidBackgroundColor: string;
-    readonly platform: NodeJS.Platform;
-  },
+  options: WindowShellMaterialOptions,
 ): Effect.Effect<void> {
   return Effect.promise(async () => {
     if (window.isDestroyed()) return;
 
-    const existingState = windowStates.get(window);
-    if (
-      options.material === "solid" &&
-      (existingState === undefined ||
-        (existingState.glassView === null &&
-          !existingState.hasVibrancy &&
-          !existingState.hasWindowsMaterial &&
-          !existingState.nonOpaque))
-    ) {
+    if (options.material === "solid" && isNativeIdle(windowStates.get(window))) {
       window.setBackgroundColor(
         options.platform === "darwin" ? "#00000000" : options.solidBackgroundColor,
       );
@@ -271,69 +442,9 @@ export function applyWindowShellMaterial(
     const state = getWindowState(window);
 
     if (options.platform === "darwin") {
-      if (options.material === "solid") {
-        if (state.glassView !== null) {
-          const bridge = await loadMacObjcBridge();
-          if (bridge && !window.isDestroyed()) {
-            detachMacGlassView(bridge, state);
-          }
-        }
-        if (state.hasVibrancy && !window.isDestroyed()) {
-          setVibrancySafe(window, null);
-          state.hasVibrancy = false;
-        }
-        if (!window.isDestroyed()) {
-          // Keep the transparent macOS BrowserWindow's backing clear; CSS fills the solid frame.
-          window.setBackgroundColor("#00000000");
-        }
-        return;
-      }
-
-      if (options.material === "transparent") {
-        if (state.glassView !== null) {
-          const bridge = await loadMacObjcBridge();
-          if (bridge && !window.isDestroyed()) {
-            detachMacGlassView(bridge, state);
-          }
-        }
-        if (window.isDestroyed()) return;
-        if (state.hasVibrancy) {
-          setVibrancySafe(window, null);
-          state.hasVibrancy = false;
-        }
-        window.setBackgroundColor("#00000000");
-        return;
-      }
-
-      if (options.material === "blur") {
-        if (state.glassView !== null) {
-          const bridge = await loadMacObjcBridge();
-          if (bridge && !window.isDestroyed()) {
-            detachMacGlassView(bridge, state);
-          }
-        }
-        if (window.isDestroyed()) return;
-        window.setBackgroundColor("#00000000");
-        if (setVibrancySafe(window, "under-window")) {
-          state.hasVibrancy = true;
-        }
-        return;
-      }
-
-      // Liquid Glass on macOS 26+, falling back to frosted vibrancy on older macOS.
-      if (state.hasVibrancy) {
-        setVibrancySafe(window, null);
-        state.hasVibrancy = false;
-      }
-      window.setBackgroundColor("#00000000");
-      const bridge = await loadMacObjcBridge();
-      if (window.isDestroyed()) return;
-      if (bridge && attachMacLiquidGlassView(bridge, window, state)) {
-        return;
-      }
-      if (setVibrancySafe(window, "under-window")) {
-        state.hasVibrancy = true;
-      }
+      state.latestOptions = options;
+      await applyMacMaterial(window, state, options);
+      scheduleReapplyOnShow(window, state);
       return;
     }
 
@@ -365,13 +476,52 @@ export function cleanupWindowShellMaterial(window: Electron.BrowserWindow): void
   if (state.glassView === null) return;
   const glassView = state.glassView;
   state.glassView = null;
-  void loadMacObjcBridge().then((bridge) => {
-    if (!bridge) return;
+  void loadMacShellNative().then((native) => {
+    if (!native) return;
     try {
-      bridge.msg0(glassView, "removeFromSuperview");
-      bridge.msg0(glassView, "release");
+      native.removeGlassView(glassView);
     } catch {
       // Window is already closed.
     }
   });
+}
+
+export type ShellAppearanceSettings = Pick<
+  ClientSettings,
+  "shellMaterial" | "shellTransparency" | "shellBlur" | "shellGlassStyle" | "shellColor"
+>;
+
+export const DEFAULT_SHELL_APPEARANCE: ShellAppearanceSettings = {
+  shellMaterial: DEFAULT_CLIENT_SETTINGS.shellMaterial,
+  shellTransparency: DEFAULT_CLIENT_SETTINGS.shellTransparency,
+  shellBlur: DEFAULT_CLIENT_SETTINGS.shellBlur,
+  shellGlassStyle: DEFAULT_CLIENT_SETTINGS.shellGlassStyle,
+  shellColor: DEFAULT_CLIENT_SETTINGS.shellColor,
+};
+
+export function pickShellAppearance(settings: ShellAppearanceSettings): ShellAppearanceSettings {
+  return {
+    shellMaterial: settings.shellMaterial,
+    shellTransparency: settings.shellTransparency,
+    shellBlur: settings.shellBlur,
+    shellGlassStyle: settings.shellGlassStyle,
+    shellColor: settings.shellColor,
+  };
+}
+
+/** The native half of the shell appearance; the renderer paints the CSS half from the same settings. */
+export function shellMaterialOptions(
+  shell: ShellAppearanceSettings,
+  shouldUseDarkColors: boolean,
+): Pick<WindowShellMaterialOptions, "material" | "blurRadius" | "glassStyle" | "glassTint"> {
+  return {
+    material: shell.shellMaterial,
+    blurRadius: shellBlurRadius(shell.shellBlur),
+    glassStyle: shell.shellGlassStyle,
+    glassTint: shellGlassTint(
+      shell.shellColor,
+      shouldUseDarkColors ? "dark" : "light",
+      shell.shellTransparency,
+    ),
+  };
 }

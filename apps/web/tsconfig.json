@@ -40,6 +40,7 @@
     "../../scripts/lib/public-config.ts",
     "../../antimatter/rebrand.ts",
     "../../antimatter/shell.ts",
+    "../../antimatter/shellTint.ts",
     "../../antimatter/icons/plugin.ts",
     "../../antimatter/icons/sfSymbolIcon.ts",
     "../../antimatter/icons/sf-symbol-map.ts",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { adaptShellColor } from "../../../antimatter/shellTint";
 import { applyMattrShellAppearance, buildMattrShellGrainDataUrl } from "./mattrShellAppearance";
 
 function makeFakeRoot() {
@@ -37,14 +38,78 @@ describe("mattrShellAppearance", () => {
 
   it("applies and clears data attributes and CSS variable on the document root", () => {
     const root = makeFakeRoot();
-    applyMattrShellAppearance(root, { shellMaterial: "liquid-glass", shellGrain: 45 });
+    applyMattrShellAppearance(root, {
+      shellMaterial: "liquid-glass",
+      shellGrain: 45,
+      shellTransparency: 50,
+      shellColor: null,
+    });
     expect(root.dataset.mattrShellMaterial).toBe("liquid-glass");
     expect(root.dataset.mattrShellGrain).toBe("on");
     expect(root.style.getPropertyValue("--mattr-shell-grain")).toContain("data:image/svg+xml");
 
-    applyMattrShellAppearance(root, { shellMaterial: "solid", shellGrain: 0 });
+    applyMattrShellAppearance(root, {
+      shellMaterial: "solid",
+      shellGrain: 0,
+      shellTransparency: 50,
+      shellColor: null,
+    });
     expect(root.dataset.mattrShellMaterial).toBe("solid");
     expect(root.dataset.mattrShellGrain).toBeUndefined();
     expect(root.style.getPropertyValue("--mattr-shell-grain")).toBe("");
+  });
+
+  it("drives the frame opacity from the material and transparency", () => {
+    const root = makeFakeRoot();
+    applyMattrShellAppearance(root, {
+      shellMaterial: "transparent",
+      shellGrain: 0,
+      shellTransparency: 100,
+      shellColor: null,
+    });
+    expect(root.style.getPropertyValue("--mattr-shell-opacity")).toBe("0%");
+
+    applyMattrShellAppearance(root, {
+      shellMaterial: "transparent",
+      shellGrain: 0,
+      shellTransparency: 0,
+      shellColor: null,
+    });
+    expect(root.style.getPropertyValue("--mattr-shell-opacity")).toBe("96%");
+
+    applyMattrShellAppearance(root, {
+      shellMaterial: "solid",
+      shellGrain: 0,
+      shellTransparency: 100,
+      shellColor: null,
+    });
+    expect(root.style.getPropertyValue("--mattr-shell-opacity")).toBe("100%");
+  });
+
+  it("sets theme-fitted tint variables for a shell color and clears them on reset", () => {
+    const root = makeFakeRoot();
+    applyMattrShellAppearance(root, {
+      shellMaterial: "solid",
+      shellGrain: 0,
+      shellTransparency: 50,
+      shellColor: "#3f6e8c",
+    });
+    expect(root.dataset.mattrShellTint).toBe("on");
+    expect(root.style.getPropertyValue("--mattr-shell-tint-light")).toBe(
+      adaptShellColor("#3f6e8c", "light"),
+    );
+    expect(root.style.getPropertyValue("--mattr-shell-tint-dark")).toBe(
+      adaptShellColor("#3f6e8c", "dark"),
+    );
+
+    applyMattrShellAppearance(root, {
+      shellMaterial: "solid",
+      shellGrain: 0,
+      shellTransparency: 50,
+      shellColor: null,
+    });
+    expect(root.dataset.mattrShellTint).toBeUndefined();
+    expect(root.style.getPropertyValue("--mattr-shell-tint-light")).toBe("");
+    expect(root.style.getPropertyValue("--mattr-shell-tint-dark")).toBe("");
   });
 });

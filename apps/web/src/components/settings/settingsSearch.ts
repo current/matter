@@ -418,6 +418,35 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    // Prefixed because the slider control already owns the `shell-transparency` id.
+    id: "setting-shell-transparency",
+    title: msg("Shell transparency"),
+    to: "/settings/appearance",
+    desktopOnly: true,
+    searchTerms: [msg("window frame sidebar transparent see through opacity desktop")],
+  },
+  {
+    // Prefixed because the slider control already owns the `shell-blur` id.
+    id: "setting-shell-blur",
+    title: msg("Blur amount"),
+    to: "/settings/appearance",
+    desktopOnly: true,
+    searchTerms: [msg("window frame sidebar blur frosted radius strength")],
+  },
+  {
+    id: "shell-glass-style",
+    title: msg("Glass style"),
+    to: "/settings/appearance",
+    desktopOnly: true,
+    searchTerms: [msg("liquid glass clear regular frosted window frame")],
+  },
+  {
+    id: "shell-color",
+    title: msg("Shell color"),
+    to: "/settings/appearance",
+    searchTerms: [msg("arc tint color colour window frame sidebar theme hue")],
+  },
+  {
     // Prefixed because the slider control already owns the `shell-grain` id.
     id: "setting-shell-grain",
     title: msg("Shell grain"),

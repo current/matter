@@ -16,7 +16,6 @@ import {
   type DatabaseMigrationProgress,
   type DesktopSnapShotEvent,
   DEFAULT_CLIENT_SETTINGS,
-  type ShellMaterial,
 } from "@t3tools/contracts";
 
 import * as DesktopAssets from "../app/DesktopAssets.ts";
@@ -51,7 +50,14 @@ import { m } from "../i18n/messages.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
 import { makeQuitShortcutHandler } from "./QuitHold.ts";
 import { copyContextMenuImage } from "./ContextMenuImage.ts";
-import { applyWindowShellMaterial, cleanupWindowShellMaterial } from "./MattrShellMaterial.ts";
+import {
+  applyWindowShellMaterial,
+  cleanupWindowShellMaterial,
+  DEFAULT_SHELL_APPEARANCE,
+  pickShellAppearance,
+  type ShellAppearanceSettings,
+  shellMaterialOptions,
+} from "./MattrShellMaterial.ts";
 import { installMainWindowRemoteRequestHeaderPolicy } from "./RemoteRequestHeaders.ts";
 
 const TITLEBAR_HEIGHT = 40;
@@ -370,14 +376,14 @@ const syncWindowAppearance = Effect.fn("DesktopWindow.syncWindowAppearance")(fun
   hasTitleBarOverlay: boolean,
   shouldUseDarkColors: boolean,
   platform: NodeJS.Platform,
-  shellMaterial: ShellMaterial,
+  shell: ShellAppearanceSettings,
 ) {
   if (window.isDestroyed()) {
     return;
   }
 
   yield* applyWindowShellMaterial(window, {
-    material: shellMaterial,
+    ...shellMaterialOptions(shell, shouldUseDarkColors),
     solidBackgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
     platform,
   });
@@ -437,7 +443,7 @@ export const make = Effect.gen(function* () {
   );
   let flushMainWindowBounds: Effect.Effect<void> = Effect.void;
   let remoteRequestHeaderOwner: Electron.BrowserWindow | null = null;
-  let currentShellMaterial: ShellMaterial = DEFAULT_CLIENT_SETTINGS.shellMaterial;
+  let currentShell: ShellAppearanceSettings = DEFAULT_SHELL_APPEARANCE;
 
   const dismissConnectingSplash = Effect.gen(function* () {
     const splash = yield* Ref.getAndSet(splashWindowRef, Option.none());
@@ -484,9 +490,9 @@ export const make = Effect.gen(function* () {
     const persistedClientSettings = yield* clientSettings.get.pipe(
       Effect.orElseSucceed(() => Option.none()),
     );
-    currentShellMaterial = Option.match(persistedClientSettings, {
-      onNone: () => currentShellMaterial,
-      onSome: (settings) => settings.shellMaterial,
+    currentShell = Option.match(persistedClientSettings, {
+      onNone: () => currentShell,
+      onSome: pickShellAppearance,
     });
     const persistedSettings = yield* desktopSettings.get;
     const persistedBounds = persistedSettings.mainWindowBounds;
@@ -529,7 +535,7 @@ export const make = Effect.gen(function* () {
       backgroundColor:
         environment.platform === "darwin"
           ? "#00000000"
-          : currentShellMaterial === "solid"
+          : currentShell.shellMaterial === "solid"
             ? getInitialWindowBackgroundColor(shouldUseDarkColors)
             : "#00000000",
       ...iconOption,
@@ -558,9 +564,9 @@ export const make = Effect.gen(function* () {
     if (environment.platform === "darwin") {
       window.setAutoHideCursor(false);
     }
-    if (currentShellMaterial !== "solid") {
+    if (currentShell.shellMaterial !== "solid") {
       yield* applyWindowShellMaterial(window, {
-        material: currentShellMaterial,
+        ...shellMaterialOptions(currentShell, shouldUseDarkColors),
         solidBackgroundColor: getInitialWindowBackgroundColor(shouldUseDarkColors),
         platform: environment.platform,
       });
@@ -1350,9 +1356,9 @@ export const make = Effect.gen(function* () {
       const persistedClientSettings = yield* clientSettings.get.pipe(
         Effect.orElseSucceed(() => Option.none()),
       );
-      currentShellMaterial = Option.match(persistedClientSettings, {
-        onNone: () => currentShellMaterial,
-        onSome: (settings) => settings.shellMaterial,
+      currentShell = Option.match(persistedClientSettings, {
+        onNone: () => currentShell,
+        onSome: pickShellAppearance,
       });
       const mainWindow = yield* electronWindow.main;
       const activeMain = Option.getOrNull(mainWindow);
@@ -1362,7 +1368,7 @@ export const make = Effect.gen(function* () {
           titleBarOverlay,
           shouldUseDarkColors,
           environment.platform,
-          window === activeMain ? currentShellMaterial : "solid",
+          window === activeMain ? currentShell : { ...currentShell, shellMaterial: "solid" },
         ),
       );
     }).pipe(Effect.withSpan("desktop.window.syncAppearance")),

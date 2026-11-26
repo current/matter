@@ -162,6 +162,31 @@ export const ShellGrain = Schema.Int.check(
 export type ShellGrain = typeof ShellGrain.Type;
 const DEFAULT_SHELL_GRAIN: ShellGrain = 0;
 
+// mattr: how see-through the frame is for non-solid materials, the Blur material's native blur
+// radius, the Liquid Glass style, and an Arc-style frame color (null keeps the theme's frame).
+export const MIN_SHELL_TRANSPARENCY = 0;
+export const MAX_SHELL_TRANSPARENCY = 100;
+export const ShellTransparency = Schema.Int.check(
+  Schema.isBetween({ minimum: MIN_SHELL_TRANSPARENCY, maximum: MAX_SHELL_TRANSPARENCY }),
+);
+export type ShellTransparency = typeof ShellTransparency.Type;
+const DEFAULT_SHELL_TRANSPARENCY: ShellTransparency = 50;
+
+export const MIN_SHELL_BLUR = 0;
+export const MAX_SHELL_BLUR = 100;
+export const ShellBlur = Schema.Int.check(
+  Schema.isBetween({ minimum: MIN_SHELL_BLUR, maximum: MAX_SHELL_BLUR }),
+);
+export type ShellBlur = typeof ShellBlur.Type;
+const DEFAULT_SHELL_BLUR: ShellBlur = 60;
+
+export const ShellGlassStyle = Schema.Literals(["regular", "clear"]);
+export type ShellGlassStyle = typeof ShellGlassStyle.Type;
+const DEFAULT_SHELL_GLASS_STYLE: ShellGlassStyle = "regular";
+
+export const ShellColor = Schema.NullOr(Schema.String.check(Schema.isPattern(/^#[0-9a-f]{6}$/)));
+export type ShellColor = typeof ShellColor.Type;
+
 export const MIN_APPEARANCE_CONTRAST = 50;
 export const MAX_APPEARANCE_CONTRAST = 200;
 export const AppearanceContrast = Schema.Int.check(
@@ -514,6 +539,14 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_MATERIAL)),
   ),
   shellGrain: ShellGrain.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_GRAIN))),
+  shellTransparency: ShellTransparency.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_TRANSPARENCY)),
+  ),
+  shellBlur: ShellBlur.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_BLUR))),
+  shellGlassStyle: ShellGlassStyle.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_SHELL_GLASS_STYLE)),
+  ),
+  shellColor: ShellColor.pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   fontSizeInterface: InterfaceFontSize.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_INTERFACE_FONT_SIZE)),
   ),
@@ -2186,6 +2219,10 @@ export const ClientSettingsPatch = Schema.Struct({
   glassOpacity: Schema.optionalKey(GlassOpacity),
   shellMaterial: Schema.optionalKey(ShellMaterial),
   shellGrain: Schema.optionalKey(ShellGrain),
+  shellTransparency: Schema.optionalKey(ShellTransparency),
+  shellBlur: Schema.optionalKey(ShellBlur),
+  shellGlassStyle: Schema.optionalKey(ShellGlassStyle),
+  shellColor: Schema.optionalKey(ShellColor),
   onboardingCompletedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   fontSizeInterface: Schema.optionalKey(InterfaceFontSize),
   fontSizePrompt: Schema.optionalKey(PromptFontSize),

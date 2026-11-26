@@ -1,4 +1,10 @@
-import type { ShellGrain, ShellMaterial } from "@t3tools/contracts/settings";
+import type {
+  ShellColor,
+  ShellGrain,
+  ShellMaterial,
+  ShellTransparency,
+} from "@t3tools/contracts/settings";
+import { adaptShellColor, shellFrameOpacity } from "../../../antimatter/shellTint";
 
 const SHELL_GRAIN_TILE_SIZE = 180;
 const SHELL_GRAIN_MAX_OPACITY = 0.12;
@@ -23,14 +29,31 @@ export function buildMattrShellGrainDataUrl(grainPercent: number): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-export function applyMattrShellAppearance(
-  root: HTMLElement,
-  settings: {
-    readonly shellMaterial: ShellMaterial;
-    readonly shellGrain: ShellGrain;
-  },
-): void {
+export interface MattrShellAppearance {
+  readonly shellMaterial: ShellMaterial;
+  readonly shellGrain: ShellGrain;
+  readonly shellTransparency: ShellTransparency;
+  readonly shellColor: ShellColor;
+}
+
+export function applyMattrShellAppearance(root: HTMLElement, settings: MattrShellAppearance): void {
   root.dataset.mattrShellMaterial = settings.shellMaterial;
+  root.style.setProperty(
+    "--mattr-shell-opacity",
+    `${shellFrameOpacity(settings.shellMaterial, settings.shellTransparency) * 100}%`,
+  );
+  if (settings.shellColor === null) {
+    delete root.dataset.mattrShellTint;
+    root.style.removeProperty("--mattr-shell-tint-light");
+    root.style.removeProperty("--mattr-shell-tint-dark");
+  } else {
+    root.dataset.mattrShellTint = "on";
+    root.style.setProperty(
+      "--mattr-shell-tint-light",
+      adaptShellColor(settings.shellColor, "light"),
+    );
+    root.style.setProperty("--mattr-shell-tint-dark", adaptShellColor(settings.shellColor, "dark"));
+  }
   if (settings.shellGrain > 0) {
     root.dataset.mattrShellGrain = "on";
     root.style.setProperty("--mattr-shell-grain", buildMattrShellGrainDataUrl(settings.shellGrain));

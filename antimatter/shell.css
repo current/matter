@@ -18,7 +18,11 @@
   [data-slot="sidebar-wrapper"] {
     --mattr-shell-gap: 8px;
     --mattr-shell-radius: 10px;
-    --mattr-frame: var(--sidebar);
+    /* The frame is one base color (the theme's, or the Arc-style Shell color fitted to the theme
+       by antimatter/shellTint.ts) painted at one opacity (--mattr-shell-opacity, from the Shell
+       transparency setting; always 100% for Solid). */
+    --mattr-frame-base: var(--sidebar);
+    --mattr-frame: var(--mattr-frame-base);
     --mattr-canvas: var(--background);
     /* Resolved here, before the card sets its own titlebar row height. */
     --mattr-frame-titlebar: var(--workspace-topbar-height);
@@ -27,7 +31,7 @@
   }
 
   .dark [data-slot="sidebar-wrapper"] {
-    --mattr-frame: #111313;
+    --mattr-frame-base: #111313;
     /* A soft near-black card instead of true black, so it sits in the gray frame without a hard
        edge; raised surfaces (composer, details card) lift one step above it. */
     --mattr-canvas: #141414;
@@ -79,28 +83,21 @@
     background-image: none !important;
   }
 
-  html[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(in srgb, var(--sidebar) 46%, transparent);
+  html[data-mattr-shell-tint="on"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame-base: var(--mattr-shell-tint-light);
   }
 
-  html.dark[data-mattr-shell-material="transparent"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: rgb(17 19 19 / 46%);
+  html.dark[data-mattr-shell-tint="on"] [data-slot="sidebar-wrapper"] {
+    --mattr-frame-base: var(--mattr-shell-tint-dark);
   }
 
-  html[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(in srgb, var(--sidebar) 30%, transparent);
-  }
-
-  html.dark[data-mattr-shell-material="blur"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: rgb(17 19 19 / 28%);
-  }
-
-  html[data-mattr-shell-material="liquid-glass"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: color-mix(in srgb, var(--sidebar) 14%, transparent);
-  }
-
-  html.dark[data-mattr-shell-material="liquid-glass"] [data-slot="sidebar-wrapper"] {
-    --mattr-frame: rgb(17 19 19 / 16%);
+  html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
+    [data-slot="sidebar-wrapper"] {
+    --mattr-frame: color-mix(
+      in srgb,
+      var(--mattr-frame-base) var(--mattr-shell-opacity, 46%),
+      transparent
+    );
   }
 
   html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"])
