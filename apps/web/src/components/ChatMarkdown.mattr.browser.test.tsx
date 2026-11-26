@@ -121,4 +121,26 @@ describe("ChatMarkdown streaming text animation", () => {
     expect(words(container)).toHaveLength(0);
     expect(caret(container)).toBeNull();
   });
+
+  it("segments CJK prose into individual animated words and keeps settled segments mounted", async () => {
+    using _mode = streamMode("blur");
+    await using screen = await render(message("日本語のテスト", true));
+    const { container, rerender } = screen;
+    const settled = words(container);
+    expect(settled.length).toBeGreaterThan(1);
+    expect(settled.map((node) => node.textContent).join("")).toBe("日本語のテスト");
+
+    await rerender(message("日本語のテストを実行します", true));
+    const next = words(container);
+    expect(next.length).toBeGreaterThan(settled.length);
+    settled.forEach((node, index) => expect(next[index]).toBe(node));
+  });
+
+  it("keeps strikethrough spans inline under Rise & Settle so line-through paints while streaming", async () => {
+    using _mode = streamMode("rise");
+    await using screen = await render(message("Keep ~~old code~~ now", true));
+    const struckWord = screen.container.querySelector<HTMLElement>(`del .${STREAM_WORD_CLASS}`);
+    expect(struckWord).not.toBeNull();
+    expect(getComputedStyle(struckWord!).display).toBe("inline");
+  });
 });

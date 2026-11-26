@@ -192,7 +192,7 @@ export function MattrStreamAnimationSetting() {
                 <span className="block truncate text-sm font-medium text-foreground">
                   {m(definition.name)}
                 </span>
-                <span className="block truncate text-2xs text-muted-foreground">
+                <span className="line-clamp-2 text-2xs text-muted-foreground">
                   {m(definition.description)}
                 </span>
               </span>

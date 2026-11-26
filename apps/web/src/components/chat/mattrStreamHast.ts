@@ -45,10 +45,27 @@ const CARET_HOSTS = new Set([
 const CARET_CONTAINERS = new Set([...CARET_HOSTS, "ul", "ol", "blockquote", "div"]);
 
 const TOKEN_PATTERN = /\s+|\S+/g;
+const wordSegmenter =
+  typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
+    ? new Intl.Segmenter(undefined, { granularity: "word" })
+    : null;
 
-/** Splits text into alternating words and runs of space, in order. */
+/** Splits text into alternating word segments and runs of space, including space-less scripts (CJK). */
 export function splitStreamWords(value: string): string[] {
-  return value.match(TOKEN_PATTERN) ?? [];
+  const chunks = value.match(TOKEN_PATTERN);
+  if (!chunks) return [];
+  if (!wordSegmenter) return chunks;
+  const out: string[] = [];
+  for (const chunk of chunks) {
+    if (isSpace(chunk)) {
+      out.push(chunk);
+      continue;
+    }
+    for (const { segment } of wordSegmenter.segment(chunk)) {
+      if (segment.length > 0) out.push(segment);
+    }
+  }
+  return out;
 }
 
 const isSpace = (token: string) => /\s/.test(token[0]!);
