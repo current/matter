@@ -1,4 +1,5 @@
 import { isElectron } from "../../../env";
+import type { SidebarRouteReveal } from "../routeReveal";
 import { SidebarChromeHeader } from "../SidebarChrome";
 import { MattrDefaultSidebar } from "./MattrDefaultSidebar";
 import { MattrSpacesSidebar } from "./MattrSpacesSidebar";
@@ -11,8 +12,10 @@ import { useMattrSidebarModel } from "./useMattrSidebarModel";
  * Default and Timeline carry their own footers. */
 export function MattrCustomSidebarHost({
   layout,
+  routeReveal,
 }: {
   layout: Exclude<MattrSidebarLayout, "classic">;
+  routeReveal?: SidebarRouteReveal | undefined;
 }) {
   const model = useMattrSidebarModel();
   return (
@@ -24,7 +27,7 @@ export function MattrCustomSidebarHost({
           <MattrStatusLine />
         </>
       ) : layout === "timeline" ? (
-        <MattrTimelineSidebar model={model} />
+        <MattrTimelineSidebar model={model} routeReveal={routeReveal} />
       ) : (
         <MattrDefaultSidebar model={model} />
       )}

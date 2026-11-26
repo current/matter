@@ -299,35 +299,30 @@
 
   /* The titlebar row reads as three groups, in visible gaps: traffic lights, 18pt (the inset in
      apps/desktop/src/preload.ts), toggle + wordmark 12pt apart, 16pt, then the history chevrons as
-     one 8pt pair. Narrow buttons keep the thin chevrons from sitting a full button apart. */
+     a pair of 24px non-overlapping hit targets. */
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     div:has(> button > svg.lucide-arrow-left) {
-    margin-inline-start: 7.5px;
+    margin-inline-start: 2.5px;
+  }
+
+  [data-slot="sidebar-inner"]
+    :is([data-mattr-sidebar-layout="inbox"], [data-mattr-sidebar-layout="timeline"])
+    .drag-region
+    div:has(> button > svg.lucide-arrow-left) {
+    margin-inline-start: var(--workspace-titlebar-content-left);
   }
 
   :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
     .drag-region
     button:has(> svg:is(.lucide-arrow-left, .lucide-arrow-right)) {
-    width: 14px;
-  }
-
-  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
-    .drag-region
-    button:has(> svg.lucide-arrow-right) {
-    margin-inline-start: -1.5px;
-  }
-
-  /* The 14pt chevrons are too narrow for a hover backdrop: hover only brightens the glyph. */
-  :is([data-mattr-collapsed-header], [data-slot="sidebar-inner"])
-    .drag-region
-    button:has(> svg:is(.lucide-arrow-left, .lucide-arrow-right)) {
+    width: 24px;
     --control-icon-color: var(--contrast-muted-foreground);
     background-color: transparent;
 
     &:is(:hover, [data-pressed]):not(:disabled) {
       --control-icon-color: var(--foreground);
-      background-color: transparent;
+      background-color: var(--accent);
     }
   }
 

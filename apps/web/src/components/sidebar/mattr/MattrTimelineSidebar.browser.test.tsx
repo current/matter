@@ -50,6 +50,7 @@ import {
   MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY,
 } from "./mattrSidebarStore";
 import { MattrTimelineSidebar } from "./MattrTimelineSidebar";
+import type { SidebarRouteReveal } from "../routeReveal";
 import type { MattrSidebarModel, MattrSidebarProject } from "./useMattrSidebarModel";
 
 const TIMELINE_SORT_STORAGE_KEY = "mattr:sidebar:timeline-sort:v1";
@@ -74,18 +75,23 @@ function project(id: string, name: string): MattrSidebarProject {
 }
 
 const MATTR = project("mattr", "mattr");
+const LILT = project("lilt", "Lilt");
 
-function thread(title: string, overrides: ThreadFixtureOverrides = {}) {
+function thread(
+  title: string,
+  overrides: ThreadFixtureOverrides = {},
+  owner: MattrSidebarProject | null = MATTR,
+) {
   return toMattrThreadItem(
     makeThreadFixture({
       environmentId,
       id: ThreadId.make(title),
-      projectId: ProjectId.make(MATTR.key),
+      projectId: ProjectId.make(owner?.key ?? "none"),
       title,
       latestUserMessageAt: local(10, 9),
       ...overrides,
     }),
-    MATTR,
+    owner,
     NOW_ISO,
   );
 }
@@ -158,7 +164,12 @@ function model(overrides: Partial<MattrSidebarModel> = {}): MattrSidebarModel {
     activeThreadKey: today.key,
     nowMs: NOW_MS,
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
-    actions: { openThread: vi.fn(), newThread: vi.fn(), openThreadMenu: vi.fn() },
+    actions: {
+      openThread: vi.fn(),
+      newThread: vi.fn(),
+      openThreadMenu: vi.fn(),
+      runThreadAction: vi.fn(),
+    },
     ...overrides,
   };
 }
@@ -208,10 +219,10 @@ function useServer(
   };
 }
 
-const renderTimeline = (current: MattrSidebarModel = model()) =>
+const renderTimeline = (current: MattrSidebarModel = model(), routeReveal?: SidebarRouteReveal) =>
   render(
     <SidebarProvider>
-      <MattrTimelineSidebar model={current} />
+      <MattrTimelineSidebar model={current} routeReveal={routeReveal} />
     </SidebarProvider>,
   );
 
@@ -260,7 +271,8 @@ describe("MattrTimelineSidebar", () => {
     expect(needs!.querySelector(".mts-sm")?.textContent).toBe("Needs you");
     expect(needs!.querySelector(".mts-sm")?.getAttribute("data-tone")).toBe("needs");
     expect(running!.querySelector(".mts-conn")).not.toBeNull();
-    expect(running!.querySelector(".mts-sm")?.textContent).toBe("subagent · 4m");
+    expect(running!.querySelector(".mts-sm")?.textContent).toBe("4m");
+    expect(running!.querySelector(".mts-sub-dot")).not.toBeNull();
     expect(screen.container.textContent).not.toContain("Write matrix doc");
     expect(screen.container.textContent).not.toContain("Broken probe");
   });
@@ -308,17 +320,22 @@ describe("MattrTimelineSidebar", () => {
     }
   });
 
-  it("spins the running indicator smoothly", async () => {
+  it("spins the running indicator smoothly and wires observeVisibleAnimation", async () => {
     using _server = useServer();
     await using screen = await renderTimeline(
       model({ items: [{ ...today, attention: "running" }, yesterday, older], children: [] }),
     );
     await expect.element(page.getByRole("img", { name: "Running" })).toBeInTheDocument();
-    const spin = getComputedStyle(screen.container.querySelector(".mts-spin")!);
+    const spinEl = screen.container.querySelector<SVGSVGElement>(".mts-spin")!;
+    const spin = getComputedStyle(spinEl);
     expect(spin.animationName).toBe("mts-spin");
     expect(spin.animationTimingFunction).toBe("linear");
     expect(spin.animationIterationCount).toBe("infinite");
     expect(screen.container.querySelectorAll(".mts-spin")).toHaveLength(1);
+    await expect
+      .poll(() => spinEl.style.getPropertyValue("--visible-animation-state"))
+      .toBe("running");
+    expect(spinEl.style.getPropertyValue("--visible-animation-will-change")).toBe("transform");
   });
 
   it("hides every subagent while Show active subagents is off", async () => {
@@ -363,15 +380,142 @@ describe("MattrTimelineSidebar", () => {
     expect(current.actions.openThread).toHaveBeenCalledWith(yesterday);
   });
 
-  it("toggles the sort and saves it", async () => {
+  it("toggles the sort, highlights data-sort=created, and saves it", async () => {
     using _server = useServer();
-    await using _screen = await renderTimeline();
-    await page.getByRole("button", { name: "Sort by created" }).click();
-    await expect.element(page.getByRole("button", { name: "Sort by last update" })).toBeVisible();
+    await using screen = await renderTimeline();
+    const sortBtn = page.getByRole("button", { name: "Sort by created" });
+    await expect.element(sortBtn).toHaveAttribute("data-sort", "updated");
+    expect(screen.container.querySelector(".mts-so-lab")).toBeNull();
+
+    await sortBtn.click();
+    const activeSort = page.getByRole("button", { name: "Sort by last update" });
+    await expect.element(activeSort).toBeVisible();
+    await expect.element(activeSort).toHaveAttribute("data-sort", "created");
+    expect(screen.container.querySelector(".mts-so-lab")?.textContent).toBe("Created");
     expect(window.localStorage.getItem(TIMELINE_SORT_STORAGE_KEY)).toBe('"created"');
   });
 
-  it("shows usage meters from provider limits and none without them", async () => {
+  it("keeps Inbox transparent when off and shows removable Needs you pill when active", async () => {
+    using _server = useServer();
+    await using screen = await renderTimeline(
+      model({
+        items: [today, thread("Needs approval", { hasPendingApprovals: true }), yesterday],
+        children: [],
+      }),
+    );
+    const inbox = page.getByRole("button", { name: /^Needs you/ });
+    await expect.element(inbox).toHaveAttribute("aria-pressed", "false");
+    expect(getComputedStyle(inbox.element()).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    expect(screen.container.querySelector(".mts-pill")).toBeNull();
+
+    await inbox.click();
+    await expect.element(inbox).toHaveAttribute("aria-pressed", "true");
+    expect(getComputedStyle(inbox.element()).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    const pill = page.getByRole("button", { name: "Clear Needs you filter" });
+    await expect.element(pill).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "Needs approval" })).toBeVisible();
+    expect(row(screen.container, today)).toBeNull();
+
+    await pill.click();
+    await expect.element(inbox).toHaveAttribute("aria-pressed", "false");
+    await expect.element(pill).not.toBeInTheDocument();
+  });
+
+  it("omits workspace icon on No project threads and hides project name when filtered", async () => {
+    using _server = useServer();
+    const scratch = thread("Scratch note", { worktreePath: "/tmp/scratch-wt" }, null);
+    const liltThread = thread(
+      "Lilt polish",
+      { branch: "lilt/fix", worktreePath: "/worktrees/lilt/fix" },
+      LILT,
+    );
+    await using screen = await renderTimeline(
+      model({ items: [today, scratch, liltThread], children: [], projects: [MATTR, LILT] }),
+    );
+    const scratchRow = row(screen.container, scratch)!;
+    expect(scratchRow.querySelector("[data-mattr-workspace]")).toBeNull();
+    expect(scratchRow.querySelector(".mts-proj")?.textContent).toBe("No project");
+
+    await page.getByRole("button", { name: "Activity scope: All activity" }).click();
+    await page.getByRole("menuitemradio", { name: /^Lilt/ }).click();
+    const filteredRow = row(screen.container, liltThread)!;
+    expect(filteredRow.querySelector(".mts-proj")).toBeNull();
+    expect(filteredRow.querySelector('[data-mattr-workspace="worktree"]')).not.toBeNull();
+    expect(filteredRow.querySelector(".mts-br")?.textContent).toBe("lilt/fix");
+  });
+
+  it("renders Pinned bucket, Failed dot, Unread salience, and idle relative timestamps", async () => {
+    using _server = useServer();
+    const pinned = thread("Pinned spec", {
+      pinnedAt: local(1, 9),
+      latestUserMessageAt: local(10, 11),
+    });
+    const failed = thread("Broken run", { runtime: runtime("failed") });
+    const unread = thread("Fresh reply", {
+      latestUserMessageAt: local(10, 11),
+      lastVisitedAt: local(10, 10),
+      latestRun: {
+        runId: RunId.make("done"),
+        status: "completed",
+        requestedAt: null,
+        startedAt: local(10, 11),
+        completedAt: local(10, 11, 45),
+        assistantMessageId: null,
+      },
+    });
+    await using screen = await renderTimeline(
+      model({ items: [pinned, failed, unread, today], children: [] }),
+    );
+    const pinnedRegion = page.getByRole("region", { name: "Pinned" });
+    await expect.element(pinnedRegion.getByRole("button", { name: "Pinned spec" })).toBeVisible();
+    expect(row(screen.container, pinned)!.querySelector(".mts-pin")).not.toBeNull();
+
+    const failedRow = row(screen.container, failed)!;
+    expect(failedRow.querySelector(".mts-fail")).not.toBeNull();
+    expect(failedRow.querySelector(".mts-age")).toBeNull();
+
+    const unreadRow = row(screen.container, unread)!;
+    expect(unreadRow.hasAttribute("data-unread")).toBe(true);
+    expect(unreadRow.querySelector(".mts-unread")).not.toBeNull();
+    expect(unreadRow.querySelector(".mts-age")?.textContent).toBe("15m");
+
+    const todayRow = row(screen.container, today)!;
+    expect(todayRow.querySelector(".mts-age")?.textContent).toBe("3h");
+  });
+
+  it("renders distinct open and merged PR glyphs", async () => {
+    using _server = useServer();
+    await using screen = await renderTimeline();
+    const openSvg = row(screen.container, today)!.querySelector('.mts-pr[data-state="open"] svg')!;
+    const mergedSvg = row(screen.container, yesterday)!.querySelector(
+      '.mts-pr[data-state="merged"] svg',
+    )!;
+    expect(openSvg.innerHTML).not.toBe(mergedSvg.innerHTML);
+  });
+
+  it("opens a frosted Web/PWA thread menu on right-click and via the row actions trigger", async () => {
+    using _server = useServer();
+    const current = model({ children: [] });
+    await using screen = await renderTimeline(current);
+    const todayRow = row(screen.container, today)!;
+
+    todayRow.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 80, clientY: 120 }),
+    );
+    await expect.element(page.getByRole("menuitem", { name: "Pin" })).toBeVisible();
+    await expect.element(page.getByRole("menuitem", { name: "Copy link" })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Pin" }).click();
+    expect(current.actions.runThreadAction).toHaveBeenCalledWith(today, "pin");
+
+    const moreButton = todayRow.querySelector<HTMLButtonElement>(".mts-more")!;
+    expect(moreButton).not.toBeNull();
+    moreButton.click();
+    await expect.element(page.getByRole("menuitem", { name: "Mark as unread" })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Mark as unread" }).click();
+    expect(current.actions.runThreadAction).toHaveBeenCalledWith(today, "mark-unread");
+  });
+
+  it("shows 3+ usage meters with severity tones and none without limits", async () => {
     using _server = useServer({
       providers: [
         {
@@ -384,13 +528,48 @@ describe("MattrTimelineSidebar", () => {
             windows: [{ id: "weekly", kind: "weekly", label: "Weekly", usedPercent: 47 }],
           },
         } as unknown as ServerProvider,
+        {
+          instanceId: "codex",
+          driver: "codex",
+          displayName: "Codex",
+          enabled: true,
+          usageLimits: {
+            checkedAt: NOW_ISO,
+            windows: [
+              {
+                id: "session",
+                kind: "session",
+                label: "5h",
+                windowDurationMins: 300,
+                usedPercent: 82,
+              },
+            ],
+          },
+        } as unknown as ServerProvider,
+        {
+          instanceId: "antigravity",
+          driver: "antigravity",
+          displayName: "Antigravity",
+          enabled: true,
+          usageLimits: {
+            checkedAt: NOW_ISO,
+            windows: [{ id: "weekly", kind: "weekly", label: "Weekly", usedPercent: 96 }],
+          },
+        } as unknown as ServerProvider,
       ],
     });
     await using screen = await renderTimeline();
     const meters = page.getByRole("group", { name: "Usage limits" });
-    await expect
-      .element(meters.getByRole("button", { name: "Claude · wk: 47% used" }))
-      .toBeVisible();
+    const claudeBtn = meters.getByRole("button", { name: "Claude · wk: 47% used" });
+    const codexBtn = meters.getByRole("button", { name: "Codex · 5h: 82% used" });
+    const agBtn = meters.getByRole("button", { name: "Antigravity · wk: 96% used" });
+    await expect.element(claudeBtn).toHaveAttribute("data-tone", "normal");
+    await expect.element(codexBtn).toHaveAttribute("data-tone", "warn");
+    await expect.element(agBtn).toHaveAttribute("data-tone", "critical");
+    expect(codexBtn.element().querySelector(".mts-pi")?.hasAttribute("data-monochrome")).toBe(true);
+    expect(claudeBtn.element().querySelector(".mts-pi")?.hasAttribute("data-monochrome")).toBe(
+      false,
+    );
 
     harness.providers = [];
     await screen.rerender(
@@ -400,6 +579,60 @@ describe("MattrTimelineSidebar", () => {
     );
     await expect.element(meters).not.toBeInTheDocument();
     expect(screen.container.querySelector(".mts-use")).toBeNull();
+  });
+
+  it("tracks top/bottom scroll fade and respects data-mattr-scroll-fade=off", async () => {
+    using _server = useServer();
+    const many = Array.from({ length: 18 }, (_, index) =>
+      thread(`Thread ${index + 1}`, { latestUserMessageAt: local(10, 9, index) }),
+    );
+    await using screen = await render(
+      <div style={{ height: "260px", display: "flex", flexDirection: "column" }}>
+        <SidebarProvider>
+          <MattrTimelineSidebar model={model({ items: many, children: [] })} />
+        </SidebarProvider>
+      </div>,
+    );
+    const list = screen.container.querySelector<HTMLDivElement>(".mts-list")!;
+    await expect.poll(() => list.hasAttribute("data-scrolled-bottom")).toBe(true);
+    expect(list.hasAttribute("data-scrolled-top")).toBe(false);
+
+    list.scrollTop = 60;
+    list.dispatchEvent(new Event("scroll"));
+    expect(list.hasAttribute("data-scrolled-top")).toBe(true);
+    expect(getComputedStyle(list).maskImage).not.toBe("none");
+
+    document.documentElement.setAttribute("data-mattr-scroll-fade", "off");
+    try {
+      expect(getComputedStyle(list).maskImage).toBe("none");
+    } finally {
+      document.documentElement.removeAttribute("data-mattr-scroll-fade");
+    }
+  });
+
+  it("reveals the active row when activeThreadKey changes", async () => {
+    using _server = useServer();
+    const reveal: SidebarRouteReveal = { observedKey: null, pendingKey: null };
+    const scrollSpy = vi
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+    try {
+      await using screen = await renderTimeline(model({ activeThreadKey: today.key }), reveal);
+      expect(scrollSpy).toHaveBeenCalled();
+      scrollSpy.mockClear();
+
+      await screen.rerender(
+        <SidebarProvider>
+          <MattrTimelineSidebar
+            model={model({ activeThreadKey: yesterday.key })}
+            routeReveal={reveal}
+          />
+        </SidebarProvider>,
+      );
+      expect(scrollSpy).toHaveBeenCalledWith({ block: "nearest" });
+    } finally {
+      scrollSpy.mockRestore();
+    }
   });
 });
 

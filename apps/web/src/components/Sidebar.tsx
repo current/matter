@@ -931,7 +931,9 @@ function readRouteThreadKey(router: AnyRouter): string | null {
 
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
   const [mattrLayout] = useMattrSidebarLayout();
-  if (mattrLayout !== "classic") return <MattrCustomSidebarHost layout={mattrLayout} />;
+  if (mattrLayout !== "classic") {
+    return <MattrCustomSidebarHost layout={mattrLayout} routeReveal={routeReveal} />;
+  }
   return <ClassicSidebar routeReveal={routeReveal} />;
 }
 

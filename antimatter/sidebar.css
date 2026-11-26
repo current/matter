@@ -93,9 +93,12 @@
    uses hash history, so its home link's href ends in "#/" rather than being "/". */
 [data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]),
 [data-mattr-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) {
-  width: 0;
-  min-width: 0;
-  visibility: hidden;
+  display: none !important;
+}
+
+[data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]) + div,
+[data-mattr-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) + div {
+  margin-inline-start: var(--workspace-titlebar-content-left);
 }
 
 /* Brand row: wordmark menu and the Inbox button. */
@@ -518,7 +521,6 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
 .mfs-row[data-active],
 .mfs-row[aria-current="page"] {
   background: var(--mfs-active);
-  box-shadow: inset 0 0 0 1px var(--mfs-active-ring);
   color: var(--mfs-fg);
   font-weight: 500;
 }

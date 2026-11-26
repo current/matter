@@ -87,17 +87,22 @@ export function MattrMenuPopup({
   children,
   align = "start",
   side = "bottom",
+  anchor,
+  sideOffset = 4,
 }: {
   children: ReactNode;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom";
+  anchor?: MenuPrimitive.Positioner.Props["anchor"];
+  sideOffset?: number;
 }) {
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
         align={align}
         side={side}
-        sideOffset={4}
+        anchor={anchor}
+        sideOffset={sideOffset}
         className="z-[130]"
         render={renderClosingPositioner}
       >
@@ -109,7 +114,7 @@ export function MattrMenuPopup({
   );
 }
 
-function MattrMenuItem({
+export function MattrMenuItem({
   icon,
   label,
   hint,
@@ -169,7 +174,13 @@ function useHostStatus() {
 }
 
 /** The "mattr ⌄" brand menu: Settings, Usage, Voice Mode, layout, and the host's state. */
-export function MattrBrandMenu({ onNavigate }: { onNavigate: () => void }) {
+export function MattrBrandMenu({
+  onNavigate,
+  caret,
+}: {
+  onNavigate: () => void;
+  caret?: ReactNode;
+}) {
   const gt = useGT();
   const navigate = useNavigate();
   const [layout, setLayout] = useMattrSidebarLayout();
@@ -185,7 +196,7 @@ export function MattrBrandMenu({ onNavigate }: { onNavigate: () => void }) {
       <MenuPrimitive.Trigger className="mfs-wn" aria-label={gt("mattr menu")}>
         <T3Wordmark aria-hidden className="mfs-logo" />
         <span>{"mattr"}</span>
-        <ChevronDownIcon aria-hidden className="mfs-caret" />
+        {caret ?? <ChevronDownIcon aria-hidden className="mfs-caret" />}
       </MenuPrimitive.Trigger>
       <MattrMenuPopup>
         <MattrMenuItem

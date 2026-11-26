@@ -555,9 +555,9 @@ describe("Default layout titlebar", () => {
         </div>,
       );
       const [brand, elsewhere] = screen.container.querySelectorAll("a");
-      expect(getComputedStyle(brand!).visibility).toBe("hidden");
+      expect(getComputedStyle(brand!).display).toBe("none");
       expect(brand!.getBoundingClientRect().width).toBe(0);
-      expect(getComputedStyle(elsewhere!).visibility).toBe("visible");
+      expect(getComputedStyle(elsewhere!).display).not.toBe("none");
     },
   );
 });

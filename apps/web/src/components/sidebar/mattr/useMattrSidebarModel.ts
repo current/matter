@@ -2,6 +2,7 @@ import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { pickableProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { isShownUnderParent } from "@t3tools/client-runtime/state/threads";
+import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import type {
   ContextMenuSource,
   ProviderDriverKind,
@@ -12,11 +13,14 @@ import { useRouter } from "@tanstack/react-router";
 import { useGT } from "gt-react";
 
 import { openCommandPalette } from "../../../commandPaletteBus";
+import { configuredHostedAppUrl } from "../../../hostedPairing";
 import { useHandleNewThread } from "../../../hooks/useHandleNewThread";
 import { useNowMinute } from "../../../hooks/useNowMinute";
 import { useShownThreadRouteTarget } from "../../../hooks/useShownThreadRouteTarget";
 import { useSidebarProjectGroups } from "../../../hooks/useSidebarProjectGroups";
 import { useThreadActions } from "../../../hooks/useThreadActions";
+import { m } from "../../../i18n/messages";
+import { copyThreadReference } from "../../../lib/copyThreadReference";
 import { readLocalApi } from "../../../localApi";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { useDelegatedUnderParent, useQuietThreadShells } from "../../../state/entities";
@@ -39,6 +43,16 @@ export interface MattrSidebarProject extends MattrProjectRef {
   readonly group: SidebarProjectSnapshot;
 }
 
+export type MattrThreadMenuAction =
+  | "open"
+  | "pin"
+  | "unpin"
+  | "mark-unread"
+  | "settle"
+  | "unsettle"
+  | "archive"
+  | "copy-link";
+
 export interface MattrSidebarActions {
   readonly openThread: (item: MattrThreadItem) => void;
   readonly newThread: (projectKey: string | null) => void;
@@ -47,6 +61,8 @@ export interface MattrSidebarActions {
     position: { x: number; y: number },
     source: ContextMenuSource,
   ) => void;
+  /** Runs one thread menu action directly (used by Web/PWA popover menus when no native menu exists). */
+  readonly runThreadAction?: (item: MattrThreadItem, action: MattrThreadMenuAction) => void;
 }
 
 export interface MattrSidebarModel {
@@ -59,15 +75,6 @@ export interface MattrSidebarModel {
   readonly keybindings: ResolvedKeybindingsConfig;
   readonly actions: MattrSidebarActions;
 }
-
-type ThreadMenuAction =
-  | "open"
-  | "pin"
-  | "unpin"
-  | "mark-unread"
-  | "settle"
-  | "unsettle"
-  | "archive";
 
 /** Everything the custom sidebars read, derived from the same stores the classic sidebar uses. */
 export function useMattrSidebarModel(): MattrSidebarModel {
@@ -169,29 +176,9 @@ export function useMattrSidebarModel(): MattrSidebarModel {
     );
   };
 
-  const openThreadMenu: MattrSidebarActions["openThreadMenu"] = (item, position, source) => {
+  const runThreadAction = (item: MattrThreadItem, action: MattrThreadMenuAction) => {
     void (async () => {
-      const api = readLocalApi();
-      if (!api) return;
-      const clicked = await settlePromise(() =>
-        api.contextMenu.show<ThreadMenuAction>(
-          [
-            { id: "open", label: gt("Open thread") },
-            item.pinned
-              ? { id: "unpin", label: gt("Unpin"), separatorBefore: true }
-              : { id: "pin", label: gt("Pin"), separatorBefore: true },
-            { id: "mark-unread", label: gt("Mark as unread") },
-            item.settled
-              ? { id: "unsettle", label: gt("Unsettle") }
-              : { id: "settle", label: gt("Settle") },
-            { id: "archive", label: gt("Archive"), separatorBefore: true },
-          ],
-          position,
-          source,
-        ),
-      );
-      if (clicked._tag === "Failure" || clicked.value === null) return;
-      switch (clicked.value) {
+      switch (action) {
         case "open":
           openThread(item);
           return;
@@ -210,10 +197,42 @@ export function useMattrSidebarModel(): MattrSidebarModel {
         case "unsettle":
           reportFailure(await unsettleThread(item.ref));
           return;
+        case "copy-link":
+          await copyThreadReference(
+            threadChipCopyTarget(item.ref, item.title, configuredHostedAppUrl(), m),
+          );
+          return;
         case "archive":
           reportFailure(await archiveThread(item.ref));
           return;
       }
+    })();
+  };
+
+  const openThreadMenu: MattrSidebarActions["openThreadMenu"] = (item, position, source) => {
+    void (async () => {
+      const api = readLocalApi();
+      if (!api) return;
+      const clicked = await settlePromise(() =>
+        api.contextMenu.show<MattrThreadMenuAction>(
+          [
+            { id: "open", label: gt("Open thread") },
+            item.pinned
+              ? { id: "unpin", label: gt("Unpin"), separatorBefore: true }
+              : { id: "pin", label: gt("Pin"), separatorBefore: true },
+            { id: "mark-unread", label: gt("Mark as unread") },
+            item.settled
+              ? { id: "unsettle", label: gt("Unsettle") }
+              : { id: "settle", label: gt("Settle") },
+            { id: "copy-link", label: gt("Copy link") },
+            { id: "archive", label: gt("Archive"), separatorBefore: true },
+          ],
+          position,
+          source,
+        ),
+      );
+      if (clicked._tag === "Failure" || clicked.value === null) return;
+      runThreadAction(item, clicked.value);
     })();
   };
 
@@ -224,6 +243,6 @@ export function useMattrSidebarModel(): MattrSidebarModel {
     activeThreadKey: routeTarget?.kind === "server" ? scopedThreadKey(routeTarget.threadRef) : null,
     nowMs,
     keybindings,
-    actions: { openThread, newThread, openThreadMenu },
+    actions: { openThread, newThread, openThreadMenu, runThreadAction },
   };
 }

@@ -1,18 +1,20 @@
-/* mattr Timeline sidebar (Synara frames 04 "pure" and 05 "full", Doop canvas _1uGShyX4Q). Sizes
-   are the frames' own; dark colors are their exact tokens, light ones mix the sidebar foreground
-   so they hold over every shell material. The root also carries .mfs, so the brand menu, Crew,
-   notices and popovers keep antimatter/sidebar.css. Rules are scoped `.mts .mts-*` so they outrank
-   `.mfs button { color: inherit }`. Rendered by MattrTimelineSidebar.tsx. */
+/* mattr Timeline sidebar (Synara frames 04 "pure" and 05 "full", Doop canvas _1uGShyX4Q).
+   Outer hover/selected pills inset 8px (matching --mattr-shell-gap); leading/trailing content
+   locks to 16px; nav labels, thread titles, line-2 projects and Settings share a 38px text rail.
+   The root also carries .mfs, so the brand menu, Crew, notices and popovers keep sidebar.css.
+   Rules are scoped `.mts .mts-*` so they outrank `.mfs button { color: inherit }`. */
 
 .mts {
   --mts-ink: var(--sidebar-foreground);
   --mts-nav: color-mix(in srgb, var(--sidebar-foreground) 88%, transparent);
   --mts-secondary: var(--sidebar-muted-foreground);
-  --mts-muted: color-mix(in srgb, var(--sidebar-muted-foreground) 86%, transparent);
+  --mts-muted: color-mix(in srgb, var(--sidebar-muted-foreground) 96%, var(--sidebar-foreground));
   --mts-hover: color-mix(in srgb, var(--sidebar-foreground) 4.5%, transparent);
-  --mts-active: color-mix(in srgb, var(--sidebar-foreground) 7%, transparent);
-  --mts-selected: color-mix(in srgb, var(--sidebar-foreground) 6.5%, transparent);
-  --mts-selected-ring: color-mix(in srgb, var(--sidebar-foreground) 4%, transparent);
+  --mts-press: color-mix(in srgb, var(--sidebar-foreground) 9%, transparent);
+  --mts-active: color-mix(in srgb, var(--sidebar-foreground) 7.5%, transparent);
+  --mts-selected: var(--sidebar-row-active);
+  --mts-selected-ring: color-mix(in srgb, var(--sidebar-foreground) 10%, transparent);
+  --mts-selected-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   --mts-track: color-mix(in srgb, var(--sidebar-foreground) 9%, transparent);
   --mts-trunk: color-mix(in srgb, var(--sidebar-foreground) 18%, transparent);
   --mts-edge: color-mix(in srgb, var(--sidebar-foreground) 8%, transparent);
@@ -21,25 +23,34 @@
   --mts-pr-closed: #d93a4a;
   --mts-needs: #d97706;
   --mts-mono: var(--font-mono, ui-monospace, "SF Mono", monospace);
+  container-type: inline-size;
 }
 
 .dark .mts {
-  /* The frames' exact tokens are fallbacks; a custom theme's sidebar colors win. */
+  /* Derive tints from --mts-ink so warm/tinted custom themes (Ember, Grove) stay harmonious. */
   --mts-ink: var(--sidebar-foreground, #f1f3f7);
   --mts-nav: color-mix(in srgb, var(--mts-ink) 88%, transparent);
   --mts-secondary: var(--sidebar-muted-foreground, #98a0b0);
-  --mts-muted: color-mix(in srgb, var(--mts-secondary) 68%, transparent);
-  --mts-hover: rgb(241 243 247 / 0.05);
-  --mts-active: rgb(241 243 247 / 0.09);
-  --mts-selected: rgb(241 243 247 / 0.085);
-  --mts-selected-ring: rgb(241 243 247 / 0.07);
-  --mts-track: rgb(241 243 247 / 0.08);
-  --mts-trunk: rgb(241 243 247 / 0.16);
-  --mts-edge: rgb(241 243 247 / 0.06);
+  --mts-muted: color-mix(in srgb, var(--mts-secondary) 82%, transparent);
+  --mts-hover: color-mix(in srgb, var(--mts-ink) 5%, transparent);
+  --mts-press: color-mix(in srgb, var(--mts-ink) 12%, transparent);
+  --mts-active: color-mix(in srgb, var(--mts-ink) 9%, transparent);
+  --mts-selected: color-mix(in srgb, var(--mts-ink) 8.5%, transparent);
+  --mts-selected-ring: color-mix(in srgb, var(--mts-ink) 7%, transparent);
+  --mts-selected-shadow: none;
+  --mts-track: color-mix(in srgb, var(--mts-ink) 8%, transparent);
+  --mts-trunk: color-mix(in srgb, var(--mts-ink) 16%, transparent);
+  --mts-edge: color-mix(in srgb, var(--mts-ink) 6%, transparent);
   --mts-pr-open: #4ec27a;
   --mts-pr-merged: #a58bfa;
   --mts-pr-closed: #f2727f;
   --mts-needs: #fbbf24;
+}
+
+/* Keep muted metadata opaque over translucent Blur and Liquid Glass wallpapers. */
+html[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) .mts,
+html.dark[data-mattr-shell-material]:not([data-mattr-shell-material="solid"]) .mts {
+  --mts-muted: var(--mts-secondary);
 }
 
 .mts svg {
@@ -47,19 +58,44 @@
   flex: none;
 }
 
-/* Brand row: wordmark menu, then search and the Needs you filter. */
+@media (prefers-reduced-motion: no-preference) {
+  .mts
+    :is(
+      .mts-ib,
+      .mts-ni,
+      .mts-scope,
+      .mts-so,
+      .mts-fold,
+      .mts-row,
+      .mts-sub,
+      .mts-m,
+      .mts-set,
+      .mts-help,
+      .mts-pill,
+      .mts-more
+    ) {
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+}
+
+/* Brand row: wordmark menu on the 16px rail, search and Needs you on the 8px outer inset. */
 .mts .mts-brand {
   display: flex;
   height: 34px;
   flex: none;
   align-items: center;
   gap: 4px;
-  padding: 0 10px 0 15px;
+  padding: 0 8px 0 16px;
 }
 
 .mts .mts-brand .mfs-wn {
   gap: 0;
   margin-right: auto;
+  margin-left: -8px;
+  padding: 5px 8px;
+  border-radius: 7px;
   font-size: 16.5px;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -73,8 +109,13 @@
 .mts .mts-brand .mfs-wn .mfs-caret {
   width: 14px;
   height: 14px;
-  margin: 2px 0 0 4px;
+  margin: 1px 0 0 4px;
   color: var(--mts-muted);
+  transition: rotate 140ms ease;
+}
+
+.mts .mts-brand .mfs-wn[data-popup-open] .mfs-caret {
+  rotate: 180deg;
 }
 
 .mts .mts-ib {
@@ -98,12 +139,13 @@
   color: var(--mts-ink);
 }
 
-.mts .mts-ib[aria-pressed] {
-  background: var(--mts-hover);
+.mts .mts-ib:active {
+  background: var(--mts-press);
 }
 
 .mts .mts-ib[aria-pressed="true"] {
   background: var(--mts-active);
+  box-shadow: inset 0 0 0 1px var(--mts-selected-ring);
   color: var(--mts-ink);
 }
 
@@ -118,30 +160,44 @@
   content: "";
 }
 
-/* Four stacked nav rows. */
+/* Four stacked nav rows: 8px outer container, 16px icon rail, 38px text rail. */
 .mts .mts-nav {
   display: flex;
   flex: none;
   flex-direction: column;
-  padding: 4px 6px 7px;
+  padding: 4px 8px 8px;
 }
 
 .mts .mts-ni {
   display: flex;
   height: 29px;
   align-items: center;
-  gap: 8px;
-  padding: 0 7px;
+  gap: 6px;
+  padding: 0 8px;
   border-radius: 7px;
   color: var(--mts-nav);
-  font-size: 12.5px;
+  font-size: 13px;
   letter-spacing: -0.005em;
   text-align: left;
   white-space: nowrap;
 }
 
+.mts .mts-ni[data-primary] {
+  margin-bottom: 5px;
+  color: var(--mts-ink);
+  font-weight: 500;
+}
+
+.mts .mts-ni[data-primary] svg {
+  color: var(--mts-nav);
+}
+
 .mts .mts-ni:hover {
   background: var(--mts-hover);
+}
+
+.mts .mts-ni:active {
+  background: var(--mts-press);
 }
 
 .mts .mts-ni[aria-current="page"] {
@@ -160,13 +216,29 @@
   text-overflow: ellipsis;
 }
 
-/* Activity scope and sort. */
+.mts .mts-kbd {
+  margin-left: auto;
+  color: var(--mts-muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 450;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.mts .mts-ni:is(:hover, :focus-visible) .mts-kbd {
+  opacity: 1;
+}
+
+/* Activity scope, removable filter pill, and sort control. */
 .mts .mts-act {
   display: flex;
   height: 36px;
   flex: none;
   align-items: center;
-  padding: 0 8px 0 7px;
+  gap: 6px;
+  padding: 0 8px;
 }
 
 .mts .mts-scope {
@@ -174,16 +246,22 @@
   min-width: 0;
   height: 26px;
   align-items: center;
-  padding: 0 6px;
+  gap: 2px;
+  padding: 0 8px;
   border-radius: 7px;
   color: var(--mts-secondary);
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
 }
 
 .mts .mts-scope:hover,
 .mts .mts-scope[data-popup-open] {
   background: var(--mts-hover);
   color: var(--mts-ink);
+}
+
+.mts .mts-scope:active {
+  background: var(--mts-press);
 }
 
 .mts .mts-scope > span {
@@ -198,13 +276,53 @@
   margin-left: 1px;
 }
 
-.mts .mts-so {
-  display: grid;
-  width: 26px;
-  height: 26px;
+.mts .mts-scope .mts-cr {
+  transition: rotate 140ms ease;
+}
+
+.mts .mts-scope[data-popup-open] .mts-cr {
+  rotate: 180deg;
+}
+
+.mts .mts-pill {
+  display: inline-flex;
+  height: 22px;
   flex: none;
-  place-items: center;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mts-needs) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mts-needs) 24%, transparent);
+  color: var(--mts-needs);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.mts .mts-pill:hover {
+  background: color-mix(in srgb, var(--mts-needs) 22%, transparent);
+}
+
+.mts .mts-pill:active {
+  background: color-mix(in srgb, var(--mts-needs) 28%, transparent);
+}
+
+.mts .mts-pill svg {
+  width: 11px;
+  height: 11px;
+}
+
+.mts .mts-so {
+  display: inline-flex;
+  min-width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   margin-left: auto;
+  padding: 0 6px;
   border-radius: 7px;
   color: var(--mts-muted);
 }
@@ -214,26 +332,134 @@
   color: var(--mts-ink);
 }
 
+.mts .mts-so:active {
+  background: var(--mts-press);
+}
+
+.mts .mts-so[data-sort="created"] {
+  background: var(--mts-active);
+  box-shadow: inset 0 0 0 1px var(--mts-selected-ring);
+  color: var(--mts-ink);
+}
+
 .mts .mts-so svg {
   width: 15px;
   height: 15px;
 }
 
-/* The day-bucketed feed. */
+.mts .mts-so-lab {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* The day-bucketed feed with smooth 14px top/bottom scroll-boundary fade masks. */
 .mts .mts-list {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   overflow-y: auto;
+  padding-bottom: 12px;
   scrollbar-width: none;
+}
+
+html:not([data-mattr-scroll-fade="off"])
+  .mts
+  .mts-list[data-scrolled-top]:not([data-scrolled-bottom]) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    rgb(0 0 0 / 10%) 1.4px,
+    rgb(0 0 0 / 30%) 3.4px,
+    rgb(0 0 0 / 58%) 5.9px,
+    rgb(0 0 0 / 82%) 8.7px,
+    rgb(0 0 0 / 96%) 11.5px,
+    black 14px,
+    black 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    rgb(0 0 0 / 10%) 1.4px,
+    rgb(0 0 0 / 30%) 3.4px,
+    rgb(0 0 0 / 58%) 5.9px,
+    rgb(0 0 0 / 82%) 8.7px,
+    rgb(0 0 0 / 96%) 11.5px,
+    black 14px,
+    black 100%
+  );
+}
+
+html:not([data-mattr-scroll-fade="off"])
+  .mts
+  .mts-list[data-scrolled-bottom]:not([data-scrolled-top]) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black calc(100% - 14px),
+    rgb(0 0 0 / 96%) calc(100% - 11.5px),
+    rgb(0 0 0 / 82%) calc(100% - 8.7px),
+    rgb(0 0 0 / 58%) calc(100% - 5.9px),
+    rgb(0 0 0 / 30%) calc(100% - 3.4px),
+    rgb(0 0 0 / 10%) calc(100% - 1.4px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black calc(100% - 14px),
+    rgb(0 0 0 / 96%) calc(100% - 11.5px),
+    rgb(0 0 0 / 82%) calc(100% - 8.7px),
+    rgb(0 0 0 / 58%) calc(100% - 5.9px),
+    rgb(0 0 0 / 30%) calc(100% - 3.4px),
+    rgb(0 0 0 / 10%) calc(100% - 1.4px),
+    transparent 100%
+  );
+}
+
+html:not([data-mattr-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data-scrolled-bottom] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    rgb(0 0 0 / 10%) 1.4px,
+    rgb(0 0 0 / 30%) 3.4px,
+    rgb(0 0 0 / 58%) 5.9px,
+    rgb(0 0 0 / 82%) 8.7px,
+    rgb(0 0 0 / 96%) 11.5px,
+    black 14px,
+    black calc(100% - 14px),
+    rgb(0 0 0 / 96%) calc(100% - 11.5px),
+    rgb(0 0 0 / 82%) calc(100% - 8.7px),
+    rgb(0 0 0 / 58%) calc(100% - 5.9px),
+    rgb(0 0 0 / 30%) calc(100% - 3.4px),
+    rgb(0 0 0 / 10%) calc(100% - 1.4px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    rgb(0 0 0 / 10%) 1.4px,
+    rgb(0 0 0 / 30%) 3.4px,
+    rgb(0 0 0 / 58%) 5.9px,
+    rgb(0 0 0 / 82%) 8.7px,
+    rgb(0 0 0 / 96%) 11.5px,
+    black 14px,
+    black calc(100% - 14px),
+    rgb(0 0 0 / 96%) calc(100% - 11.5px),
+    rgb(0 0 0 / 82%) calc(100% - 8.7px),
+    rgb(0 0 0 / 58%) calc(100% - 5.9px),
+    rgb(0 0 0 / 30%) calc(100% - 3.4px),
+    rgb(0 0 0 / 10%) calc(100% - 1.4px),
+    transparent 100%
+  );
 }
 
 .mts .mts-sec {
   display: flex;
   flex: none;
   align-items: center;
-  padding: 13px 13px 8px;
+  padding: 13px 16px 6px;
   color: var(--mts-muted);
   font-size: 11.5px;
   font-weight: 500;
@@ -242,14 +468,18 @@
 .mts .mts-fold {
   display: flex;
   align-items: center;
-  margin: -4px -6px;
-  padding: 4px 6px;
+  margin: -4px -8px;
+  padding: 4px 8px;
   border-radius: 6px;
   color: inherit;
 }
 
 .mts .mts-fold:hover {
   color: var(--mts-ink);
+}
+
+.mts .mts-fold:active {
+  background: var(--mts-press);
 }
 
 .mts .mts-fold .mts-cr {
@@ -263,7 +493,7 @@
 .mts .mts-rows {
   flex: none;
   margin: 0;
-  padding: 0 5px 2px;
+  padding: 0 8px 2px;
   list-style: none;
 }
 
@@ -287,24 +517,28 @@
   display: flex;
   flex-direction: column;
   margin-bottom: 1.5px;
-  padding: 8px 9px 8px 10px;
-  border-radius: 9px;
+  padding: 8px;
+  border-radius: 8px;
 }
 
 .mts .mts-row:hover {
   background: var(--mts-hover);
 }
 
+.mts .mts-row:has(> .mts-hit:active) {
+  background: var(--mts-press);
+}
+
 .mts .mts-row[data-active] {
   background: var(--mts-selected);
-  box-shadow: inset 0 0 0 1px var(--mts-selected-ring);
+  box-shadow: var(--mts-selected-shadow);
 }
 
 .mts .mts-l1 {
   display: flex;
   height: 19px;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
 .mts .mts-pi {
@@ -325,17 +559,26 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: var(--mts-ink);
-  font-size: 12.5px;
-  font-weight: 450;
+  color: color-mix(in srgb, var(--mts-ink) 86%, transparent);
+  font-size: 13px;
+  font-weight: 400;
   letter-spacing: -0.005em;
   line-height: 19px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mts .mts-row[data-unread] .mts-t {
-  font-weight: 520;
+.mts .mts-row[data-unread] .mts-t,
+.mts .mts-row[data-active] .mts-t {
+  color: var(--mts-ink);
+  font-weight: 560;
+}
+
+.mts .mts-pin {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  color: var(--mts-muted);
 }
 
 .mts .mts-spin {
@@ -344,6 +587,8 @@
   color: var(--mts-secondary);
   transform-origin: center;
   animation: mts-spin 0.9s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
 }
 
 @keyframes mts-spin {
@@ -358,13 +603,84 @@
   }
 }
 
-.mts .mts-need {
+.mts .mts-need,
+.mts .mts-fail {
   width: 7px;
   height: 7px;
   flex: none;
   margin: 0 3.5px;
   border-radius: 50%;
+}
+
+.mts .mts-need {
   background: var(--mts-needs);
+}
+
+.mts .mts-fail {
+  background: var(--destructive);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.mts .mts-age {
+  flex: none;
+  color: var(--mts-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mts .mts-unread {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--info);
+}
+
+/* Subtle hover / focus-visible row action trigger on web and touch clients. */
+.mts .mts-more {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 0;
+  height: 20px;
+  flex: none;
+  place-items: center;
+  margin-left: -8px;
+  overflow: hidden;
+  border-radius: 5px;
+  color: var(--mts-secondary);
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.mts .mts-more svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mts .mts-row:is(:hover, :focus-within) .mts-more,
+.mts .mts-more:focus-visible {
+  width: 20px;
+  margin-left: 0;
+  opacity: 1;
+}
+
+.mts .mts-more:hover {
+  background: var(--mts-active);
+  color: var(--mts-ink);
+}
+
+.mts .mts-more:active {
+  background: var(--mts-press);
+}
+
+@media (hover: none) {
+  .mts .mts-more {
+    width: 24px;
+    margin-left: 0;
+    opacity: 1;
+  }
 }
 
 .mts .mts-l2 {
@@ -380,13 +696,14 @@
 .mts .mts-mi {
   width: 14px;
   height: 14px;
-  margin-right: 5px;
+  margin-right: 8px;
   color: var(--mts-muted);
 }
 
 .mts .mts-proj {
-  max-width: 45%;
-  flex: none;
+  min-width: 36px;
+  max-width: 44%;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -398,9 +715,13 @@
   gap: 3px;
   margin-left: 8px;
   font-family: var(--mts-mono);
-  font-size: 11px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.mts .mts-mi + .mts-pr {
+  margin-left: 0;
 }
 
 .mts .mts-pr svg {
@@ -431,15 +752,13 @@
   align-items: center;
   gap: 4px;
   margin-left: auto;
-  padding-left: 10px;
+  padding-left: 12px;
   color: var(--mts-muted);
   font-family: var(--mts-mono);
   font-size: 10.5px;
   letter-spacing: -0.02em;
-}
-
-.mts .mts-pr + .mts-br {
-  margin-left: 0;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .mts .mts-br svg {
@@ -452,6 +771,18 @@
   text-overflow: ellipsis;
 }
 
+/* Keep active-row metadata and spinners legible against the brighter selected pill. */
+.mts .mts-row[data-active] .mts-br,
+.mts .mts-row[data-active] .mts-mi,
+.mts .mts-row[data-active] .mts-age,
+.mts .mts-row[data-active] .mts-pin {
+  color: var(--mts-secondary);
+}
+
+.mts .mts-row[data-active] .mts-spin {
+  color: var(--mts-ink);
+}
+
 /* An active subagent under its thread: a curved 6px elbow from the parent's provider mark. */
 .mts .mts-sub {
   position: relative;
@@ -459,33 +790,40 @@
   height: 28px;
   align-items: center;
   gap: 7px;
-  margin: -2px 0 2px;
-  padding: 0 10px 0 33px;
+  margin: 1px 0 2px;
+  padding: 0 8px 0 31px;
   border-radius: 8px;
   color: var(--mts-nav);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .mts .mts-sub:hover {
   background: var(--mts-hover);
 }
 
+.mts .mts-sub:has(> .mts-hit:active) {
+  background: var(--mts-press);
+}
+
 .mts .mts-sub[data-active] {
   background: var(--mts-selected);
-  box-shadow: inset 0 0 0 1px var(--mts-selected-ring);
+  box-shadow: var(--mts-selected-shadow);
+  color: var(--mts-ink);
 }
 
 /*
  * The strokes are translucent, so no two segments may overlap or the overlap
  * reads as a brighter band. Each subagent draws its own elbow; one with a later
  * sibling also draws the full-height trunk and clips the elbow's left stroke.
+ * Margins leave 1.5px below the parent (no overlap with its active ring) and 2px
+ * between siblings, so connectors reach up by the exact gap to stay seamless.
  */
 .mts .mts-sub .mts-conn {
   position: absolute;
-  top: 0;
-  left: 16.5px;
+  top: -2px;
+  left: 14.25px;
   width: 11px;
-  height: 14px;
+  height: 16px;
   border-bottom: 1.5px solid var(--mts-trunk);
   border-left: 1.5px solid var(--mts-trunk);
   border-bottom-left-radius: 6px;
@@ -497,23 +835,22 @@
 
 .mts .mts-sub:has(+ .mts-sub)::after {
   position: absolute;
-  top: 0;
+  top: -2px;
   bottom: 0;
-  left: 16.5px;
+  left: 14.25px;
   width: 1.5px;
   background: var(--mts-trunk);
   content: "";
   pointer-events: none;
 }
 
-/* The first subagent overlaps its parent by 0.5px; start at the parent's edge. */
 .mts .mts-sub:first-child .mts-conn,
 .mts .mts-sub:first-child::after {
-  top: 0.5px;
+  top: -1.5px;
 }
 
 .mts .mts-sub:first-child .mts-conn {
-  height: 13.5px;
+  height: 15.5px;
 }
 
 .mts .mts-sub .mts-pi,
@@ -532,9 +869,12 @@
 }
 
 .mts .mts-sm {
+  display: inline-flex;
   flex: none;
+  align-items: center;
+  gap: 5px;
   color: var(--mts-muted);
-  font-size: 11px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -543,20 +883,41 @@
   font-weight: 500;
 }
 
-/* The two tightest usage limits as 4px bars above the footer hairline. */
-.mts .mts-use {
-  display: flex;
+.mts .mts-sub-dot {
+  width: 5px;
+  height: 5px;
   flex: none;
-  gap: 14px;
-  padding: 8px 14px 10px 13px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+/* Usage limits footer: top hairline separates scrolled rows; supports 3+ providers & narrow stack. */
+.mts .mts-use {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 14px;
+  row-gap: 9px;
+  padding: 10px 16px;
+  box-shadow: inset 0 1px 0 var(--mts-edge);
+}
+
+.mts .mts-use[data-count="1"] {
+  grid-template-columns: 1fr;
+}
+
+@container (max-width: 230px) {
+  .mts .mts-use {
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+  }
 }
 
 .mts .mts-m {
   display: block;
   min-width: 0;
-  flex: 1;
-  margin: -4px;
-  padding: 4px;
+  margin: -4px -6px;
+  padding: 4px 6px;
   border-radius: 6px;
   text-align: left;
 }
@@ -565,13 +926,17 @@
   background: var(--mts-hover);
 }
 
+.mts .mts-m:active {
+  background: var(--mts-press);
+}
+
 .mts .mts-mh {
   display: flex;
   height: 16px;
   align-items: center;
   gap: 5px;
   color: var(--mts-secondary);
-  font-size: 11px;
+  font-size: 11.5px;
   white-space: nowrap;
 }
 
@@ -582,6 +947,10 @@
   height: 11px;
 }
 
+.mts .mts-mh .mts-pi[data-monochrome] {
+  opacity: 0.85;
+}
+
 .mts .mts-ml {
   min-width: 0;
   overflow: hidden;
@@ -590,9 +959,18 @@
 
 .mts .mts-v {
   margin-left: auto;
-  color: var(--mts-secondary);
-  font-size: 10.5px;
+  color: var(--mts-nav);
+  font-size: 11px;
+  font-weight: 550;
   font-variant-numeric: tabular-nums;
+}
+
+.mts .mts-m[data-tone="warn"] .mts-v {
+  color: var(--mts-needs);
+}
+
+.mts .mts-m[data-tone="critical"] .mts-v {
+  color: var(--destructive);
 }
 
 .mts .mts-tr {
@@ -611,12 +989,21 @@
   background: var(--mts-secondary);
 }
 
+.mts .mts-m[data-tone="warn"] .mts-tr > i {
+  background: var(--mts-needs);
+}
+
+.mts .mts-m[data-tone="critical"] .mts-tr > i {
+  background: var(--destructive);
+}
+
+/* Compact 40px footer matching Default rail, on the same 8px / 16px / 38px rails. */
 .mts .mts-foot {
   display: flex;
-  min-height: calc(50px + env(safe-area-inset-bottom));
+  min-height: calc(40px + env(safe-area-inset-bottom));
   flex: none;
   align-items: center;
-  padding: 0 8px 0 7px;
+  padding: 0 8px;
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: inset 0 1px 0 var(--mts-edge);
 }
@@ -625,17 +1012,21 @@
   display: flex;
   height: 30px;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px 0 6px;
+  gap: 6px;
+  padding: 0 8px;
   border-radius: 7px;
   color: var(--mts-nav);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .mts .mts-set:hover,
 .mts .mts-set[aria-current="page"] {
   background: var(--mts-hover);
   color: var(--mts-ink);
+}
+
+.mts .mts-set:active {
+  background: var(--mts-press);
 }
 
 .mts .mts-set svg {
@@ -659,7 +1050,38 @@
   color: var(--mts-ink);
 }
 
+.mts .mts-help:active {
+  background: var(--mts-press);
+}
+
 .mts .mts-help svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Touch ergonomics for mobile sheets and touch displays. */
+@media (pointer: coarse) {
+  .mts .mts-ib,
+  .mts .mts-so,
+  .mts .mts-help {
+    min-width: 36px;
+    height: 36px;
+  }
+
+  .mts .mts-ni,
+  .mts .mts-set {
+    height: 40px;
+  }
+
+  .mts .mts-scope,
+  .mts .mts-fold {
+    min-height: 36px;
+  }
+
+  .mts .mts-more {
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+    opacity: 1;
+  }
 }

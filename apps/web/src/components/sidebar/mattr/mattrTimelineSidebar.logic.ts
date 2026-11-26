@@ -4,6 +4,8 @@ import type { MattrThreadItem } from "./mattrSidebar.logic";
 export type MattrTimelineSort = "updated" | "created";
 
 export interface MattrTimelineBuckets {
+  /** Pinned threads that match the current scope and filter, newest first. */
+  readonly pinned: ReadonlyArray<MattrThreadItem>;
   /** Today's threads, plus anything running or waiting on you whatever its age. */
   readonly recent: ReadonlyArray<MattrThreadItem>;
   readonly yesterday: ReadonlyArray<MattrThreadItem>;
@@ -48,6 +50,7 @@ export function buildTimelineBuckets(
   const activeChildParents = options.activeChildParents ?? new Set<string>();
   const todayStart = startOfLocalDay(options.nowMs);
   const yesterdayStart = startOfLocalDay(options.nowMs, 1);
+  const pinned: MattrThreadItem[] = [];
   const recent: MattrThreadItem[] = [];
   const yesterday: MattrThreadItem[] = [];
   const earlier: MattrThreadItem[] = [];
@@ -56,6 +59,10 @@ export function buildTimelineBuckets(
     if (options.projectFilter !== null && item.projectKey !== options.projectFilter) continue;
     const raisesHand = item.attention === "needs" || needsChildParents.has(item.key);
     if (options.filter === "needs" && !raisesHand) continue;
+    if (item.pinned) {
+      pinned.push(item);
+      continue;
+    }
     const at = timelineAt(item, options.sort);
     if (
       item.attention === "running" ||
@@ -70,6 +77,7 @@ export function buildTimelineBuckets(
   const newestFirst = (left: MattrThreadItem, right: MattrThreadItem) =>
     timelineAt(right, options.sort) - timelineAt(left, options.sort);
   return {
+    pinned: pinned.toSorted(newestFirst),
     recent: recent.toSorted(newestFirst),
     yesterday: yesterday.toSorted(newestFirst),
     earlier: earlier.toSorted(newestFirst),
@@ -116,9 +124,19 @@ export function subagentElapsed(child: MattrThreadItem, nowMs: number): string {
   return compactAge(child.runningSince ?? child.activityAt, nowMs);
 }
 
-/** Where the thread's files live: its own worktree, or the project's checkout. */
-export function workspaceKind(item: MattrThreadItem): "worktree" | "local" {
+/** Where the thread's files live: none when detached from a project, its own worktree, or the project's checkout. */
+export function workspaceKind(item: MattrThreadItem): "none" | "worktree" | "local" {
+  if (item.projectName === null) return "none";
   return item.worktreePath !== null ? "worktree" : "local";
+}
+
+export type MattrUsageMeterTone = "normal" | "warn" | "critical";
+
+/** Severity bucket for a usage meter's used percentage. */
+export function usageMeterTone(usedPercent: number): MattrUsageMeterTone {
+  if (usedPercent >= 95) return "critical";
+  if (usedPercent >= 75) return "warn";
+  return "normal";
 }
 
 /** The footer's compact window names: "5h", "wk", "mo". */
@@ -126,4 +144,21 @@ export function compactWindowLabel(label: string): string {
   if (label === "week") return "wk";
   if (label === "month") return "mo";
   return label;
+}
+
+const LEGACY_WORKTREE_PREFIX = /^(?:t3|t3code)\//i;
+
+/** Formats a sidebar branch label as `repo/branch` (replacing legacy `t3/` prefixes with the repo name). */
+export function formatTimelineBranchLabel(branch: string, projectName: string | null): string {
+  const trimmed = branch.trim();
+  if (!trimmed || !projectName) return trimmed;
+  const repoSlug = projectName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!repoSlug) return trimmed;
+  if (trimmed.toLowerCase().startsWith(`${repoSlug}/`)) return trimmed;
+  const stripped = trimmed.replace(LEGACY_WORKTREE_PREFIX, "");
+  return `${repoSlug}/${stripped}`;
 }

@@ -10,6 +10,7 @@ import {
   compactWindowLabel,
   isActiveSubagent,
   subagentElapsed,
+  usageMeterTone,
   workspaceKind,
 } from "./mattrTimelineSidebar.logic";
 
@@ -81,6 +82,7 @@ function children(...items: ReturnType<typeof item>[]) {
 }
 
 const bucketTitles = (buckets: ReturnType<typeof buildTimelineBuckets>) => ({
+  pinned: buckets.pinned.map((entry) => entry.title),
   recent: buckets.recent.map((entry) => entry.title),
   yesterday: buckets.yesterday.map((entry) => entry.title),
   earlier: buckets.earlier.map((entry) => entry.title),
@@ -105,9 +107,39 @@ describe("buildTimelineBuckets", () => {
       options,
     );
     expect(bucketTitles(buckets)).toEqual({
+      pinned: [],
       recent: ["today late", "today early"],
       yesterday: ["yesterday"],
       earlier: ["last week"],
+    });
+  });
+
+  it("places pinned threads in their own top bucket, respecting filters and sort", () => {
+    const pinnedOld = item("pinned old", {
+      pinnedAt: local(1, 9),
+      latestUserMessageAt: local(2, 9),
+    });
+    const pinnedNew = item("pinned new", {
+      pinnedAt: local(1, 9),
+      latestUserMessageAt: local(10, 14),
+    });
+    const pinnedLilt = item("pinned lilt", { pinnedAt: local(1, 9) }, LILT);
+    const regular = item("regular");
+    const all = [pinnedOld, pinnedNew, pinnedLilt, regular];
+
+    expect(bucketTitles(buildTimelineBuckets(all, options))).toEqual({
+      pinned: ["pinned new", "pinned lilt", "pinned old"],
+      recent: ["regular"],
+      yesterday: [],
+      earlier: [],
+    });
+    expect(
+      bucketTitles(buildTimelineBuckets(all, { ...options, projectFilter: LILT.key })),
+    ).toEqual({
+      pinned: ["pinned lilt"],
+      recent: [],
+      yesterday: [],
+      earlier: [],
     });
   });
 
@@ -217,9 +249,20 @@ describe("activeSubagentsByParent", () => {
 });
 
 describe("row details", () => {
-  it("tells a worktree from the project checkout", () => {
+  it("tells a worktree, local checkout, and detached No project thread apart", () => {
     expect(workspaceKind(item("wt", { worktreePath: "/repo/.worktrees/wt" }))).toBe("worktree");
     expect(workspaceKind(item("local", { worktreePath: null }))).toBe("local");
+    expect(workspaceKind(item("scratch", { worktreePath: "/tmp/scratch" }, null))).toBe("none");
+    expect(workspaceKind(item("scratch-plain", { worktreePath: null }, null))).toBe("none");
+  });
+
+  it("classifies usage meter severity thresholds", () => {
+    expect(usageMeterTone(0)).toBe("normal");
+    expect(usageMeterTone(74)).toBe("normal");
+    expect(usageMeterTone(75)).toBe("warn");
+    expect(usageMeterTone(94)).toBe("warn");
+    expect(usageMeterTone(95)).toBe("critical");
+    expect(usageMeterTone(100)).toBe("critical");
   });
 
   it("carries the branch and creation time", () => {
