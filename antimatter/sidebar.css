@@ -91,7 +91,8 @@
 /* The brand row replaces the titlebar wordmark, so the titlebar keeps only its controls. */
 /* The header is the host's first child; web and the PWA render it without .drag-region. Electron
    uses hash history, so its home link's href ends in "#/" rather than being "/". */
-[data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]) {
+[data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]),
+[data-mattr-sidebar-layout="timeline"] > :first-child :is(a[href="/"], a[href$="#/"]) {
   width: 0;
   min-width: 0;
   visibility: hidden;

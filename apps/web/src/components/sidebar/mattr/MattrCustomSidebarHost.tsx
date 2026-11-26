@@ -3,10 +3,12 @@ import { SidebarChromeHeader } from "../SidebarChrome";
 import { MattrDefaultSidebar } from "./MattrDefaultSidebar";
 import { MattrSpacesSidebar } from "./MattrSpacesSidebar";
 import { MattrStatusLine } from "./MattrStatusLine";
+import { MattrTimelineSidebar } from "./MattrTimelineSidebar";
 import type { MattrSidebarLayout } from "./mattrSidebarStore";
 import { useMattrSidebarModel } from "./useMattrSidebarModel";
 
-/** The fork's custom sidebar bodies under Classic's chrome header. Spaces ends in a status line. */
+/** The fork's custom sidebar bodies under Classic's chrome header. Spaces ends in a status line;
+ * Default and Timeline carry their own footers. */
 export function MattrCustomSidebarHost({
   layout,
 }: {
@@ -21,6 +23,8 @@ export function MattrCustomSidebarHost({
           <MattrSpacesSidebar model={model} />
           <MattrStatusLine />
         </>
+      ) : layout === "timeline" ? (
+        <MattrTimelineSidebar model={model} />
       ) : (
         <MattrDefaultSidebar model={model} />
       )}

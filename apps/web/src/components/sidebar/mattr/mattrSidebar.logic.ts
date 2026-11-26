@@ -34,6 +34,10 @@ export interface MattrThreadItem {
   readonly pullRequest: MattrPullRequestBadge | null;
   /** The thread this one runs under (a subagent or delegated task), as a scoped key. */
   readonly parentKey: string | null;
+  readonly createdAt: string;
+  readonly branch: string | null;
+  /** Set when the thread runs in its own worktree rather than the project's checkout. */
+  readonly worktreePath: string | null;
 }
 
 export type MattrPullRequestState = "open" | "merged" | "closed" | "draft";
@@ -107,6 +111,9 @@ export function toMattrThreadItem(
     driver,
     pullRequest: resolvePullRequestBadge(thread),
     parentKey: resolveParentKey(thread),
+    createdAt: thread.createdAt,
+    branch: thread.branch,
+    worktreePath: thread.worktreePath,
   };
 }
 

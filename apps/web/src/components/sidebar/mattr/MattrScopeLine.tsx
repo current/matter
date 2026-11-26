@@ -44,13 +44,18 @@ export function MattrScopeLine() {
             <MenuGroupLabel>{gt("View")}</MenuGroupLabel>
             <MenuRadioGroup
               value={isDefault ? "inbox" : "spaces"}
-              onValueChange={(value) => setLayout(value === "spaces" ? "spaces" : "inbox")}
+              onValueChange={(value) =>
+                setLayout(value === "spaces" || value === "timeline" ? value : "inbox")
+              }
             >
               <MenuRadioItem closeOnClick value="inbox">
                 {gt("Default")}
               </MenuRadioItem>
               <MenuRadioItem closeOnClick value="spaces">
                 {gt("Spaces")}
+              </MenuRadioItem>
+              <MenuRadioItem closeOnClick value="timeline">
+                {gt("Timeline")}
               </MenuRadioItem>
             </MenuRadioGroup>
           </MenuGroup>

@@ -8,8 +8,11 @@ const MATTR_SIDEBAR_INBOX_PROJECT_STORAGE_KEY = "mattr:sidebar:inbox-project:v1"
 const MATTR_SIDEBAR_EARLIER_EXPANDED_STORAGE_KEY = "mattr:sidebar:earlier-expanded:v1";
 const MATTR_SIDEBAR_SORT_STORAGE_KEY = "mattr:sidebar:sort:v1";
 const MATTR_SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "mattr:sidebar:collapsed-groups:v1";
+export const MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY = "mattr:sidebar:timeline-subagents:v1";
+const MATTR_TIMELINE_SORT_STORAGE_KEY = "mattr:sidebar:timeline-sort:v1";
+const MATTR_TIMELINE_EARLIER_STORAGE_KEY = "mattr:sidebar:timeline-earlier:v1";
 
-export const MattrSidebarLayout = Schema.Literals(["inbox", "spaces", "classic"]);
+export const MattrSidebarLayout = Schema.Literals(["inbox", "spaces", "timeline", "classic"]);
 export type MattrSidebarLayout = typeof MattrSidebarLayout.Type;
 
 /**
@@ -68,4 +71,20 @@ export function useMattrCollapsedGroups() {
     [],
     CollapsedGroups,
   );
+}
+
+/** Timeline nests a thread's running subagents under it while this is on. */
+export function useMattrTimelineSubagents() {
+  return useLocalStorage(MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY, true, Schema.Boolean);
+}
+
+const MattrTimelineSort = Schema.Literals(["updated", "created"]);
+
+/** Timeline's feed order and day buckets: by last activity or by when threads began. */
+export function useMattrTimelineSort() {
+  return useLocalStorage(MATTR_TIMELINE_SORT_STORAGE_KEY, "updated", MattrTimelineSort);
+}
+
+export function useMattrTimelineEarlierExpanded() {
+  return useLocalStorage(MATTR_TIMELINE_EARLIER_STORAGE_KEY, false, Schema.Boolean);
 }

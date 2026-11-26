@@ -1,4 +1,5 @@
 @import "./sidebar.css";
+@import "./timeline-sidebar.css";
 @import "./stream-animation.css";
 
 /* mattr shell: the window is a frame, like a browser's. Its top row holds the traffic lights and

@@ -58,7 +58,11 @@ import {
   type MattrUsageMeter,
 } from "./mattrFinalSidebar.logic";
 import { MattrTip } from "./MattrSidebarParts";
-import { useMattrSidebarLayout, type MattrSidebarLayout } from "./mattrSidebarStore";
+import {
+  useMattrSidebarLayout,
+  useMattrTimelineSubagents,
+  type MattrSidebarLayout,
+} from "./mattrSidebarStore";
 
 /** A thread's provider as its own colored brand mark. */
 export function MattrProviderMark({ driver }: { driver: ProviderDriverKind | null }) {
@@ -169,6 +173,7 @@ export function MattrBrandMenu({ onNavigate }: { onNavigate: () => void }) {
   const gt = useGT();
   const navigate = useNavigate();
   const [layout, setLayout] = useMattrSidebarLayout();
+  const [showSubagents, setShowSubagents] = useMattrTimelineSubagents();
   const voiceEnabled = useIsAddonEnabled("voice-assistant");
   const host = useHostStatus();
   const go = (to: () => void) => {
@@ -211,8 +216,26 @@ export function MattrBrandMenu({ onNavigate }: { onNavigate: () => void }) {
           >
             <MattrMenuRadioItem value="inbox" label={gt("Default")} />
             <MattrMenuRadioItem value="spaces" label={gt("Spaces")} />
+            <MattrMenuRadioItem value="timeline" label={gt("Timeline")} />
             <MattrMenuRadioItem value="classic" label={gt("Classic")} />
           </MenuPrimitive.RadioGroup>
+          {layout === "timeline" ? (
+            <>
+              <div className="mfs-menu-sep" />
+              <MenuPrimitive.CheckboxItem
+                className="mfs-menu-item"
+                checked={showSubagents}
+                onCheckedChange={(checked: boolean) => setShowSubagents(checked)}
+              >
+                <span className="inline-flex size-3.5 items-center justify-center">
+                  <MenuPrimitive.CheckboxItemIndicator>
+                    <CheckIcon aria-hidden className="mfs-menu-check" />
+                  </MenuPrimitive.CheckboxItemIndicator>
+                </span>
+                <span className="mfs-menu-text">{gt("Show active subagents")}</span>
+              </MenuPrimitive.CheckboxItem>
+            </>
+          ) : null}
         </MenuPrimitive.Group>
         <div className="mfs-menu-sep" />
         <div className="mfs-menu-host" data-mattr-host-status={host.tone ?? "ok"}>
