@@ -6,6 +6,7 @@ import * as Schema from "effect/Schema";
 
 import { isFontFamilyAvailable } from "../../appearanceFonts";
 import {
+  applyMattrUiFont,
   DEFAULT_MATTR_UI_FONT,
   loadMattrUiFont,
   MATTR_UI_FONTS,
@@ -51,7 +52,10 @@ export function MattrUiFontSetting() {
         font !== DEFAULT_MATTR_UI_FONT ? (
           <SettingResetButton
             ariaLabel={gt("Reset UI font to default")}
-            onClick={() => setFont(DEFAULT_MATTR_UI_FONT)}
+            onClick={() => {
+              applyMattrUiFont(document.documentElement, DEFAULT_MATTR_UI_FONT);
+              setFont(DEFAULT_MATTR_UI_FONT);
+            }}
           />
         ) : null
       }
@@ -61,7 +65,10 @@ export function MattrUiFontSetting() {
           aria-label={gt("UI font")}
           value={font}
           onValueChange={(value) => {
-            if (isMattrUiFont(value)) setFont(value);
+            if (!isMattrUiFont(value)) return;
+            // Apply here too, so the pick never depends on the entry hook having subscribed.
+            applyMattrUiFont(document.documentElement, value);
+            setFont(value);
           }}
           className="grid grid-cols-1 @min-[32rem]/settings-row:grid-cols-2 @min-[48rem]/settings-row:grid-cols-3"
         >
@@ -76,20 +83,24 @@ export function MattrUiFontSetting() {
 
 function MattrUiFontTile({ definition }: { readonly definition: MattrUiFontDefinition }) {
   const gt = useGT();
+  const installed = definition.localFamily !== undefined && isInstalled(definition.localFamily);
+  // Without the licensed face this pick renders exactly like the default, so it can't be picked.
+  const unavailable = definition.standIn === SYSTEM_STAND_IN && !installed;
   const standInNote =
     definition.standIn === undefined
       ? null
-      : definition.localFamily !== undefined && isInstalled(definition.localFamily)
+      : installed
         ? gt("Installed")
-        : definition.standIn === SYSTEM_STAND_IN
-          ? gt("System font until installed")
+        : unavailable
+          ? gt("Not installed")
           : gt("{font} stand-in", { font: definition.standIn });
 
   return (
     <RadioPrimitive.Root
       value={definition.id}
+      disabled={unavailable}
       data-mattr-ui-font-option={definition.id}
-      className="group/font relative flex min-w-0 cursor-pointer flex-col gap-2.5 rounded-lg bg-card px-3 pt-2.5 pb-3 text-left outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
+      className="group/font relative flex min-w-0 cursor-pointer data-disabled:cursor-not-allowed data-disabled:opacity-50 flex-col gap-2.5 rounded-lg bg-card px-3 pt-2.5 pb-3 text-left outline-none ring-1 ring-black/5 hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-checked:bg-primary/8 data-checked:ring-2 data-checked:ring-inset data-checked:ring-primary data-checked:hover:bg-primary/8 dark:bg-white/3 dark:ring-white/5 dark:hover:bg-white/5 dark:data-checked:bg-primary/15 dark:data-checked:ring-primary dark:data-checked:hover:bg-primary/15"
     >
       <span className="flex min-w-0 items-start gap-2">
         <span className="min-w-0 flex-1">

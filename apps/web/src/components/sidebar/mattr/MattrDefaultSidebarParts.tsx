@@ -31,6 +31,10 @@ import { BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
 import { retainBotsSync, useBotsState } from "../../bots/botsStore";
 import { ProviderInstanceIcon, providerTextColor } from "../../chat/ProviderInstanceIcon";
 import { ClaudeAI } from "../../Icons";
+import {
+  getDesktopUpdateDownloadedVersion,
+  resolveDesktopUpdateButtonAction,
+} from "../../desktopUpdate.logic";
 import { T3Wordmark } from "../../T3Wordmark";
 import { renderClosingPositioner } from "../../ui/closing-positioner";
 import { useSidebar } from "../../ui/sidebar";
@@ -38,6 +42,8 @@ import { useNavigateToMainApp } from "../mainAppLocation";
 import { SidebarProviderUpdatePill } from "../SidebarProviderUpdatePill";
 import { SidebarThreadUndoNotice } from "../SidebarThreadUndoNotice";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "../SidebarUpdatePill";
+import { useUpdateEverythingRun } from "../updateEverythingRun";
+import { useUpdateEverything } from "../useUpdateEverything";
 import {
   botKey,
   botNeedsAttention,
@@ -439,6 +445,19 @@ export function MattrUsageMeters({
   );
 }
 
+/** Upstream's pill doubles as an always-on "Check for updates" button; Default shows it only while an update applies. */
+export function MattrUpdateNotice() {
+  const state = useDesktopUpdateState();
+  const action = state ? resolveDesktopUpdateButtonAction(state) : "none";
+  const everything = useUpdateEverything(
+    state && action !== "none" ? getDesktopUpdateDownloadedVersion(state) : null,
+  );
+  const run = useUpdateEverythingRun();
+  const applies =
+    run !== null || everything.hasUpdates || action !== "none" || state?.status === "downloading";
+  return applies ? <SidebarUpdatePill /> : null;
+}
+
 /** Footer A: notices while they apply, the two tightest usage meters, then host and Settings. */
 export function MattrFooter({ nowMs }: { nowMs: number }) {
   const gt = useGT();
@@ -460,7 +479,7 @@ export function MattrFooter({ nowMs }: { nowMs: number }) {
       <div className="mfs-notices">
         <SidebarProviderUpdatePill />
         <SidebarUpdateArchitectureWarning />
-        <SidebarUpdatePill />
+        <MattrUpdateNotice />
         <SidebarThreadUndoNotice />
       </div>
       <footer className="mfs-f" data-mattr-footer>

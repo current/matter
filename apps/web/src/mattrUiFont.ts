@@ -124,7 +124,7 @@ export function mattrUiFontDefinition(id: MattrUiFont): MattrUiFontDefinition {
 
 // Each bundled face is its own chunk, fetched only once that font is picked or previewed.
 export const MATTR_UI_FONT_LOADERS: Partial<Record<MattrUiFont, () => Promise<unknown>>> = {
-  geist: () => import("@fontsource-variable/geist"),
+  geist: () => import("@fontsource-variable/geist/index.css"),
   "ibm-plex-sans": () =>
     Promise.all([
       import("@fontsource/ibm-plex-sans/400.css"),
@@ -132,10 +132,10 @@ export const MATTR_UI_FONT_LOADERS: Partial<Record<MattrUiFont, () => Promise<un
       import("@fontsource/ibm-plex-sans/600.css"),
       import("@fontsource/ibm-plex-sans/700.css"),
     ]),
-  allo: () => import("@fontsource-variable/figtree"),
-  "anthropic-sans": () => import("@fontsource-variable/source-sans-3"),
-  "jetbrains-sans": () => import("@fontsource-variable/inter-tight"),
-  "google-sans-flex": () => import("@fontsource-variable/google-sans-flex"),
+  allo: () => import("@fontsource-variable/figtree/index.css"),
+  "anthropic-sans": () => import("@fontsource-variable/source-sans-3/index.css"),
+  "jetbrains-sans": () => import("@fontsource-variable/inter-tight/index.css"),
+  "google-sans-flex": () => import("@fontsource-variable/google-sans-flex/index.css"),
   "berkeley-mono": () =>
     Promise.all([
       import("@fontsource/commit-mono/400.css"),

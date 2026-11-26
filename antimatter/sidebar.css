@@ -89,8 +89,9 @@
 }
 
 /* The brand row replaces the titlebar wordmark, so the titlebar keeps only its controls. */
-/* The header is the host's first child; web and the PWA render it without .drag-region. */
-[data-mattr-sidebar-layout="inbox"] > :first-child a[href="/"] {
+/* The header is the host's first child; web and the PWA render it without .drag-region. Electron
+   uses hash history, so its home link's href ends in "#/" rather than being "/". */
+[data-mattr-sidebar-layout="inbox"] > :first-child :is(a[href="/"], a[href$="#/"]) {
   width: 0;
   min-width: 0;
   visibility: hidden;
@@ -139,15 +140,14 @@
 
 .mfs-wi {
   display: flex;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex: none;
   align-items: center;
   justify-content: center;
   margin-left: auto;
-  border-radius: 9px;
+  border-radius: 7px;
   background: var(--mfs-field);
-  box-shadow: inset 0 0 0 1px var(--mfs-field-ring);
   color: var(--mfs-icon);
 }
 
@@ -162,8 +162,8 @@
 }
 
 .mfs-wi[data-on] {
-  background: color-mix(in srgb, var(--primary) 16%, var(--mfs-active));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
+  background: var(--mfs-on);
+  box-shadow: none;
   color: var(--mfs-fg);
 }
 
@@ -779,12 +779,15 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
 }
 
 /* Footer A: two usage meters, then the host and Settings. */
+/* Upstream's update pill renders an <li>, so drop its marker. */
 .mfs-notices {
   display: flex;
   flex: none;
   flex-direction: column;
   gap: 4px;
+  margin: 0;
   padding: 6px 8px 0;
+  list-style: none;
 }
 
 .mfs-notices:empty {
@@ -849,17 +852,20 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
   font-variant-numeric: tabular-nums;
 }
 
+/* A <span> inside the meter button, so it needs display: block for its 4px height to hold. */
 .mfs-tr {
+  display: block;
+  width: 100%;
   height: 4px;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--mfs-track);
 }
 
 .mfs-tr > i {
   display: block;
   height: 100%;
-  border-radius: 2px;
+  border-radius: inherit;
 }
 
 .mfs-rs {

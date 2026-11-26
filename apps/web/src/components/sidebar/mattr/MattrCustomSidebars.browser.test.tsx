@@ -1,3 +1,4 @@
+/* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet antimatter/sidebar.css, which loads outside Tailwind. */
 import { render } from "../../../../test/render";
 import {
   EnvironmentId,
@@ -249,6 +250,10 @@ describe("MattrDefaultSidebar", () => {
     await page.getByRole("button", { name: "Island spring morphs", exact: true }).click();
     expect(current.actions.openThread).toHaveBeenCalledWith(items[1]);
 
+    const inbox = page.getByRole("button", { name: "Show all activity" }).element();
+    expect(inbox.getBoundingClientRect()).toMatchObject({ width: 28, height: 28 });
+    expect(getComputedStyle(inbox)).toMatchObject({ borderRadius: "7px", boxShadow: "none" });
+
     await mattr.getByRole("button", { name: /^mattr/ }).click();
     await expect.element(page.getByText("Pinned plan")).not.toBeInTheDocument();
 
@@ -435,6 +440,66 @@ describe("MattrUsageMeters", () => {
     await claude.click();
     expect(onOpen).toHaveBeenCalledOnce();
   });
+
+  it("draws each meter as a 4px track that stays above its reset line", async () => {
+    await using screen = await render(
+      <div className="mfs" style={{ width: 280 }}>
+        <MattrUsageMeters
+          nowMs={Date.parse(NOW_ISO)}
+          onOpen={() => {}}
+          meters={[
+            {
+              key: "claude:weekly",
+              driver: ProviderDriverKind.make("claudeAgent"),
+              providerName: "Claude",
+              accountName: "Claude main",
+              windowLabel: "week",
+              usedPercent: 15,
+              resetsAt: "2026-03-10T17:14:00.000Z",
+            },
+          ]}
+        />
+      </div>,
+    );
+    await expect.element(page.getByText("Resets in 2h 14m")).toBeVisible();
+    const track = screen.container.querySelector<HTMLElement>(".mfs-tr")!;
+    const fill = track.querySelector("i")!;
+    const reset = screen.container.querySelector(".mfs-rs")!;
+    expect(track.getBoundingClientRect().height).toBe(4);
+    expect(fill.getBoundingClientRect().height).toBe(4);
+    expect(getComputedStyle(track).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(fill.getBoundingClientRect().width).toBeCloseTo(
+      track.getBoundingClientRect().width * 0.15,
+      0,
+    );
+    expect(reset.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      track.getBoundingClientRect().bottom,
+    );
+  });
+});
+
+describe("Default layout titlebar", () => {
+  // Web uses browser history ("/"); Electron uses hash history, whose home href ends in "#/".
+  it.each(["/", "/#/", "/index.html#/"])(
+    "hides the duplicate wordmark linked as %s",
+    async (href) => {
+      await using screen = await render(
+        <div data-mattr-sidebar-layout="inbox">
+          <header>
+            <a href={href} style={{ display: "flex" }}>
+              mattr
+            </a>
+            <button type="button">Toggle</button>
+          </header>
+          <a href={href}>Elsewhere</a>
+        </div>,
+      );
+      const [brand, elsewhere] = screen.container.querySelectorAll("a");
+      expect(getComputedStyle(brand!).visibility).toBe("hidden");
+      expect(brand!.getBoundingClientRect().width).toBe(0);
+      expect(getComputedStyle(elsewhere!).visibility).toBe("visible");
+    },
+  );
 });
 
 describe("MattrSpacesSidebar", () => {
