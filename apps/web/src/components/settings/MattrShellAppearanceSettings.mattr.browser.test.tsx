@@ -43,6 +43,9 @@ vi.mock("../sidebar/mattr/MattrSidebarLayoutSetting", () => ({
 }));
 vi.mock("./MattrUiFontSetting", () => ({ MattrUiFontSetting: () => null }));
 vi.mock("./MattrIconPackSetting", () => ({ MattrIconPackSetting: () => null }));
+vi.mock("./MattrComposerAppearanceSettings", () => ({
+  MattrComposerAppearanceSettings: () => null,
+}));
 
 import { MattrShellAppearanceSettings } from "./MattrShellAppearanceSettings";
 

@@ -1,8 +1,8 @@
 import type { Plugin } from "vite-plus";
 
 // Loads the mattr shell stylesheet after the app's own CSS, from the web entry, so no upstream
-// file imports it. The UI font call goes first in the entry's body (imports are hoisted), so the
-// saved face applies before the first render. Tests skip it, like the rebrand.
+// file imports it. The UI font and composer appearance calls go first in the entry's body (imports
+// are hoisted), so saved picks apply before the first render. Tests skip it, like the rebrand.
 export function mattrShellPlugin(): Plugin {
   return {
     name: "antimatter:shell",
@@ -13,6 +13,7 @@ export function mattrShellPlugin(): Plugin {
       return {
         code:
           `import { startMattrUiFont } from "./mattrUiFont";\nstartMattrUiFont();\n` +
+          `import { startMattrComposerAppearance } from "./mattrComposerAppearance";\nstartMattrComposerAppearance();\n` +
           `${code}\nimport "../../../antimatter/shell.css";\n`,
         map: null,
       };

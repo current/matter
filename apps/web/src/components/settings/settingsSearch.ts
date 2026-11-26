@@ -462,6 +462,44 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("texture noise arc film paper sidebar frame shell")],
   },
   {
+    id: "mattr-scroll-fade",
+    title: msg("Scroll edge fade"),
+    to: "/settings/appearance",
+    searchTerms: [msg("vignette gradient fade mask top edge chat scroll header")],
+  },
+  {
+    id: "mattr-composer-material",
+    title: msg("Composer material"),
+    to: "/settings/appearance",
+    searchTerms: [msg("prompt input box frosted glass tinted minimal solid translucent surface")],
+  },
+  {
+    id: "mattr-composer-shape",
+    title: msg("Composer style"),
+    to: "/settings/appearance",
+    searchTerms: [msg("prompt input box shape shelf floating compact pill rounded corners")],
+  },
+  {
+    // Prefixed because the slider control already owns the `mattr-composer-transparency` id.
+    id: "setting-mattr-composer-transparency",
+    title: msg("Composer transparency"),
+    to: "/settings/appearance",
+    searchTerms: [msg("prompt input box opacity see through translucent")],
+  },
+  {
+    // Prefixed because the slider control already owns the `mattr-composer-blur` id.
+    id: "setting-mattr-composer-blur",
+    title: msg("Composer blur"),
+    to: "/settings/appearance",
+    searchTerms: [msg("prompt input box frosted backdrop blur strength")],
+  },
+  {
+    id: "mattr-composer-color",
+    title: msg("Composer color"),
+    to: "/settings/appearance",
+    searchTerms: [msg("prompt input box tint colour hue shell match")],
+  },
+  {
     id: "diff-color-scheme",
     title: msg("Diff colors"),
     to: "/settings/diffs",

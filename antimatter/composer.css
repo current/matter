@@ -28,6 +28,10 @@
   /* Upstream's composer tokens, so popovers and icon rings that read them match the card. */
   --chat-composer-glass-surface: var(--mc-card);
   --chat-composer-outline: var(--mc-card-line);
+  /* Shape tokens; Settings → Appearance → Composer style swaps them (composer-appearance.css). */
+  --mc-radius-shelf: 17px;
+  --mc-radius-card: 13px;
+  --mc-shelf-pad: 4px;
 }
 
 .dark [data-mattr-composer] {
@@ -66,8 +70,8 @@ html[data-theme-id] [data-mattr-composer] {
 [data-mattr-composer] {
   background-color: var(--mc-shelf);
   border: 1px solid var(--mc-shelf-line);
-  border-radius: 17px;
-  padding: 4px;
+  border-radius: var(--mc-radius-shelf);
+  padding: var(--mc-shelf-pad);
 }
 
 [data-mattr-composer][data-context-row] {
@@ -77,7 +81,7 @@ html[data-theme-id] [data-mattr-composer] {
 [data-mattr-composer]:not([data-context-row]) {
   background-color: transparent;
   border: 0;
-  border-radius: 13px;
+  border-radius: var(--mc-radius-card);
   padding: 0;
 }
 
@@ -87,7 +91,7 @@ html[data-theme-id] [data-mattr-composer] {
 
 /* The card. */
 [data-mattr-composer] [data-slot="composer-host"] {
-  border-radius: 13px;
+  border-radius: var(--mc-radius-card);
   background-color: var(--mc-card);
   box-shadow: var(--mc-card-shadow);
 }
@@ -103,13 +107,21 @@ html[data-theme-id] [data-mattr-composer] {
 
 [data-mattr-composer] [data-chat-composer-main-surface],
 [data-mattr-composer] [data-chat-composer-surface] {
-  border-radius: 13px;
+  border-radius: var(--mc-radius-card);
 }
 
 /* A banner attached above the card hands the card's paint to the main surface. */
+[data-mattr-composer]:has([data-composer-banner-surface="attached"]) [data-slot="composer-host"] {
+  background-color: transparent;
+  box-shadow: none;
+}
+
 [data-mattr-composer]:has([data-composer-banner-surface="attached"])
   [data-chat-composer-main-surface] {
   background-color: var(--mc-card);
+  box-shadow: var(--mc-card-shadow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* Prompt: 15px in from the top, two 20px lines tall at rest. */

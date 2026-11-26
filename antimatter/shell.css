@@ -2,7 +2,15 @@
 @import "./timeline-sidebar.css";
 @import "./stream-animation.css";
 @import "./composer.css";
+@import "./composer-appearance.css";
 @import "./rareui-chat.css";
+
+/* Settings → Appearance → Scroll edge fade off (mattrComposerAppearance.ts): content runs straight
+   to the top edge. A mask never affects layout, so turning it off moves nothing. */
+html[data-mattr-scroll-fade="off"] .topbar-scroll-fade {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
 
 /* mattr shell: the window is a frame, like a browser's. Its top row holds the traffic lights and
    the sidebar's titlebar row; each page is an inset card below it, and the sidebar only takes

@@ -1,0 +1,333 @@
+/* Settings → Appearance: the composer's material, style and color
+   (apps/web/src/mattrComposerAppearance.ts writes the root attributes). Every default leaves no
+   attribute, so the approved composer in composer.css renders untouched, and backdrop blur only
+   exists while data-mattr-composer-blur is on. */
+
+/* Color. Custom seeds arrive pre-fitted per scheme (--mca-tint-light/-dark); Match shell reuses
+   the Shell color, already fitted to a legible window by shellTint.ts, softened toward the card. */
+html[data-mattr-composer-tint="custom"] [data-mattr-composer] {
+  --mca-tint: var(--mca-tint-light);
+}
+
+html.dark[data-mattr-composer-tint="custom"] [data-mattr-composer] {
+  --mca-tint: var(--mca-tint-dark);
+}
+
+html[data-mattr-composer-tint="shell"] [data-mattr-composer] {
+  --mca-tint: color-mix(in oklab, var(--mattr-shell-tint-light, var(--sidebar)) 45%, #ffffff);
+}
+
+html.dark[data-mattr-composer-tint="shell"] [data-mattr-composer] {
+  --mca-tint: color-mix(
+    in oklab,
+    var(--mattr-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 55%,
+    #1c1c1c
+  );
+}
+
+html[data-mattr-composer-material="tinted"][data-mattr-composer-tint="shell"]
+  [data-mattr-composer] {
+  --mca-tint: color-mix(in oklab, var(--mattr-shell-tint-light, var(--sidebar)) 80%, #ffffff);
+}
+
+html.dark[data-mattr-composer-material="tinted"][data-mattr-composer-tint="shell"]
+  [data-mattr-composer] {
+  --mca-tint: color-mix(
+    in oklab,
+    var(--mattr-shell-tint-dark, var(--app-theme-sidebar, #1c1c1c)) 90%,
+    #262626
+  );
+}
+
+html[data-mattr-composer-tint] [data-mattr-composer] {
+  --mc-card: var(--mca-tint);
+  --mc-card-line: color-mix(in oklab, var(--mca-tint), #000000 9%);
+  --mc-shelf: color-mix(in oklab, var(--mca-tint), #000000 5%);
+  --mc-shelf-line: color-mix(in oklab, var(--mca-tint), #000000 11%);
+}
+
+html.dark[data-mattr-composer-tint] [data-mattr-composer] {
+  --mc-card-line: color-mix(in oklab, var(--mca-tint), #ffffff 7%);
+  --mc-shelf: color-mix(in oklab, var(--mca-tint), #000000 22%);
+  --mc-shelf-line: color-mix(in oklab, var(--mca-tint), #ffffff 10%);
+}
+
+/* Style. Radii stay concentric: shelf = card + shelf padding. */
+html[data-mattr-composer-shape="compact"] [data-mattr-composer] {
+  --mc-radius-card: 10px;
+  --mc-radius-shelf: 13px;
+  --mc-shelf-pad: 3px;
+}
+
+html[data-mattr-composer-shape="compact"] [data-mattr-composer] [data-chat-composer-body] {
+  padding: 10px 14px 4px;
+}
+
+html[data-mattr-composer-shape="compact"] [data-mattr-composer] [data-chat-composer-footer] {
+  min-height: 38px;
+}
+
+html[data-mattr-composer-shape="compact"]
+  [data-mattr-composer]
+  [data-slot="composer-context-strip"] {
+  min-height: 32px;
+}
+
+html[data-mattr-composer-shape="pill"] [data-mattr-composer] {
+  --mc-radius-card: 18px;
+  --mc-radius-shelf: 22px;
+}
+
+html[data-mattr-composer-shape="pill"] [data-mattr-composer] [data-chat-composer-body] {
+  padding: 15px 19px 7px;
+}
+
+html[data-mattr-composer-shape="pill"] [data-mattr-composer] [data-chat-composer-footer] {
+  padding: 0 10px 0 13px;
+}
+
+html[data-mattr-composer-shape="pill"] [data-mattr-composer] [data-slot="composer-context-strip"] {
+  padding: 0 12px;
+}
+
+/* Floating and Minimal drop the visible shelf. Solid and Minimal keep the page color underneath so
+   chat scrolling behind the under-tray never shows through its labels. */
+html:is([data-mattr-composer-shape="floating"], [data-mattr-composer-material="minimal"])
+  [data-mattr-composer][data-context-row] {
+  background-color: var(--background);
+  border-color: transparent;
+  padding: 0;
+}
+
+html[data-mattr-composer-shape="floating"]:not(
+    [data-mattr-composer-material="minimal"],
+    [data-mattr-composer-material="glass"]
+  )
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html[data-mattr-composer-shape="floating"]:not(
+    [data-mattr-composer-material="minimal"],
+    [data-mattr-composer-material="glass"]
+  )
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  box-shadow:
+    0 1px 2px rgb(20 22 30 / 6%),
+    0 14px 34px -16px rgb(20 22 30 / 30%);
+}
+
+html.dark[data-mattr-composer-shape="floating"]:not(
+    [data-mattr-composer-material="minimal"],
+    [data-mattr-composer-material="glass"]
+  )
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html.dark[data-mattr-composer-shape="floating"]:not(
+    [data-mattr-composer-material="minimal"],
+    [data-mattr-composer-material="glass"]
+  )
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 4%),
+    0 16px 36px -14px rgb(0 0 0 / 70%);
+}
+
+html[data-mattr-composer-shape="floating"]
+  [data-mattr-composer]
+  [data-slot="composer-context-strip"] {
+  margin-top: 4px;
+}
+
+/* Minimal: one flat card with a hairline, no shadow. */
+html[data-mattr-composer-material="minimal"] [data-mattr-composer] {
+  --mc-card-shadow: none;
+}
+
+html[data-mattr-composer-material="minimal"] [data-mattr-composer] [data-slot="composer-host"],
+html[data-mattr-composer-material="minimal"]
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  box-shadow: none;
+}
+
+/* Frosted, Glass and Tinted paint the shelf and card at --mca-opacity. */
+html:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  )
+  [data-mattr-composer] {
+  --mca-shelf-paint: color-mix(in srgb, var(--mc-shelf) var(--mca-opacity, 100%), transparent);
+  --mca-card-paint: color-mix(in srgb, var(--mc-card) var(--mca-opacity, 100%), transparent);
+}
+
+/* On a shelf the card already sits over the shelf's paint, so it only adds a lighter lift. */
+html:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  ):not([data-mattr-composer-shape="floating"])
+  [data-mattr-composer][data-context-row] {
+  --mca-card-paint: color-mix(in srgb, var(--mc-card) var(--mca-card-lift, 100%), transparent);
+  background-color: var(--mca-shelf-paint);
+}
+
+/* Floating translucent leaves the outer wrapper unpainted so the card blurs and paints once at its
+   own radius, while the under-tray sits on its own clean surface behind its labels. */
+html[data-mattr-composer-shape="floating"]:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  )
+  [data-mattr-composer][data-context-row] {
+  background-color: transparent;
+}
+
+html[data-mattr-composer-shape="floating"]:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  )
+  [data-mattr-composer]
+  [data-slot="composer-context-strip"] {
+  background-color: var(--background);
+  border-radius: 10px;
+}
+
+html:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  )
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html:is(
+    [data-mattr-composer-material="frosted"],
+    [data-mattr-composer-material="glass"],
+    [data-mattr-composer-material="tinted"]
+  )
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  background-color: var(--mca-card-paint);
+}
+
+/* Backdrop blur rides a pseudo-element, as upstream's composer glass does, so the composer never
+   becomes a containing block for fixed descendants. Non-floating shelves blur once on the shell;
+   floating and trayless composers blur directly on the card (or main surface when a banner is
+   attached so side gutters next to the inset banner stay clean). */
+html[data-mattr-composer-blur="on"]:not([data-mattr-composer-shape="floating"])
+  [data-mattr-composer][data-context-row] {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+html[data-mattr-composer-blur="on"]
+  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html[data-mattr-composer-blur="on"]
+  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface],
+html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  background-color: transparent;
+}
+
+html[data-mattr-composer-blur="on"]:not([data-mattr-composer-shape="floating"])
+  [data-mattr-composer][data-context-row]::before,
+html[data-mattr-composer-blur="on"]
+  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"]::before,
+html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"]::before,
+html[data-mattr-composer-blur="on"]
+  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface]::before,
+html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface]::before {
+  content: "";
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--mca-blur)) saturate(var(--mca-saturate, 1.05));
+  backdrop-filter: blur(var(--mca-blur)) saturate(var(--mca-saturate, 1.05));
+}
+
+/* Covers the border too (a negative z-index paints above it), so it redraws the line once. */
+html[data-mattr-composer-blur="on"]:not([data-mattr-composer-shape="floating"])
+  [data-mattr-composer][data-context-row]::before {
+  inset: -1px;
+  background-color: var(--mca-shelf-paint);
+  box-shadow: inset 0 0 0 1px var(--mc-shelf-line);
+}
+
+html[data-mattr-composer-blur="on"]
+  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"]::before,
+html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"]::before,
+html[data-mattr-composer-blur="on"]
+  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface]::before,
+html[data-mattr-composer-blur="on"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface]::before {
+  background-color: var(--mca-card-paint);
+}
+
+/* Glass: clearer, more saturated, with a specular top hairline and a soft depth rim. */
+html[data-mattr-composer-material="glass"] [data-mattr-composer] {
+  --mca-saturate: 1.4;
+  --mca-specular: inset 0 1px 0 rgb(255 255 255 / 70%), inset 0 0 0 0.5px rgb(255 255 255 / 30%);
+  --mca-depth: 0 1px 2px rgb(20 22 30 / 6%), 0 10px 30px -14px rgb(20 22 30 / 26%);
+}
+
+html.dark[data-mattr-composer-material="glass"] [data-mattr-composer] {
+  --mca-specular: inset 0 1px 0 rgb(255 255 255 / 9%), inset 0 0 0 0.5px rgb(255 255 255 / 4%);
+  --mca-depth: 0 12px 32px -14px rgb(0 0 0 / 62%);
+}
+
+html[data-mattr-composer-material="glass"]:not([data-mattr-composer-shape="floating"])
+  [data-mattr-composer][data-context-row] {
+  box-shadow: var(--mca-specular), var(--mca-depth);
+}
+
+html[data-mattr-composer-material="glass"]
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html[data-mattr-composer-material="glass"]
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  box-shadow: var(--mca-specular);
+}
+
+html[data-mattr-composer-material="glass"]
+  [data-mattr-composer]:not([data-context-row]):not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html[data-mattr-composer-material="glass"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:not(:has([data-composer-banner-surface="attached"]))
+  [data-slot="composer-host"],
+html[data-mattr-composer-material="glass"]
+  [data-mattr-composer]:not([data-context-row]):has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface],
+html[data-mattr-composer-material="glass"][data-mattr-composer-shape="floating"]
+  [data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  box-shadow: var(--mca-specular), var(--mca-depth);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  html[data-mattr-composer-blur="on"] [data-mattr-composer] {
+    --mca-opacity: 100%;
+  }
+}
