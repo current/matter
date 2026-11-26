@@ -265,6 +265,62 @@ describe("MattrTimelineSidebar", () => {
     expect(screen.container.textContent).not.toContain("Broken probe");
   });
 
+  it("draws subagent connectors without overlapping strokes", async () => {
+    using _server = useServer();
+    const runningParent = { ...today, attention: "running" as const };
+    const threeRunning = ["Audit adapters", "Probe codex", "Probe claude"].map((title) =>
+      subagent(title, { runtime: runtime("running") }),
+    );
+    await using screen = await renderTimeline(
+      model({ items: [runningParent, yesterday, older], children: threeRunning }),
+    );
+    await expect
+      .element(page.getByRole("group", { name: "Subagents of Timeline rail" }))
+      .toBeVisible();
+    const parent = row(screen.container, today)!;
+    const subs = [
+      ...screen.container.querySelectorAll<HTMLElement>("[data-mattr-timeline-subagent]"),
+    ];
+    expect(subs).toHaveLength(3);
+
+    const spans: Array<[number, number]> = [];
+    subs.forEach((sub, index) => {
+      const last = index === subs.length - 1;
+      const top = sub.getBoundingClientRect().top;
+      const conn = sub.querySelector<HTMLElement>(".mts-conn")!;
+      const elbow = conn.getBoundingClientRect();
+      const trunk = getComputedStyle(sub, "::after");
+      // A sibling below takes the elbow's left stroke over with one full-height trunk.
+      expect(getComputedStyle(conn).clipPath).toBe(last ? "none" : "inset(0px 0px 0px 1.5px)");
+      expect(trunk.content).toBe(last ? "none" : '""');
+      if (!last) {
+        expect(trunk.width).toBe("1.5px");
+        expect(parseFloat(trunk.left)).toBe(elbow.left - sub.getBoundingClientRect().left);
+        spans.push([top + parseFloat(trunk.top), sub.getBoundingClientRect().bottom]);
+      } else {
+        spans.push([elbow.top, elbow.bottom]);
+      }
+    });
+    // The trunk starts at the parent's edge, and each segment ends where the next begins.
+    expect(spans[0]![0]).toBeCloseTo(parent.getBoundingClientRect().bottom, 2);
+    for (let index = 1; index < spans.length; index += 1) {
+      expect(spans[index]![0]).toBeCloseTo(spans[index - 1]![1], 2);
+    }
+  });
+
+  it("spins the running indicator smoothly", async () => {
+    using _server = useServer();
+    await using screen = await renderTimeline(
+      model({ items: [{ ...today, attention: "running" }, yesterday, older], children: [] }),
+    );
+    await expect.element(page.getByRole("img", { name: "Running" })).toBeInTheDocument();
+    const spin = getComputedStyle(screen.container.querySelector(".mts-spin")!);
+    expect(spin.animationName).toBe("mts-spin");
+    expect(spin.animationTimingFunction).toBe("linear");
+    expect(spin.animationIterationCount).toBe("infinite");
+    expect(screen.container.querySelectorAll(".mts-spin")).toHaveLength(1);
+  });
+
   it("hides every subagent while Show active subagents is off", async () => {
     using _server = useServer({ storage: { [MATTR_TIMELINE_SUBAGENTS_STORAGE_KEY]: false } });
     await using screen = await renderTimeline();

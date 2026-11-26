@@ -292,6 +292,36 @@ describe("MattrDefaultSidebar", () => {
     await expect.element(tree).toBeVisible();
   });
 
+  it("draws the subagent tree without overlapping strokes", async () => {
+    using _server = useServer(false);
+    await using screen = await render(
+      <SidebarProvider>
+        <MattrDefaultSidebar model={model()} />
+      </SidebarProvider>,
+    );
+    await expect
+      .element(page.getByRole("list", { name: "Subagents of Muse provider matrix" }))
+      .toBeVisible();
+    const rows = [
+      ...screen.container.querySelectorAll<HTMLElement>(
+        'ul[aria-label="Subagents of Muse provider matrix"] > li',
+      ),
+    ];
+    expect(rows).toHaveLength(2);
+    const [first, last] = rows.map((row) => ({
+      elbow: getComputedStyle(row, "::before"),
+      trunk: getComputedStyle(row, "::after"),
+    }));
+    // Elbows start at the parent row's edge; a sibling below draws one full-height trunk
+    // and clips the elbow's left stroke so translucent strokes never stack.
+    expect(first!.elbow.top).toBe("0px");
+    expect(first!.elbow.clipPath).toBe("inset(0px 0px 0px 1.5px)");
+    expect(first!.trunk).toMatchObject({ top: "0px", bottom: "0px", width: "1.5px" });
+    expect(first!.trunk.left).toBe(first!.elbow.left);
+    expect(last!.elbow.clipPath).toBe("none");
+    expect(last!.trunk.content).toBe("none");
+  });
+
   it("nests subagents-of-subagents and counts and keeps subagents that need you", async () => {
     using _server = useServer(false);
     const settledParent = thread("Settled release", MATTR, { settledOverride: "settled" });

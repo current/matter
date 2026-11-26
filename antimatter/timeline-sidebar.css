@@ -342,13 +342,13 @@
   width: 14px;
   height: 14px;
   color: var(--mts-secondary);
-  /* Stepped, so a running row repaints 12 times a second rather than every frame. */
-  animation: mts-spin 1s steps(12) infinite;
+  transform-origin: center;
+  animation: mts-spin 0.9s linear infinite;
 }
 
 @keyframes mts-spin {
   to {
-    rotate: 360deg;
+    transform: rotate(360deg);
   }
 }
 
@@ -475,21 +475,45 @@
   box-shadow: inset 0 0 0 1px var(--mts-selected-ring);
 }
 
+/*
+ * The strokes are translucent, so no two segments may overlap or the overlap
+ * reads as a brighter band. Each subagent draws its own elbow; one with a later
+ * sibling also draws the full-height trunk and clips the elbow's left stroke.
+ */
 .mts .mts-sub .mts-conn {
   position: absolute;
-  top: -1px;
+  top: 0;
   left: 16.5px;
   width: 11px;
-  height: 15px;
+  height: 14px;
   border-bottom: 1.5px solid var(--mts-trunk);
   border-left: 1.5px solid var(--mts-trunk);
   border-bottom-left-radius: 6px;
 }
 
-/* Later siblings pick the trunk up where the previous elbow starts to curve. */
-.mts .mts-sub + .mts-sub .mts-conn {
-  top: -20px;
-  height: 34px;
+.mts .mts-sub:has(+ .mts-sub) .mts-conn {
+  clip-path: inset(0 0 0 1.5px);
+}
+
+.mts .mts-sub:has(+ .mts-sub)::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 16.5px;
+  width: 1.5px;
+  background: var(--mts-trunk);
+  content: "";
+  pointer-events: none;
+}
+
+/* The first subagent overlaps its parent by 0.5px; start at the parent's edge. */
+.mts .mts-sub:first-child .mts-conn,
+.mts .mts-sub:first-child::after {
+  top: 0.5px;
+}
+
+.mts .mts-sub:first-child .mts-conn {
+  height: 13.5px;
 }
 
 .mts .mts-sub .mts-pi,

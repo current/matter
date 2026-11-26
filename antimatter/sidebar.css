@@ -668,11 +668,16 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
   position: relative;
 }
 
+/*
+ * The strokes are translucent, so no two segments may overlap or the overlap
+ * reads as a brighter band. Each child draws its own elbow; one with a later
+ * sibling also draws the full-height trunk and clips the elbow's left stroke.
+ */
 .mfs-tree > li::before {
   position: absolute;
   top: 0;
-  left: -0.75px;
-  width: 12.75px;
+  left: -1px;
+  width: 13px;
   height: 14.75px;
   border-bottom: 1.5px solid var(--mfs-trunk);
   border-left: 1.5px solid var(--mfs-trunk);
@@ -681,17 +686,17 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
   pointer-events: none;
 }
 
-.mfs-tree > li:first-child::before {
-  top: -7px;
-  height: 21.75px;
+.mfs-tree > li:not(:last-child)::before {
+  clip-path: inset(0 0 0 1.5px);
 }
 
 .mfs-tree > li:not(:last-child)::after {
   position: absolute;
-  top: 8px;
+  top: 0;
   bottom: 0;
-  left: -0.75px;
-  border-left: 1.5px solid var(--mfs-trunk);
+  left: -1px;
+  width: 1.5px;
+  background: var(--mfs-trunk);
   content: "";
   pointer-events: none;
 }
