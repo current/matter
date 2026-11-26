@@ -3,7 +3,12 @@ import type { IslandDisplayMetrics } from "./types.ts";
 // Fits the 420pt Open card plus its 18pt ears and the hover bloom, with room for the drop zones.
 export const ISLAND_WINDOW_WIDTH = 520;
 export const ISLAND_WINDOW_HEIGHT = 560;
-/** How far below the screen top a drag counts as "near the notch". */
+/** A drag arms the drop zones only by touching the notch: its height plus a little below. */
+export const ISLAND_DROP_ARM_HEIGHT = 44;
+/** How far either side of the notch counts as touching it (the alert wing's width). */
+export const ISLAND_DROP_ARM_SLOP = 44;
+/** Once armed, the zones' card (420pt Open card plus its 18pt ears) keeps the drag caught. */
+export const ISLAND_DROP_ZONES_WIDTH = 456;
 export const ISLAND_DROP_CATCH_HEIGHT = 140;
 // Wider than both 14"/16" MacBook Pro (~185pt) and 13"/15" MacBook Air (~192pt) camera housings
 // so left/right pill wings never clip beneath the physical notch.

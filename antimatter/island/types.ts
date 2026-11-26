@@ -213,6 +213,8 @@ export interface IslandSnapshot {
   /** Whether "New thread" has a project to start in. */
   readonly canStartThread: boolean;
   readonly canCreateTask: boolean;
+  /** This Mac's environment; dropped local paths only go to threads there. */
+  readonly localEnvironmentId: string | null;
   readonly voice: IslandVoiceState;
   readonly assistant: IslandVoiceAssistantState;
 }

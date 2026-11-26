@@ -50,6 +50,7 @@ import { primaryServerProvidersAtom } from "../state/server";
 import { usePreparedConnection } from "../state/session";
 import { useProjects } from "../state/entities";
 import { usePrimaryEnvironmentId } from "../state/environments";
+import { localEnvironmentIdAtom } from "../state/primaryEnvironment";
 import { environmentSummaries } from "../state/presentation";
 import { environmentShell } from "../state/shell";
 import {
@@ -97,6 +98,9 @@ import type {
 const MAX_RECENT_THREADS = 12;
 const MAX_DONE_NOTIFICATIONS = 8;
 const MAX_WATCHED_RUNNING_THREADS = 6;
+// Idle plan-mode threads are watched for a ready plan only among the most recent few.
+const MAX_WATCHED_PLAN_THREADS = 3;
+const MAX_CACHED_PLAN_OVERVIEWS = 16;
 const SNAPSHOT_SYNC_INTERVAL_MS = 32;
 
 function defaultApprovalOptions(): ReadonlyArray<IslandApprovalOption> {
@@ -105,6 +109,25 @@ function defaultApprovalOptions(): ReadonlyArray<IslandApprovalOption> {
     { decision: "acceptForSession", label: m(msg("Always allow this session")) },
     { decision: "decline", label: m(msg("Deny")) },
   ];
+}
+
+const planOverviewCache = new Map<
+  string,
+  { readonly markdown: string; readonly overview: ReturnType<typeof parseMattrPlanOverview> }
+>();
+
+/** The host re-renders on every streamed token; a plan is parsed again only when it changes. */
+function cachedPlanOverview(planId: string, markdown: string) {
+  const hit = planOverviewCache.get(planId);
+  if (hit && hit.markdown === markdown) return hit.overview;
+  const overview = parseMattrPlanOverview(markdown);
+  planOverviewCache.delete(planId);
+  planOverviewCache.set(planId, { markdown, overview });
+  if (planOverviewCache.size > MAX_CACHED_PLAN_OVERVIEWS) {
+    const oldest = planOverviewCache.keys().next();
+    if (!oldest.done) planOverviewCache.delete(oldest.value);
+  }
+  return overview;
 }
 
 function currentTimestampIso(): string {
@@ -162,6 +185,7 @@ export function MattrIslandHost() {
   const location = useLocation();
   const routeParams = useParams({ strict: false });
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const localEnvironmentId = useAtomValue(localEnvironmentIdAtom);
   const projects = useProjects();
   const environmentIds = useAtomValue(environmentSummaries.environmentIdsAtom);
   const voiceMicrophone = useClientSettings((s) => s.voiceMicrophone);
@@ -178,8 +202,13 @@ export function MattrIslandHost() {
   const dismissUserInput = useAtomCommand(threadEnvironment.dismissUserInput, {
     reportFailure: false,
   });
-  // Captures from the island report failures in the app: the island itself has no toasts.
+  // Captures and answers from the island report failures in the app: the island has no toasts.
   const startCaptureTurn = useOrchestrationCommand(threadEnvironment.startTurn);
+  const respondToApprovalFromIsland = useOrchestrationCommand(threadEnvironment.respondToApproval);
+  const respondToUserInputFromIsland = useOrchestrationCommand(
+    threadEnvironment.respondToUserInput,
+  );
+  const dismissUserInputFromIsland = useAtomCommand(threadEnvironment.dismissUserInput);
   const setInteractionMode = useOrchestrationCommand(threadEnvironment.setInteractionMode);
 
   const [mainWindowFocused, setMainWindowFocused] = useState(() =>
@@ -420,16 +449,19 @@ export function MattrIslandHost() {
   if (scopedVoiceThreadKey) watchedDetailKeys.add(scopedVoiceThreadKey);
   let watchedRunning = 0;
   for (const [key, entry] of shellsByKey) {
-    if (
-      entry.status === "approval" ||
-      entry.status === "input" ||
-      (entry.raw.interactionMode === "plan" && entry.status !== "running")
-    ) {
+    if (entry.status === "approval" || entry.status === "input") {
       watchedDetailKeys.add(key);
     } else if (entry.status === "running" && watchedRunning < MAX_WATCHED_RUNNING_THREADS) {
       watchedDetailKeys.add(key);
       watchedRunning += 1;
     }
+  }
+  const planThreadKeys = new Set<string>();
+  for (const [key, entry] of sortedShells) {
+    if (planThreadKeys.size >= MAX_WATCHED_PLAN_THREADS) break;
+    if (entry.raw.interactionMode !== "plan" || entry.status === "running") continue;
+    planThreadKeys.add(key);
+    watchedDetailKeys.add(key);
   }
   const watchedDetailKeySignature = [...watchedDetailKeys].toSorted().join("\u0001");
 
@@ -500,9 +532,9 @@ export function MattrIslandHost() {
     const plans: IslandPendingPlan[] = [];
     const threads: IslandThreadSummary[] = [];
 
-    for (const [key, entry] of shellsByKey) {
-      if (entry.raw.interactionMode !== "plan" || entry.status === "running") continue;
-      if (!watchedDetailKeys.has(key)) continue;
+    for (const key of planThreadKeys) {
+      const entry = shellsByKey.get(key);
+      if (!entry) continue;
       const projection = Option.getOrNull(
         appAtomRegistry.get(environmentThreadDetails.stateAtom(parseThreadKey(key))).data,
       );
@@ -510,7 +542,7 @@ export function MattrIslandHost() {
         (candidate) => candidate.kind === "proposed_plan" && candidate.status === "active",
       );
       if (!plan || plan.kind !== "proposed_plan") continue;
-      const overview = parseMattrPlanOverview(plan.markdown);
+      const overview = cachedPlanOverview(plan.id, plan.markdown);
       planMarkdownById.set(plan.id, plan.markdown);
       plans.push({
         environmentId: entry.environmentId,
@@ -1154,7 +1186,7 @@ export function MattrIslandHost() {
         return;
       }
       case "respond-approval": {
-        void respondToApproval({
+        void respondToApprovalFromIsland({
           environmentId: EnvironmentId.make(action.environmentId),
           input: {
             threadId: ThreadId.make(action.threadId),
@@ -1165,7 +1197,7 @@ export function MattrIslandHost() {
         return;
       }
       case "respond-user-input": {
-        void respondToUserInput({
+        void respondToUserInputFromIsland({
           environmentId: EnvironmentId.make(action.environmentId),
           input: {
             threadId: ThreadId.make(action.threadId),
@@ -1176,7 +1208,7 @@ export function MattrIslandHost() {
         return;
       }
       case "dismiss-user-input": {
-        void dismissUserInput({
+        void dismissUserInputFromIsland({
           environmentId: EnvironmentId.make(action.environmentId),
           input: {
             threadId: ThreadId.make(action.threadId),
@@ -1217,6 +1249,7 @@ export function MattrIslandHost() {
         selectedThreadKey: effectiveSelectedKey,
         canStartThread: referenceProject !== null,
         canCreateTask: tasksApiConfig !== null,
+        localEnvironmentId,
         voice: {
           phase: speech.state.phase,
           level: speech.level,

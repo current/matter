@@ -70,6 +70,7 @@ export function makeIslandSnapshot(overrides: Partial<IslandSnapshot> = {}): Isl
     selectedThreadKey: null,
     canStartThread: true,
     canCreateTask: true,
+    localEnvironmentId: "env",
     voice: {
       phase: "idle",
       level: 0,

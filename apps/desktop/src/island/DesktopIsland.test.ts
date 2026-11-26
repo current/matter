@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
 import { islandModelRuntime } from "../../../../antimatter/island/islandModel.ts";
 import {
+  ISLAND_DROP_ARM_HEIGHT,
   ISLAND_DROP_CATCH_HEIGHT,
   ISLAND_WINDOW_HEIGHT,
   ISLAND_WINDOW_WIDTH,
@@ -17,6 +18,8 @@ import {
 import {
   INITIAL_MODIFIER_ROUTING,
   buildIslandWindowOptions,
+  createIslandMonitorController,
+  isIslandRendererAction,
   isNearDropCatch,
   routeModifierEvent,
   type ModifierRoutingState,
@@ -145,11 +148,22 @@ describe("computeIslandPlacement & buildIslandWindowOptions", () => {
     expect(buildIslandWindowOptions(bounds, "/tmp/p.cjs", false).type).toBeUndefined();
   });
 
-  it("catches drags only in the band just below the notch", () => {
+  it("arms drop zones only at the notch, then keeps the drag over the zones' card", () => {
     const bounds = { x: 496, y: 0, width: ISLAND_WINDOW_WIDTH };
-    expect(isNearDropCatch({ x: 756, y: 10 }, bounds)).toBe(true);
-    expect(isNearDropCatch({ x: 756, y: ISLAND_DROP_CATCH_HEIGHT + 1 }, bounds)).toBe(false);
-    expect(isNearDropCatch({ x: 100, y: 10 }, bounds)).toBe(false);
+    const center = 496 + ISLAND_WINDOW_WIDTH / 2;
+    // A drag across a browser's tab strip or toolbar below the menu bar never arms.
+    expect(isNearDropCatch({ x: center, y: 10 }, bounds, 200, false)).toBe(true);
+    expect(isNearDropCatch({ x: center, y: ISLAND_DROP_ARM_HEIGHT + 20 }, bounds, 200, false)).toBe(
+      false,
+    );
+    expect(isNearDropCatch({ x: center + 200, y: 10 }, bounds, 200, false)).toBe(false);
+    // Armed, the cursor can move down onto the zones.
+    expect(isNearDropCatch({ x: center + 200, y: 100 }, bounds, 200, true)).toBe(true);
+    expect(isNearDropCatch({ x: center, y: ISLAND_DROP_CATCH_HEIGHT + 1 }, bounds, 200, true)).toBe(
+      false,
+    );
+    // Measured against the window's own display, not the one under the cursor.
+    expect(isNearDropCatch({ x: center + 1512, y: 10 }, bounds, 200, false)).toBe(false);
   });
 });
 
@@ -413,5 +427,93 @@ describe("modifier routing", () => {
         0,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("modifier poller", () => {
+  function harness() {
+    const starts: Array<{
+      readonly resolve: (stop: () => void) => void;
+      readonly reject: (error: Error) => void;
+      readonly fail: (error: Error) => void;
+    }> = [];
+    const stopped: number[] = [];
+    const timers: Array<{
+      readonly run: () => void;
+      readonly delayMs: number;
+      cancelled: boolean;
+    }> = [];
+    let clock = 0;
+    const controller = createIslandMonitorController({
+      start: (_modifier, _onEvent, onFailure) =>
+        new Promise((resolve, reject) => {
+          starts.push({ resolve, reject, fail: onFailure });
+        }),
+      onEvent: () => undefined,
+      schedule: (run, delayMs) => {
+        const timer = { run, delayMs, cancelled: false };
+        timers.push(timer);
+        return () => {
+          timer.cancelled = true;
+        };
+      },
+      now: () => clock,
+    });
+    const ready = async (index: number) => {
+      starts[index]!.resolve(() => stopped.push(index));
+      await Promise.resolve();
+    };
+    return {
+      controller,
+      starts,
+      stopped,
+      timers,
+      ready,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("stops a poller that finishes starting after a newer settings change", async () => {
+    const h = harness();
+    h.controller.start("control");
+    // A second slider step lands before the first poller printed "ready".
+    h.controller.start("control");
+    expect(h.starts).toHaveLength(2);
+    await h.ready(0);
+    expect(h.stopped).toEqual([0]);
+    await h.ready(1);
+    expect(h.stopped).toEqual([0]);
+    h.controller.stop();
+    expect(h.stopped).toEqual([0, 1]);
+  });
+
+  it("restarts a crashed poller with growing backoff, never after stop", async () => {
+    const h = harness();
+    h.controller.start("option");
+    await h.ready(0);
+    h.starts[0]!.fail(new Error("exited"));
+    expect(h.timers.map((timer) => timer.delayMs)).toEqual([1000]);
+    h.timers[0]!.run();
+    expect(h.starts).toHaveLength(2);
+    h.starts[1]!.reject(new Error("exited before ready"));
+    await Promise.resolve();
+    expect(h.timers.map((timer) => timer.delayMs)).toEqual([1000, 2000]);
+    h.controller.stop();
+    expect(h.timers[1]!.cancelled).toBe(true);
+    h.timers[1]!.run();
+    expect(h.starts).toHaveLength(2);
+  });
+});
+
+describe("island actions", () => {
+  it("forwards only the actions the island renderer may send to the main window", () => {
+    expect(isIslandRendererAction({ type: "respond-approval" })).toBe(true);
+    expect(isIslandRendererAction({ type: "submit-capture" })).toBe(true);
+    expect(isIslandRendererAction({ type: "composer-dictation-hold", phase: "start" })).toBe(false);
+    expect(isIslandRendererAction({ type: "close-panel" })).toBe(false);
+    expect(isIslandRendererAction(null)).toBe(false);
+    expect(isIslandRendererAction({ type: 1 })).toBe(false);
   });
 });

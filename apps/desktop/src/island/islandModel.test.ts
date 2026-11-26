@@ -366,3 +366,142 @@ describe("quick capture", () => {
     });
   });
 });
+
+describe("capture target", () => {
+  const plan = {
+    environmentId: "env",
+    threadId: "bg",
+    threadTitle: "Background thread",
+    planId: "plan-1",
+    title: "Plan",
+    steps: [],
+    stepCount: 0,
+    canApprove: true,
+  };
+
+  it("keeps Revise…'s plan thread even when it is not the selected thread", () => {
+    const snapshot = makeIslandSnapshot({
+      selectedThreadKey: "env:a",
+      recentThreads: [makeIslandThread({ key: "env:a" })],
+      pendingPlans: [plan],
+    });
+    const revise = { kind: "thread" as const, environmentId: "env", threadId: "bg" };
+    expect(M.reconcileTarget(snapshot, revise)).toEqual(revise);
+    expect(M.threadTitle(snapshot, "env:bg")).toBe("Background thread");
+  });
+
+  it("holds a chosen thread while another thread becomes the newest, until it disappears", () => {
+    const chosen = { kind: "thread" as const, environmentId: "env", threadId: "a" };
+    const busier = makeIslandSnapshot({
+      recentThreads: [makeIslandThread({ key: "env:b" }), makeIslandThread({ key: "env:a" })],
+    });
+    expect(M.captureTargets(busier)[0]).toEqual({
+      kind: "thread",
+      environmentId: "env",
+      threadId: "b",
+    });
+    expect(M.reconcileTarget(busier, chosen)).toEqual(chosen);
+    const gone = makeIslandSnapshot({ recentThreads: [makeIslandThread({ key: "env:b" })] });
+    expect(M.reconcileTarget(gone, chosen)).toEqual({
+      kind: "thread",
+      environmentId: "env",
+      threadId: "b",
+    });
+  });
+
+  it("picks the first target when none is set, and drops New thread once it can't start", () => {
+    const snapshot = makeIslandSnapshot({ canStartThread: false });
+    expect(M.reconcileTarget(snapshot, null)).toEqual({ kind: "task" });
+    expect(M.reconcileTarget(snapshot, { kind: "new-thread" })).toEqual({ kind: "task" });
+  });
+
+  it("sends local paths only to threads on this Mac", () => {
+    const snapshot = makeIslandSnapshot({
+      localEnvironmentId: "env",
+      selectedThreadKey: "remote:r",
+      recentThreads: [makeIslandThread({ key: "remote:r" }), makeIslandThread({ key: "env:a" })],
+    });
+    expect(
+      M.capturePathsAllowed(snapshot, { kind: "thread", environmentId: "env", threadId: "a" }),
+    ).toBe(true);
+    expect(
+      M.capturePathsAllowed(snapshot, { kind: "thread", environmentId: "remote", threadId: "r" }),
+    ).toBe(false);
+    // New thread starts beside the selected thread, here on the remote environment.
+    expect(M.capturePathsAllowed(snapshot, { kind: "new-thread" })).toBe(false);
+    expect(M.capturePathsAllowed(snapshot, { kind: "task" })).toBe(true);
+    expect(
+      M.capturePathsAllowed(makeIslandSnapshot({ localEnvironmentId: null }), {
+        kind: "thread",
+        environmentId: "env",
+        threadId: "a",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps only http(s) and file links and strips control characters from names", () => {
+    expect(
+      M.acceptedDropLinks(
+        "# comment\nhttps://x.dev/a\njavascript:alert(1)\nfile:///Users/me/a.txt\nmailto:a@b.c\n",
+      ),
+    ).toEqual(["https://x.dev/a", "file:///Users/me/a.txt"]);
+    expect(M.stripControlCharacters("re\nport\u0007.pdf\u009b")).toBe("report.pdf");
+    expect(M.hasControlCharacters("/tmp/a\nb")).toBe(true);
+    expect(M.hasControlCharacters("/tmp/ünïcode ok.png")).toBe(false);
+  });
+});
+
+describe("answering safely", () => {
+  it("ignores presses for 300 ms after the item under them changes", () => {
+    let guard = M.stepInputGuard({ key: "", since: 0 }, "request-1", 1000);
+    expect(M.isInputGuarded(guard, 1000 + M.INPUT_GUARD_MS - 1)).toBe(true);
+    expect(M.isInputGuarded(guard, 1000 + M.INPUT_GUARD_MS)).toBe(false);
+    // The same item on later renders keeps its original time.
+    expect(M.stepInputGuard(guard, "request-1", 5000)).toBe(guard);
+    // A request answered elsewhere: the next one slides in and is guarded again.
+    guard = M.stepInputGuard(guard, "request-2", 5000);
+    expect(M.isInputGuarded(guard, 5100)).toBe(true);
+    // Nothing actionable on screen guards nothing.
+    expect(M.isInputGuarded(M.stepInputGuard(guard, "", 6000), 6000)).toBe(false);
+  });
+
+  it("shows an answered request again if it is still live after the timeout", () => {
+    const answered = new Map([
+      ["cleared", 0],
+      ["pending", 1000],
+    ]);
+    const live = new Set(["pending"]);
+    expect([...M.pruneAnswered(answered, live, 2000).keys()]).toEqual(["pending"]);
+    expect(M.pruneAnswered(answered, live, 1000 + M.ANSWER_TIMEOUT_MS).size).toBe(0);
+    const snapshot = makeIslandSnapshot({ pendingApprovals: [makeIslandApproval()] });
+    expect(M.needsYouItems(snapshot, new Map([["request-1", 0]]))).toEqual([]);
+  });
+
+  it("offers inline Approve / Deny only for a real accept and decline", () => {
+    expect(M.inlineApprovalChoices(makeIslandApproval())).toEqual({
+      accept: { decision: "accept", label: "Allow once" },
+      decline: { decision: "decline", label: "Deny" },
+    });
+    // Antigravity without allow-once: no fallback to "always allow" or to cancel.
+    expect(
+      M.inlineApprovalChoices(
+        makeIslandApproval({
+          options: [
+            { decision: "acceptForSession", label: "Always allow" },
+            { decision: "decline", label: "Deny" },
+          ],
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      M.inlineApprovalChoices(
+        makeIslandApproval({
+          options: [
+            { decision: "accept", label: "Allow" },
+            { decision: "cancel", label: "Stop" },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+});

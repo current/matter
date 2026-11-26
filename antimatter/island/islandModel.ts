@@ -76,6 +76,17 @@ export interface IslandModifierGestureState {
   readonly lastTapAt: number | null;
 }
 
+/** When the actionable item on screen last changed, so a stale press can't answer the next one. */
+export interface IslandInputGuardState {
+  readonly key: string;
+  readonly since: number;
+}
+
+/** Request ids answered from the island; anything with `has` (a Set or an id → time Map). */
+export interface IslandAnsweredIds {
+  readonly has: (id: string) => boolean;
+}
+
 export interface IslandShellGeometry {
   readonly width: number;
   readonly height: number;
@@ -101,6 +112,9 @@ export function islandModelRuntime() {
   const OPEN_WIDTH = 420;
   const MAX_ROWS = 4;
   const PILL_TOP = 6;
+  const INPUT_GUARD_MS = 300;
+  // A response that hasn't cleared the request by then probably failed: show it again.
+  const ANSWER_TIMEOUT_MS = 8000;
 
   function keyOf(environmentId: string, threadId: string): string {
     return environmentId + ":" + threadId;
@@ -130,7 +144,7 @@ export function islandModelRuntime() {
   /** Approvals, then questions, then plans: the order the Open card pages through. */
   function needsYouItems(
     snapshot: IslandSnapshot,
-    answered?: ReadonlySet<string>,
+    answered?: IslandAnsweredIds,
   ): IslandNeedsYouItem[] {
     const threads = threadByKey(snapshot);
     const provider = (key: string) => {
@@ -208,7 +222,7 @@ export function islandModelRuntime() {
   function deriveWing(
     snapshot: IslandSnapshot | null,
     nowMs: number,
-    answered?: ReadonlySet<string>,
+    answered?: IslandAnsweredIds,
   ): IslandWing {
     if (!snapshot || !snapshot.settings.enabled) return wing("idle", null);
     if (isListening(snapshot)) return wing("listening", null);
@@ -296,7 +310,7 @@ export function islandModelRuntime() {
   }
 
   /** Read-only Peek: needs-you rows (approvals answer inline), then running, then finished. */
-  function peekRows(snapshot: IslandSnapshot, answered?: ReadonlySet<string>): IslandPeekRow[] {
+  function peekRows(snapshot: IslandSnapshot, answered?: IslandAnsweredIds): IslandPeekRow[] {
     const threads = threadByKey(snapshot);
     const rows: IslandPeekRow[] = [];
     const seenThreads = new Set<string>();
@@ -387,6 +401,109 @@ export function islandModelRuntime() {
       return a.environmentId === b.environmentId && a.threadId === b.threadId;
     }
     return true;
+  }
+
+  /** A thread's title from the recent list, else from a request it is waiting on. */
+  function threadTitle(snapshot: IslandSnapshot, key: string): string | null {
+    const recent = snapshot.recentThreads.find((thread) => thread.key === key);
+    if (recent) return recent.title;
+    const waiting = [
+      ...snapshot.pendingApprovals,
+      ...snapshot.pendingUserInputs,
+      ...(snapshot.pendingPlans || []),
+    ].find((item) => keyOf(item.environmentId, item.threadId) === key);
+    return waiting ? waiting.threadTitle : null;
+  }
+
+  /**
+   * The composer's target stays put once chosen (on open, by a drop, Tab or Revise…): a thread
+   * target holds until that thread is gone, New thread / Task until they become unavailable.
+   */
+  function reconcileTarget(
+    snapshot: IslandSnapshot,
+    current: IslandCaptureTarget | null,
+  ): IslandCaptureTarget | null {
+    const targets = captureTargets(snapshot);
+    if (current && current.kind === "thread") {
+      if (threadTitle(snapshot, keyOf(current.environmentId, current.threadId)) !== null) {
+        return current;
+      }
+    } else if (current && targets.some((candidate) => sameTarget(candidate, current))) {
+      return current;
+    }
+    return targets[0] || null;
+  }
+
+  /** Local absolute paths only go to threads on this Mac; a task just keeps them as a note. */
+  function capturePathsAllowed(
+    snapshot: IslandSnapshot,
+    target: IslandCaptureTarget | null,
+  ): boolean {
+    if (!target) return false;
+    if (target.kind === "task") return true;
+    const local = snapshot.localEnvironmentId;
+    if (!local) return false;
+    if (target.kind === "thread") return target.environmentId === local;
+    const reference = captureTargets(snapshot).find((candidate) => candidate.kind === "thread");
+    return Boolean(reference && reference.kind === "thread" && reference.environmentId === local);
+  }
+
+  function stripControlCharacters(text: string): string {
+    let out = "";
+    for (const char of text) {
+      const code = char.charCodeAt(0);
+      if (code >= 0x20 && (code < 0x7f || code > 0x9f)) out += char;
+    }
+    return out;
+  }
+
+  function hasControlCharacters(text: string): boolean {
+    return stripControlCharacters(text) !== text;
+  }
+
+  /** `text/uri-list` links worth keeping: http(s) and file only, comments dropped. */
+  function acceptedDropLinks(uriList: string): string[] {
+    return uriList
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && /^(https?|file):/i.test(line))
+      .filter((line) => !hasControlCharacters(line));
+  }
+
+  /** Inline Approve / Deny only when the request really offers a plain accept and decline. */
+  function inlineApprovalChoices(approval: IslandPendingApproval): {
+    readonly accept: IslandPendingApproval["options"][number];
+    readonly decline: IslandPendingApproval["options"][number];
+  } | null {
+    const accept = approval.options.find((option) => option.decision === "accept");
+    const decline = approval.options.find((option) => option.decision === "decline");
+    return accept && decline ? { accept, decline } : null;
+  }
+
+  function stepInputGuard(
+    state: IslandInputGuardState,
+    key: string,
+    nowMs: number,
+  ): IslandInputGuardState {
+    return key === state.key ? state : { key, since: nowMs };
+  }
+
+  /** Blocks presses for a moment after the item under them changed (double clicks, key repeat). */
+  function isInputGuarded(state: IslandInputGuardState, nowMs: number): boolean {
+    return state.key !== "" && nowMs - state.since < INPUT_GUARD_MS;
+  }
+
+  /** Forgets answers whose request cleared, and ones still live after the timeout. */
+  function pruneAnswered(
+    answered: ReadonlyMap<string, number>,
+    liveIds: ReadonlySet<string>,
+    nowMs: number,
+  ): Map<string, number> {
+    const kept = new Map<string, number>();
+    for (const [id, at] of answered) {
+      if (liveIds.has(id) && nowMs - at < ANSWER_TIMEOUT_MS) kept.set(id, at);
+    }
+    return kept;
   }
 
   /** Tab order: → thread, New thread, Task, back to the thread. */
@@ -495,6 +612,8 @@ export function islandModelRuntime() {
     HOVER_DWELL_MS,
     DOUBLE_TAP_MS,
     PILL_TOP,
+    INPUT_GUARD_MS,
+    ANSWER_TIMEOUT_MS,
     keyOf,
     isListening,
     needsYouItems,
@@ -505,6 +624,16 @@ export function islandModelRuntime() {
     glanceThreads,
     captureTargets,
     sameTarget,
+    threadTitle,
+    reconcileTarget,
+    capturePathsAllowed,
+    stripControlCharacters,
+    hasControlCharacters,
+    acceptedDropLinks,
+    inlineApprovalChoices,
+    stepInputGuard,
+    isInputGuarded,
+    pruneAnswered,
     nextTarget,
     parseCapturePrefix,
     stepAutoPeek,

@@ -11,6 +11,7 @@ import {
   startMacSingleTapModifierMonitor,
   type MacModifierEvent,
   type MacMonitorEvent,
+  type MacSingleTapModifier,
 } from "../../../../antimatter/island/MacControlTapMonitor.ts";
 import { buildIslandHtml } from "../../../../antimatter/island/islandHtml.ts";
 import {
@@ -18,7 +19,10 @@ import {
   type IslandModifierGestureState,
 } from "../../../../antimatter/island/islandModel.ts";
 import {
+  ISLAND_DROP_ARM_HEIGHT,
+  ISLAND_DROP_ARM_SLOP,
   ISLAND_DROP_CATCH_HEIGHT,
+  ISLAND_DROP_ZONES_WIDTH,
   ISLAND_WINDOW_WIDTH,
   NOTCHED_DISPLAY_NOTCH_WIDTH,
   computeIslandPlacement,
@@ -48,6 +52,10 @@ import { focusIslandWithoutActivating } from "./IslandMacPanel.ts";
 const ISLAND_FALLBACK_SHORTCUT = "CommandOrControl+Shift+Space";
 const HIDE_FALLBACK_TIMEOUT_MS = 420;
 const DRAG_WATCH_INTERVAL_MS = 60;
+const MONITOR_RETRY_BASE_MS = 1000;
+const MONITOR_RETRY_MAX_MS = 30_000;
+// A poller that ran this long before dying restarts from the shortest backoff again.
+const MONITOR_STABLE_MS = 60_000;
 // A hold for island dictation starts once it can no longer be the first half of a double tap.
 const ISLAND_HOLD_START_DELAY_MS = Math.round(MODIFIER_TAP_MAX_SECONDS * 1000);
 
@@ -149,17 +157,129 @@ export function routeModifierEvent(
   return { state: { gesture: gesture.state, holdTarget }, events };
 }
 
-/** Whether a cursor (screen points) is close enough to the island's top-center to show drop zones. */
+/**
+ * Whether a drag's cursor (screen points) should show the drop zones. A drag has to touch the
+ * notch to arm them; once armed it stays caught over the zones' card. Anywhere else, drops go
+ * to whatever app is under the cursor.
+ */
 export function isNearDropCatch(
   cursor: { readonly x: number; readonly y: number },
   windowBounds: { readonly x: number; readonly y: number; readonly width: number },
+  notchWidth: number,
+  armed: boolean,
 ): boolean {
+  const centerX = windowBounds.x + windowBounds.width / 2;
+  const halfWidth = armed ? ISLAND_DROP_ZONES_WIDTH / 2 : notchWidth / 2 + ISLAND_DROP_ARM_SLOP;
+  const height = armed ? ISLAND_DROP_CATCH_HEIGHT : ISLAND_DROP_ARM_HEIGHT;
   return (
-    cursor.x >= windowBounds.x &&
-    cursor.x <= windowBounds.x + windowBounds.width &&
+    cursor.x >= centerX - halfWidth &&
+    cursor.x <= centerX + halfWidth &&
     cursor.y >= windowBounds.y &&
-    cursor.y <= windowBounds.y + ISLAND_DROP_CATCH_HEIGHT
+    cursor.y <= windowBounds.y + height
   );
+}
+
+/** What the island renderer may ask the main window to do; main-only actions never pass. */
+const ISLAND_RENDERER_ACTION_TYPES: ReadonlySet<string> = new Set<IslandAction["type"]>([
+  "open-thread",
+  "submit-capture",
+  "respond-approval",
+  "respond-user-input",
+  "dismiss-user-input",
+  "approve-plan",
+  "voice-start",
+  "voice-stop",
+  "voice-cancel",
+  "update-draft",
+  "assistant-open-voice-mode-modal",
+  "open-voice-settings",
+  "open-island-settings",
+]);
+
+export function isIslandRendererAction(raw: unknown): raw is IslandAction {
+  return (
+    typeof raw === "object" &&
+    raw !== null &&
+    "type" in raw &&
+    typeof raw.type === "string" &&
+    ISLAND_RENDERER_ACTION_TYPES.has(raw.type)
+  );
+}
+
+export interface IslandMonitorControllerOptions {
+  readonly start: (
+    modifier: MacSingleTapModifier,
+    onEvent: (event: MacMonitorEvent) => void,
+    onFailure: (error: Error) => void,
+  ) => Promise<() => void>;
+  readonly onEvent: (event: MacMonitorEvent) => void;
+  readonly schedule?: (run: () => void, delayMs: number) => () => void;
+  readonly now?: () => number;
+}
+
+/**
+ * Owns the one modifier poller. Every start or stop bumps a generation, so a poller that finishes
+ * starting after a newer request is stopped instead of leaking; a crashed poller restarts with
+ * backoff.
+ */
+export function createIslandMonitorController(options: IslandMonitorControllerOptions) {
+  const schedule =
+    options.schedule ??
+    ((run: () => void, delayMs: number) => {
+      const timer = setTimeout(run, delayMs);
+      return () => clearTimeout(timer);
+    });
+  const now = options.now ?? Date.now;
+  let generation = 0;
+  let stopPoller: (() => void) | null = null;
+  let cancelRetry: (() => void) | null = null;
+  let failures = 0;
+  let readyAt: number | null = null;
+
+  const launch = (modifier: MacSingleTapModifier, owner: number) => {
+    const failed = () => {
+      if (owner !== generation) return;
+      stopPoller = null;
+      if (readyAt !== null && now() - readyAt >= MONITOR_STABLE_MS) failures = 0;
+      readyAt = null;
+      const delay = Math.min(MONITOR_RETRY_MAX_MS, MONITOR_RETRY_BASE_MS * 2 ** failures);
+      failures += 1;
+      cancelRetry = schedule(() => {
+        cancelRetry = null;
+        if (owner === generation) launch(modifier, owner);
+      }, delay);
+    };
+    void options.start(modifier, options.onEvent, failed).then((stop) => {
+      if (owner !== generation) {
+        stop();
+        return;
+      }
+      stopPoller = stop;
+      readyAt = now();
+    }, failed);
+  };
+
+  const stop = () => {
+    generation += 1;
+    if (cancelRetry) {
+      cancelRetry();
+      cancelRetry = null;
+    }
+    if (stopPoller) {
+      stopPoller();
+      stopPoller = null;
+    }
+    readyAt = null;
+  };
+
+  return {
+    start: (modifier: MacSingleTapModifier) => {
+      stop();
+      failures = 0;
+      launch(modifier, generation);
+    },
+    stop,
+  };
 }
 
 export class DesktopIsland extends Context.Service<
@@ -204,7 +324,6 @@ export const layer = Layer.effect(
     let pendingHide = false;
     let pendingHideTimer: ReturnType<typeof setTimeout> | null = null;
     let mainWebContentsId: number | null = null;
-    let stopMonitor: (() => void) | null = null;
     let registeredGlobalShortcut: string | null = null;
     let modifierRouting = INITIAL_MODIFIER_ROUTING;
     let islandHoldTimer: ReturnType<typeof setTimeout> | null = null;
@@ -463,8 +582,9 @@ export const layer = Layer.effect(
         stopDragWatch();
         const wasNear = dragNear;
         dragNear = false;
+        // Always: the page may have shown the zones from its own dragenter.
+        sendCommandToIsland({ type: "drag", phase: "end" });
         if (wasNear) {
-          sendCommandToIsland({ type: "drag", phase: "end" });
           if (usable(islandWindow) && !forcedOpen) {
             islandWindow.setIgnoreMouseEvents(true, { forward: true });
           }
@@ -473,11 +593,16 @@ export const layer = Layer.effect(
         return;
       }
       stopDragWatch();
-      // Polls only while a drag is in flight; the island window becomes a drop target near the notch.
+      // Polls only while a drag is in flight; the island window becomes a drop target at the notch.
       dragWatch = setInterval(() => {
+        // Test the window where it is; a hidden one shows on the cursor's display.
+        const shown = usable(islandWindow) && islandWindow.isVisible() ? islandWindow : null;
+        const placement = computeNotchPlacement(isMac);
         const near = isNearDropCatch(
           Electron.screen.getCursorScreenPoint(),
-          computeNotchPlacement(isMac).bounds,
+          shown ? shown.getBounds() : placement.bounds,
+          shown ? latestMetrics.notchWidth : placement.metrics.notchWidth,
+          dragNear,
         );
         if (near === dragNear) return;
         dragNear = near;
@@ -513,13 +638,22 @@ export const layer = Layer.effect(
       }
     };
 
+    const monitor = createIslandMonitorController({
+      start: startMacSingleTapModifierMonitor,
+      onEvent: (event) => onMonitorEvent(event),
+    });
+
     const stopShortcuts = () => {
       if (modifierRouting.holdTarget) onMonitorEvent("hold-cancel");
       modifierRouting = INITIAL_MODIFIER_ROUTING;
       stopDragWatch();
-      if (stopMonitor) {
-        stopMonitor();
-        stopMonitor = null;
+      monitor.stop();
+      if (dragNear) {
+        dragNear = false;
+        sendCommandToIsland({ type: "drag", phase: "end" });
+        if (usable(islandWindow) && !forcedOpen) {
+          islandWindow.setIgnoreMouseEvents(true, { forward: true });
+        }
       }
       if (registeredGlobalShortcut) {
         try {
@@ -534,21 +668,9 @@ export const layer = Layer.effect(
       stopShortcuts();
       if (!settings.enabled) return;
 
-      if (isMac) {
-        // The poller also watches drags, so it runs whatever the shortcut is.
-        const modifier =
-          settings.shortcut === "control" || settings.shortcut === "option"
-            ? settings.shortcut
-            : null;
-        void startMacSingleTapModifierMonitor(modifier, onMonitorEvent, () => undefined)
-          .then((stop) => {
-            if (!currentSettings.enabled || currentSettings.shortcut !== settings.shortcut) {
-              stop();
-              return;
-            }
-            stopMonitor = stop;
-          })
-          .catch(() => undefined);
+      // The poller also reports drags, but runs only for a modifier shortcut: no idle CPU otherwise.
+      if (isMac && (settings.shortcut === "control" || settings.shortcut === "option")) {
+        monitor.start(settings.shortcut);
       }
       if (settings.shortcut === "command-shift-space") {
         try {
@@ -563,9 +685,8 @@ export const layer = Layer.effect(
       usable(islandWindow) && event.sender === islandWindow.webContents ? islandWindow : null;
 
     const onIslandAction = (event: Electron.IpcMainEvent, rawAction: unknown) => {
-      if (!fromIsland(event)) return;
-      if (typeof rawAction !== "object" || rawAction === null || !("type" in rawAction)) return;
-      const action = rawAction as IslandAction;
+      if (!fromIsland(event) || !isIslandRendererAction(rawAction)) return;
+      const action = rawAction;
       if (
         action.type === "open-thread" ||
         action.type === "open-voice-settings" ||
@@ -678,8 +799,13 @@ export const layer = Layer.effect(
       ),
       updateSettings: Effect.fn("desktop.island.updateSettings")(function* (settings) {
         yield* Effect.sync(() => {
+          // Voice sliders call this on every step; only a shortcut change restarts the poller.
+          const shortcutsChanged =
+            !shortcutsInitialized ||
+            settings.enabled !== currentSettings.enabled ||
+            settings.shortcut !== currentSettings.shortcut;
           currentSettings = settings;
-          applyShortcuts(settings);
+          if (shortcutsChanged) applyShortcuts(settings);
           syncVisibility();
         });
       }),

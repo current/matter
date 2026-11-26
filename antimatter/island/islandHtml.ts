@@ -244,7 +244,10 @@ export function buildIslandHtml(): string {
   let leaveTimer = 0;
   let deadlineTimer = 0;
   let autoPeek = { seen: [], until: 0 };
-  const answered = new Set();
+  // Request id → when the island answered it; hidden until it clears or the answer times out.
+  let answered = new Map();
+  let inputGuard = { key: "", since: 0 };
+  let notice = "";
   let needsKey = null;
   let glanceIndex = 0;
   let draft = "";
@@ -428,12 +431,11 @@ export function buildIslandHtml(): string {
   }
 
   function approvalButtons(approval) {
-    const primary = approval.options.find((o) => o.decision === "accept") || approval.options[0];
-    const deny = approval.options.find((o) => o.decision === "decline") || approval.options.find((o) => o.decision === "cancel");
-    let html = "";
-    if (deny) html += '<button class="btn small" data-action="approve" data-request="' + esc(approval.requestId) + '" data-decision="' + deny.decision + '">Deny</button>';
-    if (primary) html += '<button class="btn small primary" data-action="approve" data-request="' + esc(approval.requestId) + '" data-decision="' + primary.decision + '">Approve</button>';
-    return approval.canRespond ? '<div style="display:flex;gap:5px;flex:none">' + html + "</div>" : "";
+    const choices = approval.canRespond ? M.inlineApprovalChoices(approval) : null;
+    if (!choices) return null;
+    const button = (option, label, primary) => '<button class="btn small' + (primary ? " primary" : "") + '" data-action="approve" data-request="' +
+      esc(approval.requestId) + '" data-decision="' + option.decision + '">' + label + "</button>";
+    return '<div style="display:flex;gap:5px;flex:none">' + button(choices.decline, "Deny", false) + button(choices.accept, "Approve", true) + "</div>";
   }
 
   function peekHtml() {
@@ -444,9 +446,8 @@ export function buildIslandHtml(): string {
     return rows.map((row) => {
       const thread = threadByKey(row.threadKey);
       const dot = row.kind === "needs-you" ? "needs" : row.kind;
-      const trailing = row.needsYou && row.needsYou.kind === "approval"
-        ? approvalButtons(row.needsYou.item)
-        : '<span class="state-dot ' + dot + '"></span>';
+      const trailing = (row.needsYou && row.needsYou.kind === "approval" ? approvalButtons(row.needsYou.item) : null) ||
+        '<span class="state-dot ' + dot + '"></span>';
       return rowHtml({ providerKind: row.providerKind, providerName: thread ? thread.providerName : null, title: row.title, detail: row.detail, trailing });
     }).join("");
   }
@@ -518,22 +519,29 @@ export function buildIslandHtml(): string {
     if (!entry) return { key: "needs:none", html: "" };
     const body = entry.item.kind === "approval" ? approvalCard(entry.item.item)
       : entry.item.kind === "question" ? questionCard(entry.item.item) : planCard(entry.item.item);
-    return { key: "needs:" + entry.item.id + ":" + list.length + ":" + JSON.stringify(question), html: needsHeader(entry, list.length) + body };
+    // The custom answer stays out of the key: typing it must never rebuild the card under the caret.
+    const questionKey = entry.item.kind === "question" ? JSON.stringify({ index: question.index, answers: question.answers }) : "";
+    return { key: "needs:" + entry.item.id + ":" + list.length + ":" + questionKey, html: needsHeader(entry, list.length) + body,
+      item: entry.item.id + ":" + (entry.item.kind === "question" ? question.index : "") };
   }
 
   function targetLabel(t) {
     if (!t) return "No target";
     if (t.kind === "new-thread") return "New thread";
     if (t.kind === "task") return "Task";
-    const thread = threadByKey(t.environmentId + ":" + t.threadId);
-    return "→ " + (thread ? thread.title : "Thread");
+    return "→ " + (M.threadTitle(snapshot, t.environmentId + ":" + t.threadId) || "Thread");
   }
 
   function ensureTarget() {
-    const targets = M.captureTargets(snapshot);
-    if (!targets.some((candidate) => M.sameTarget(candidate, target))) target = targets[0] || null;
-    return targets;
+    target = M.reconcileTarget(snapshot, target);
+    return M.captureTargets(snapshot);
   }
+
+  function hasLocalPaths() {
+    return files.length > 0 || urls.some((u) => /^file:/i.test(u));
+  }
+
+  const REMOTE_PATHS_NOTICE = "Local files can't go to a thread on another computer.";
 
   function promptCard() {
     ensureTarget();
@@ -548,10 +556,11 @@ export function buildIslandHtml(): string {
       '<textarea id="draft" rows="1" placeholder="' + (listening ? "Listening…" : "Ask, steer or add a task…") + '"></textarea>' +
       (listening ? '<div id="voice-preview" class="muted" style="margin:0 2px;font-size:12px"></div>' : "") +
       (chips ? '<div class="chips">' + chips + "</div>" : "") +
+      (notice ? '<div class="reason">' + esc(notice) + "</div>" : "") +
       '<div class="composer-foot"><span class="hint">Tab target · ⌃ hold to dictate · ↵ send</span>' +
       '<button class="icon-btn' + (listening ? " is-on" : "") + '" data-action="mic" title="Dictate">' + MIC_SVG + "</button>" +
       '<button class="icon-btn send" data-action="send" title="Send"' + (canSend ? "" : " disabled") + ">" + SEND_SVG + "</button></div>";
-    return { key: "prompt:" + targetLabel(target) + ":" + parsed.interactionMode + ":" + chips + ":" + listening + ":" + canSend, html, prompt: true };
+    return { key: "prompt:" + targetLabel(target) + ":" + parsed.interactionMode + ":" + chips + ":" + listening + ":" + canSend + ":" + notice, html, prompt: true };
   }
 
   function glanceCard() {
@@ -572,7 +581,6 @@ export function buildIslandHtml(): string {
   }
 
   function dropCard() {
-    ensureTarget();
     const threadTarget = M.captureTargets(snapshot).find((t) => t.kind === "thread");
     const threadTitle = threadTarget ? (threadByKey(threadTarget.environmentId + ":" + threadTarget.threadId) || {}).title : null;
     const zone = (id, label, sub, enabled) =>
@@ -600,7 +608,7 @@ export function buildIslandHtml(): string {
     if (!snapshot) return { key: "none", html: "" };
     if (mode === "peek") {
       const html = peekHtml();
-      return { key: "peek:" + html, html };
+      return { key: "peek:" + html, html, item: M.peekRows(snapshot, answered).map((row) => (row.needsYou ? row.needsYou.id : "")).join(",") };
     }
     if (mode !== "open") return { key: "none", html: "" };
     const kind = openCardKind();
@@ -612,12 +620,14 @@ export function buildIslandHtml(): string {
 
   function paintPanel() {
     const next = buildPanel();
+    inputGuard = M.stepInputGuard(inputGuard, next.item || "", Date.now());
     if (next.key === lastPanelKey) return;
     const wasEmpty = lastPanelKey === "" || lastPanelKey === "none";
     const sameCard = lastPanelKey.split(":")[0] === next.key.split(":")[0];
     lastPanelKey = next.key;
     const active = document.activeElement;
-    const selection = active && active.id === "draft" ? [active.selectionStart, active.selectionEnd] : null;
+    const focusedId = active && (active.id === "draft" || active.id === "custom-answer") ? active.id : null;
+    const selection = focusedId ? [active.selectionStart, active.selectionEnd] : null;
     const old = panelInner.querySelector(".card");
     if (old && !sameCard && !wasEmpty) {
       old.classList.remove("content-in");
@@ -639,9 +649,14 @@ export function buildIslandHtml(): string {
       autosize(textarea);
       if (open) {
         textarea.focus();
-        if (selection) textarea.setSelectionRange(selection[0], selection[1]);
+        if (focusedId === "draft") textarea.setSelectionRange(selection[0], selection[1]);
         else textarea.setSelectionRange(draft.length, draft.length);
       }
+    }
+    const custom = card.querySelector("#custom-answer");
+    if (custom && open && focusedId === "custom-answer") {
+      custom.focus();
+      custom.setSelectionRange(selection[0], selection[1]);
     }
   }
 
@@ -710,7 +725,8 @@ export function buildIslandHtml(): string {
   function scheduleDeadline(wing) {
     clearTimeout(deadlineTimer);
     const now = Date.now();
-    const deadlines = [autoPeek.until, wing.expiresAt].filter((value) => typeof value === "number" && value > now);
+    const expiries = [...answered.values()].map((at) => at + M.ANSWER_TIMEOUT_MS);
+    const deadlines = [autoPeek.until, wing.expiresAt, ...expiries].filter((value) => typeof value === "number" && value > now);
     if (deadlines.length === 0) return;
     deadlineTimer = setTimeout(render, Math.min(...deadlines) - now + 16);
   }
@@ -718,8 +734,7 @@ export function buildIslandHtml(): string {
   function render() {
     if (!snapshot) return;
     const now = Date.now();
-    const liveIds = new Set(M.needsYouItems(snapshot).map((item) => item.id));
-    for (const id of [...answered]) if (!liveIds.has(id)) answered.delete(id);
+    answered = M.pruneAnswered(answered, new Set(M.needsYouItems(snapshot).map((item) => item.id)), now);
     const wing = M.deriveWing(snapshot, now, answered);
     const autoPeeking = M.isAutoPeeking(autoPeek, now);
     mode = snapshot.settings.enabled
@@ -743,6 +758,8 @@ export function buildIslandHtml(): string {
 
   // ---- Open / close ----
   function openIsland(reason) {
+    // The target is fixed when the island opens, so a busy thread can't take over the draft.
+    if (!open && snapshot) target = M.reconcileTarget(snapshot, null);
     open = true;
     openReason = reason;
     hoverPeek = false;
@@ -760,8 +777,11 @@ export function buildIslandHtml(): string {
     dropActive = false;
     dropZone = null;
     hoverPeek = false;
+    notice = "";
     if (snapshot && snapshot.voice.phase === "recording") bridge.sendAction({ type: "voice-stop" });
     if (wasOpen) bridge.releaseFocus();
+    // Main made the window click-through; the next pointer move re-sends what the pointer is over.
+    lastPassthrough = null;
     render();
   }
 
@@ -777,6 +797,8 @@ export function buildIslandHtml(): string {
     ensureTarget();
     const parsed = M.parseCapturePrefix(draft);
     if (!target || (!parsed.text && files.length === 0 && urls.length === 0)) return;
+    if (hasLocalPaths() && !M.capturePathsAllowed(snapshot, target)) { notice = REMOTE_PATHS_NOTICE; render(); return; }
+    notice = "";
     bridge.sendAction({ type: "submit-capture", target, text: parsed.text, interactionMode: parsed.interactionMode, files, urls });
     files = [];
     urls = [];
@@ -787,10 +809,17 @@ export function buildIslandHtml(): string {
   function respondApproval(requestId, decision) {
     const approval = snapshot.pendingApprovals.find((item) => item.requestId === requestId);
     if (!approval) return;
-    answered.add(requestId);
+    answered.set(requestId, Date.now());
     bridge.sendAction({ type: "respond-approval", environmentId: approval.environmentId, threadId: approval.threadId, requestId, decision });
+    if (!open) {
+      // A click in Peek can key the panel; hand the keyboard straight back.
+      bridge.releaseFocus();
+      lastPassthrough = null;
+    }
     render();
   }
+
+  function inputBlocked() { return M.isInputGuarded(inputGuard, Date.now()); }
 
   function currentQuestionInput() {
     const entry = currentNeeds(needsList());
@@ -826,7 +855,7 @@ export function buildIslandHtml(): string {
       render();
       return;
     }
-    answered.add(input.requestId);
+    answered.set(input.requestId, Date.now());
     bridge.sendAction({ type: "respond-user-input", environmentId: input.environmentId, threadId: input.threadId, requestId: input.requestId, answers: state.answers });
     render();
   }
@@ -848,6 +877,8 @@ export function buildIslandHtml(): string {
       return;
     }
     const d = el.dataset;
+    const answers = d.action === "approve" || d.action === "approve-plan" || d.action === "pick-option" || d.action === "submit-question" || d.action === "skip-question";
+    if (answers && inputBlocked()) { event.stopPropagation(); return; }
     switch (d.action) {
       case "approve": event.stopPropagation(); respondApproval(d.request, d.decision); return;
       case "open-thread":
@@ -855,7 +886,7 @@ export function buildIslandHtml(): string {
         closeIsland();
         return;
       case "approve-plan":
-        answered.add(d.plan);
+        answered.set(d.plan, Date.now());
         bridge.sendAction({ type: "approve-plan", environmentId: d.env, threadId: d.thread, planId: d.plan });
         render();
         return;
@@ -871,7 +902,7 @@ export function buildIslandHtml(): string {
       case "skip-question": {
         const input = currentQuestionInput();
         if (!input) return;
-        answered.add(input.requestId);
+        answered.set(input.requestId, Date.now());
         bridge.sendAction({ type: "dismiss-user-input", environmentId: input.environmentId, threadId: input.threadId, requestId: input.requestId });
         render();
         return;
@@ -914,10 +945,12 @@ export function buildIslandHtml(): string {
     const kind = lastPanelKey.split(":")[0];
     if (kind === "prompt") {
       if (event.key === "Tab") { event.preventDefault(); target = M.nextTarget(ensureTarget(), target); render(); return; }
-      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); submitCapture(); }
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); if (!event.repeat) submitCapture(); }
       return;
     }
     if (kind === "needs") {
+      // Held keys and presses right after the request changed never answer the next one.
+      if (event.repeat || inputBlocked()) return;
       if (event.metaKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) { event.preventDefault(); stepNeeds(event.key === "ArrowDown" ? 1 : -1); return; }
       const entry = currentNeeds(needsList());
       if (!entry) return;
@@ -926,8 +959,8 @@ export function buildIslandHtml(): string {
         const digit = Number.parseInt(event.key, 10);
         if (approval.canRespond && digit >= 1 && digit <= approval.options.length) { event.preventDefault(); respondApproval(approval.requestId, approval.options[digit - 1].decision); return; }
         if (approval.canRespond && event.key === "Enter") {
-          const primary = approval.options.find((o) => o.decision === "accept") || approval.options[0];
-          if (primary) { event.preventDefault(); respondApproval(approval.requestId, primary.decision); }
+          const accept = approval.options.find((o) => o.decision === "accept");
+          if (accept) { event.preventDefault(); respondApproval(approval.requestId, accept.decision); }
         }
         return;
       }
@@ -943,7 +976,7 @@ export function buildIslandHtml(): string {
       if (entry.item.kind === "plan" && event.key === "Enter" && entry.item.item.canApprove) {
         event.preventDefault();
         const plan = entry.item.item;
-        answered.add(plan.planId);
+        answered.set(plan.planId, Date.now());
         bridge.sendAction({ type: "approve-plan", environmentId: plan.environmentId, threadId: plan.threadId, planId: plan.planId });
         render();
       }
@@ -1034,6 +1067,11 @@ export function buildIslandHtml(): string {
   }
 
   window.addEventListener("dragenter", (event) => { event.preventDefault(); if (!dropActive) { dropActive = true; render(); } });
+  window.addEventListener("dragleave", (event) => {
+    // Only a leave out of the window itself; leaves between child elements keep the zones up.
+    const out = event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight;
+    if (out && dropActive) { dropActive = false; dropZone = null; render(); }
+  });
   window.addEventListener("dragover", (event) => {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
@@ -1045,18 +1083,26 @@ export function buildIslandHtml(): string {
     const zone = zoneAt(event.clientX, event.clientY);
     const data = event.dataTransfer;
     if (!zone || !data) { dropActive = false; dropZone = null; render(); return; }
-    for (const file of data.files) {
-      const path = bridge.getPathForFile(file);
-      if (path) files.push({ name: file.name || path.split("/").pop(), path });
-    }
-    if (data.files.length === 0) {
-      const list = (data.getData("text/uri-list") || "").split("\\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
-      const plain = data.getData("text/plain") || "";
-      for (const link of list.length ? list : looksLikeUrl(plain) ? [plain.trim()] : []) if (!urls.includes(link)) urls.push(link);
-      if (!list.length && plain && !looksLikeUrl(plain)) syncDraft((draft ? draft + "\\n" : "") + plain);
-    }
     const targets = M.captureTargets(snapshot);
     target = zone === "thread" ? targets.find((t) => t.kind === "thread") || target : { kind: zone };
+    const pathsAllowed = M.capturePathsAllowed(snapshot, target);
+    let refused = false;
+    for (const file of data.files) {
+      const path = bridge.getPathForFile(file);
+      if (!path || M.hasControlCharacters(path)) continue;
+      if (!pathsAllowed) { refused = true; continue; }
+      files.push({ name: M.stripControlCharacters(file.name || path.split("/").pop() || "") || "file", path });
+    }
+    if (data.files.length === 0) {
+      const list = M.acceptedDropLinks(data.getData("text/uri-list") || "");
+      const plain = data.getData("text/plain") || "";
+      for (const link of list.length ? list : looksLikeUrl(plain) ? [plain.trim()] : []) {
+        if (/^file:/i.test(link) && !pathsAllowed) { refused = true; continue; }
+        if (!urls.includes(link)) urls.push(link);
+      }
+      if (!list.length && plain && !looksLikeUrl(plain)) syncDraft((draft ? draft + "\\n" : "") + plain);
+    }
+    notice = refused ? REMOTE_PATHS_NOTICE : "";
     dropActive = false;
     dropZone = null;
     open = true;
