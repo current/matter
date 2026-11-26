@@ -25,6 +25,7 @@ export const SF_SYMBOL_FOR_LUCIDE: Readonly<Record<string, string | null>> = {
   AtSignIcon: "at",
   AudioLinesIcon: "waveform",
   BatteryIcon: "battery.100",
+  BellIcon: "bell",
   BlocksIcon: "square.grid.2x2",
   BookOpenIcon: "book",
   BookmarkIcon: "bookmark",

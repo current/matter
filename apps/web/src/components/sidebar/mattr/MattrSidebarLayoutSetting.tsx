@@ -20,7 +20,7 @@ export function MattrSidebarLayoutSetting() {
       id="mattr-sidebar-layout"
       title={gt("Sidebar layout")}
       description={gt(
-        "Attention Inbox sorts threads by what needs you. Spaces shows one project at a time. Classic keeps the original sidebar.",
+        "The default groups threads by project with their subagents nested. Spaces shows one project at a time. Classic keeps the original sidebar.",
       )}
       devicePreference
       resetAction={
@@ -41,7 +41,7 @@ export function MattrSidebarLayoutSetting() {
             if (isMattrSidebarLayout(value)) setLayout(value);
           }}
         >
-          <Toggle value="inbox">{gt("Attention Inbox")}</Toggle>
+          <Toggle value="inbox">{gt("Default")}</Toggle>
           <Toggle value="spaces">{gt("Spaces")}</Toggle>
           <Toggle value="classic">{gt("Classic")}</Toggle>
         </ToggleGroup>

@@ -19,7 +19,6 @@ import { BotAvatar } from "../../bots/BotAvatarRenderer";
 import { BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
 import { retainBotsSync, useBotsState } from "../../bots/botsStore";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../../ui/tooltip";
-import { botPreviewText } from "./mattrBots.logic";
 import type { MattrThreadItem } from "./mattrSidebar.logic";
 import type { MattrSidebarActions } from "./useMattrSidebarModel";
 
@@ -333,102 +332,6 @@ export function MattrBotLink({
   );
 }
 
-/** Full-row Needs You entry for a Bot that is blocked on the user. */
-export function MattrBotAttentionRow({
-  bot,
-  requestTitle,
-}: {
-  bot: BotIdentity;
-  requestTitle?: string | undefined;
-}) {
-  const m = useMessages();
-  const pathname = useLocation({ select: (location) => location.pathname });
-  const href = `/bots/${encodeURIComponent(bot.providerId)}/${encodeURIComponent(bot.remoteBotId)}`;
-  const active = pathname === href;
-  const statusLabel = m(BOT_ACTIVITY_LABELS[bot.status]);
-
-  return (
-    <li>
-      <Link
-        to="/bots/$providerId/$botId"
-        params={{ providerId: bot.providerId, botId: bot.remoteBotId }}
-        aria-current={active ? "page" : undefined}
-        aria-label={`${bot.name}, ${statusLabel}`}
-        className={cn(
-          "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm leading-snug outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
-          active
-            ? "bg-sidebar-row-active text-sidebar-foreground"
-            : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover",
-        )}
-      >
-        <span className="relative inline-flex shrink-0 items-center justify-center">
-          <BotAvatar bot={bot} size={24} activity={bot.status} />
-          <MattrBotBadge bot={bot} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-medium text-sidebar-foreground">{bot.name}</span>
-          <span className="mt-0.5 truncate text-2xs leading-tight text-warning-foreground">
-            {requestTitle ?? statusLabel}
-          </span>
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-/** A Crew row: the Bot as a standing teammate, with its live state or latest line beside it. */
-export function MattrBotCrewRow({ bot }: { bot: BotIdentity }) {
-  const gt = useGT();
-  const m = useMessages();
-  const pathname = useLocation({ select: (location) => location.pathname });
-  const href = `/bots/${encodeURIComponent(bot.providerId)}/${encodeURIComponent(bot.remoteBotId)}`;
-  const active = pathname === href;
-  const unread = bot.unreadCount > 0;
-  const liveStatus = bot.status === "working" || bot.status === "error" || bot.status === "offline";
-  const preview = botPreviewText(bot);
-  const subtitle = liveStatus ? m(BOT_ACTIVITY_LABELS[bot.status]) : preview;
-  const tone =
-    bot.status === "working"
-      ? "text-success-foreground"
-      : bot.status === "error"
-        ? "text-destructive-foreground"
-        : "text-sidebar-muted-foreground";
-  const accessibleStatus = unread
-    ? gt("{count, plural, one {# unread} other {# unread}}", { count: bot.unreadCount })
-    : m(BOT_ACTIVITY_LABELS[bot.status]);
-
-  return (
-    <li>
-      <Link
-        to="/bots/$providerId/$botId"
-        params={{ providerId: bot.providerId, botId: bot.remoteBotId }}
-        aria-current={active ? "page" : undefined}
-        aria-label={`${bot.name}, ${accessibleStatus}`}
-        data-unread={unread ? "" : undefined}
-        className={cn(
-          "flex h-7.5 items-center gap-2 rounded-md px-2 text-sm outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
-          active
-            ? "bg-sidebar-row-active text-sidebar-foreground"
-            : unread
-              ? "text-sidebar-foreground hover:bg-sidebar-row-hover"
-              : "text-sidebar-foreground/85 hover:bg-sidebar-row-hover",
-        )}
-      >
-        <span className="relative inline-flex shrink-0 items-center justify-center">
-          <BotAvatar bot={bot} size={18} activity={bot.status} />
-          <MattrBotBadge bot={bot} />
-        </span>
-        <span className={cn("max-w-[60%] shrink-0 truncate", unread && "font-semibold")}>
-          {bot.name}
-        </span>
-        {subtitle ? (
-          <span className={cn("min-w-0 flex-1 truncate text-2xs", tone)}>{subtitle}</span>
-        ) : null}
-      </Link>
-    </li>
-  );
-}
-
 function MattrVoiceWaveformGlyph({ className }: { className?: string | undefined }) {
   return (
     <svg
@@ -446,7 +349,7 @@ function MattrVoiceWaveformGlyph({ className }: { className?: string | undefined
 }
 
 /** A Voice Mode trigger, shown only while the Voice Assistant add-on is enabled. */
-export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" | "icon" }) {
+export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" }) {
   const gt = useGT();
   const enabled = useIsAddonEnabled("voice-assistant");
   if (!enabled) return null;
@@ -458,21 +361,17 @@ export function MattrVoiceTrigger({ variant }: { variant: "pill" | "tile" | "ico
         aria-label={gt("Voice Mode")}
         className={cn(
           "inline-flex shrink-0 cursor-pointer items-center justify-center outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
-          variant === "icon"
-            ? "size-7 rounded-md text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-            : variant === "pill"
-              ? "ml-auto h-7 gap-1.5 rounded-full bg-sidebar-row-active/85 px-2.5 text-xs font-medium text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65 hover:bg-sidebar-row-active"
-              : "h-12 w-full flex-col gap-1 rounded-lg bg-sidebar-row-hover/40 px-1 text-sidebar-muted-foreground ring-1 ring-inset ring-sidebar-border/45 hover:bg-sidebar-row-hover/85 hover:text-sidebar-foreground hover:ring-sidebar-border/75",
+          variant === "pill"
+            ? "ml-auto h-7 gap-1.5 rounded-full bg-sidebar-row-active/85 px-2.5 text-xs font-medium text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/65 hover:bg-sidebar-row-active"
+            : "h-12 w-full flex-col gap-1 rounded-lg bg-sidebar-row-hover/40 px-1 text-sidebar-muted-foreground ring-1 ring-inset ring-sidebar-border/45 hover:bg-sidebar-row-hover/85 hover:text-sidebar-foreground hover:ring-sidebar-border/75",
         )}
       >
         <MattrVoiceWaveformGlyph
           className={variant === "tile" ? "h-4 w-4.5 text-sidebar-foreground" : undefined}
         />
-        {variant === "icon" ? null : (
-          <span className={variant === "tile" ? "text-3xs leading-none" : undefined}>
-            {gt("Voice")}
-          </span>
-        )}
+        <span className={variant === "tile" ? "text-3xs leading-none" : undefined}>
+          {gt("Voice")}
+        </span>
       </button>
     </MattrTip>
   );

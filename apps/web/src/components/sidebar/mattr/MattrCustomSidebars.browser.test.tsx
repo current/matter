@@ -4,6 +4,7 @@ import {
   MATTR_ADDON_MANIFESTS,
   NO_BOT_PROVIDER_CAPABILITIES,
   ProjectId,
+  ProviderDriverKind,
   ProviderInstanceId,
   RunId,
   ThreadId,
@@ -16,6 +17,8 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import "../../../index.css";
+// The rail's look, and the hit areas its rows click through, live in the fork stylesheet.
+import "../../../../../../antimatter/sidebar.css";
 import { resetAddonStoreForTests } from "../../../addons/addonStore";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
@@ -32,7 +35,8 @@ vi.mock(import("../../../addons/mattrApi"), async (original) => ({
   useMattrApiConfig: () => config,
 }));
 
-import { MattrAttentionInboxSidebar } from "./MattrAttentionInboxSidebar";
+import { MattrDefaultSidebar } from "./MattrDefaultSidebar";
+import { MattrUsageMeters } from "./MattrDefaultSidebarParts";
 import { toMattrThreadItem } from "./mattrSidebar.logic";
 import { MattrScopeLine } from "./MattrScopeLine";
 import { MATTR_SIDEBAR_LAYOUT_STORAGE_KEY } from "./mattrSidebarStore";
@@ -103,9 +107,25 @@ const items = [
   thread("Onboarding copy pass", LILT),
 ];
 
+const subagent = (title: string, overrides: ThreadFixtureOverrides = {}) =>
+  thread(title, MATTR, {
+    lineage: {
+      rootThreadId: ThreadId.make("Muse provider matrix"),
+      parentThreadId: ThreadId.make("Muse provider matrix"),
+      relationshipToParent: "subagent",
+    },
+    ...overrides,
+  });
+
+const children = [
+  subagent("Audit adapters", { runtime: runtime("running") }),
+  subagent("Write matrix doc"),
+];
+
 function model(): MattrSidebarModel {
   return {
     items,
+    children,
     projects: [MATTR, LILT],
     activeThreadKey: items[1]!.key,
     nowMs: Date.parse(NOW_ISO),
@@ -199,63 +219,100 @@ function useServer(
   };
 }
 
-describe("MattrAttentionInboxSidebar", () => {
-  it("orders threads by attention, folds Quiet, and shows no Bots while the add-on is off", async () => {
+describe("MattrDefaultSidebar", () => {
+  it("groups threads by project and shows no Crew while the add-on is off", async () => {
     using server = useServer(false);
     const current = model();
     await using screen = await render(
       <SidebarProvider>
-        <MattrAttentionInboxSidebar model={current} />
+        <MattrDefaultSidebar model={current} />
       </SidebarProvider>,
     );
-    const headings = () =>
-      [...screen.container.querySelectorAll("h3")].map((heading) => heading.textContent);
-    await expect.element(page.getByRole("region", { name: "Needs you" })).toBeVisible();
-    expect(headings()).toEqual(["Needs you1", "Running1", "Ready to review1", "Quiet4"]);
-    await expect.element(page.getByText("Muse provider matrix")).not.toBeInTheDocument();
+    const mattr = page.getByRole("region", { name: "mattr" });
+    await expect.element(mattr).toBeVisible();
+    await expect.element(page.getByRole("region", { name: "Lilt" })).toBeVisible();
+    const titles = [
+      ...screen.container.querySelectorAll('section[aria-label="mattr"] > ul > li'),
+    ].map((row) => row.querySelector(".mfs-t")?.textContent);
+    expect(titles[0]).toBe("Pinned plan");
+    expect(titles).toContain("Old notes");
 
-    await page.getByRole("button", { name: /Quiet/ }).click();
-    await expect.element(page.getByText("Muse provider matrix")).toBeVisible();
-
-    await page.getByRole("button", { name: "Review" }).click();
-    expect(current.actions.openThread).toHaveBeenCalledWith(items[0]);
-
-    await page.getByRole("button", { name: /Island spring morphs/ }).click();
+    await page.getByRole("button", { name: "Island spring morphs", exact: true }).click();
     expect(current.actions.openThread).toHaveBeenCalledWith(items[1]);
 
+    await mattr.getByRole("button", { name: /^mattr/ }).click();
+    await expect.element(page.getByText("Pinned plan")).not.toBeInTheDocument();
+
     await expect.poll(() => server.addonCalls().length).toBeGreaterThan(0);
-    expect(screen.container.querySelector('[role="group"][aria-label="Bots"]')).toBeNull();
+    expect(screen.container.querySelector('section[aria-label="Crew"]')).toBeNull();
     expect(server.botsCalls()).toEqual([]);
   });
 
-  it("slices the queue to one project and searches titles", async () => {
+  it("nests subagents under their parent with live status and toggles the tree", async () => {
+    using _server = useServer(false);
+    const current = model();
+    await using screen = await render(
+      <SidebarProvider>
+        <MattrDefaultSidebar model={current} />
+      </SidebarProvider>,
+    );
+    const tree = page.getByRole("list", { name: "Subagents of Muse provider matrix" });
+    await expect.element(tree).toBeVisible();
+    const rows = screen.container.querySelectorAll(
+      'ul[aria-label="Subagents of Muse provider matrix"] > li[data-mattr-subagent]',
+    );
+    expect([...rows].map((row) => row.querySelector(".mfs-t")?.textContent)).toEqual([
+      "Audit adapters",
+      "Write matrix doc",
+    ]);
+    expect(rows[0]!.querySelector(".mfs-st")?.getAttribute("data-tone")).toBe("running");
+    expect(rows[0]!.querySelector(".mfs-st")?.textContent).toBe("4m");
+    expect(rows[1]!.querySelector(".mfs-st")?.textContent).toBe("Done");
+
+    await page.getByRole("button", { name: "Audit adapters", exact: true }).click();
+    expect(current.actions.openThread).toHaveBeenCalledWith(children[0]);
+
+    await page.getByRole("button", { name: "Hide subagents of Muse provider matrix" }).click();
+    await expect.element(tree).not.toBeInTheDocument();
+    await page.getByRole("button", { name: "Show 2 subagents of Muse provider matrix" }).click();
+    await expect.element(tree).toBeVisible();
+  });
+
+  it("filters to Needs you, scopes to one project, and searches titles", async () => {
     using _server = useServer(false);
     const current = model();
     await using _screen = await render(
       <SidebarProvider>
-        <MattrAttentionInboxSidebar model={current} />
+        <MattrDefaultSidebar model={current} />
       </SidebarProvider>,
     );
-    await page.getByRole("button", { name: /Sidebar view: Inbox, All projects/ }).click();
-    await page.getByRole("menuitemradio", { name: /Lilt/ }).click();
-    await expect.element(page.getByRole("region", { name: "Running" })).not.toBeInTheDocument();
-    await page.getByRole("button", { name: /Quiet/ }).click();
-    await expect.element(page.getByText("Onboarding copy pass")).toBeVisible();
-    await expect.element(page.getByText("Muse provider matrix")).not.toBeInTheDocument();
+    const needsYou = page.getByRole("button", { name: /Needs you/ });
+    await expect.element(needsYou).toHaveAttribute("aria-pressed", "false");
+    await expect.element(needsYou).toHaveTextContent("Needs you1");
+    await needsYou.click();
+    await expect.element(needsYou).toHaveAttribute("aria-pressed", "true");
+    await expect.element(page.getByText("Run xcodebuild on device")).toBeVisible();
+    await expect.element(page.getByText("Island spring morphs")).not.toBeInTheDocument();
+    await needsYou.click();
 
-    await page.getByRole("button", { name: /Sidebar view: Inbox, Lilt/ }).click();
-    await page.getByRole("menuitemradio", { name: "All projects" }).click();
+    await page.getByRole("button", { name: "Activity scope: All activity" }).click();
+    await page.getByRole("menuitemradio", { name: /Lilt/ }).click();
+    await expect.element(page.getByText("Onboarding copy pass")).toBeVisible();
+    await expect.element(page.getByText("Island spring morphs")).not.toBeInTheDocument();
+    await page.getByRole("button", { name: "Show all activity" }).click();
+    await expect.element(page.getByText("Island spring morphs")).toBeVisible();
+
     await page.getByRole("searchbox", { name: "Search threads" }).fill("spring");
     await expect.element(page.getByRole("region", { name: "Search results" })).toBeVisible();
     await userEvent.keyboard("{Enter}");
     expect(current.actions.openThread).toHaveBeenCalledWith(items[1]);
   });
 
-  it("shows the Crew section and bot attention once the Grok Bot add-on is on", async () => {
+  it("shows the Crew section with Bots once the Grok Bot add-on is on", async () => {
     using _server = useServer(true);
     await using _screen = await render(
       <SidebarProvider>
-        <MattrAttentionInboxSidebar model={model()} />
+        <MattrDefaultSidebar model={model()} />
       </SidebarProvider>,
     );
     const crew = page.getByRole("region", { name: "Crew" });
@@ -263,18 +320,9 @@ describe("MattrAttentionInboxSidebar", () => {
     await expect
       .element(crew.getByRole("link", { name: /Scout/ }))
       .toHaveAttribute("href", "/bots/grok-bot/scout");
-    await expect
-      .element(crew.getByRole("link", { name: /Scout/ }))
-      .toHaveAttribute("data-unread", "");
-    expect(crew.getByText("3 unread").elements()).toHaveLength(0);
-    // Unread alone is not a blocker: Scout stays in Crew and out of Needs you.
-    await expect
-      .element(page.getByRole("heading", { name: /Needs you/ }))
-      .toHaveTextContent("Needs you1");
-    expect(page.getByRole("link", { name: /Scout/ }).elements()).toHaveLength(1);
   });
 
-  it("moves a Bot blocked on the user to Needs you and out of Crew", async () => {
+  it("counts a Bot blocked on the user in Needs you", async () => {
     const waiting = { ...bot, remoteBotId: "ward", name: "Ward", status: "idle" as const };
     using _server = useServer(true, {
       bots: [bot, waiting],
@@ -297,39 +345,55 @@ describe("MattrAttentionInboxSidebar", () => {
     });
     await using _screen = await render(
       <SidebarProvider>
-        <MattrAttentionInboxSidebar model={model()} />
+        <MattrDefaultSidebar model={model()} />
       </SidebarProvider>,
     );
-    const needsYou = page.getByRole("region", { name: "Needs you" });
-    await expect.element(needsYou.getByRole("link", { name: /Ward/ })).toBeVisible();
-    await expect.element(needsYou.getByText("Deploy to production?")).toBeVisible();
     await expect
-      .element(page.getByRole("region", { name: "Crew" }).getByRole("link", { name: /Scout/ }))
+      .element(page.getByRole("button", { name: /Needs you/ }))
+      .toHaveTextContent("Needs you2");
+    await expect
+      .element(page.getByRole("region", { name: "Crew" }).getByRole("link", { name: /Ward/ }))
       .toBeVisible();
-    expect(page.getByRole("link", { name: /Ward/ }).elements()).toHaveLength(1);
   });
+});
 
-  it("caps Crew at five Bots behind a Show all toggle, previews first", async () => {
-    const crewBots = Array.from({ length: 7 }, (_, index) => ({
-      ...bot,
-      remoteBotId: `crew-${index}`,
-      name: `Crew ${index}`,
-      status: "idle" as const,
-      unreadCount: 0,
-      metadata: { lastMessagePreview: `**Report** ${index}\nready` },
-    }));
-    using _server = useServer(true, { bots: crewBots });
+describe("MattrUsageMeters", () => {
+  it("renders live usage per provider and opens Usage on click", async () => {
+    const onOpen = vi.fn();
     await using _screen = await render(
-      <SidebarProvider>
-        <MattrAttentionInboxSidebar model={model()} />
-      </SidebarProvider>,
+      <MattrUsageMeters
+        nowMs={Date.parse(NOW_ISO)}
+        onOpen={onOpen}
+        meters={[
+          {
+            key: "claude:weekly",
+            driver: ProviderDriverKind.make("claudeAgent"),
+            providerName: "Claude",
+            accountName: "Claude main",
+            windowLabel: "week",
+            usedPercent: 47,
+            resetsAt: "2026-03-10T17:14:00.000Z",
+          },
+          {
+            key: "codex:weekly",
+            driver: ProviderDriverKind.make("codex"),
+            providerName: "Codex",
+            accountName: "Codex main",
+            windowLabel: "5h",
+            usedPercent: 9,
+            resetsAt: null,
+          },
+        ]}
+      />,
     );
-    const crew = page.getByRole("region", { name: "Crew" });
-    await expect.element(crew.getByText("Report 0 ready")).toBeVisible();
-    expect(crew.getByRole("link").elements()).toHaveLength(5);
-    expect(crew.getByText("Idle").elements()).toHaveLength(0);
-    await crew.getByRole("button", { name: "Show all (7)" }).click();
-    expect(crew.getByRole("link").elements()).toHaveLength(7);
+    const meters = page.getByRole("group", { name: "Usage limits" });
+    const claude = meters.getByRole("button", { name: /Claude week: 47% used/ });
+    await expect.element(claude).toBeVisible();
+    await expect.element(claude.getByText("47%", { exact: true })).toBeVisible();
+    await expect.element(claude.getByText("Resets in 2h 14m")).toBeVisible();
+    await expect.element(meters.getByRole("button", { name: /Codex 5h: 9% used/ })).toBeVisible();
+    await claude.click();
+    expect(onOpen).toHaveBeenCalledOnce();
   });
 });
 

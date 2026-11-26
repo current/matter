@@ -1,7 +1,12 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { pickableProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
-import type { ContextMenuSource, ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import { isShownUnderParent } from "@t3tools/client-runtime/state/threads";
+import type {
+  ContextMenuSource,
+  ProviderDriverKind,
+  ResolvedKeybindingsConfig,
+} from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useRouter } from "@tanstack/react-router";
 import { useGT } from "gt-react";
@@ -15,6 +20,7 @@ import { useThreadActions } from "../../../hooks/useThreadActions";
 import { readLocalApi } from "../../../localApi";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { useDelegatedUnderParent, useQuietThreadShells } from "../../../state/entities";
+import { useEnvironmentProviders } from "../../../state/environments";
 import { primaryServerKeybindingsAtom } from "../../../state/server";
 import { buildThreadRouteParams } from "../../../threadRoutes";
 import { filterSidebarV2VisibleThreads } from "../../Sidebar.logic";
@@ -42,6 +48,8 @@ export interface MattrSidebarActions {
 
 export interface MattrSidebarModel {
   readonly items: ReadonlyArray<MattrThreadItem>;
+  /** Subagents and delegated tasks, which the rail nests under their parent rather than lists. */
+  readonly children: ReadonlyArray<MattrThreadItem>;
   readonly projects: ReadonlyArray<MattrSidebarProject>;
   readonly activeThreadKey: string | null;
   readonly nowMs: number;
@@ -66,6 +74,7 @@ export function useMattrSidebarModel(): MattrSidebarModel {
   const threads = useQuietThreadShells();
   const delegatedUnderParent = useDelegatedUnderParent();
   const projectGroups = useSidebarProjectGroups();
+  const providersByEnvironment = useEnvironmentProviders();
   const nowMinute = useNowMinute();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const routeTarget = useShownThreadRouteTarget().shownTarget;
@@ -88,13 +97,36 @@ export function useMattrSidebarModel(): MattrSidebarModel {
       projectByMemberKey.set(`${ref.environmentId}:${ref.projectId}`, project);
     }
   }
-  const items = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent).map((thread) =>
+  const driverByInstance = new Map<string, ProviderDriverKind>();
+  for (const [environmentId, providers] of providersByEnvironment) {
+    for (const provider of providers) {
+      driverByInstance.set(`${environmentId}:${provider.instanceId}`, provider.driver);
+    }
+  }
+  const toItem = (thread: (typeof threads)[number]) =>
     toMattrThreadItem(
       thread,
       projectByMemberKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null,
       nowIso,
-    ),
-  );
+      driverByInstance.get(
+        `${thread.environmentId}:${thread.runtime?.providerInstanceId ?? thread.modelSelection.instanceId}`,
+      ) ?? null,
+    );
+  const items = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent).map(toItem);
+  const children = threads
+    .filter(
+      (thread) =>
+        thread.archivedAt === null &&
+        thread.lineage.sideChat !== true &&
+        thread.lineage.workflowStep !== true &&
+        isShownUnderParent(
+          { environmentId: thread.environmentId, threadId: thread.id },
+          thread.lineage,
+          delegatedUnderParent,
+        ),
+    )
+    .map(toItem)
+    .filter((item) => item.parentKey !== null);
 
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);
@@ -176,6 +208,7 @@ export function useMattrSidebarModel(): MattrSidebarModel {
 
   return {
     items,
+    children,
     projects,
     activeThreadKey: routeTarget?.kind === "server" ? scopedThreadKey(routeTarget.threadRef) : null,
     nowMs,

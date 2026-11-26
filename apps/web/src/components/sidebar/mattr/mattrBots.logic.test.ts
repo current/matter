@@ -1,14 +1,7 @@
 import type { BotIdentity, BotPendingRequest } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  botNeedsAttention,
-  botPreviewText,
-  hostDotTone,
-  rankCrew,
-  shortHostLabel,
-  splitBotsByAttention,
-} from "./mattrBots.logic";
+import { botNeedsAttention, hostDotTone, rankCrew, shortHostLabel } from "./mattrBots.logic";
 
 const bot = (overrides: Partial<BotIdentity> & Pick<BotIdentity, "remoteBotId">): BotIdentity => ({
   providerId: "grok-bot",
@@ -53,15 +46,6 @@ describe("botNeedsAttention", () => {
   });
 });
 
-describe("splitBotsByAttention", () => {
-  it("puts each Bot in exactly one section", () => {
-    const bots = [bot({ remoteBotId: "a" }), bot({ remoteBotId: "b" })];
-    const { needsYou, crew } = splitBotsByAttention(bots, [request("b")]);
-    expect(needsYou.map((entry) => entry.remoteBotId)).toEqual(["b"]);
-    expect(crew.map((entry) => entry.remoteBotId)).toEqual(["a"]);
-  });
-});
-
 describe("rankCrew", () => {
   it("lifts working and unread Bots and keeps the rest in order", () => {
     const ranked = rankCrew([
@@ -76,18 +60,6 @@ describe("rankCrew", () => {
       "idle-1",
       "idle-2",
     ]);
-  });
-});
-
-describe("botPreviewText", () => {
-  it("flattens markdown to one line and skips empty previews", () => {
-    expect(
-      botPreviewText(bot({ remoteBotId: "a", metadata: { lastMessagePreview: "**Done**\n  ok" } })),
-    ).toBe("Done ok");
-    expect(botPreviewText(bot({ remoteBotId: "a", metadata: { lastMessagePreview: "  " } }))).toBe(
-      null,
-    );
-    expect(botPreviewText(bot({ remoteBotId: "a" }))).toBe(null);
   });
 });
 

@@ -1,7 +1,5 @@
 import type { BotIdentity, BotPendingRequest } from "@t3tools/contracts";
 
-export const CREW_COLLAPSED_LIMIT = 5;
-
 export function botKey(bot: Pick<BotIdentity, "providerId" | "remoteBotId">): string {
   return `${bot.providerId}:${bot.remoteBotId}`;
 }
@@ -26,16 +24,6 @@ export function botNeedsAttention(
   return typeof asks === "number" && asks > 0;
 }
 
-export function splitBotsByAttention(
-  bots: ReadonlyArray<BotIdentity>,
-  pending: ReadonlyArray<BotPendingRequest>,
-): { readonly needsYou: ReadonlyArray<BotIdentity>; readonly crew: ReadonlyArray<BotIdentity> } {
-  const needsYou: BotIdentity[] = [];
-  const crew: BotIdentity[] = [];
-  for (const bot of bots) (botNeedsAttention(bot, pending) ? needsYou : crew).push(bot);
-  return { needsYou, crew };
-}
-
 function crewRank(bot: BotIdentity): number {
   if (bot.status === "working") return 0;
   if (bot.status === "error") return 1;
@@ -49,20 +37,6 @@ export function rankCrew(bots: ReadonlyArray<BotIdentity>): ReadonlyArray<BotIde
     .map((bot, index) => ({ bot, index }))
     .toSorted((a, b) => crewRank(a.bot) - crewRank(b.bot) || a.index - b.index)
     .map(({ bot }) => bot);
-}
-
-function oneLine(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const text = value
-    .replace(/[`*_#>[\]]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.length > 0 ? text : null;
-}
-
-/** The latest thing the Bot said, if the provider reports one, as a single clean line. */
-export function botPreviewText(bot: BotIdentity): string | null {
-  return oneLine(bot.metadata["lastMessagePreview"]);
 }
 
 /** Drops a possessive owner prefix ("Christopher’s MacBook Pro" → "MacBook Pro"). */

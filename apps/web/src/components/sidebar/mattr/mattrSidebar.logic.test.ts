@@ -3,9 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
 import {
-  bucketInboxThreads,
   buildSpaceSections,
-  countLiveThreadsByProject,
   filterThreadsByQuery,
   resolveActiveSpaceKey,
   resolveProjectAttention,
@@ -98,37 +96,15 @@ describe("toMattrThreadItem", () => {
   });
 });
 
-describe("bucketInboxThreads", () => {
+describe("resolveProjectAttention", () => {
   const needs = item("needs", { hasPendingApprovals: true, settledOverride: "settled" });
   const running = item("running", { runtime: runtime("running") });
-  const review = item("review", {
-    ...completed("2026-03-10T14:30:00.000Z"),
-    lastVisitedAt: "2026-03-10T14:00:00.000Z",
-  });
   const quiet = item("quiet");
   const settled = item("settled", { settledOverride: "settled" });
   const lilt = item("lilt", {}, LILT);
 
-  it("orders the queue by what needs attention and drops settled threads", () => {
-    const buckets = bucketInboxThreads([quiet, settled, review, running, needs, lilt], null);
-    expect(buckets.needsYou.map((entry) => entry.key)).toEqual([needs.key]);
-    expect(buckets.running.map((entry) => entry.key)).toEqual([running.key]);
-    expect(buckets.review.map((entry) => entry.key)).toEqual([review.key]);
-    expect(buckets.quiet.map((entry) => entry.key).toSorted()).toEqual(
-      [quiet.key, lilt.key].toSorted(),
-    );
-  });
-
-  it("slices every bucket to one project", () => {
-    const buckets = bucketInboxThreads([quiet, lilt, needs], LILT.key);
-    expect(buckets.needsYou).toEqual([]);
-    expect(buckets.quiet.map((entry) => entry.key)).toEqual([lilt.key]);
-  });
-
-  it("counts live threads per project and finds the most urgent tile dot", () => {
+  it("finds the most urgent tile dot", () => {
     const items = [quiet, settled, running, lilt];
-    expect(countLiveThreadsByProject(items).get(MATTR.key)).toBe(2);
-    expect(countLiveThreadsByProject(items).get(LILT.key)).toBe(1);
     expect(resolveProjectAttention(items, MATTR.key)).toBe("running");
     expect(resolveProjectAttention([...items, needs], MATTR.key)).toBe("needs");
     expect(resolveProjectAttention(items, LILT.key)).toBeNull();

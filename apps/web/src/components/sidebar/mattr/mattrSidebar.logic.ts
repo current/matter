@@ -1,7 +1,8 @@
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import { resolveThreadCurrentPullRequestLink } from "@t3tools/client-runtime/thread-pull-requests";
+import type { ProviderDriverKind, ScopedThreadRef } from "@t3tools/contracts";
 
 import { hasUnseenCompletion, resolveSidebarRowStatus } from "../../Sidebar.logic";
 
@@ -27,6 +28,19 @@ export interface MattrThreadItem {
   /** When the current run started, while one is running. */
   readonly runningSince: string | null;
   readonly providerName: string | null;
+  /** The provider driving the thread now, for its brand mark; null when unknown. */
+  readonly driver: ProviderDriverKind | null;
+  /** The thread's current pull request, for the inline PR badge. */
+  readonly pullRequest: MattrPullRequestBadge | null;
+  /** The thread this one runs under (a subagent or delegated task), as a scoped key. */
+  readonly parentKey: string | null;
+}
+
+export type MattrPullRequestState = "open" | "merged" | "closed" | "draft";
+
+export interface MattrPullRequestBadge {
+  readonly number: number;
+  readonly state: MattrPullRequestState;
 }
 
 export interface MattrProjectRef {
@@ -38,6 +52,7 @@ export function toMattrThreadItem(
   thread: EnvironmentThreadShell,
   project: MattrProjectRef | null,
   nowIso: string,
+  driver: ProviderDriverKind | null = null,
 ): MattrThreadItem {
   const ref = scopeThreadRef(thread.environmentId, thread.id);
   const status = resolveSidebarRowStatus(thread);
@@ -89,7 +104,37 @@ export function toMattrThreadItem(
         ? (thread.runtime?.activityStartedAt ?? thread.latestRun?.startedAt ?? null)
         : null,
     providerName: thread.runtime?.providerName ?? null,
+    driver,
+    pullRequest: resolvePullRequestBadge(thread),
+    parentKey: resolveParentKey(thread),
   };
+}
+
+function resolvePullRequestBadge(thread: EnvironmentThreadShell): MattrPullRequestBadge | null {
+  const link = resolveThreadCurrentPullRequestLink(thread.pullRequests ?? []);
+  if (link === null) return null;
+  const snapshot = link.snapshot;
+  const state: MattrPullRequestState =
+    snapshot === null
+      ? "open"
+      : snapshot.state === "open"
+        ? snapshot.isDraft
+          ? "draft"
+          : "open"
+        : snapshot.state;
+  return { number: link.number, state };
+}
+
+/** A delegated task names its parent across environments; a subagent names one in its own. */
+function resolveParentKey(thread: EnvironmentThreadShell): string | null {
+  if (thread.delegatedFrom != null) {
+    return scopedThreadKey(
+      scopeThreadRef(thread.delegatedFrom.environmentId, thread.delegatedFrom.threadId),
+    );
+  }
+  const { parentThreadId, relationshipToParent } = thread.lineage;
+  if (relationshipToParent !== "subagent" || parentThreadId === null) return null;
+  return scopedThreadKey(scopeThreadRef(thread.environmentId, parentThreadId));
 }
 
 function latestTimestamp(values: ReadonlyArray<string | null>): string {
@@ -110,65 +155,9 @@ function byActivityDesc(left: MattrThreadItem, right: MattrThreadItem): number {
   return Date.parse(right.activityAt) - Date.parse(left.activityAt);
 }
 
-function byRunningSinceDesc(left: MattrThreadItem, right: MattrThreadItem): number {
-  const leftMs = Date.parse(left.runningSince ?? left.activityAt);
-  const rightMs = Date.parse(right.runningSince ?? right.activityAt);
-  return rightMs - leftMs;
-}
-
 /** Threads that belong in a live list: not settled and not snoozed. */
 function isLive(item: MattrThreadItem): boolean {
   return !item.settled && !item.snoozed;
-}
-
-export interface MattrInboxBuckets {
-  readonly needsYou: ReadonlyArray<MattrThreadItem>;
-  readonly running: ReadonlyArray<MattrThreadItem>;
-  readonly review: ReadonlyArray<MattrThreadItem>;
-  readonly quiet: ReadonlyArray<MattrThreadItem>;
-}
-
-/**
- * The Attention Inbox queue. A thread that needs Chris surfaces even when it is settled or
- * snoozed, since a raised hand is the whole point of the inbox.
- */
-export function bucketInboxThreads(
-  items: ReadonlyArray<MattrThreadItem>,
-  projectFilter: string | null,
-): MattrInboxBuckets {
-  const needsYou: MattrThreadItem[] = [];
-  const running: MattrThreadItem[] = [];
-  const review: MattrThreadItem[] = [];
-  const quiet: MattrThreadItem[] = [];
-  for (const item of items) {
-    if (projectFilter !== null && item.projectKey !== projectFilter) continue;
-    if (item.attention === "needs") {
-      needsYou.push(item);
-      continue;
-    }
-    if (!isLive(item)) continue;
-    if (item.attention === "running") running.push(item);
-    else if (item.attention === "review") review.push(item);
-    else quiet.push(item);
-  }
-  return {
-    needsYou: needsYou.toSorted(byActivityDesc),
-    running: running.toSorted(byRunningSinceDesc),
-    review: review.toSorted(byActivityDesc),
-    quiet: quiet.toSorted(byActivityDesc),
-  };
-}
-
-/** Live threads per project, for the filter pills and space header. */
-export function countLiveThreadsByProject(
-  items: ReadonlyArray<MattrThreadItem>,
-): ReadonlyMap<string, number> {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    if (item.projectKey === null || !isLive(item)) continue;
-    counts.set(item.projectKey, (counts.get(item.projectKey) ?? 0) + 1);
-  }
-  return counts;
 }
 
 /** The most urgent state among a project's threads, for its tile dot. */
