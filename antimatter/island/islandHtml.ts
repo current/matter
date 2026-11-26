@@ -473,9 +473,11 @@ export function buildIslandHtml(): string {
     }).join("");
   }
 
-  function needsHeader(entry, total) {
+  // The left wing already shows the first item's provider right above this line; repeat it only when it differs.
+  function needsHeader(entry, total, lead) {
     const thread = threadByKey(entry.item.threadKey);
-    return '<div class="head">' + providerGlyph(entry.item.providerKind, thread ? thread.providerName : null) +
+    const glyph = entry.item.providerKind === lead.providerKind ? "" : providerGlyph(entry.item.providerKind, thread ? thread.providerName : null);
+    return '<div class="head">' + glyph +
       '<span class="title">' + esc(entry.item.item.threadTitle) + "</span>" +
       (total > 1 ? '<span class="pager">' + (entry.index + 1) + " of " + total + " · ⌘↑↓</span>" : "") + "</div>";
   }
@@ -552,7 +554,7 @@ export function buildIslandHtml(): string {
       : entry.item.kind === "question" ? questionCard(entry.item.item) : planCard(entry.item.item);
     // The custom answer stays out of the key: typing it must never rebuild the card under the caret.
     const questionKey = entry.item.kind === "question" ? JSON.stringify({ index: question.index, answers: question.answers }) : "";
-    return { key: "needs:" + entry.item.id + ":" + list.length + ":" + questionKey, html: needsHeader(entry, list.length) + body,
+    return { key: "needs:" + entry.item.id + ":" + list.length + ":" + questionKey, html: needsHeader(entry, list.length, list[0]) + body,
       item: entry.item.id + ":" + (entry.item.kind === "question" ? question.index : "") };
   }
 
