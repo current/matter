@@ -66,6 +66,7 @@ every optional integration is **off by default** in settings → add-ons. disabl
 ### fork extras
 
 - **account fallback with exclusions** — automatically switches to another account with usage left when one runs out, with per-account exclusions (`fallbackExcludedInstanceIds`).
+- **redesigned composer** — the prompt card sits in a shelf with the project, workspace and branch underneath; permissions on the left, a red send circle on the right.
 - **composer predictions** — after each turn, the empty composer offers your likely next message in your own voice, for every provider; tab or → fills it in.
 - **stalled turn flags** — flags running turns with no agent activity for 10 minutes.
 - **multi-project delegation** — delegate tasks across local projects from one thread.

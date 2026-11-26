@@ -128,6 +128,7 @@ import {
 } from "./composerContextUndo";
 import { ComposerBanner } from "./ComposerBanner";
 import { ComposerSurface } from "./ComposerSurface";
+import { MattrComposerAttachButton } from "./MattrComposerParts.mattr";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";
 import {
@@ -220,7 +221,6 @@ import {
   composerSuggestionOptionId,
 } from "./ComposerCommandMenu";
 import {
-  ComposerAttachButton,
   ComposerAttachInput,
   ComposerAttachmentFileList,
   ComposerAttachmentMediaRow,
@@ -3644,7 +3644,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       />
     ) : null;
   const composerAttachButton = showComposerAttachAction ? (
-    <ComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
+    <MattrComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
   ) : null;
   return (
     <form

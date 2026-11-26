@@ -1,0 +1,395 @@
+/* mattr "final choice composer" (Doop zX652hyA6X / 5K4fM2mBQ5): the prompt card sits inside a
+   shelf that also holds the under-tray (project, Local/Worktree, branch). Scoped to the chat
+   composer by ChatView's data-mattr-composer; unlayered, so it wins over Tailwind utilities
+   without restyling upstream markup. */
+[data-mattr-composer] {
+  --mc-shelf: #f3f3f5;
+  --mc-shelf-line: rgb(0 0 0 / 6%);
+  --mc-card: #ffffff;
+  --mc-card-line: rgb(0 0 0 / 7.5%);
+  --mc-card-shadow: 0 1px 2px rgb(20 22 30 / 5%);
+  --mc-text: #3a3b40;
+  --mc-placeholder: #a3a5ab;
+  --mc-icon: #76787f;
+  --mc-tray: #7c7e85;
+  --mc-hover: rgb(0 0 0 / 5%);
+  --mc-rest: rgb(0 0 0 / 3.5%);
+  --mc-amber: #c7782a;
+  --mc-send: #e5484d;
+  --mc-send-hover: #d93d42;
+  --mc-send-idle: #c9cacf;
+  --mc-send-idle-ink: #ffffff;
+  /* Upstream's composer tokens, so popovers and icon rings that read them match the card. */
+  --chat-composer-glass-surface: var(--mc-card);
+  --chat-composer-outline: var(--mc-card-line);
+}
+
+.dark [data-mattr-composer] {
+  --mc-shelf: #171717;
+  --mc-shelf-line: rgb(255 255 255 / 9%);
+  --mc-card: #1c1c1c;
+  --mc-card-line: rgb(255 255 255 / 5%);
+  --mc-card-shadow: none;
+  --mc-text: #d6d6d6;
+  --mc-placeholder: #9e9e9e;
+  --mc-icon: #b5b5b5;
+  --mc-tray: #9e9e9e;
+  --mc-hover: rgb(255 255 255 / 6%);
+  --mc-rest: rgb(255 255 255 / 3.5%);
+  --mc-amber: #d39a52;
+  --mc-send-idle: #2a2a2a;
+  --mc-send-idle-ink: #8a8a8a;
+}
+
+/* Custom themes keep their own surfaces; only the shape and controls follow the frame. */
+html[data-theme-id] [data-mattr-composer] {
+  --mc-shelf: color-mix(in srgb, var(--app-theme-surface-raised) 55%, var(--background));
+  --mc-shelf-line: var(--app-theme-toolbar-border);
+  --mc-card: var(--app-theme-surface-raised);
+  --mc-card-line: var(--app-theme-toolbar-border);
+}
+
+/* The shelf: one rounded tray holding the card and the under-tray. */
+[data-mattr-composer] {
+  background-color: var(--mc-shelf);
+  border: 1px solid var(--mc-shelf-line);
+  border-radius: 17px;
+  padding: 4px;
+}
+
+[data-mattr-composer][data-context-row] {
+  padding-bottom: 0;
+}
+
+[data-mattr-composer]::before {
+  display: none;
+}
+
+/* The card. */
+[data-mattr-composer] [data-slot="composer-host"] {
+  border-radius: 13px;
+  background-color: var(--mc-card);
+  box-shadow: var(--mc-card-shadow);
+}
+
+[data-mattr-composer] [data-slot="composer-host"]::before {
+  display: none;
+}
+
+[data-mattr-composer] [data-slot="composer-host"]::after {
+  border-color: var(--mc-card-line);
+  box-shadow: none;
+}
+
+[data-mattr-composer] [data-chat-composer-main-surface],
+[data-mattr-composer] [data-chat-composer-surface] {
+  border-radius: 13px;
+}
+
+/* A banner attached above the card hands the card's paint to the main surface. */
+[data-mattr-composer]:has([data-composer-banner-surface="attached"])
+  [data-chat-composer-main-surface] {
+  background-color: var(--mc-card);
+}
+
+/* Prompt: 15px in from the top, two 20px lines tall at rest. */
+[data-mattr-composer] [data-chat-composer-body] {
+  padding: 15px 16px 7px;
+}
+
+[data-mattr-composer] [data-testid="composer-editor"] {
+  line-height: 20px;
+}
+
+[data-mattr-composer] [data-chat-composer-body] .placeholder,
+[data-mattr-composer] [data-chat-composer-body] [data-placeholder]::before,
+[data-mattr-composer] [data-chat-composer-body] .is-editor-empty::before {
+  color: var(--mc-placeholder);
+}
+
+/* Footer bar: 44px, +, permissions on the left; model, mic, send on the right. */
+[data-mattr-composer] [data-chat-composer-footer] {
+  min-height: 44px;
+  padding: 0 8px 0 10px;
+  font-size: 12.5px;
+  color: var(--mc-icon);
+}
+
+[data-mattr-composer] [data-chat-composer-footer] > .me-2 {
+  margin-inline-end: 2px;
+}
+
+[data-mattr-composer] [data-chat-composer-actions="right"] {
+  gap: 2px;
+}
+
+[data-mattr-composer] [data-chat-composer-footer-controls] {
+  gap: 2px;
+}
+
+[data-mattr-composer] [data-chat-composer-footer-controls] > [data-resting-block="mode"] {
+  order: -1;
+  margin-inline-end: auto;
+}
+
+/* Footer buttons: 28px, 8px corners, 14-15px solid glyphs in the icon gray. */
+[data-mattr-composer] [data-chat-composer-footer] button:not([type="submit"]):not(.rounded-full) {
+  height: 28px;
+  min-width: 28px;
+  border-radius: 8px;
+  color: var(--mc-icon);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  button:not([type="submit"]):not(.rounded-full):hover,
+[data-mattr-composer] [data-chat-composer-footer] button[data-popup-open],
+[data-mattr-composer] [data-chat-composer-footer] button[data-pressed] {
+  background-color: var(--mc-hover);
+  color: var(--mc-text);
+}
+
+[data-mattr-composer]
+  [data-chat-composer-footer]
+  button:not([type="submit"]):not(.rounded-full)
+  svg {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+[data-mattr-composer] [data-mattr-composer-attach] {
+  width: 27px;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[data-mattr-composer-attach]:not(:hover) {
+  color: var(--mc-text);
+}
+
+[data-mattr-composer] [data-mattr-composer-attach] svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[aria-pressed="true"]:not(:hover) {
+  background-color: var(--mc-rest);
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Start voice input"] svg {
+  width: 15px !important;
+  height: 15px !important;
+}
+
+/* Permissions: the label alone, amber, since it only shows when it differs from the default. */
+[data-mattr-composer] [data-resting-block="mode"] button {
+  padding-inline: 7px;
+  color: var(--mc-amber) !important;
+}
+
+[data-mattr-composer]
+  [data-resting-block="mode"][data-composer-block-icon-only="false"]
+  [data-composer-control-icon]:not([data-composer-control-compact-icon]) {
+  display: none;
+}
+
+/* Model picker: provider glyph, name in the label gray, effort muted, then a chevron. */
+[data-mattr-composer] [data-chat-composer-footer] [data-chat-provider-model-picker] {
+  padding-inline: 7px;
+  gap: 6px;
+  color: var(--mc-text);
+}
+
+[data-mattr-composer] [data-chat-provider-model-picker] > span {
+  gap: 6px;
+}
+
+[data-mattr-composer] [data-chat-provider-model-picker] [data-chat-provider-model-picker-icon] svg,
+[data-mattr-composer]
+  [data-chat-provider-model-picker]
+  [data-chat-provider-model-picker-icon]
+  > span {
+  width: 14px;
+  height: 14px;
+}
+
+[data-mattr-composer] [data-chat-provider-model-picker-label] {
+  color: var(--mc-text);
+}
+
+[data-mattr-composer] [data-chat-provider-model-picker] [data-composer-control-label] {
+  color: var(--mc-placeholder);
+}
+
+@media (pointer: fine) {
+  [data-mattr-composer] [data-chat-composer-footer] [data-chat-provider-model-picker]::after,
+  [data-mattr-composer]
+    [data-slot="composer-context-strip"]
+    :is(
+      button[data-composer-shortcut~="composer.workspace"],
+      button[data-slot="combobox-trigger"]
+    )::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    flex: none;
+    margin-inline-start: -1px;
+    background-color: currentColor;
+    opacity: 0.6;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.3 5.6 4.4 4.5 8 8.1l3.6-3.6 1.1 1.1L8 10.3z'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.3 5.6 4.4 4.5 8 8.1l3.6-3.6 1.1 1.1L8 10.3z'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+}
+
+/* Send: a 28px signal-red circle with a white arrow; a quiet gray one while there is nothing
+   to send. Stop shares the red circle. */
+[data-mattr-composer] [data-chat-composer-footer] button[type="submit"] {
+  width: 28px;
+  height: 28px;
+  margin-inline-start: 4px;
+  background-color: var(--mc-send);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[type="submit"]:enabled:hover {
+  background-color: var(--mc-send-hover);
+  transform: none;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[type="submit"]:disabled {
+  background-color: var(--mc-send-idle);
+  color: var(--mc-send-idle-ink);
+  opacity: 1;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[type="submit"] [data-stage-art] {
+  display: none;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[type="submit"] svg {
+  width: 14px;
+  height: 14px;
+}
+
+[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Stop generation"],
+[data-mattr-composer] [data-chat-composer-footer] button[aria-label="Stopping"] {
+  width: 28px;
+  height: 28px;
+  margin-inline-start: 4px;
+  background-color: var(--mc-send);
+  box-shadow: none;
+}
+
+/* Under-tray: 38px, project name first, Local/Worktree beside it, branch on the right. */
+[data-mattr-composer] [data-slot="composer-context-strip"] {
+  min-height: 38px;
+  padding: 0 6px;
+  gap: 6px;
+  background: transparent;
+  backdrop-filter: none;
+  font-size: 12px;
+  color: var(--mc-tray);
+}
+
+[data-mattr-composer] [data-slot="composer-context-strip"] button {
+  height: 26px;
+  padding-inline: 6px;
+  gap: 6px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--mc-tray);
+}
+
+[data-mattr-composer] [data-slot="composer-context-strip"] span[data-composer-context-control] {
+  color: var(--mc-tray);
+}
+
+[data-mattr-composer] [data-slot="composer-context-strip"] button:hover,
+[data-mattr-composer] [data-slot="composer-context-strip"] button[data-popup-open] {
+  background-color: var(--mc-hover);
+  color: var(--mc-text);
+}
+
+[data-mattr-composer] [data-slot="composer-context-strip"] svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* A new thread's permissions sit in the tray beside Local, amber and label-only like the footer
+   chip; the branch keeps the right edge. */
+[data-mattr-composer] [data-slot="composer-context-strip"] > [data-mattr-composer-project] {
+  order: -3;
+}
+
+[data-mattr-composer]
+  [data-slot="composer-context-strip"]
+  > :has([data-composer-shortcut~="composer.workspace"]),
+[data-mattr-composer]
+  [data-slot="composer-context-strip"]
+  > .contents
+  > [data-composer-shortcut~="composer.workspace"] {
+  order: -2;
+  flex: 0 1 auto;
+}
+
+[data-mattr-composer]
+  [data-slot="composer-context-strip"]
+  > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut]) {
+  order: -1;
+  margin-inline-start: 0;
+  color: var(--mc-amber);
+}
+
+[data-mattr-composer]
+  [data-slot="composer-context-strip"]
+  > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut])
+  > svg {
+  display: none;
+}
+
+[data-mattr-composer]
+  [data-slot="composer-context-strip"]
+  > :has(button[data-slot="combobox-trigger"]):not(
+    :has([data-composer-shortcut~="composer.workspace"])
+  ) {
+  margin-inline-start: auto;
+}
+
+[data-mattr-composer-project] {
+  display: inline-flex;
+  min-width: 0;
+  flex: none;
+  max-width: 40%;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 6px;
+  margin-inline-end: 8px;
+  color: var(--mc-tray);
+}
+
+[data-mattr-composer-project-name] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--mc-text);
+}
+
+/* Narrow panes drop the project name first, so Local and the branch keep their room. */
+@container composer-surface (max-width: 30rem) {
+  [data-mattr-composer-project] {
+    display: none;
+  }
+
+  [data-mattr-composer]
+    [data-slot="composer-context-strip"]
+    > button[aria-haspopup="menu"][data-composer-context-control]:not([data-composer-shortcut])
+    > svg {
+    display: revert-layer;
+  }
+}
