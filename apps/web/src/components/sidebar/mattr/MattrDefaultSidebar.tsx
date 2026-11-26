@@ -259,6 +259,14 @@ function ThreadGroup({
         >
           <span>{name}</span>
           <em>{group.items.length}</em>
+          {collapsed && group.items.some((item) => item.attention === "running") ? (
+            <span
+              role="img"
+              aria-label={gt("Running")}
+              className="mfs-dot"
+              style={{ background: "var(--success)" }}
+            />
+          ) : null}
           <ChevronDownIcon
             aria-hidden
             className="mfs-fold"

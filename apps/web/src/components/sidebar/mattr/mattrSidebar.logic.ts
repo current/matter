@@ -117,6 +117,50 @@ export function toMattrThreadItem(
   };
 }
 
+/**
+ * Threads with a subagent or delegated task still running anywhere below them, keyed to when
+ * the earliest of those runs started. Walks `parentKey` up from each running thread, so a
+ * grandchild counts for every ancestor; a lineage cycle stops at the first repeat.
+ */
+export function workingDescendantSince(
+  lineage: ReadonlyArray<MattrThreadItem>,
+): ReadonlyMap<string, string> {
+  const parentOf = new Map(lineage.map((item) => [item.key, item.parentKey]));
+  const since = new Map<string, string>();
+  for (const item of lineage) {
+    if (item.attention !== "running") continue;
+    const started = item.runningSince ?? item.activityAt;
+    const visited = new Set([item.key]);
+    let ancestor = item.parentKey;
+    while (ancestor !== null && !visited.has(ancestor)) {
+      visited.add(ancestor);
+      const current = since.get(ancestor);
+      if (current === undefined || Date.parse(started) < Date.parse(current)) {
+        since.set(ancestor, started);
+      }
+      ancestor = parentOf.get(ancestor) ?? null;
+    }
+  }
+  return since;
+}
+
+/**
+ * Shows a thread as running while any of its descendants runs, even after its own turn ended.
+ * A thread that needs you keeps that state; the rest return to their own once the work ends.
+ */
+export function withDescendantWork<T extends MattrThreadItem>(
+  items: ReadonlyArray<T>,
+  workingSince: ReadonlyMap<string, string>,
+): ReadonlyArray<T> {
+  return items.map((item) => {
+    const since = workingSince.get(item.key);
+    if (since === undefined || item.attention === "needs" || item.attention === "running") {
+      return item;
+    }
+    return { ...item, attention: "running", runningSince: since };
+  });
+}
+
 function resolvePullRequestBadge(thread: EnvironmentThreadShell): MattrPullRequestBadge | null {
   const link = resolveThreadCurrentPullRequestLink(thread.pullRequests ?? []);
   if (link === null) return null;

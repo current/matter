@@ -29,6 +29,8 @@ import { useSidebar } from "../../ui/sidebar";
 import { attachListedAncestors, type MattrChildItem } from "./mattrFinalSidebar.logic";
 import {
   toMattrThreadItem,
+  withDescendantWork,
+  workingDescendantSince,
   type MattrProjectRef,
   type MattrThreadItem,
 } from "./mattrSidebar.logic";
@@ -113,8 +115,10 @@ export function useMattrSidebarModel(): MattrSidebarModel {
         `${thread.environmentId}:${thread.runtime?.providerInstanceId ?? thread.modelSelection.instanceId}`,
       ) ?? null,
     );
-  const items = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent).map(toItem);
-  const children = attachListedAncestors(
+  const listedItems = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent).map(
+    toItem,
+  );
+  const listedChildren = attachListedAncestors(
     threads
       .filter(
         (thread) =>
@@ -131,6 +135,9 @@ export function useMattrSidebarModel(): MattrSidebarModel {
       .filter((item) => item.parentKey !== null),
     threads,
   );
+  const workingSince = workingDescendantSince([...listedItems, ...listedChildren]);
+  const items = withDescendantWork(listedItems, workingSince);
+  const children = withDescendantWork(listedChildren, workingSince);
 
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);

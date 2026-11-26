@@ -466,6 +466,10 @@ button.mfs-lab:hover {
   transition: opacity 120ms ease;
 }
 
+.mfs-lab .mfs-dot {
+  margin-bottom: 4px;
+}
+
 button.mfs-lab:hover .mfs-fold,
 button.mfs-lab[aria-expanded="false"] .mfs-fold {
   opacity: 1;
