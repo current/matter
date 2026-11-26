@@ -1067,6 +1067,26 @@ describe("streamed voice turns", () => {
     ).toEqual(["/turn-stream", "/turn", "/turn"]);
     expect(tts.speak.mock.calls.map(([req]) => req.text)).toEqual(["Done.", "Done."]);
   });
+
+  it("shows a readable error instead of a bare network TypeError when the server is unreachable", async () => {
+    registerHostBridge({
+      getWorkspaceContext: () => makeContext(),
+      executeClientAction: () => undefined,
+      transcribePcm: async () => "",
+      getApiBaseUrlAndHeaders: () => ({ baseUrl: "http://localhost:3773" }),
+      fetchImpl: (async () => {
+        throw new TypeError("Failed to fetch");
+      }) as unknown as typeof fetch,
+      createTtsPlayer: () => silentTts().player,
+    });
+    setMode("assistant");
+
+    expect(await submitUtterance("can you hear me?")).toBeNull();
+    expect(getVoiceAssistantState()).toMatchObject({
+      phase: "error",
+      error: "Couldn't reach the voice assistant. Check the connection and try again.",
+    });
+  });
 });
 
 describe("voice barge-in guard", () => {

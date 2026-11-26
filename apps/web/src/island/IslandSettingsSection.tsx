@@ -28,6 +28,7 @@ import {
   updateVoiceAssistantSettings,
   useIslandSettings,
 } from "./islandSettingsStore";
+import { buildVoiceApiConfig } from "./voiceApiConfig";
 import {
   buildVoiceSpeakOptions,
   setVoiceModeOpen,
@@ -176,32 +177,7 @@ function CredentialStatusBadge({ configured }: { readonly configured: boolean })
   );
 }
 
-interface VoiceApiConfig {
-  readonly baseUrl: string;
-  readonly headers: Record<string, string>;
-  readonly credentials: RequestCredentials;
-}
-
-function buildVoiceApiConfig(
-  prepared: {
-    readonly httpBaseUrl?: string | null;
-    readonly httpAuthorization?:
-      | { readonly _tag: "Bearer"; readonly token: string }
-      | { readonly _tag: "Dpop"; readonly accessToken: string }
-      | null;
-  } | null,
-): VoiceApiConfig {
-  const rawBase = prepared?.httpBaseUrl?.trim();
-  const baseUrl =
-    rawBase && rawBase.length > 0 ? rawBase.replace(/\/+$/, "") : window.location.origin;
-  const headers: Record<string, string> = {};
-  if (prepared?.httpAuthorization?._tag === "Bearer") {
-    headers.authorization = `Bearer ${prepared.httpAuthorization.token}`;
-  } else if (prepared?.httpAuthorization?._tag === "Dpop") {
-    headers.authorization = `Bearer ${prepared.httpAuthorization.accessToken}`;
-  }
-  return { baseUrl, headers, credentials: "include" };
-}
+type VoiceApiConfig = ReturnType<typeof buildVoiceApiConfig>;
 
 async function postVoiceCredentials(
   api: VoiceApiConfig,
@@ -307,7 +283,7 @@ export function IslandSettingsSection() {
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads TTS credential status from the connected server
   useEffect(() => {
     let disposed = false;
-    const api = buildVoiceApiConfig(prepared);
+    const api = buildVoiceApiConfig(prepared, window.location.origin);
     void fetch(`${api.baseUrl}/api/mattr/voice-assistant/tts-info`, {
       method: "GET",
       headers: api.headers,
@@ -343,14 +319,17 @@ export function IslandSettingsSection() {
 
   const updateTtsSettings = (patch: Partial<VoiceAssistantSettings>) => {
     const next = updateVoiceAssistantSettings(patch);
-    void syncVoiceTtsPreferencesToServer(buildVoiceApiConfig(prepared), next.voiceAssistant);
+    void syncVoiceTtsPreferencesToServer(
+      buildVoiceApiConfig(prepared, window.location.origin),
+      next.voiceAssistant,
+    );
   };
 
   const handleSaveKey = async (provider: CredentialProvider, nextKey: string) => {
     setSavingKey(provider);
     setCredentialFeedback(null);
     const result = await postVoiceCredentials(
-      buildVoiceApiConfig(prepared),
+      buildVoiceApiConfig(prepared, window.location.origin),
       provider === "elevenlabs" ? { elevenlabsApiKey: nextKey } : { deepgramApiKey: nextKey },
     );
     setSavingKey(null);
@@ -424,7 +403,7 @@ export function IslandSettingsSection() {
     setTestingVoice(true);
     setCredentialFeedback(null);
     const outcome = await fetchAndPlayVoicePreview(
-      buildVoiceApiConfig(prepared),
+      buildVoiceApiConfig(prepared, window.location.origin),
       {
         text: gt("Hey! Voice Mode is ready whenever you want to talk through your threads."),
         ...buildVoiceSpeakOptions({

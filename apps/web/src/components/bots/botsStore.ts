@@ -9,7 +9,7 @@ import type {
 } from "@t3tools/contracts";
 import { useSyncExternalStore } from "react";
 
-import { mattrApiRequest, type MattrApiConfig } from "../../addons/mattrApi";
+import { mattrApiRequest, mattrFetchCredentials, type MattrApiConfig } from "../../addons/mattrApi";
 
 export interface BotsState {
   readonly providers: ReadonlyArray<BotProviderDescriptor>;
@@ -144,7 +144,7 @@ async function loadSnapshot(config: MattrApiConfig, signal: AbortSignal) {
 async function readEventStream(config: MattrApiConfig, signal: AbortSignal) {
   const response = await fetch(`${config.baseUrl}/api/mattr/bots/events`, {
     headers: { ...config.headers, accept: "text/event-stream" },
-    credentials: "include",
+    credentials: mattrFetchCredentials(config.headers),
     signal,
   });
   if (!response.ok || !response.body) throw new Error(`events_${response.status}`);

@@ -61,6 +61,7 @@ import {
   toggleVoiceAssistantMute,
   useVoiceAssistantState,
 } from "./voiceAssistantStore";
+import { buildVoiceApiConfig } from "./voiceApiConfig";
 import { encodeWav16k } from "./voiceModeAudio";
 import type {
   IslandAction,
@@ -730,42 +731,23 @@ export function MattrIslandHost() {
     },
   );
 
-  const getApiBaseUrlAndHeaders = useStableCallback(() => {
-    const conn = primaryPrepared;
-    const rawBase = conn?.httpBaseUrl?.trim();
-    const baseUrl =
-      rawBase && rawBase.length > 0 ? rawBase.replace(/\/+$/, "") : window.location.origin;
-    const headers: Record<string, string> = {};
-    if (conn?.httpAuthorization?._tag === "Bearer") {
-      headers.authorization = `Bearer ${conn.httpAuthorization.token}`;
-    } else if (conn?.httpAuthorization?._tag === "Dpop") {
-      headers.authorization = `Bearer ${conn.httpAuthorization.accessToken}`;
-    }
-    return {
-      baseUrl,
-      headers,
-      credentials: "include" as const,
-    };
-  });
+  const getApiBaseUrlAndHeaders = useStableCallback(() =>
+    buildVoiceApiConfig(primaryPrepared, window.location.origin),
+  );
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- probes server TTS/STT availability once connected and refreshes when credentials change
   useEffect(() => {
     let disposed = false;
-    const rawBase = primaryPrepared?.httpBaseUrl?.trim();
-    const baseUrl =
-      rawBase && rawBase.length > 0 ? rawBase.replace(/\/+$/, "") : window.location.origin;
-    const headers: Record<string, string> = {};
-    if (primaryPrepared?.httpAuthorization?._tag === "Bearer") {
-      headers.authorization = `Bearer ${primaryPrepared.httpAuthorization.token}`;
-    } else if (primaryPrepared?.httpAuthorization?._tag === "Dpop") {
-      headers.authorization = `Bearer ${primaryPrepared.httpAuthorization.accessToken}`;
-    }
+    const { baseUrl, headers, credentials } = buildVoiceApiConfig(
+      primaryPrepared,
+      window.location.origin,
+    );
     const probe = async () => {
       try {
         const response = await fetch(`${baseUrl}/api/mattr/voice-assistant/tts-info`, {
           method: "GET",
           headers,
-          credentials: "include",
+          credentials,
         });
         if (!response.ok || disposed) return;
         const info = (await response.json()) as Partial<VoiceAvailableTtsInfo>;

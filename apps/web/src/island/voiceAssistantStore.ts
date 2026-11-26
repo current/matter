@@ -880,13 +880,24 @@ async function postTurn(
   body: unknown,
   signal: AbortSignal,
 ): Promise<Response> {
-  return getFetchImpl()(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...apiConfig.headers },
-    credentials: apiConfig.credentials ?? "include",
-    body: JSON.stringify(body),
-    signal,
-  });
+  try {
+    return await getFetchImpl()(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...apiConfig.headers },
+      credentials: apiConfig.credentials ?? "include",
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (error) {
+    // fetch rejects with a bare "Failed to fetch" TypeError when the server is unreachable.
+    if (signal.aborted || !(error instanceof TypeError)) throw error;
+    throw new Error(
+      m(msg("Couldn't reach the voice assistant. Check the connection and try again.")),
+      {
+        cause: error,
+      },
+    );
+  }
 }
 
 async function failedTurn(response: Response): Promise<never> {

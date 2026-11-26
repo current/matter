@@ -27,6 +27,16 @@ export function useMattrApiConfig(): MattrApiConfig | null {
   return internConfig(baseUrl, bearer);
 }
 
+/**
+ * Packaged servers answer CORS with a non-credentialed `*`, so a credentialed cross-origin fetch
+ * (the desktop renderer at t3code://app) fails preflight. Only cookie auth needs credentials.
+ */
+export function mattrFetchCredentials(
+  headers: Readonly<Record<string, string>>,
+): RequestCredentials {
+  return headers.authorization === undefined ? "include" : "omit";
+}
+
 let interned: MattrApiConfig | null = null;
 
 /** The same object while the connection is unchanged, so effects can depend on it. */
@@ -61,7 +71,7 @@ export async function mattrApiRequest<A>(
       ...config.headers,
       ...(init.body === undefined ? {} : { "content-type": "application/json" }),
     },
-    credentials: "include",
+    credentials: mattrFetchCredentials(config.headers),
     ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
     ...(init.signal ? { signal: init.signal } : {}),
   });
