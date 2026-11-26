@@ -21,7 +21,11 @@ export const ChatCanvasContext = createContext<{
   /** Where an inline card sits when nothing overlaps it; null when the canvas is too narrow. */
   preferredDetailsCard: ReturnType<typeof resolveThreadDetailsCardLayout>;
   /** Where the inline card sits now; null when it shows as a popover. */
-  detailsCardPlacement: ReturnType<typeof resolveThreadDetailsCardLayout>;
+  detailsCardPlacement:
+    | (NonNullable<ReturnType<typeof resolveThreadDetailsCardLayout>> & {
+        readonly pinnedLeft?: boolean;
+      })
+    | null;
 } | null>(null);
 
 export const useChatCanvas = () => useContext(ChatCanvasContext);

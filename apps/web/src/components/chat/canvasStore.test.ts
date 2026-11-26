@@ -84,5 +84,102 @@ describe("chat canvas model", () => {
     store.getState().setMeasurements({ ...measurements(1400), narrowestWidth: 900 });
     expect(store.getState().measurements.narrowestWidth).toBe(900);
     expect(store.getState()).not.toBe(measured);
+    const withTransition = store.getState();
+    store.getState().setMeasurements({
+      ...measurements(1400),
+      narrowestWidth: 900,
+      rightPanelTransition: { startWidth: 900, endWidth: 1400 },
+    });
+    expect(store.getState()).not.toBe(withTransition);
+  });
+
+  it("mounts the details card at its closing destination so chat widens monotonically without bouncing", () => {
+    const startWidth = 510;
+    const endWidth = 1050;
+    const detailsCardMeasurement = { threadRef, width: 280, fullContentHeight: 320 };
+    const finalModel = resolveChatCanvasModel({
+      measurements: measurements(endWidth),
+      detailsCardMeasurement,
+      threadRef,
+      preview: null,
+      detailsCardInlineOpen: true,
+    });
+    let prevWidth = 0;
+    let prevLeft = 0;
+    for (let width = startWidth; width <= endWidth; width += 30) {
+      const model = resolveChatCanvasModel({
+        measurements: {
+          ...measurements(width),
+          narrowestWidth: startWidth,
+          rightPanelTransition: { startWidth, endWidth },
+        },
+        detailsCardMeasurement,
+        threadRef,
+        preview: null,
+        detailsCardInlineOpen: true,
+      });
+      expect(model.detailsCardMode).toBe("inline");
+      expect(model.detailsCardPlacement).toMatchObject({
+        x: finalModel.detailsCardPlacement!.x,
+        pinnedLeft: true,
+      });
+      expect(model.layout.chat.width).toBeGreaterThanOrEqual(prevWidth);
+      expect(model.layout.chat.width).toBeLessThanOrEqual(finalModel.layout.chat.width);
+      expect(model.layout.chat.left).toBeGreaterThanOrEqual(prevLeft);
+      expect(model.layout.chat.left).toBeLessThanOrEqual(finalModel.layout.chat.left);
+      prevWidth = model.layout.chat.width;
+      prevLeft = model.layout.chat.left;
+    }
+  });
+
+  it("holds the details card boundary while a right panel opens so chat narrows monotonically", () => {
+    const startWidth = 1050;
+    const endWidth = 510;
+    const detailsCardMeasurement = { threadRef, width: 280, fullContentHeight: 320 };
+    const startModel = resolveChatCanvasModel({
+      measurements: measurements(startWidth),
+      detailsCardMeasurement,
+      threadRef,
+      preview: null,
+      detailsCardInlineOpen: true,
+    });
+    let prevWidth = startModel.layout.chat.width;
+    let prevLeft = startModel.layout.chat.left;
+    for (let width = startWidth; width >= endWidth; width -= 30) {
+      const model = resolveChatCanvasModel({
+        measurements: {
+          ...measurements(width),
+          narrowestWidth: endWidth,
+          rightPanelTransition: { startWidth, endWidth },
+        },
+        detailsCardMeasurement,
+        threadRef,
+        preview: null,
+        detailsCardInlineOpen: true,
+      });
+      expect(model.detailsCardMode).toBe("popover");
+      expect(model.detailsCardPlacement).toBeNull();
+      expect(model.layout.chat.width).toBeLessThanOrEqual(prevWidth);
+      expect(model.layout.chat.left).toBeLessThanOrEqual(prevLeft);
+      prevWidth = model.layout.chat.width;
+      prevLeft = model.layout.chat.left;
+    }
+  });
+
+  it("keeps the card right-anchored when it already fits at both ends of a right panel slide", () => {
+    const model = resolveChatCanvasModel({
+      measurements: {
+        ...measurements(1200),
+        narrowestWidth: 1060,
+        rightPanelTransition: { startWidth: 1060, endWidth: 1600 },
+      },
+      detailsCardMeasurement: { threadRef, width: 280, fullContentHeight: 320 },
+      threadRef,
+      preview: null,
+      detailsCardInlineOpen: true,
+    });
+    expect(model.detailsCardMode).toBe("inline");
+    expect(model.detailsCardPlacement?.pinnedLeft).toBeUndefined();
+    expect(model.detailsCardPlacement?.x).toBe(1200 - 280 - 12);
   });
 });

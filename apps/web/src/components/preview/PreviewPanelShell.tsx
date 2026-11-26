@@ -189,6 +189,7 @@ function PreviewPanelShellFrame(
           : undefined
       }
       data-preview-panel-mode={props.mode}
+      data-preview-panel-expanded={collapsible ? (expanded ? "true" : "false") : undefined}
       data-preview-panel-maximized={maximized ? "true" : "false"}
     >
       {isInline && !maximized ? <RightPanelResizeHandle handlers={handlers} /> : null}

@@ -258,6 +258,29 @@
     margin-inline-start: var(--mattr-shell-gap);
   }
 
+  [data-slot="sidebar-inset"]
+    [data-preview-panel-mode="inline"][data-preview-panel-expanded="false"] {
+    margin-inline-start: 0;
+  }
+
+  /* While a right panel slides open or closed beside a docked details card, derive the lane inset
+     from the live canvas width (100%) so chat stays frame-locked to the CSS transition. */
+  [data-chat-canvas][data-chat-lane-clamp] .chat-composer-lane {
+    padding-inline-end: calc(
+      env(safe-area-inset-right) + 3rem + max(0px, 100% - var(--chat-lane-clamp-width))
+    );
+  }
+
+  [data-chat-canvas][data-chat-lane-clamp] .messages-timeline-scroll {
+    padding-inline-end: calc(
+      3rem + max(0px, 100% - var(--chat-lane-clamp-width)) - var(--chat-timeline-gutter, 0px)
+    );
+  }
+
+  [data-chat-canvas][data-chat-lane-clamp] :is(.chat-scroll-to-bottom, .chat-banner-lane) {
+    inset-inline-end: max(0px, 100% - var(--chat-lane-clamp-width));
+  }
+
   [data-sidebar-state="collapsed"] > [data-slot="sidebar-inset"] {
     /* Clear traffic lights (89pt inset) + sidebar toggle + mattr wordmark + history chevrons (~194pt). */
     --workspace-titlebar-content-left: 204px;
@@ -363,6 +386,10 @@
   [data-panel-animations="true"]
     :is([data-preview-panel-mode], div:has(> div > [data-terminal-owner="drawer"])) {
     transition-timing-function: var(--mattr-sidebar-ease);
+  }
+
+  [data-panel-animations="true"] [data-preview-panel-mode="inline"] {
+    transition-property: width, margin-inline-start;
   }
 
   /* The drawer rises from the bottom edge instead of unrolling from its header. */

@@ -2,10 +2,24 @@ import { useLayoutEffect, useRef, useState, type ComponentProps, type CSSPropert
 import { useStore } from "zustand";
 import { ChatCanvasContext } from "./ChatCanvasContext";
 import type { ChatCanvasPreview } from "./chatCanvasLayout";
-import { resolveChatCanvasModel, type ChatCanvasStore } from "./canvasStore";
+import {
+  resolveChatCanvasModel,
+  type ChatCanvasStore,
+  type RightPanelWidthTransition,
+} from "./canvasStore";
 import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
 import { observeResize } from "../../lib/observeResize";
 import type { ScopedThreadRef } from "@t3tools/contracts";
+
+const PANEL_WIDTH_TRANSITION_PROPERTIES = new Set(["width", "margin-inline-start", "margin-left"]);
+
+function isRightPanelTransition(animation: CSSTransition): boolean {
+  return (
+    animation.effect instanceof KeyframeEffect &&
+    animation.effect.target instanceof Element &&
+    animation.effect.target.matches('[data-preview-panel-mode="inline"]')
+  );
+}
 
 function panelWidthTransitions(element: HTMLElement) {
   const panels = element
@@ -17,7 +31,7 @@ function panelWidthTransitions(element: HTMLElement) {
       .filter(
         (animation): animation is CSSTransition =>
           animation instanceof CSSTransition &&
-          animation.transitionProperty === "width" &&
+          PANEL_WIDTH_TRANSITION_PROPERTIES.has(animation.transitionProperty) &&
           animation.playState === "running",
       ),
   );
@@ -27,19 +41,33 @@ function panelWidthTransitions(element: HTMLElement) {
 function measureTransitionWidths(element: HTMLElement, transitions: CSSTransition[]) {
   if (transitions.length === 0) return null;
   const times = transitions.map((animation) => animation.currentTime);
-  // Opposite panel transitions can reach their widest points at different times.
-  for (const animation of transitions) {
-    const end = Number(animation.effect?.getComputedTiming().endTime ?? 0);
-    animation.currentTime = 0;
+  const onlyRightPanel = transitions.every(isRightPanelTransition);
+  let narrowestWidth: number;
+  let rightPanelTransition: RightPanelWidthTransition | null = null;
+  if (onlyRightPanel) {
+    for (const animation of transitions) animation.currentTime = 0;
     const startWidth = element.clientWidth;
-    animation.currentTime = end;
-    if (startWidth < element.clientWidth) animation.currentTime = 0;
+    for (const animation of transitions) {
+      animation.currentTime = Number(animation.effect?.getComputedTiming().endTime ?? 0);
+    }
+    const endWidth = element.clientWidth;
+    narrowestWidth = Math.min(startWidth, endWidth);
+    rightPanelTransition = { startWidth, endWidth };
+  } else {
+    // Opposite panel transitions can reach their widest points at different times.
+    for (const animation of transitions) {
+      const end = Number(animation.effect?.getComputedTiming().endTime ?? 0);
+      animation.currentTime = 0;
+      const startWidth = element.clientWidth;
+      animation.currentTime = end;
+      if (startWidth < element.clientWidth) animation.currentTime = 0;
+    }
+    narrowestWidth = element.clientWidth;
   }
-  const narrowestWidth = element.clientWidth;
   transitions.forEach((animation, index) => {
-    animation.currentTime = times[index] ?? null;
+    animation.currentTime = times[index] ?? 0;
   });
-  return { transitions, narrowestWidth };
+  return { transitions, narrowestWidth, rightPanelTransition };
 }
 
 export function ChatCanvas({
@@ -115,6 +143,7 @@ export function ChatCanvas({
             : null,
         width,
         narrowestWidth: transitionWidths?.narrowestWidth ?? width,
+        rightPanelTransition: transitionWidths?.rightPanelTransition ?? null,
         height: element.clientHeight,
         padding: Number.parseFloat(styles.paddingLeft),
         maxChatWidth: Number.parseFloat(styles.width),
@@ -127,6 +156,17 @@ export function ChatCanvas({
       });
     };
     measure();
+    const animationRoot = element.closest<HTMLElement>("[data-panel-animations]");
+    const onTransitionRun = (event: TransitionEvent) => {
+      if (
+        PANEL_WIDTH_TRANSITION_PROPERTIES.has(event.propertyName) &&
+        event.target instanceof Element &&
+        event.target.matches('[data-slot="sidebar-gap"], [data-preview-panel-mode="inline"]')
+      ) {
+        measure();
+      }
+    };
+    animationRoot?.addEventListener("transitionrun", onTransitionRun);
     const observed: Element[] = [element, probe, htmlPreviewProbe];
     if (findBar) observed.push(findBar);
     if (composerOverlayElement) observed.push(composerOverlayElement);
@@ -134,6 +174,7 @@ export function ChatCanvas({
     const stopObserving = observeResize(observed, measure);
     return () => {
       disposed = true;
+      animationRoot?.removeEventListener("transitionrun", onTransitionRun);
       stopObserving();
     };
   }, [store, composerOverlayElement, timelineElement, detailsCardTopInset]);
@@ -174,6 +215,7 @@ export function ChatCanvas({
         {...props}
         ref={elementRef}
         data-chat-canvas
+        data-chat-lane-clamp={model.laneClampWidth !== null ? "" : undefined}
         data-preview-overlaps-chat={layout.overlapsChat || undefined}
         className="relative flex min-h-0 min-w-0 flex-1 flex-col"
         style={
@@ -181,6 +223,9 @@ export function ChatCanvas({
             "--chat-timeline-gutter": `${measurements.timelineGutter}px`,
             "--chat-lane-inset-start": `${layout.chat.insetStart}px`,
             "--chat-lane-inset-end": `${layout.chat.insetEnd}px`,
+            ...(model.laneClampWidth !== null
+              ? { "--chat-lane-clamp-width": `${model.laneClampWidth}px` }
+              : null),
             ...htmlPreviewLane,
           } as CSSProperties
         }
