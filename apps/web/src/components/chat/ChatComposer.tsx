@@ -4174,7 +4174,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           state={speechInput.state}
                           shortcutLabel={dictationShortcutLabel}
                           disabled={dictationDisabled}
-                          onStart={() => void speechInput.start()}
+                          onStart={() => speechInput.start()}
+                          onStop={() => void speechInput.stop()}
                         />
                       </>
                     ) : null}
