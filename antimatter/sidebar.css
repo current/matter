@@ -42,26 +42,27 @@
 }
 
 .dark .mfs {
-  --mfs-fg: #f1f3f7;
-  --mfs-fg-90: rgb(241 243 247 / 0.9);
-  --mfs-fg-75: rgb(241 243 247 / 0.75);
-  --mfs-muted: #a3a3a3;
-  --mfs-muted-50: rgb(163 163 163 / 0.5);
-  --mfs-secondary: rgb(143 143 143 / 0.85);
-  --mfs-icon: #8e8f8f;
-  --mfs-hover: rgb(241 243 247 / 0.06);
-  --mfs-active: rgb(241 243 247 / 0.11);
-  --mfs-active-ring: rgb(255 255 255 / 0.04);
-  --mfs-field: rgb(241 243 247 / 0.04);
-  --mfs-field-ring: rgb(255 255 255 / 0.06);
-  --mfs-kbd: rgb(255 255 255 / 0.07);
-  --mfs-button: rgb(241 243 247 / 0.09);
-  --mfs-button-hover: rgb(241 243 247 / 0.13);
-  --mfs-button-ring: rgb(255 255 255 / 0.08);
-  --mfs-on: rgb(241 243 247 / 0.09);
-  --mfs-trunk: rgb(255 255 255 / 0.14);
-  --mfs-divider: rgb(255 255 255 / 0.08);
-  --mfs-track: rgb(255 255 255 / 0.08);
+  /* The canvas's exact dark tokens are fallbacks; a custom theme's sidebar colors win. */
+  --mfs-fg: var(--sidebar-foreground, #f1f3f7);
+  --mfs-fg-90: color-mix(in srgb, var(--mfs-fg) 90%, transparent);
+  --mfs-fg-75: color-mix(in srgb, var(--mfs-fg) 75%, transparent);
+  --mfs-muted: var(--sidebar-muted-foreground, #a3a3a3);
+  --mfs-muted-50: color-mix(in srgb, var(--mfs-muted) 50%, transparent);
+  --mfs-secondary: color-mix(in srgb, var(--mfs-muted) 85%, transparent);
+  --mfs-icon: color-mix(in srgb, var(--mfs-muted) 88%, transparent);
+  --mfs-hover: color-mix(in srgb, var(--mfs-fg) 6%, transparent);
+  --mfs-active: color-mix(in srgb, var(--mfs-fg) 11%, transparent);
+  --mfs-active-ring: color-mix(in srgb, var(--mfs-fg) 4%, transparent);
+  --mfs-field: color-mix(in srgb, var(--mfs-fg) 4%, transparent);
+  --mfs-field-ring: color-mix(in srgb, var(--mfs-fg) 6%, transparent);
+  --mfs-kbd: color-mix(in srgb, var(--mfs-fg) 7%, transparent);
+  --mfs-button: color-mix(in srgb, var(--mfs-fg) 9%, transparent);
+  --mfs-button-hover: color-mix(in srgb, var(--mfs-fg) 13%, transparent);
+  --mfs-button-ring: color-mix(in srgb, var(--mfs-fg) 8%, transparent);
+  --mfs-on: color-mix(in srgb, var(--mfs-fg) 9%, transparent);
+  --mfs-trunk: color-mix(in srgb, var(--mfs-fg) 14%, transparent);
+  --mfs-divider: color-mix(in srgb, var(--mfs-fg) 8%, transparent);
+  --mfs-track: color-mix(in srgb, var(--mfs-fg) 8%, transparent);
   --mfs-success: #34d399;
   --mfs-warning: #fbbf24;
   --mfs-warning-bg: rgb(251 191 36 / 0.14);
@@ -79,7 +80,7 @@
   -webkit-app-region: no-drag;
 }
 
-.mfs :is(button, a, input):focus-visible {
+.mfs :is(button, a):focus-visible {
   box-shadow: inset 0 0 0 1.5px var(--ring);
 }
 
@@ -88,7 +89,8 @@
 }
 
 /* The brand row replaces the titlebar wordmark, so the titlebar keeps only its controls. */
-[data-mattr-sidebar-layout="inbox"] > .drag-region a[href="/"] {
+/* The header is the host's first child; web and the PWA render it without .drag-region. */
+[data-mattr-sidebar-layout="inbox"] > :first-child a[href="/"] {
   width: 0;
   min-width: 0;
   visibility: hidden;
@@ -137,13 +139,15 @@
 
 .mfs-wi {
   display: flex;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex: none;
   align-items: center;
   justify-content: center;
   margin-left: auto;
-  border-radius: 7px;
+  border-radius: 9px;
+  background: var(--mfs-field);
+  box-shadow: inset 0 0 0 1px var(--mfs-field-ring);
   color: var(--mfs-icon);
 }
 
@@ -153,12 +157,13 @@
 }
 
 .mfs-wi:hover {
-  background: var(--mfs-hover);
+  background: var(--mfs-active);
   color: var(--mfs-fg);
 }
 
 .mfs-wi[data-on] {
-  background: var(--mfs-on);
+  background: color-mix(in srgb, var(--primary) 16%, var(--mfs-active));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
   color: var(--mfs-fg);
 }
 
@@ -447,7 +452,7 @@ button.mfs-lab:hover {
 }
 
 .mfs-lab em {
-  color: var(--mfs-muted-50);
+  color: var(--mfs-secondary);
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }
@@ -594,6 +599,17 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
 .mfs-row:hover .mfs-pm[data-parent] > :not(.mfs-disclose),
 .mfs-pm[data-parent]:has(.mfs-disclose:focus-visible) > :not(.mfs-disclose) {
   visibility: hidden;
+}
+
+/* No hover on touch: keep the chevron in place of the provider mark so a tap reads as a fold. */
+@media (hover: none) {
+  .mfs-disclose {
+    opacity: 1;
+  }
+
+  .mfs-pm[data-parent] > :not(.mfs-disclose) {
+    visibility: hidden;
+  }
 }
 
 .mfs-pr {
@@ -779,12 +795,13 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
   flex: none;
   margin-top: 6px;
   padding: 11px 12px 0;
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--mfs-divider);
 }
 
 .mfs-mg {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 12px;
   margin: 0 -4px;
   padding: 0 2px;
@@ -961,7 +978,7 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
   color: var(--muted-foreground);
 }
 
-.mfs-menu-item > span:first-of-type {
+.mfs-menu-text {
   min-width: 0;
   flex: 1;
   overflow: hidden;

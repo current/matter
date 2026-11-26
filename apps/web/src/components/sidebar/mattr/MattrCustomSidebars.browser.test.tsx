@@ -37,6 +37,7 @@ vi.mock(import("../../../addons/mattrApi"), async (original) => ({
 
 import { MattrDefaultSidebar } from "./MattrDefaultSidebar";
 import { MattrUsageMeters } from "./MattrDefaultSidebarParts";
+import type { MattrChildItem } from "./mattrFinalSidebar.logic";
 import { toMattrThreadItem } from "./mattrSidebar.logic";
 import { MattrScopeLine } from "./MattrScopeLine";
 import { MATTR_SIDEBAR_LAYOUT_STORAGE_KEY } from "./mattrSidebarStore";
@@ -107,22 +108,29 @@ const items = [
   thread("Onboarding copy pass", LILT),
 ];
 
-const subagent = (title: string, overrides: ThreadFixtureOverrides = {}) =>
-  thread(title, MATTR, {
+const subagent = (
+  title: string,
+  overrides: ThreadFixtureOverrides = {},
+  parent = "Muse provider matrix",
+  ancestor = parent,
+): MattrChildItem => ({
+  ...thread(title, MATTR, {
     lineage: {
-      rootThreadId: ThreadId.make("Muse provider matrix"),
-      parentThreadId: ThreadId.make("Muse provider matrix"),
+      rootThreadId: ThreadId.make(ancestor),
+      parentThreadId: ThreadId.make(parent),
       relationshipToParent: "subagent",
     },
     ...overrides,
-  });
+  }),
+  ancestorKey: `${environmentId}:${ancestor}`,
+});
 
 const children = [
   subagent("Audit adapters", { runtime: runtime("running") }),
   subagent("Write matrix doc"),
 ];
 
-function model(): MattrSidebarModel {
+function model(overrides: Partial<MattrSidebarModel> = {}): MattrSidebarModel {
   return {
     items,
     children,
@@ -131,6 +139,7 @@ function model(): MattrSidebarModel {
     nowMs: Date.parse(NOW_ISO),
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
     actions: { openThread: vi.fn(), newThread: vi.fn(), openThreadMenu: vi.fn() },
+    ...overrides,
   };
 }
 
@@ -276,6 +285,37 @@ describe("MattrDefaultSidebar", () => {
     await expect.element(tree).not.toBeInTheDocument();
     await page.getByRole("button", { name: "Show 2 subagents of Muse provider matrix" }).click();
     await expect.element(tree).toBeVisible();
+  });
+
+  it("nests subagents-of-subagents and counts and keeps subagents that need you", async () => {
+    using _server = useServer(false);
+    const settledParent = thread("Settled release", MATTR, { settledOverride: "settled" });
+    const nested = [
+      ...children,
+      subagent("Probe one adapter", {}, "Audit adapters", "Muse provider matrix"),
+      subagent("Ask about signing", { hasPendingUserInput: true }, "Settled release"),
+    ];
+    await using screen = await render(
+      <SidebarProvider>
+        <MattrDefaultSidebar
+          model={model({ items: [...items, settledParent], children: nested })}
+        />
+      </SidebarProvider>,
+    );
+    const muse = screen.container.querySelectorAll(
+      'ul[aria-label="Subagents of Muse provider matrix"] > li[data-mattr-subagent] .mfs-t',
+    );
+    expect([...muse].map((title) => title.textContent)).toContain("Probe one adapter");
+
+    const needsYou = page.getByRole("button", { name: /Needs you/ });
+    await expect.element(needsYou).toHaveTextContent("Needs you2");
+    await needsYou.click();
+    await expect.element(page.getByText("Settled release")).toBeVisible();
+    await expect
+      .element(page.getByRole("list", { name: "Subagents of Settled release" }))
+      .toBeVisible();
+    await expect.element(page.getByText("Ask about signing")).toBeVisible();
+    await expect.element(page.getByText("Muse provider matrix")).not.toBeInTheDocument();
   });
 
   it("filters to Needs you, scopes to one project, and searches titles", async () => {

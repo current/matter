@@ -25,8 +25,10 @@ import { useSidebar } from "../../ui/sidebar";
 import {
   buildThreadGroups,
   compactAge,
+  countNeedsYou,
   countOpenPullRequests,
   indexChildrenByParent,
+  parentsWithNeedsChild,
   shouldAutoExpand,
   subagentStatus,
   summarizeProjects,
@@ -313,8 +315,14 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
       : null;
   const projectSummary = summarizeProjects(items);
   const childrenByParent = indexChildrenByParent(children);
-  const groups = buildThreadGroups(items, projects, { sort, projectFilter, filter });
-  const needsCount = items.filter((item) => item.attention === "needs").length + crew.needsCount;
+  const needsChildParents = parentsWithNeedsChild(childrenByParent);
+  const groups = buildThreadGroups(items, projects, {
+    sort,
+    projectFilter,
+    filter,
+    needsChildParents,
+  });
+  const needsCount = countNeedsYou(items, children) + crew.needsCount;
   const openPullRequests = countOpenPullRequests(items);
   const searching = query.trim().length > 0;
   const results = searching
@@ -541,11 +549,13 @@ export function MattrDefaultSidebar({ model }: { model: MattrSidebarModel }) {
                   <div
                     className="mfs-row"
                     data-active={item.key === activeThreadKey ? "" : undefined}
+                    onContextMenu={rowMenuHandler(model, item)}
                   >
                     <button
                       type="button"
                       className="mfs-hit"
                       aria-label={item.title}
+                      aria-current={item.key === activeThreadKey ? "page" : undefined}
                       onClick={() => {
                         actions.openThread(item);
                         setQuery("");

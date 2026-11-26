@@ -113,7 +113,7 @@ function MattrMenuItem({
   return (
     <MenuPrimitive.Item className="mfs-menu-item" onClick={onClick}>
       {icon}
-      <span>{label}</span>
+      <span className="mfs-menu-text">{label}</span>
       {hint}
     </MenuPrimitive.Item>
   );
@@ -135,7 +135,7 @@ export function MattrMenuRadioItem({
           <CheckIcon aria-hidden className="mfs-menu-check" />
         </MenuPrimitive.RadioItemIndicator>
       </span>
-      <span>{label}</span>
+      <span className="mfs-menu-text">{label}</span>
       {hint}
     </MenuPrimitive.RadioItem>
   );
@@ -378,7 +378,10 @@ export function MattrCrew({
 }
 
 function resetText(meter: MattrUsageMeter, nowMs: number, gt: ReturnType<typeof useGT>) {
-  if (meter.resetsAt === null) return gt("{percent}% left", { percent: 100 - meter.usedPercent });
+  // A reset that already passed means the meter is stale until the next poll; skip the time.
+  if (meter.resetsAt === null || !(Date.parse(meter.resetsAt) > nowMs)) {
+    return gt("{percent}% left", { percent: 100 - meter.usedPercent });
+  }
   const soon = formatResetLabel(meter.resetsAt, nowMs);
   if (soon !== null) return gt("Resets in {duration}", { duration: soon });
   const when = new Intl.DateTimeFormat(undefined, {

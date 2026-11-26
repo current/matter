@@ -26,6 +26,7 @@ import { buildThreadRouteParams } from "../../../threadRoutes";
 import { filterSidebarV2VisibleThreads } from "../../Sidebar.logic";
 import { stackedThreadToast, toastManager } from "../../ui/toast";
 import { useSidebar } from "../../ui/sidebar";
+import { attachListedAncestors, type MattrChildItem } from "./mattrFinalSidebar.logic";
 import {
   toMattrThreadItem,
   type MattrProjectRef,
@@ -48,8 +49,8 @@ export interface MattrSidebarActions {
 
 export interface MattrSidebarModel {
   readonly items: ReadonlyArray<MattrThreadItem>;
-  /** Subagents and delegated tasks, which the rail nests under their parent rather than lists. */
-  readonly children: ReadonlyArray<MattrThreadItem>;
+  /** Subagents and delegated tasks, which the rail nests under their listed ancestor. */
+  readonly children: ReadonlyArray<MattrChildItem>;
   readonly projects: ReadonlyArray<MattrSidebarProject>;
   readonly activeThreadKey: string | null;
   readonly nowMs: number;
@@ -113,20 +114,23 @@ export function useMattrSidebarModel(): MattrSidebarModel {
       ) ?? null,
     );
   const items = filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent).map(toItem);
-  const children = threads
-    .filter(
-      (thread) =>
-        thread.archivedAt === null &&
-        thread.lineage.sideChat !== true &&
-        thread.lineage.workflowStep !== true &&
-        isShownUnderParent(
-          { environmentId: thread.environmentId, threadId: thread.id },
-          thread.lineage,
-          delegatedUnderParent,
-        ),
-    )
-    .map(toItem)
-    .filter((item) => item.parentKey !== null);
+  const children = attachListedAncestors(
+    threads
+      .filter(
+        (thread) =>
+          thread.archivedAt === null &&
+          thread.lineage.sideChat !== true &&
+          thread.lineage.workflowStep !== true &&
+          isShownUnderParent(
+            { environmentId: thread.environmentId, threadId: thread.id },
+            thread.lineage,
+            delegatedUnderParent,
+          ),
+      )
+      .map(toItem)
+      .filter((item) => item.parentKey !== null),
+    threads,
+  );
 
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);

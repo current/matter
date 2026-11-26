@@ -1,3 +1,5 @@
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+import { resolveListedAncestorThreadRef } from "@t3tools/client-runtime/state/threads";
 import type {
   ProviderDriverKind,
   ServerProvider,
@@ -25,9 +27,13 @@ export function compactAge(iso: string | null, nowMs: number): string {
 export type MattrSortMode = "project" | "recent";
 export type MattrListFilter = "all" | "needs";
 
-/** A thread the rail lists: live, or settled/snoozed but raising a hand. */
-function isListed(item: MattrThreadItem): boolean {
-  return item.attention === "needs" || (!item.settled && !item.snoozed);
+/** A thread the rail lists: live, or settled/snoozed but raising a hand itself or through a child. */
+function isListed(item: MattrThreadItem, needsChildParents?: ReadonlySet<string>): boolean {
+  return (
+    item.attention === "needs" ||
+    needsChildParents?.has(item.key) === true ||
+    (!item.settled && !item.snoozed)
+  );
 }
 
 function byActivityDesc(left: MattrThreadItem, right: MattrThreadItem): number {
@@ -58,13 +64,18 @@ export function buildThreadGroups(
     readonly sort: MattrSortMode;
     readonly projectFilter: string | null;
     readonly filter: MattrListFilter;
+    /** Rows with a subagent that needs you, from `parentsWithNeedsChild`. */
+    readonly needsChildParents?: ReadonlySet<string>;
   },
 ): ReadonlyArray<MattrThreadGroup> {
+  const needsChildParents = options.needsChildParents;
   const listed = items.filter(
     (item) =>
-      isListed(item) &&
+      isListed(item, needsChildParents) &&
       (options.projectFilter === null || item.projectKey === options.projectFilter) &&
-      (options.filter === "all" || item.attention === "needs"),
+      (options.filter === "all" ||
+        item.attention === "needs" ||
+        needsChildParents?.has(item.key) === true),
   );
   if (options.sort === "recent") {
     return listed.length === 0
@@ -101,16 +112,33 @@ const CHILD_RANK: Record<MattrThreadItem["attention"], number> = {
   idle: 2,
 };
 
-/** Each parent's subagents and delegated tasks: blocked and running first, then newest. */
-export function indexChildrenByParent(
+/** A subagent or delegated task with the key of the rail row it nests under. */
+export interface MattrChildItem extends MattrThreadItem {
+  /** The nearest listed ancestor, so a subagent's own subagents nest under the same row. */
+  readonly ancestorKey: string;
+}
+
+/** Points each child at its nearest listed ancestor, skipping subagents-of-subagents. */
+export function attachListedAncestors(
   children: ReadonlyArray<MattrThreadItem>,
-): ReadonlyMap<string, ReadonlyArray<MattrThreadItem>> {
-  const index = new Map<string, MattrThreadItem[]>();
+  threads: Parameters<typeof resolveListedAncestorThreadRef>[1],
+): ReadonlyArray<MattrChildItem> {
+  return children.map((child) => ({
+    ...child,
+    ancestorKey: scopedThreadKey(resolveListedAncestorThreadRef(child.ref, threads)),
+  }));
+}
+
+/** Each row's subagents and delegated tasks: blocked and running first, then newest. */
+export function indexChildrenByParent(
+  children: ReadonlyArray<MattrChildItem>,
+): ReadonlyMap<string, ReadonlyArray<MattrChildItem>> {
+  const index = new Map<string, MattrChildItem[]>();
   for (const child of children) {
-    if (child.parentKey === null) continue;
-    const bucket = index.get(child.parentKey) ?? [];
+    if (child.ancestorKey === child.key) continue;
+    const bucket = index.get(child.ancestorKey) ?? [];
     bucket.push(child);
-    index.set(child.parentKey, bucket);
+    index.set(child.ancestorKey, bucket);
   }
   for (const [key, bucket] of index) {
     index.set(
@@ -122,6 +150,29 @@ export function indexChildrenByParent(
     );
   }
   return index;
+}
+
+/** Rows with at least one child that needs you. */
+export function parentsWithNeedsChild(
+  childrenByParent: ReadonlyMap<string, ReadonlyArray<MattrThreadItem>>,
+): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const [key, bucket] of childrenByParent) {
+    if (bucket.some((child) => child.attention === "needs")) keys.add(key);
+  }
+  return keys;
+}
+
+/** The Needs you badge: threads and the subagents of listed threads that are waiting on you. */
+export function countNeedsYou(
+  items: ReadonlyArray<MattrThreadItem>,
+  children: ReadonlyArray<MattrChildItem>,
+): number {
+  const rowKeys = new Set(items.map((item) => item.key));
+  return (
+    items.filter((item) => item.attention === "needs").length +
+    children.filter((child) => child.attention === "needs" && rowKeys.has(child.ancestorKey)).length
+  );
 }
 
 /** A tree opens by itself while it is on screen or still has live children. */
@@ -275,7 +326,8 @@ export function formatResetLabel(resetsAt: string | null, nowMs: number): string
   if (resetsAt === null) return null;
   const at = Date.parse(resetsAt);
   if (!Number.isFinite(at)) return null;
-  const minutes = Math.max(0, Math.round((at - nowMs) / 60_000));
+  const minutes = Math.round((at - nowMs) / 60_000);
+  if (minutes <= 0) return null;
   if (minutes < 60) return `${minutes}m`;
   if (minutes < 24 * 60) {
     const rest = minutes % 60;

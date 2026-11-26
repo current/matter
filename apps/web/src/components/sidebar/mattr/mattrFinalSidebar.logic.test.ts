@@ -11,11 +11,14 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fixtures";
 import {
+  attachListedAncestors,
   buildThreadGroups,
   compactAge,
+  countNeedsYou,
   countOpenPullRequests,
   formatResetLabel,
   indexChildrenByParent,
+  parentsWithNeedsChild,
   pickUsageMeters,
   shortWindowLabel,
   shouldAutoExpand,
@@ -200,17 +203,98 @@ describe("buildThreadGroups", () => {
 
 describe("subagent trees", () => {
   const parent = item("parent");
-  const done = item("done", {
-    ...subagentOf("parent"),
-    latestUserMessageAt: "2026-03-10T14:50:00.000Z",
+  const under = (child: ReturnType<typeof item>, ancestor = parent.key) => ({
+    ...child,
+    ancestorKey: ancestor,
   });
-  const live = item("live", { ...subagentOf("parent"), ...running });
-  const blocked = item("blocked", { ...subagentOf("parent"), hasPendingUserInput: true });
+  const done = under(
+    item("done", { ...subagentOf("parent"), latestUserMessageAt: "2026-03-10T14:50:00.000Z" }),
+  );
+  const live = under(item("live", { ...subagentOf("parent"), ...running }));
+  const blocked = under(item("blocked", { ...subagentOf("parent"), hasPendingUserInput: true }));
 
   it("orders blocked, then running, then done children under their parent", () => {
-    const index = indexChildrenByParent([done, live, blocked, item("unrelated")]);
+    const unrelated = item("unrelated");
+    const index = indexChildrenByParent([done, live, blocked, under(unrelated, unrelated.key)]);
     expect(index.get(parent.key)!.map((child) => child.title)).toEqual(["blocked", "live", "done"]);
     expect(index.size).toBe(1);
+  });
+
+  it("nests a subagent's own subagents under the nearest listed ancestor", () => {
+    const shell = (id: string, parentId: string | null) => ({
+      id: ThreadId.make(id),
+      environmentId: env,
+      archivedAt: null,
+      delegatedFrom: null,
+      lineage:
+        parentId === null
+          ? { rootThreadId: ThreadId.make(id), parentThreadId: null, relationshipToParent: null }
+          : {
+              rootThreadId: ThreadId.make("parent"),
+              parentThreadId: ThreadId.make(parentId),
+              relationshipToParent: "subagent" as const,
+            },
+    });
+    const threads = [
+      shell("parent", null),
+      shell("child", "parent"),
+      { ...shell("archived-child", "parent"), archivedAt: "2026-03-10T14:00:00.000Z" },
+      shell("grandchild", "child"),
+      shell("great-grandchild", "archived-child"),
+      shell("orphan", "missing"),
+    ];
+    const children = attachListedAncestors(
+      [
+        item("child", subagentOf("parent")),
+        item("grandchild", subagentOf("child")),
+        item("great-grandchild", subagentOf("archived-child")),
+        item("orphan", subagentOf("missing")),
+      ],
+      threads,
+    );
+    expect(children.map((child) => child.ancestorKey)).toEqual([
+      parent.key,
+      parent.key,
+      parent.key,
+      "local:orphan",
+    ]);
+    const index = indexChildrenByParent(children);
+    expect(
+      index
+        .get(parent.key)!
+        .map((child) => child.title)
+        .toSorted(),
+    ).toEqual(["child", "grandchild", "great-grandchild"]);
+    expect(index.size).toBe(1);
+  });
+
+  it("counts and keeps parents whose subagents need you", () => {
+    const settled = item("settled", { settledOverride: "settled" });
+    const ask = under(
+      item("ask", { ...subagentOf("settled"), hasPendingUserInput: true }),
+      settled.key,
+    );
+    const lost = under(item("lost", { hasPendingUserInput: true }), "local:archived");
+    const children = [done, live, blocked, ask, lost];
+    const index = indexChildrenByParent(children);
+    const needsChildParents = parentsWithNeedsChild(index);
+    expect([...needsChildParents].toSorted()).toEqual(["local:archived", parent.key, settled.key]);
+    expect(countNeedsYou([parent, settled], children)).toBe(2);
+
+    const needs = buildThreadGroups([parent, settled, item("quiet")], [MATTR], {
+      sort: "recent",
+      projectFilter: null,
+      filter: "needs",
+      needsChildParents,
+    });
+    expect(needs[0]!.items.map((entry) => entry.title).toSorted()).toEqual(["parent", "settled"]);
+    const all = buildThreadGroups([parent, settled], [MATTR], {
+      sort: "recent",
+      projectFilter: null,
+      filter: "all",
+      needsChildParents: new Set(),
+    });
+    expect(all[0]!.items.map((entry) => entry.title)).toEqual(["parent"]);
   });
 
   it("opens a tree for the active thread or live children only", () => {
@@ -279,5 +363,7 @@ describe("usage meters", () => {
     expect(formatResetLabel("2026-03-10T17:14:00.000Z", NOW_MS)).toBe("2h 14m");
     expect(formatResetLabel("2026-03-10T15:20:00.000Z", NOW_MS)).toBe("20m");
     expect(formatResetLabel("2026-03-12T15:00:00.000Z", NOW_MS)).toBeNull();
+    expect(formatResetLabel("2026-03-10T14:59:00.000Z", NOW_MS)).toBeNull();
+    expect(formatResetLabel(NOW_ISO, NOW_MS)).toBeNull();
   });
 });
