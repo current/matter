@@ -2,6 +2,7 @@
 import { use, useEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 import { useGT, useMessages } from "gt-react";
 
+import { MATTER_AI_STATUS_PHASE_HOLD_MS } from "@t3tools/client-runtime/matter/ai-status";
 import { observeResize } from "~/lib/observeResize";
 import { tickTextContent } from "~/lib/tickTextContent";
 import { cn } from "~/lib/utils";
@@ -152,7 +153,7 @@ export function MatterThinkingTimelineRow({
 
 function RareUiWorkingRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
   const m = useMessages();
-  const phase = useHeldValue(use(MatterAiStatusPhaseCtx), PHASE_HOLD_MS);
+  const phase = useHeldValue(use(MatterAiStatusPhaseCtx), MATTER_AI_STATUS_PHASE_HOLD_MS);
   const { activeThreadEnvironmentId } = use(TimelineRowCtx);
   const config = MATTER_AI_STATUS_PHASES[row.compacting ? "compacting" : phase];
   const { createdAt } = row;
@@ -176,9 +177,6 @@ function RareUiWorkingRow({ row }: { row: Extract<TimelineRow, { kind: "working"
     </div>
   );
 }
-
-// Agents think for a beat between tool calls; holding each phase keeps the label from flickering.
-const PHASE_HOLD_MS = 700;
 
 /** `value`, changing at most once per `holdMs`; a value that reverts within the hold never shows. */
 function useHeldValue<T>(value: T, holdMs: number): T {

@@ -5758,5 +5758,18 @@
   "ad208e3e32c85029": "모두 숨기기",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "채팅의 도구 호출",
-  "8d545d54c0a9e950": "에이전트가 실행하는 명령, 편집, 검색을 숨깁니다. 성공한 항목 숨기기는 실패를 남겨 둡니다. Zen은 최종 답변만 표시합니다. 승인, 질문, 오류는 항상 표시됩니다."
+  "8d545d54c0a9e950": "에이전트가 실행하는 명령, 편집, 검색을 숨깁니다. 성공한 항목 숨기기는 실패를 남겨 둡니다. Zen은 최종 답변만 표시합니다. 승인, 질문, 오류는 항상 표시됩니다.",
+  "2dd272baf675e105": "{status}, {elapsed}",
+  "78f361d4aed207ef": "Thinking",
+  "bbcdc6642adf07cc": "Searching",
+  "d018252cc4697063": "Reading",
+  "4231b1f56e08c87e": "Browsing",
+  "68f1e51d0b56725e": "Editing",
+  "dc3d706198e8772a": "Running command",
+  "e75075dabcf1efc3": "Delegating",
+  "3a708664bf1602aa": "Working",
+  "3d3c2c16506e66bf": "Writing",
+  "f1a84f6361ceb78e": "Needs your input",
+  "eebeab436756c4a4": "Compacting",
+  "d4d6459ff291c0be": "Setting up worktree"
 }

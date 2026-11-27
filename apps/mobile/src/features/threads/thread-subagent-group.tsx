@@ -43,7 +43,9 @@ function SubagentElapsed({ agents }: { readonly agents: ReadonlyArray<AgentTimin
   const messages = useMessages();
   const elapsed = subagentCardElapsed(agents, nowMs, messages);
   return elapsed ? (
-    <Text className="shrink-0 text-xs tabular-nums text-foreground-muted">{elapsed}</Text>
+    <Text className="shrink-0 text-3xs tabular-nums text-foreground-muted opacity-70">
+      {elapsed}
+    </Text>
   ) : null;
 }
 
@@ -198,7 +200,7 @@ export function ThreadSubagentGroup(props: {
         </Pressable>
       ) : null}
       {!grouped || expanded ? (
-        <View className="mb-1 gap-px rounded-xl border border-border bg-card/30 p-1">
+        <View className="mb-1 gap-px rounded-lg border border-border bg-card/30 p-1">
           {agents.map((agent) => {
             // A task in a linked environment opens there, if this app is connected to it.
             const target = subagentThreadTarget(

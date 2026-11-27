@@ -5782,5 +5782,18 @@
   "ad208e3e32c85029": "Hide all",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Tool calls in chat",
-  "8d545d54c0a9e950": "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show."
+  "8d545d54c0a9e950": "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show.",
+  "2dd272baf675e105": "{status}, {elapsed}",
+  "78f361d4aed207ef": "Thinking",
+  "bbcdc6642adf07cc": "Searching",
+  "d018252cc4697063": "Reading",
+  "4231b1f56e08c87e": "Browsing",
+  "68f1e51d0b56725e": "Editing",
+  "dc3d706198e8772a": "Running command",
+  "e75075dabcf1efc3": "Delegating",
+  "3a708664bf1602aa": "Working",
+  "3d3c2c16506e66bf": "Writing",
+  "f1a84f6361ceb78e": "Needs your input",
+  "eebeab436756c4a4": "Compacting",
+  "d4d6459ff291c0be": "Setting up worktree"
 }
