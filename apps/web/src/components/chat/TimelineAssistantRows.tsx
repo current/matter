@@ -221,6 +221,7 @@ function AssistantMessageMeta({
           : "opacity-0 pointer-coarse:opacity-100 focus-within:opacity-100 group-hover/assistant:opacity-100",
         className,
       )}
+      data-matter-assistant-meta=""
     >
       {projectedItem && projectedItem.item.status !== "completed" ? (
         <AssistantStatusBadge status={projectedItem.item.status} />
@@ -241,7 +242,9 @@ function AssistantMessageMeta({
       ) : null}
       {!message.streaming && (
         <SharedTooltipTrigger
-          render={<p className="text-muted-foreground text-xs tabular-nums" />}
+          render={
+            <p className="text-muted-foreground text-xs tabular-nums" data-matter-message-time="" />
+          }
           label={formatChatTimestampTooltip(message.updatedAt, ctx.timestampFormat, m)}
         >
           {formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat, undefined, undefined, m)}

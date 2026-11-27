@@ -39,6 +39,37 @@
     matter-stream-fade 520ms cubic-bezier(0.25, 0.6, 0.35, 1) backwards;
 }
 
+/* Ink: each word develops from a 2px blur, quicker and finer than Blur Reveal. */
+[data-matter-stream="ink"] .matter-sw {
+  animation: matter-stream-ink 180ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+
+/* Line settle: the live line sits 1.5px low and a little light; once a later word wraps below
+   it, useMatterLineSettle marks its words settled. Inline-block for the transform, as in Rise. */
+[data-matter-stream="line"] span.matter-sw {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  opacity: 0.72;
+  transform: translateY(1.5px);
+  transition:
+    opacity 220ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: matter-stream-fade 120ms linear backwards;
+}
+[data-matter-stream="line"] :is(del, s, u, ins) span.matter-sw {
+  display: inline;
+}
+[data-matter-stream="line"] span.matter-sw.matter-sw-settled {
+  opacity: 1;
+  transform: none;
+}
+
+/* Phrase: a clause mounts in one render (usePhrasePacedText), so its words land together. */
+[data-matter-stream="phrase"] .matter-sw {
+  animation: matter-stream-phrase 200ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+
 /* Rides the end of the live text, only while it streams: it leaves with the stream. It remounts
    as words arrive, so it holds steady while text flows and breathes a few times in a pause,
    then rests (an even count ends where it began), so a long tool call runs no animation. */
@@ -62,6 +93,20 @@
   to {
     opacity: 1;
     filter: blur(0);
+  }
+}
+
+@keyframes matter-stream-ink {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+@keyframes matter-stream-phrase {
+  from {
+    opacity: 0;
+    filter: blur(1px);
   }
 }
 
@@ -93,6 +138,9 @@
 @media (prefers-reduced-motion: reduce) {
   .matter-sw {
     animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
   .matter-stream-caret {
     display: none;

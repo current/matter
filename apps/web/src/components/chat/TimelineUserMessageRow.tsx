@@ -763,6 +763,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         {regularImages.map((image, index) => (
           <div
             key={image.id}
+            data-matter-user-media=""
             className={cn(
               "bg-background/70",
               image.source?.kind === "snap-shot" && image.previewUrl
@@ -862,6 +863,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         "flex items-center justify-end gap-x-2 gap-y-0.5",
         floatActions ? "flex-wrap" : "shrink-0",
       )}
+      data-matter-message-actions=""
     >
       {folded && senderRef && canOpenSender ? (
         <InlineButton
@@ -872,7 +874,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         </InlineButton>
       ) : null}
       <SharedTooltipTrigger
-        render={<p className="text-muted-foreground text-xs tabular-nums" />}
+        render={
+          <p className="text-muted-foreground text-xs tabular-nums" data-matter-message-time="" />
+        }
         label={formatChatTimestampTooltip(row.message.createdAt, ctx.timestampFormat, m)}
       >
         {formatDayAwareTimestamp(
@@ -883,7 +887,10 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           m,
         )}
       </SharedTooltipTrigger>
-      <div className={cn("flex items-center gap-0.5", floatActions && "flex-wrap justify-end")}>
+      <div
+        className={cn("flex items-center gap-0.5", floatActions && "flex-wrap justify-end")}
+        data-matter-message-buttons=""
+      >
         {typeof revertTurnCount === "number" && (
           <RevertUserMessageButton turnCount={revertTurnCount} messageId={row.message.id} />
         )}
@@ -921,6 +928,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   return (
     <div
       className="group @container flex flex-col items-end gap-1"
+      data-matter-user-row=""
       data-user-message-attribution={folded ? "agent" : undefined}
     >
       {userMessage.attribution === "t3code" ? (
@@ -1148,6 +1156,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             floatActions && "@min-[37rem]:hidden",
             ACTIONS_REVEAL_CLASS_NAME,
           )}
+          data-matter-actions-below=""
         >
           {messageActions}
         </div>

@@ -15,7 +15,9 @@ import {
   MatterStreamAnimation,
   advanceBurstPacer,
   advancePacedCursor,
+  advancePhrasePacer,
   pacedVisibleLength,
+  phraseBreaks,
   wholeWordEnds,
 } from "./matterStreamAnimation";
 
@@ -218,6 +220,7 @@ describe("matterStreamHast", () => {
       "world",
       " ",
     ]);
+    expect(splitStreamWords("mid-turn reconnect(),")).toEqual(["mid-turn", " ", "reconnect(),"]);
     const tree = root(element("p", [text("Hello "), element("strong", [text("bold move")])]));
     const [rendered, options] = matterStreamHast(tree, baseOptions, "fade", false);
     expect(words(rendered)).toEqual(["Hello", "bold", "move"]);
@@ -302,5 +305,49 @@ describe("matterStreamHast", () => {
     expect(options.components).toBe(baseOptions.components);
     // Same options object per base, so rendered blocks stay cached.
     expect(matterStreamHast(tree, baseOptions, "rareui", true)[1]).toBe(options);
+  });
+});
+
+describe("Phrase pacer", () => {
+  it("saves Ink, Line settle and Phrase as streaming text modes", () => {
+    expect(isStreamAnimation("ink")).toBe(true);
+    expect(isStreamAnimation("line")).toBe(true);
+    expect(isStreamAnimation("phrase")).toBe(true);
+  });
+
+  it("ends a phrase at clause punctuation, a line break or the sixth word", () => {
+    const sample = "First, the store moved.\nThen one two three four five six seven eig";
+    const ends = phraseBreaks(sample).map((phrase) => sample.slice(0, phrase.end));
+    expect(ends).toEqual([
+      "First,",
+      "First, the store moved.",
+      "First, the store moved.\nThen one two three four five",
+    ]);
+    // "six seven" waits for its clause; the arriving "eig" is not a word yet.
+    expect(phraseBreaks(sample).at(-1)?.words).toBe(6);
+  });
+
+  it("releases one phrase at a time at its natural pace", () => {
+    const breaks = phraseBreaks("One two, three four, five six, ");
+    let pace = advancePhrasePacer({ phrases: 0, wait: 0 }, breaks, 0);
+    expect(pace.phrases).toBe(1);
+    pace = advancePhrasePacer(pace, breaks, 10);
+    expect(pace.phrases).toBe(1);
+    pace = advancePhrasePacer(pace, breaks, 90);
+    expect(pace.phrases).toBe(2);
+  });
+
+  it("drains a deep backlog within about half a second", () => {
+    const breaks = phraseBreaks(
+      `${Array.from({ length: 300 }, (_, index) => `w${index},`).join(" ")} `,
+    );
+    let pace = { phrases: 0, wait: 0 };
+    let elapsed = 0;
+    while (pace.phrases < breaks.length && elapsed < 2000) {
+      pace = advancePhrasePacer(pace, breaks, 16);
+      elapsed += 16;
+    }
+    expect(pace.phrases).toBe(breaks.length);
+    expect(elapsed).toBeLessThanOrEqual(700);
   });
 });
