@@ -1,9 +1,11 @@
+import { CLAUDE_CLOUD_ADDON_ID } from "@t3tools/contracts";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import { T, useGT, Var } from "gt-react";
 import {
   BotIcon,
   CircleDotIcon,
+  CloudUploadIcon,
   EllipsisIcon,
   FileDiffIcon,
   HistoryIcon,
@@ -12,11 +14,14 @@ import {
 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
+import { openClaudeCloudDialog } from "../../addons/claudeCloudApi";
+import { useIsAddonEnabled } from "../../addons/useAddonRegistry";
 import { useT3ProjectFileState } from "../../hooks/useT3ProjectFileScripts";
 import { useClientSettings } from "../../hooks/useSettings";
 import { observeResize } from "../../lib/observeResize";
 import { useRightPanelStore } from "../../rightPanelStore";
 import { useProject, useQuietThreadShell, useServerConfigs } from "../../state/entities";
+import { usePrimaryEnvironmentId } from "../../state/environments";
 import { filesystemEnvironment } from "../../state/filesystem";
 import { useEnvironmentQuery } from "../../state/query";
 import GitActionsControl from "../GitActionsControl";
@@ -223,13 +228,24 @@ export function MatterThreadRibbon(props: MatterThreadRibbonProps) {
       closeMatterLineagePopover();
     }
   }, [showAgents, lineagePopover.threadKey, lineagePopover.anchor, lineage.threadKey]);
+  const claudeCloudEnabled = useIsAddonEnabled(CLAUDE_CLOUD_ADDON_ID);
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const showSendToCloud =
+    claudeCloudEnabled &&
+    props.isServerThread &&
+    !props.draftId &&
+    project !== null &&
+    project.isScratch !== true &&
+    (serverConfig === undefined || !isScratchProject(project, serverConfig.scratchWorkspaceRoot)) &&
+    (primaryEnvironmentId === null || props.environmentId === primaryEnvironmentId);
   const overflowPr = showPr && matterRibbonOverflows(density, "pr");
   const overflowDiff = showDiff && matterRibbonOverflows(density, "diff");
   const hasMoreTopSection =
     (overflowDiff && props.onToggleChanges !== undefined) ||
     overflowPr ||
     showOpenIn ||
-    (showScripts && props.activeProjectScripts !== undefined);
+    (showScripts && props.activeProjectScripts !== undefined) ||
+    showSendToCloud;
   const activeThreadRef = threadRef;
   const openAllDetails = () =>
     useRightPanelStore.getState().setThreadPanelOpen(threadRef, "popover", true);
@@ -419,6 +435,22 @@ export function MatterThreadRibbon(props: MatterThreadRibbonProps) {
                 onUpdateScript={props.onUpdateProjectScript}
                 onDeleteScript={props.onDeleteProjectScript}
               />
+            ) : null}
+            {showSendToCloud ? (
+              <MenuItem
+                onClick={() =>
+                  openClaudeCloudDialog({
+                    mode: "launch",
+                    projectId: props.projectId,
+                    threadId: props.threadId,
+                  })
+                }
+              >
+                <CloudUploadIcon aria-hidden />
+                <MenuItemLabel>
+                  <T>Send to Claude Cloud…</T>
+                </MenuItemLabel>
+              </MenuItem>
             ) : null}
             {hasMoreTopSection ? <MenuSeparator /> : null}
             {showAgents ? (

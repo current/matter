@@ -2,6 +2,7 @@ import {
   CLAUDE_CLOUD_THREAD_ID_PREFIX,
   ClaudeCloudTranscriptResponse,
   MessageId,
+  ProjectId,
   ProviderInstanceId,
   ThreadId,
   TurnItemId,
@@ -16,6 +17,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import "../../index.css";
 import { render } from "../../../test/render";
+import { closeClaudeCloudDialog, useClaudeCloudDialog } from "../../addons/claudeCloudApi";
 import { SidebarProvider } from "../ui/sidebar";
 import { resetClaudeCloudStoreForTests } from "./claudeCloudStore";
 
@@ -279,5 +281,61 @@ describe("ClaudeCloudSessionView", () => {
     await expect
       .element(page.getByRole("textbox", { name: "Reply to Claude Cloud" }))
       .toBeDisabled();
+  });
+
+  it("opens the teleport dialog prefilled from the Bring it back header button", async () => {
+    const projectId = ProjectId.make("project-1");
+    function DialogObserver() {
+      return (
+        <output data-testid="dialog-observer">{JSON.stringify(useClaudeCloudDialog())}</output>
+      );
+    }
+    using _server = useCloudServer({
+      session: session({
+        tracked: {
+          id: SESSION_ID,
+          url: `https://claude.ai/code/${SESSION_ID}`,
+          title: "Fix flaky tests",
+          promptPreview: "Run tests",
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          projectId,
+          cwd: "/repo",
+          branch: "fix/flaky",
+          createdBy: "user",
+          sourceThreadId: null,
+          reason: null,
+          createdAt: "2026-11-27T09:00:00.000Z",
+          lastMessageAt: null,
+          lastReplyPreview: null,
+          teleportedThreadId: null,
+          teleportedWorktreePath: null,
+        },
+      }),
+    });
+    const container = document.createElement("div");
+    container.style.cssText =
+      "height: 900px; width: 1000px; display: flex; flex-direction: column;";
+    await using _screen = await render(
+      <SidebarProvider>
+        <DialogObserver />
+        <ClaudeCloudSessionView sessionId={SESSION_ID} instanceId={null} />
+      </SidebarProvider>,
+      { container },
+    );
+
+    const button = page.getByRole("button", { name: "Bring it back" });
+    await expect.element(button).toBeVisible();
+    await userEvent.click(button);
+
+    expect(JSON.parse(page.getByTestId("dialog-observer").element().textContent ?? "null")).toEqual(
+      {
+        mode: "teleport",
+        sessionId: SESSION_ID,
+        projectId,
+        threadId: null,
+        instanceId: ProviderInstanceId.make("claudeAgent"),
+      },
+    );
+    closeClaudeCloudDialog();
   });
 });

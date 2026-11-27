@@ -13,6 +13,8 @@ import type {
   ClaudeCloudTeleportRequest,
   ClaudeCloudTeleportResult,
   ProjectId,
+  ProviderInstanceId,
+  ThreadId,
 } from "@t3tools/contracts";
 import { ClaudeCloudTranscriptResponse } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -147,6 +149,8 @@ export interface ClaudeCloudDialogState {
   readonly mode: ClaudeCloudDialogMode;
   readonly projectId: ProjectId | null;
   readonly sessionId: string;
+  readonly threadId: ThreadId | null;
+  readonly instanceId: ProviderInstanceId | null;
 }
 
 let dialog: ClaudeCloudDialogState | null = null;
@@ -160,11 +164,15 @@ export function openClaudeCloudDialog(input: {
   readonly mode: ClaudeCloudDialogMode;
   readonly projectId?: ProjectId | null;
   readonly sessionId?: string;
+  readonly threadId?: ThreadId | null;
+  readonly instanceId?: ProviderInstanceId | null;
 }): void {
   dialog = {
     mode: input.mode,
     projectId: input.projectId ?? null,
     sessionId: input.sessionId ?? "",
+    threadId: input.threadId ?? null,
+    instanceId: input.instanceId ?? null,
   };
   emit();
 }

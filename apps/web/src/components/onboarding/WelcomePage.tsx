@@ -104,6 +104,7 @@ import { CodexSetupSection } from "../settings/CodexSetupSection";
 import { readCodexSetupMode } from "../settings/CodexSetupSection.logic";
 import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
+import { MatterClaudeCloudWelcome } from "./MatterClaudeCloudWelcome";
 import { MatterDelegationWelcome } from "./MatterDelegationWelcome";
 import { ACPRegistryIcon } from "../Icons";
 import { Button } from "../ui/button";
@@ -300,6 +301,7 @@ export function WelcomePage({
                 onImportSourceEnabled={() => scans[0]?.refresh()}
               />
               <MatterDelegationWelcome environmentId={environmentId} />
+              <MatterClaudeCloudWelcome environmentId={environmentId} />
               <ProjectsSection
                 scan={scans[0]}
                 projectImport={projectImport}

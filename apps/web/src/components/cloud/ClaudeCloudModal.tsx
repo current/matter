@@ -51,7 +51,12 @@ export function ClaudeCloudModalHost() {
   const dialog = useClaudeCloudDialog();
   if (!enabled || dialog === null) return null;
   // A new key per opening resets the form.
-  return <ClaudeCloudModal key={`${dialog.mode}:${dialog.sessionId}`} dialog={dialog} />;
+  return (
+    <ClaudeCloudModal
+      key={`${dialog.mode}:${dialog.sessionId}:${dialog.threadId ?? ""}`}
+      dialog={dialog}
+    />
+  );
 }
 
 type Outcome =
@@ -129,6 +134,7 @@ function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
         projectId,
         ...(title.trim() === "" ? {} : { title: title.trim() }),
         ...(pushFirst ? { pushFirst } : {}),
+        ...(dialog.threadId !== null ? { threadId: dialog.threadId } : {}),
       });
       closeClaudeCloudDialog();
       refreshClaudeCloudSessions();
@@ -147,10 +153,12 @@ function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
       const result = await teleportClaudeCloudSession(config, {
         sessionId,
         projectId,
+        ...(dialog.instanceId !== null ? { instanceId: dialog.instanceId } : {}),
         ...(prompt.trim() === "" ? {} : { prompt: prompt.trim() }),
       });
       if (result.threadId !== null && primaryEnvironmentId !== null) {
         closeClaudeCloudDialog();
+        refreshClaudeCloudSessions();
         await navigate({
           to: "/$environmentId/$threadId",
           params: buildThreadRouteParams(scopeThreadRef(primaryEnvironmentId, result.threadId)),
@@ -265,6 +273,12 @@ function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
                 onChange={(event) => setPrompt(event.target.value)}
               />
             </label>
+
+            {mode === "launch" && dialog.threadId !== null ? (
+              <p className="text-xs text-muted-foreground" data-claude-cloud-thread-note="">
+                <T>Matter will report back to this chat when the run ends.</T>
+              </p>
+            ) : null}
 
             {mode === "launch" && eligibility !== null ? (
               <EligibilityNotes
