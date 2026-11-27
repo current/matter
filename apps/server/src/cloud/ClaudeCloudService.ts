@@ -52,6 +52,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import {
   makeClaudeEnvironment,
   mergeClaudeProcessEnvironment,
+  resolveClaudeHomePath,
 } from "../provider/Drivers/ClaudeHome.ts";
 import { deriveProviderInstanceConfigMap } from "../provider/ProviderInstanceRegistryHydration.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -80,6 +81,14 @@ const SESSION_ID_IN_OUTPUT = /\b((?:cse|session)_[A-Za-z0-9]{8,200})\b/;
 // on redraw, so the keys are chosen from where the cursor starts.
 const TRUST_PROMPT_ON_NO = /❯\s*(?:\d\.\s*)?No,\s*exit\s*(?:\d\.\s*)?Yes\b/i;
 const TRUST_PROMPT_ON_YES = /❯\s*(?:\d\.\s*)?Yes,\s*(?:I\s+trust|proceed)/i;
+
+const CLAUDE_CLOUD_TRUST_ANSWERS: ReadonlyArray<{
+  readonly when: RegExp;
+  readonly send: string;
+}> = [
+  { when: TRUST_PROMPT_ON_NO, send: "\u001b[B\r" },
+  { when: TRUST_PROMPT_ON_YES, send: "\r" },
+];
 
 export class ClaudeCloudError extends Schema.TaggedError<ClaudeCloudError>()("ClaudeCloudError", {
   code: Schema.String,
@@ -177,6 +186,16 @@ interface ClaudeInstance {
   readonly config: ProviderInstanceConfig;
 }
 
+export interface ClaudeCloudAccountLaunch {
+  readonly instanceId: ProviderInstanceId;
+  readonly displayName: string;
+  readonly account: ClaudeCloudAccountStatus;
+  readonly command: string;
+  readonly env: NodeJS.ProcessEnv;
+  readonly configDir: string | undefined;
+  readonly resolvedHomePath: string;
+}
+
 export class ClaudeCloudService extends Context.Service<
   ClaudeCloudService,
   {
@@ -213,6 +232,9 @@ export class ClaudeCloudService extends Context.Service<
       projectId?: ProjectId,
     ) => Effect.Effect<ReadonlyArray<TrackedClaudeCloudSession>, ClaudeCloudError>;
     readonly forgetSession: (sessionId: string) => Effect.Effect<boolean, ClaudeCloudError>;
+    readonly listClaudeAccounts: (options?: {
+      readonly refresh?: boolean;
+    }) => Effect.Effect<ReadonlyArray<ClaudeCloudAccountLaunch>, ClaudeCloudError>;
   }
 >()("t3/cloud/ClaudeCloudService") {}
 
@@ -378,7 +400,18 @@ export const make = Effect.gen(function* () {
     const env: NodeJS.ProcessEnv = { ...(yield* makeClaudeEnvironment(claudeConfig, processEnv)) };
     for (const key of STRIPPED_ENV_KEYS) delete env[key];
     const binary = claudeConfig.binaryPath.trim();
-    return { command: binary.length > 0 ? binary : "claude", env };
+    const explicitConfigDir = env.CLAUDE_CONFIG_DIR?.trim();
+    const configDir =
+      explicitConfigDir !== undefined && explicitConfigDir.length > 0
+        ? path.resolve(explicitConfigDir)
+        : undefined;
+    const resolvedHomePath = yield* resolveClaudeHomePath(claudeConfig, env);
+    return {
+      command: binary.length > 0 ? binary : "claude",
+      env,
+      configDir,
+      resolvedHomePath,
+    };
   }, Effect.provide(services));
 
   const probeAccount = Effect.fn("ClaudeCloudService.probeAccount")(function* (
@@ -722,10 +755,7 @@ export const make = Effect.gen(function* () {
         timeoutMs: LAUNCH_TIMEOUT_MS,
         match: findLaunchedSessionId,
         // Matter already runs Claude in this project; the folder-trust prompt defaults to yes.
-        answers: [
-          { when: TRUST_PROMPT_ON_NO, send: "\u001b[B\r" },
-          { when: TRUST_PROMPT_ON_YES, send: "\r" },
-        ],
+        answers: CLAUDE_CLOUD_TRUST_ANSWERS,
       })
       .pipe(
         Effect.mapError(
@@ -944,6 +974,33 @@ export const make = Effect.gen(function* () {
     return true;
   });
 
+  const listClaudeAccounts = Effect.fn("ClaudeCloudService.listClaudeAccounts")(
+    function* (options?: { readonly refresh?: boolean }) {
+      yield* requireEnabled;
+      const instances = yield* claudeInstances;
+      return yield* Effect.forEach(
+        instances,
+        (instance) =>
+          Effect.gen(function* () {
+            const [account, launch] = yield* Effect.all(
+              [accountStatus(instance, options?.refresh === true), instanceLaunch(instance)],
+              { concurrency: "unbounded" },
+            );
+            return {
+              instanceId: instance.instanceId,
+              displayName: instance.displayName,
+              account,
+              command: launch.command,
+              env: launch.env,
+              configDir: launch.configDir,
+              resolvedHomePath: launch.resolvedHomePath,
+            } satisfies ClaudeCloudAccountLaunch;
+          }),
+        { concurrency: "unbounded" },
+      );
+    },
+  );
+
   const agentToolsListed = Effect.gen(function* () {
     if (!(yield* addons.isEnabled(CLAUDE_CLOUD_ADDON_ID))) return false;
     return (yield* readSettings).agentDelegationMode !== "off";
@@ -978,6 +1035,7 @@ export const make = Effect.gen(function* () {
     teleportToWorktree,
     listSessions,
     forgetSession,
+    listClaudeAccounts,
   });
 });
 
