@@ -1,0 +1,303 @@
+/* Variant 1 · Tighter overrides for cards, approvals, system dividers, banners and composer chrome.
+   Motion animates only transform, opacity and small blur; nothing loops while idle. */
+
+:root {
+  --matter-cards-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --matter-cards-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --matter-cards-spring: linear(
+    0,
+    0.2 5%,
+    0.53 12%,
+    0.78 20%,
+    0.92 29%,
+    0.985 40%,
+    1.006 52%,
+    1.004 66%,
+    1
+  );
+}
+
+/* ── Approvals (timeline & child thread) ─────────────────────────────────────────────────── */
+
+[data-v2-item-type="approval_request"][role="group"] > div:last-child {
+  margin-top: 4px;
+  gap: 4px;
+}
+
+[data-v2-item-type="approval_request"][role="group"] [data-approval-detail] {
+  padding: 2px 0;
+}
+
+[data-matter-child-approval] {
+  border-radius: 10px;
+}
+
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action] {
+  height: 24px;
+  border-radius: 6px;
+  transition:
+    background-color 120ms var(--matter-cards-ease),
+    border-color 120ms var(--matter-cards-ease),
+    color 120ms var(--matter-cards-ease),
+    opacity 120ms var(--matter-cards-ease),
+    transform 120ms var(--matter-cards-ease);
+}
+
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action][data-slot="button"] {
+  padding-inline: 8px;
+}
+
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action]:active:not(:disabled, [aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+[data-v2-item-type="approval_request"][data-work-entry-id],
+[data-matter-approval-responding="true"],
+[data-matter-child-approval] [role="alert"] {
+  animation: matter-cards-decision-in 160ms var(--matter-cards-ease) backwards;
+}
+
+@keyframes matter-cards-decision-in {
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+    filter: blur(2px);
+  }
+}
+
+/* ── System & context compaction dividers ────────────────────────────────────────────────── */
+
+[data-matter-system-divider],
+[data-matter-compaction-divider] {
+  gap: 8px;
+  padding-block: 4px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+[data-matter-system-divider-pill] {
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  transition:
+    background-color 120ms var(--matter-cards-ease),
+    color 120ms var(--matter-cards-ease);
+}
+
+[data-matter-compaction-text][data-matter-compaction-changed] {
+  animation: matter-cards-text-crossfade 160ms var(--matter-cards-ease) backwards;
+}
+
+@keyframes matter-cards-text-crossfade {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* ── Banners & notices ───────────────────────────────────────────────────────────────────── */
+
+:is([data-matter-error-banner], [data-matter-status-banner]) {
+  transition: opacity 160ms var(--matter-cards-ease);
+}
+
+@starting-style {
+  :is([data-matter-error-banner], [data-matter-status-banner]) {
+    opacity: 0;
+  }
+}
+
+:is(
+  [data-matter-error-banner],
+  [data-matter-status-banner],
+  [data-composer-banner-stack]
+)[data-matter-banner-dismissing="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-composer-banner-stack][data-matter-banner-dismissing="true"] {
+  transition: opacity 160ms var(--matter-cards-ease);
+}
+
+:is([data-matter-error-banner], [data-matter-status-banner]) [data-slot="alert"] {
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+:is([data-matter-error-banner], [data-matter-status-banner]) [data-slot="alert"] > div {
+  gap: 8px;
+}
+
+:is([data-matter-error-banner], [data-matter-status-banner])
+  [data-slot="alert"]
+  [data-slot="button"] {
+  height: 24px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition:
+    background-color 120ms var(--matter-cards-ease),
+    border-color 120ms var(--matter-cards-ease),
+    opacity 120ms var(--matter-cards-ease),
+    transform 120ms var(--matter-cards-ease);
+}
+
+:is([data-matter-error-banner], [data-matter-status-banner])
+  [data-slot="alert"]
+  [data-slot="button"]:not([data-matter-banner-dismiss]) {
+  padding-inline: 8px;
+}
+
+:is([data-matter-error-banner], [data-matter-status-banner])
+  [data-slot="alert"]
+  [data-slot="button"][data-matter-banner-dismiss] {
+  width: 24px;
+  min-width: 24px;
+  padding: 0;
+}
+
+:is([data-matter-error-banner], [data-matter-status-banner])
+  [data-slot="alert"]
+  [data-slot="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+[data-composer-banner-surface="detached"]::before {
+  border-radius: 10px;
+}
+
+/* ── Composer mode menu & mode label motion ──────────────────────────────────────────────── */
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu]) {
+  transform-origin: bottom left;
+  transition:
+    opacity 200ms var(--matter-cards-spring),
+    transform 200ms var(--matter-cards-spring);
+}
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu])[data-side="bottom"] {
+  transform-origin: top left;
+}
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu])[data-starting-style] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+}
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu])[data-side="bottom"][data-starting-style] {
+  transform: translateY(-4px) scale(0.97);
+}
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu])[data-ending-style] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition:
+    opacity 110ms var(--matter-cards-ease-in),
+    transform 110ms var(--matter-cards-ease-in);
+}
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu])[data-side="bottom"][data-ending-style] {
+  transform: translateY(-4px) scale(0.98);
+}
+
+[data-slot="menu-popup"]:has([data-matter-mode-menu]) > div {
+  padding: 4px;
+}
+
+[data-matter-mode-menu] [data-slot="menu-label"] {
+  padding: 4px 8px;
+}
+
+[data-matter-mode-menu] [data-slot="menu-radio-item"] {
+  padding: 5px 8px;
+  border-radius: 6px;
+  animation: matter-mode-option-in 160ms var(--matter-cards-ease) 30ms backwards;
+}
+
+[data-matter-mode-menu] [data-slot="menu-radio-item"]:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+[data-matter-mode-menu] [data-slot="menu-radio-item"]:nth-child(3) {
+  animation-delay: 70ms;
+}
+
+[data-matter-mode-menu-hint] {
+  margin-top: 4px;
+  padding: 6px 8px 4px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+[data-matter-mode-icon][data-matter-mode-changed] {
+  animation: matter-mode-icon-in 180ms var(--matter-cards-spring) backwards;
+}
+
+[data-matter-mode-label][data-matter-mode-changed] {
+  animation: matter-mode-label-in 160ms var(--matter-cards-ease) backwards;
+}
+
+@keyframes matter-mode-option-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@keyframes matter-mode-icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes matter-mode-label-in {
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+    filter: blur(2px);
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-matter-approval-action],
+  [data-matter-system-divider-pill],
+  [data-matter-error-banner],
+  [data-matter-status-banner],
+  [data-composer-banner-stack],
+  :is([data-matter-error-banner], [data-matter-status-banner])
+    [data-slot="alert"]
+    [data-slot="button"],
+  [data-slot="menu-popup"]:has([data-matter-mode-menu]) {
+    transition: none;
+  }
+
+  [data-v2-item-type="approval_request"][data-work-entry-id],
+  [data-matter-approval-responding="true"],
+  [data-matter-child-approval] [role="alert"],
+  [data-matter-compaction-text][data-matter-compaction-changed],
+  [data-matter-mode-menu] [data-slot="menu-radio-item"],
+  [data-matter-mode-icon][data-matter-mode-changed],
+  [data-matter-mode-label][data-matter-mode-changed] {
+    animation: none;
+  }
+
+  [data-slot="menu-popup"]:has([data-matter-mode-menu]):is(
+      [data-starting-style],
+      [data-ending-style]
+    ) {
+    transform: none;
+  }
+
+  :is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+    [data-matter-approval-action]:active,
+  :is([data-matter-error-banner], [data-matter-status-banner])
+    [data-slot="alert"]
+    [data-slot="button"]:active {
+    transform: none;
+  }
+}

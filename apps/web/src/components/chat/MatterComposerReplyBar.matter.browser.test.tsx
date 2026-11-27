@@ -103,7 +103,7 @@ describe("MatterComposerReplyBar component", () => {
     await act(() =>
       bar.querySelector<HTMLButtonElement>("[data-matter-reply-bar-dismiss]")!.click(),
     );
-    expect(onDismiss).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(onDismiss).toHaveBeenCalledTimes(1));
   });
 
   it("renders a compact non-italic sent reply header above a user message", async () => {

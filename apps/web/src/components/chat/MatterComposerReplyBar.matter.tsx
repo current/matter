@@ -8,6 +8,7 @@ import type {
 import { useRouter } from "@tanstack/react-router";
 import { T, useGT } from "gt-react";
 import { ReplyIcon, XIcon } from "lucide-react";
+import { useState } from "react";
 
 import { assistantCitationNavigation } from "~/lib/assistantCitationNavigation";
 import { cn } from "~/lib/utils";
@@ -15,6 +16,7 @@ import { readThreadShell } from "~/state/entities";
 import { textDirection } from "~/textDirection";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { useMatterDismissFade } from "./matterDismissFade.matter";
 import {
   buildUserMessageReplyRecord,
   extractReplyExcerpt,
@@ -94,6 +96,12 @@ export function MatterComposerReplyBar({
       ? gt("Replying to you")
       : gt("Replying to assistant");
   const excerpt = extractReplyExcerpt(replyTo.citation.text) || replyTo.label;
+  const targetKey = `${role}:${replyTo.citation.messageId}:${excerpt}`;
+  const [targetState, setTargetState] = useState({ key: targetKey, switched: false });
+  if (targetState.key !== targetKey) {
+    setTargetState({ key: targetKey, switched: true });
+  }
+  const { dismissing, triggerDismiss } = useMatterDismissFade(onDismiss, 120, targetKey);
   const handleJump = () => {
     if (onJumpToMessage) {
       onJumpToMessage(replyTo);
@@ -107,6 +115,7 @@ export function MatterComposerReplyBar({
       data-matter-reply-bar=""
       data-matter-reply-role={role}
       data-matter-reply-message-id={replyTo.citation.messageId}
+      data-dismissing={dismissing ? "true" : undefined}
     >
       <ReplyIcon aria-hidden="true" data-matter-reply-bar-icon="" />
       <button
@@ -115,13 +124,25 @@ export function MatterComposerReplyBar({
         onClick={handleJump}
         aria-label={gt("Jump to replied message: {excerpt}", { excerpt })}
       >
-        <span data-matter-reply-bar-heading="">{heading}</span>
+        <span
+          key={`heading:${targetState.key}`}
+          data-matter-reply-bar-heading=""
+          data-matter-reply-switch={targetState.switched ? "" : undefined}
+        >
+          {heading}
+        </span>
         {excerpt ? (
           <>
             <span aria-hidden="true" data-matter-reply-bar-sep="">
               ·
             </span>
-            <span data-matter-reply-bar-excerpt="">{excerpt}</span>
+            <span
+              key={`excerpt:${targetState.key}`}
+              data-matter-reply-bar-excerpt=""
+              data-matter-reply-switch={targetState.switched ? "" : undefined}
+            >
+              {excerpt}
+            </span>
           </>
         ) : null}
       </button>
@@ -131,7 +152,7 @@ export function MatterComposerReplyBar({
             <button
               type="button"
               data-matter-reply-bar-dismiss=""
-              onClick={onDismiss}
+              onClick={triggerDismiss}
               aria-label={gt("Cancel reply")}
             />
           }

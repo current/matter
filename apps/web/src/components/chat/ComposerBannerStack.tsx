@@ -5,6 +5,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { ComposerBanner, type ComposerBannerVariant } from "./ComposerBanner";
+import { useMatterDismissFade } from "./matterDismissFade.matter";
 import { observeResize } from "~/lib/observeResize";
 
 /**
@@ -47,17 +48,40 @@ export function ComposerBannerStack({
     items.filter((item) => (item.group ?? "attention") === group),
   );
   if (detached) {
-    return ordered.map((item) => (
-      <div key={item.id} data-composer-banner-stack="true" className={FADE_IN}>
-        <NoticeCard item={item} detached />
-      </div>
-    ));
+    return ordered.map((item) => <NoticeItem key={item.id} item={item} detached />);
   }
-  return ordered.map((item) => (
-    <ComposerBanner.Attachment key={item.id} data-composer-banner-stack="true" className={FADE_IN}>
-      <NoticeCard item={item} />
+  return ordered.map((item) => <NoticeItem key={item.id} item={item} />);
+}
+
+function NoticeItem({
+  item,
+  detached = false,
+}: {
+  readonly item: ComposerBannerStackItem;
+  readonly detached?: boolean;
+}) {
+  const { dismissing, triggerDismiss } = useMatterDismissFade(item.onDismiss, 160, item.id);
+  const dismissAttr = dismissing ? "true" : undefined;
+  if (detached) {
+    return (
+      <div
+        data-composer-banner-stack="true"
+        data-matter-banner-dismissing={dismissAttr}
+        className={FADE_IN}
+      >
+        <NoticeCard item={item} detached onDismiss={item.onDismiss ? triggerDismiss : undefined} />
+      </div>
+    );
+  }
+  return (
+    <ComposerBanner.Attachment
+      data-composer-banner-stack="true"
+      data-matter-banner-dismissing={dismissAttr}
+      className={FADE_IN}
+    >
+      <NoticeCard item={item} onDismiss={item.onDismiss ? triggerDismiss : undefined} />
     </ComposerBanner.Attachment>
-  ));
+  );
 }
 
 const SUBPIXEL_ROUNDING = 0.001;
@@ -168,9 +192,11 @@ export function NoticeText({
 function NoticeCard({
   item,
   detached = false,
+  onDismiss,
 }: {
   readonly item: ComposerBannerStackItem;
   readonly detached?: boolean;
+  readonly onDismiss?: (() => void) | undefined;
 }) {
   const gt = useGT();
   return (
@@ -212,10 +238,10 @@ function NoticeCard({
         {item.actions || item.onDismiss ? (
           <ComposerBanner.Actions className="min-w-14 sm:min-w-12">
             {item.actions}
-            {item.onDismiss ? (
+            {onDismiss ? (
               <ComposerBanner.Dismiss
                 aria-label={item.dismissLabel ?? gt("Dismiss warning")}
-                onClick={item.onDismiss}
+                onClick={onDismiss}
               />
             ) : null}
           </ComposerBanner.Actions>

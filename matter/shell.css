@@ -9,6 +9,7 @@
 @import "./questions-plan.css";
 @import "./thread-ribbon.css";
 @import "./chat-messages.css";
+@import "./chat-cards.css";
 
 /* Settings → Appearance → Scroll edge (matterComposerAppearance.ts). Fade is upstream's mask; the
    others drop it. Shadow and Frost lay a sticky strip over the scroller's top edge whose net height

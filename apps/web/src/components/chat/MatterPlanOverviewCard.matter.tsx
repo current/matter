@@ -7,7 +7,14 @@ import type { EnvironmentId, PlanId, ScopedThreadRef } from "@t3tools/contracts"
 import { stripDisplayedPlanMarkdown } from "@t3tools/shared/proposedPlanText";
 import { DownloadIcon, ListChecksIcon, Maximize2Icon, XIcon } from "lucide-react";
 import { useGT } from "gt-react";
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import {
   MATTER_PLAN_AUTO_APPROVE_SECONDS,
@@ -189,8 +196,14 @@ export function MatterPlanOverviewCard({
               </div>
               <div data-matter-height="" ref={matterAnimatedHeightRef}>
                 <ul data-matter-plan-steps="">
-                  {keyedSteps(shownSteps).map(({ key, step }) => (
-                    <PlanStepRow key={key} step={step} />
+                  {keyedSteps(shownSteps).map(({ key, step }, index) => (
+                    <PlanStepRow
+                      key={key}
+                      step={step}
+                      extraIndex={
+                        index >= COLLAPSED_STEP_COUNT ? index - COLLAPSED_STEP_COUNT : undefined
+                      }
+                    />
                   ))}
                 </ul>
               </div>
@@ -361,9 +374,24 @@ function PlanTool({
   );
 }
 
-function PlanStepRow({ step }: { step: MatterPlanStep }) {
+function PlanStepRow({
+  step,
+  extraIndex,
+}: {
+  step: MatterPlanStep;
+  extraIndex?: number | undefined;
+}) {
+  const staggerStyle =
+    extraIndex !== undefined
+      ? ({ "--matter-stagger-index": Math.min(extraIndex, 7) } as CSSProperties)
+      : undefined;
   return (
-    <li data-matter-plan-step="" data-done={step.done ? "" : undefined}>
+    <li
+      data-matter-plan-step=""
+      data-matter-plan-step-extra={extraIndex !== undefined ? "" : undefined}
+      data-done={step.done ? "" : undefined}
+      style={staggerStyle}
+    >
       <span data-matter-plan-step-mark="" aria-hidden>
         {step.done ? (
           <svg viewBox="0 0 16 16">

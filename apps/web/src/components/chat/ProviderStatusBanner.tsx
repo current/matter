@@ -15,6 +15,7 @@ import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { RefreshIcon } from "../ui/refresh-icon";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
+import { useMatterDismissFade } from "./matterDismissFade.matter";
 
 function getIncompatibleVersion(status: ServerProvider) {
   const compatibility = status.compatibilityAdvisory;
@@ -155,6 +156,8 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   });
   const refreshingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const bannerKey = getProviderStatusBannerKey(status);
+  const { dismissing, triggerDismiss } = useMatterDismissFade(onDismiss, 160, bannerKey);
 
   const refresh = async () => {
     if (!status || !canRefresh || refreshingRef.current) return;
@@ -168,7 +171,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     setIsRefreshing(false);
   };
 
-  if (!status || getProviderStatusBannerKey(status) === null) {
+  if (!status || bannerKey === null) {
     return null;
   }
 
@@ -193,7 +196,11 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
     incompatible?.status !== "broken" && (status.status === "warning" || incompatible !== null);
 
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
+    <div
+      data-matter-status-banner=""
+      data-matter-banner-dismissing={dismissing ? "true" : undefined}
+      className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3"
+    >
       <Alert
         variant={isWarning ? "warning" : "error"}
         role={incompatible && incompatible.status !== "broken" ? "status" : "alert"}
@@ -241,7 +248,8 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
                     ? gt("Dismiss {provider} provider ready", { provider: providerName })
                     : gt("Dismiss {provider} provider disabled", { provider: providerName })
             }
-            onClick={onDismiss}
+            data-matter-banner-dismiss=""
+            onClick={triggerDismiss}
             size="icon-xs"
             variant="ghost-muted"
           >

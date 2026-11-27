@@ -64,6 +64,8 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
     <>
       {primaryOptions.map((option) => {
         const buttonProps = {
+          "data-matter-approval-action": "",
+          "data-matter-approval-responding": isResponding ? "true" : undefined,
           disabled: disabled || isResponding || !canRespond,
           "aria-description": option.warning,
           onClick: () => {
@@ -111,9 +113,18 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             disabled={disabled || isResponding || !canRespond}
             render={
               presentation === "inline" ? (
-                <InlineButton tone="muted" aria-label={gt("More approval options")} />
+                <InlineButton
+                  data-matter-approval-action=""
+                  tone="muted"
+                  aria-label={gt("More approval options")}
+                />
               ) : (
-                <Button size="icon-xs" variant="outline" aria-label={gt("More approval options")} />
+                <Button
+                  data-matter-approval-action=""
+                  size="icon-xs"
+                  variant="outline"
+                  aria-label={gt("More approval options")}
+                />
               )
             }
           >
