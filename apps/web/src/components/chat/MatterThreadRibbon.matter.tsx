@@ -212,7 +212,10 @@ export function MatterThreadRibbon(props: MatterThreadRibbonProps) {
   const showAgents =
     !props.draftId &&
     (visible.lineage || visible.sideChats) &&
-    (lineage.previousCount > 0 || lineage.sideChatCount > 0 || lineage.rows.length > 0);
+    (lineage.previousCount > 0 ||
+      lineage.sideChatCount > 0 ||
+      lineage.rows.length > 0 ||
+      lineage.cloudRuns.length > 0);
   const lineagePopover = useMatterLineagePopover();
   const ribbonLineageOpen =
     showAgents &&
