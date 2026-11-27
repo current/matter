@@ -9,6 +9,19 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import {
+  advancePhrasePacer,
+  MATTER_STREAM_ANIMATION_IDS,
+  MATTER_STREAM_ANIMATION_STORAGE_KEY,
+  PHRASE_HOLD_MS,
+  phraseBreaks,
+  type PhrasePace,
+  STREAM_CLAUSE_END,
+  STREAM_MAX_DEBT_MS,
+  STREAM_SENTENCE_END,
+  wholeWordEnds,
+} from "@t3tools/client-runtime/matter/stream-animation";
+
 import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "./components/chat/matterStreamHast";
 
 import {
@@ -17,19 +30,16 @@ import {
   useLocalStorage,
 } from "./hooks/useLocalStorage";
 
-export const MATTER_STREAM_ANIMATION_STORAGE_KEY = "mattr:stream-animation:v1";
+export {
+  advancePhrasePacer,
+  MATTER_STREAM_ANIMATION_STORAGE_KEY,
+  phraseBreaks,
+  type PhraseBreak,
+  type PhrasePace,
+  wholeWordEnds,
+} from "@t3tools/client-runtime/matter/stream-animation";
 
-export const MatterStreamAnimation = Schema.Literals([
-  "instant",
-  "blur",
-  "fade",
-  "rise",
-  "typewriter",
-  "rareui",
-  "ink",
-  "line",
-  "phrase",
-]);
+export const MatterStreamAnimation = Schema.Literals(MATTER_STREAM_ANIMATION_IDS);
 export type MatterStreamAnimation = typeof MatterStreamAnimation.Type;
 export type MatterAnimatedStream = Exclude<MatterStreamAnimation, "instant">;
 
@@ -229,48 +239,12 @@ const BURST_DRAIN_MS = 500;
 const BURST_DRAIN_WORDS = 8;
 const BURST_SENTENCE_PAUSE_MS = 240;
 const BURST_CLAUSE_PAUSE_MS = 90;
-/** Time owed past a gap is capped, so a stalled frame or hidden tab releases one chunk, not all. */
-const BURST_MAX_DEBT_MS = 100;
-const SENTENCE_END = /[.!?。！？]/;
-const CLAUSE_END = /[,;:，、；：]/;
 
 export interface BurstPace {
   /** Whole words shown so far. */
   readonly words: number;
   /** Milliseconds until the next chunk may land; at or below zero, it lands now. */
   readonly wait: number;
-}
-
-const WORD_TOKEN = /\S+/g;
-const SPACELESS_SCRIPT =
-  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
-const wordSegmenter =
-  typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
-    ? new Intl.Segmenter(undefined, { granularity: "word" })
-    : null;
-
-/**
- * Where each whole word of streaming `text` ends. The word at the very end may still be arriving,
- * so it counts only once it ends a sentence. Space-less scripts (CJK, Thai) split by word.
- */
-export function wholeWordEnds(text: string): number[] {
-  const ends: number[] = [];
-  for (const match of text.matchAll(WORD_TOKEN)) {
-    const token = match[0];
-    let end = match.index + token.length;
-    if (wordSegmenter && SPACELESS_SCRIPT.test(token)) {
-      end = match.index;
-      let sawWord = false;
-      for (const { segment, isWordLike } of wordSegmenter.segment(token)) {
-        // Punctuation stays with the word before it.
-        if (isWordLike && sawWord) ends.push(end);
-        if (isWordLike) sawWord = true;
-        end += segment.length;
-      }
-    }
-    if (end < text.length || SENTENCE_END.test(text[end - 1]!)) ends.push(end);
-  }
-  return ends;
 }
 
 /** The pace after `elapsedMs`: chunks land while the wait has run out, never past `ends`. */
@@ -282,7 +256,7 @@ export function advanceBurstPacer(
   random: () => number,
 ): BurstPace {
   let words = Math.min(pace.words, ends.length);
-  let wait = Math.max(pace.wait - Math.max(0, elapsedMs), -BURST_MAX_DEBT_MS);
+  let wait = Math.max(pace.wait - Math.max(0, elapsedMs), -STREAM_MAX_DEBT_MS);
   while (wait <= 0 && words < ends.length) {
     const backlog = ends.length - words;
     const chunk = Math.min(
@@ -291,9 +265,9 @@ export function advanceBurstPacer(
     );
     words += chunk;
     const tail = text[ends[words - 1]! - 1] ?? "";
-    const pause = SENTENCE_END.test(tail)
+    const pause = STREAM_SENTENCE_END.test(tail)
       ? BURST_SENTENCE_PAUSE_MS
-      : CLAUSE_END.test(tail)
+      : STREAM_CLAUSE_END.test(tail)
         ? BURST_CLAUSE_PAUSE_MS
         : 0;
     const natural = ((chunk * 1000) / BURST_WORDS_PER_SECOND) * (0.5 + random()) + pause;
@@ -348,66 +322,6 @@ export function useBurstPacedText(text: string, pacing: boolean): string {
   if (!pacing) return text;
   const length = Math.min(shown, text.length);
   return length >= text.length ? text : text.slice(0, length);
-}
-
-// Phrase: words are held until their clause ends (or six words pile up), then the clause lands
-// in one render, so its words mount and fade together. A backlog drains within PHRASE_DRAIN_MS.
-const PHRASE_MAX_WORDS = 6;
-const PHRASE_MS_PER_WORD = 46;
-const PHRASE_DRAIN_MS = 500;
-const PHRASE_DRAIN_PHRASES = 4;
-/** A clause the model leaves open (a pause, a tool call) shows after this long without text. */
-const PHRASE_HOLD_MS = 350;
-
-export interface PhraseBreak {
-  /** Where the phrase ends in the text. */
-  readonly end: number;
-  readonly words: number;
-}
-
-export interface PhrasePace {
-  /** Whole phrases shown so far. */
-  readonly phrases: number;
-  /** Milliseconds until the next phrase may land; at or below zero, it lands now. */
-  readonly wait: number;
-}
-
-/** The finished phrases of streaming `text`: each ends at clause punctuation, a line break or its sixth word. */
-export function phraseBreaks(text: string): PhraseBreak[] {
-  const breaks: PhraseBreak[] = [];
-  let words = 0;
-  for (const end of wholeWordEnds(text)) {
-    words++;
-    const tail = text[end - 1] ?? "";
-    if (
-      words >= PHRASE_MAX_WORDS ||
-      SENTENCE_END.test(tail) ||
-      CLAUSE_END.test(tail) ||
-      text[end] === "\n"
-    ) {
-      breaks.push({ end, words });
-      words = 0;
-    }
-  }
-  return breaks;
-}
-
-/** The pace after `elapsedMs`: phrases land while the wait has run out, never past `breaks`. */
-export function advancePhrasePacer(
-  pace: PhrasePace,
-  breaks: ReadonlyArray<PhraseBreak>,
-  elapsedMs: number,
-): PhrasePace {
-  let phrases = Math.min(pace.phrases, breaks.length);
-  let wait = Math.max(pace.wait - Math.max(0, elapsedMs), -BURST_MAX_DEBT_MS);
-  while (wait <= 0 && phrases < breaks.length) {
-    const backlog = breaks.length - phrases;
-    const natural = breaks[phrases]!.words * PHRASE_MS_PER_WORD;
-    const drain = (PHRASE_DRAIN_MS * Math.min(1, PHRASE_DRAIN_PHRASES / backlog)) / backlog;
-    phrases++;
-    wait += Math.min(natural, drain);
-  }
-  return { phrases, wait };
 }
 
 /**

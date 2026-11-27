@@ -78,6 +78,7 @@ const reactTests = [
   "src/features/matter/merge/MatterMergeSettlePrompt.matter.test.tsx",
   "src/features/matter/predictions/MatterPredictionGhost.matter.test.tsx",
   "src/features/matter/ribbon/MatterWhisperPill.matter.test.tsx",
+  "src/features/matter/streaming/MatterStreamingText.matter.test.tsx",
   "src/features/voice-input/useVoiceInputController.test.tsx",
 ];
 

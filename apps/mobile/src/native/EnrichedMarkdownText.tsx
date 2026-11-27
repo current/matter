@@ -33,6 +33,7 @@ import { useAppearancePreferences } from "../features/settings/appearance/Appear
 import { Menu } from "../components/ui/Menu";
 import { useEnrichedLinkVariants } from "./useEnrichedLinkVariants";
 import { useRetryingImageSource } from "./useRetryingImageSource";
+import { useMatterStreamingMarkdown } from "../features/matter/streaming/MatterStreamingText.matter";
 import * as Dialog from "../components/ui/Dialog";
 import { copyTextWithHaptic } from "../lib/copyTextWithHaptic";
 import type { HighlightScheme } from "../lib/highlights";
@@ -288,6 +289,7 @@ export function MobileEnrichedMarkdownText(props: SelectableMarkdownTextProps) {
       markdown: markdownWithTextDirection(markdownWithTableBreaks(files.markdown)),
     };
   }, [props.markdown, fileEmbedLabel]);
+  const matterStreaming = useMatterStreamingMarkdown(markdown);
   const [parsedLinkUrls, setParsedLinkUrls] = useState<ReadonlyArray<string>>([]);
   const onLinksChange = (links: MarkdownLinkOccurrence[]) => {
     const urls = [...new Set(links.map((link) => link.url))];
@@ -462,6 +464,7 @@ export function MobileEnrichedMarkdownText(props: SelectableMarkdownTextProps) {
       >
         <EnrichedMarkdownText
           markdown={markdown}
+          {...matterStreaming}
           markdownStyle={markdownStyle}
           writingDirection={props.writingDirection}
           onLinksChange={onLinksChange}

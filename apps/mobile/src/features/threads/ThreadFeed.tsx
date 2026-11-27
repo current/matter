@@ -19,6 +19,7 @@ import {
   MatterAiStatusWorkingRow,
 } from "../matter/chat/MatterAiStatus.matter";
 import { matterAiStatusFeed } from "../matter/chat/matterAiStatus";
+import { MatterStreamingMessageScope } from "../matter/streaming/MatterStreamingMessageScope.matter";
 import {
   MATTER_MESSAGE_TIME_CLASS,
   MATTER_USER_BUBBLE_BODY_CLASS,
@@ -2720,7 +2721,10 @@ function renderFeedEntry(
       >
         <MatterReplyHighlight messageId={message.id} />
         {renderedText.trim().length > 0 ? (
-          <MarkdownImageAvailableWidthContext value={props.markdownContentWidth}>
+          <MatterStreamingMessageScope
+            streaming={message.streaming === true}
+            imageWidth={props.markdownContentWidth}
+          >
             <AssistantMarkdownContent
               markdown={renderedText}
               environmentId={props.environmentId}
@@ -2733,7 +2737,7 @@ function renderFeedEntry(
               renderImage={props.renderMarkdownImage}
               skills={props.skills}
             />
-          </MarkdownImageAvailableWidthContext>
+          </MatterStreamingMessageScope>
         ) : null}
         <MessageAttachmentList
           attachments={attachments}

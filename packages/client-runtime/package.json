@@ -227,6 +227,10 @@
       "types": "./src/matter/whisper.ts",
       "default": "./src/matter/whisper.ts"
     },
+    "./matter/stream-animation": {
+      "types": "./src/matter/streamAnimation.ts",
+      "default": "./src/matter/streamAnimation.ts"
+    },
     "./matter/interaction-mode": {
       "types": "./src/matter/interactionMode.ts",
       "default": "./src/matter/interactionMode.ts"

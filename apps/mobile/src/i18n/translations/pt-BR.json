@@ -5874,5 +5874,17 @@
   "48e226ee4c63e18e": "Changes against {base}",
   "8c09359192f042d1": "{live} running · {finished} finished",
   "17a584de12b4d1d3": "{count} finished",
-  "5aa7370a0255d599": "Unable to open PR"
+  "5aa7370a0255d599": "Unable to open PR",
+  "1a2bc819a00d34da": "Instant",
+  "2dc930bd9d4a55e1": "Text appears as it arrives, with no motion",
+  "7ab163298825b31f": "Soft Fade",
+  "8d3c8eb22c5dd430": "New words glide in with a light fade",
+  "428fe15b42da6155": "Smooth Pace",
+  "6bd0877ab4cf5fa3": "Evens out bursts into a steady flow",
+  "b47b3b9ef60f4ace": "Phrase",
+  "65a6635dc1151143": "A whole phrase lands at once, so nothing moves while you read",
+  "86f141a4bb7a5627": "Moved the session store behind `reconnect()`, so a dropped socket resumes mid-turn and every streamed word lands exactly once.",
+  "37960b30a089cdb0": "Streaming text",
+  "16b0284b99d0db33": "Replay preview",
+  "32edbbd81be6eca2": "How new words appear while an assistant replies. Finished messages always render plain. Reduce Motion shows text instantly."
 }
