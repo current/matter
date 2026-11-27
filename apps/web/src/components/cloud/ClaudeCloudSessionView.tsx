@@ -16,14 +16,12 @@ import {
   CloudDownloadIcon,
   EllipsisIcon,
   ExternalLinkIcon,
-  EyeOffIcon,
   LinkIcon,
   MessageCircleQuestionIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import {
-  forgetClaudeCloudSession,
   interruptClaudeCloudSession,
   openClaudeCloudDialog,
   sendClaudeCloudFollowUp,
@@ -57,9 +55,7 @@ import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { CLAUDE_CLOUD_STATE_BADGE, CLAUDE_CLOUD_STATE_LABELS } from "./claudeCloudCopy";
 import {
   cloudErrorText,
-  dropListedClaudeCloudSession,
   pollClaudeCloudTranscriptSoon,
-  refreshClaudeCloudSessions,
   retainClaudeCloudSessions,
   retainClaudeCloudTranscript,
   useClaudeCloudSessionsState,
@@ -275,21 +271,6 @@ function CloudSessionActions({
     });
   };
 
-  const hide = async () => {
-    const result = await settle(forgetClaudeCloudSession(config, sessionId));
-    if (!result.ok) {
-      toastManager.add({
-        type: "error",
-        title: gt("Couldn't hide the session"),
-        description: result.error,
-      });
-      return;
-    }
-    dropListedClaudeCloudSession(sessionId);
-    refreshClaudeCloudSessions();
-    await navigate({ to: "/" });
-  };
-
   return (
     <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
       <Button
@@ -325,12 +306,6 @@ function CloudSessionActions({
             <LinkIcon aria-hidden="true" />
             {gt("Copy link")}
           </MenuItem>
-          {tracked !== null ? (
-            <MenuItem onClick={() => void hide()}>
-              <EyeOffIcon aria-hidden="true" />
-              {gt("Hide from Matter")}
-            </MenuItem>
-          ) : null}
         </MenuPopup>
       </Menu>
     </div>
@@ -483,13 +458,24 @@ function CloudSessionBody({
                   ? gt("This session is archived. Open it on claude.ai to restore it.")
                   : null
               }
-              showStop={isWorking && transcript.canInterrupt}
+              showStop={isWorking}
+              stopOpensClaude={!transcript.canInterrupt}
               stopping={stopping}
               onSend={(text) => {
                 scrollToEnd();
                 void send(text);
               }}
-              onStop={() => void stop()}
+              onStop={() => {
+                if (transcript.canInterrupt) {
+                  void stop();
+                  return;
+                }
+                window.open(
+                  session?.url ?? claudeCloudSessionUrl(sessionId),
+                  "_blank",
+                  "noopener,noreferrer",
+                );
+              }}
             />
           )}
         </ClaudeCloudTimeline>
@@ -562,6 +548,7 @@ function CloudComposer({
   textareaRef,
   disabledReason,
   showStop,
+  stopOpensClaude,
   stopping,
   onSend,
   onStop,
@@ -573,6 +560,8 @@ function CloudComposer({
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   disabledReason: string | null;
   showStop: boolean;
+  /** Claude's CLI can't interrupt cloud sessions, so Stop hands off to claude.ai. */
+  stopOpensClaude: boolean;
   stopping: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
@@ -641,7 +630,13 @@ function CloudComposer({
                       ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      {showStop ? <CloudStopButton stopping={stopping} onStop={onStop} /> : null}
+                      {showStop ? (
+                        <CloudStopButton
+                          stopping={stopping}
+                          opensClaude={stopOpensClaude}
+                          onStop={onStop}
+                        />
+                      ) : null}
                       {replaceSendWithStop ? null : (
                         <Tooltip>
                           <TooltipTrigger
@@ -701,7 +696,15 @@ function CloudComposer({
   );
 }
 
-function CloudStopButton({ stopping, onStop }: { stopping: boolean; onStop: () => void }) {
+function CloudStopButton({
+  stopping,
+  opensClaude,
+  onStop,
+}: {
+  stopping: boolean;
+  opensClaude: boolean;
+  onStop: () => void;
+}) {
   const gt = useGT();
   return (
     <Tooltip>
@@ -724,7 +727,9 @@ function CloudStopButton({ stopping, onStop }: { stopping: boolean; onStop: () =
       <TooltipPopup>
         {stopping
           ? gt("Stopping…")
-          : gt("Interrupt", { $context: "verb, stops the running agent" })}
+          : opensClaude
+            ? gt("Stop on claude.ai")
+            : gt("Interrupt", { $context: "verb, stops the running agent" })}
       </TooltipPopup>
     </Tooltip>
   );
