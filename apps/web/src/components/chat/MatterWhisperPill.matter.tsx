@@ -322,6 +322,7 @@ export function MatterLineagePopoverContent(
   const [stoppingKeys, setStoppingKeys] = useState<ReadonlySet<string>>(new Set());
   const { rows, cloudRuns, previousCount, sideChatCount } = props.model;
   const runningCount = rows.length + cloudRuns.length;
+  const needsYouCount = cloudRuns.filter((run) => run.state === "needs_input").length;
   const stopRow = async (row: MatterWhisperRow) => {
     if (row.stopTarget === null || stoppingKeys.has(row.key)) return;
     setStoppingKeys((current) => new Set(current).add(row.key));
@@ -394,7 +395,12 @@ export function MatterLineagePopoverContent(
     <div data-matter-lineage data-view="main">
       <div data-matter-lineage-header>
         <span data-matter-lineage-title>
-          {runningCount > 0 ? (
+          {needsYouCount > 0 ? (
+            <T>
+              Lineage · <Var>{needsYouCount}</Var> needs you ·{" "}
+              <Var>{runningCount - needsYouCount}</Var> running
+            </T>
+          ) : runningCount > 0 ? (
             <T>
               Lineage · <Var>{runningCount}</Var> running
             </T>
@@ -650,8 +656,17 @@ export function MatterWhisperPill(props: LineageThreadProps) {
                 ) : null}
               </span>
             ) : null}
-            <span data-matter-whisper-label data-tone={cloudNeedsInput ? "needs" : undefined}>
-              {label}
+            <span data-matter-whisper-label aria-hidden>
+              {needsYouCount > 0 ? (
+                <>
+                  <span data-tone="needs">{gt("{count} needs you", { count: needsYouCount })}</span>
+                  {runningCount > needsYouCount
+                    ? ` · ${gt("{count} running", { count: runningCount - needsYouCount })}`
+                    : null}
+                </>
+              ) : (
+                label
+              )}
             </span>
             {oldest !== null ? (
               <span data-matter-whisper-timer>

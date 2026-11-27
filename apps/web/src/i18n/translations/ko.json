@@ -4346,6 +4346,22 @@
   "1b7c524fccf06537": "Needs you",
   "622a159ad0eabdcb": "Running",
   "a3db5fd6c4b955ec": "Back",
+  "198a7953b5cf8249": [
+    "Lineage · ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " needs you · ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " ",
+    "running"
+  ],
   "a33df1497c9fa65b": [
     "Lineage · ",
     {
@@ -5893,7 +5909,7 @@
   "4ca1282a417b0603": "Manual only",
   "c4817a438fb46feb": "Long jobs, plus the rest on battery",
   "e79f7a08338872cf": "Only on battery or when hot",
-  "da6fb352dc462f76": "All heavy work",
+  "a18d7bb3540e0282": "All heavy work, whenever it can",
   "48baa0caeb000c8a": "Agents ask you each time",
   "35ad6322041d30d0": "Only when you send it",
   "9c368bdf3accaaf8": "Long builds and test suites run in the cloud. Other heavy work moves there on battery or when this machine runs hot.",

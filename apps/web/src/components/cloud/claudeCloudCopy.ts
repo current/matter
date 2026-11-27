@@ -41,7 +41,7 @@ export const CLAUDE_CLOUD_OFFLOAD_POLICY_HINTS: Readonly<Record<ClaudeCloudOfflo
   {
     balanced: msg("Long jobs, plus the rest on battery"),
     battery_saver: msg("Only on battery or when hot"),
-    cloud_first: msg("All heavy work"),
+    cloud_first: msg("All heavy work, whenever it can"),
     ask: msg("Agents ask you each time"),
     off: msg("Only when you send it"),
   };
