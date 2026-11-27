@@ -83,10 +83,9 @@ async function openThread(thread: FakeThread): Promise<AsyncDisposable> {
   };
 }
 
-it("switches composer modes from the menu, the clear button, Shift+Tab and slash commands", async () => {
-  const thread = threadWithHistory("thread-matter-modes", 1);
+it("switches composer modes from the menu and the clear button", async () => {
+  const thread = threadWithHistory("thread-matter-modes-menu", 1);
   await using _app = await openThread(thread);
-  const editor = page.getByTestId("composer-editor");
 
   // Menu → Plan, then × back to Default.
   await userEvent.click(modeTrigger("Default"));
@@ -103,15 +102,27 @@ it("switches composer modes from the menu, the clear button, Shift+Tab and slash
   await expect.element(modeTrigger("Default")).toBeVisible();
   // No Goal turn was sent, so leaving only switches the composer.
   expect(dispatchedCommands().filter((command) => command.type === "message.dispatch")).toEqual([]);
+});
 
-  // Shift+Tab cycles Default → Plan → Goal → Default.
-  await userEvent.click(editor);
+it("cycles composer modes with Shift+Tab", async () => {
+  const thread = threadWithHistory("thread-matter-modes-shift-tab", 1);
+  await using _app = await openThread(thread);
+
+  // Default → Plan → Goal → Default.
+  await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
   await expect.element(modeTrigger("Plan")).toBeVisible();
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
   await expect.element(modeTrigger("Goal")).toBeVisible();
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
   await expect.element(modeTrigger("Default")).toBeVisible();
+});
+
+it("switches composer modes from the slash menu", async () => {
+  const thread = threadWithHistory("thread-matter-modes-slash", 1);
+  await using _app = await openThread(thread);
+  const editor = page.getByTestId("composer-editor");
+  await userEvent.click(editor);
 
   // Picking /plan from the slash menu switches and clears the text.
   await userEvent.keyboard("/pla");
@@ -139,9 +150,13 @@ it("switches composer modes from the menu, the clear button, Shift+Tab and slash
   expect(dispatchedCommands()).toContainEqual(
     expect.objectContaining({ type: "thread.interaction-mode.set", interactionMode: "goal" }),
   );
+});
 
-  // `/plan <prompt>` switches to Plan and sends only the prompt.
-  await userEvent.click(editor);
+it("switches to Plan and sends only the prompt for `/plan <prompt>`", async () => {
+  const thread = threadWithHistory("thread-matter-modes-plan-prompt", 1);
+  await using _app = await openThread(thread);
+
+  await userEvent.click(page.getByTestId("composer-editor"));
   await insertText("/plan add dark mode");
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() =>

@@ -142,35 +142,48 @@ describe("MatterComposerReplyBar component", () => {
   });
 });
 
+const replyBar = () => document.querySelector<HTMLElement>("[data-matter-reply-bar]");
+
+/** Renders the app on thread A with commands accepted; thread B is there to switch to. */
+async function openReplyThreads(prefix: string) {
+  await page.viewport(1400, 900);
+  clearPendingMatterMessageRevealForTests();
+  const threadA = threadWithHistory(`${prefix}-a`, 2);
+  const threadB = threadWithHistory(`${prefix}-b`, 1);
+  const environment = installFakeEnvironment([threadA, threadB], { acceptCommands: true });
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const router = getRouter(
+    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${threadA.id}`] }),
+  );
+  await router.load();
+  const app = await render(<AppRoot router={router} />, { router: false });
+  const editor = page.getByTestId("composer-editor");
+  await expect.element(editor).toBeVisible();
+  return {
+    router,
+    threadA,
+    threadB,
+    editor,
+    assistantReplyButton: page.getByRole("button", { name: "Reply to this response" }).first(),
+    userReplyButton: page.getByRole("button", { name: "Reply to this message" }).first(),
+    [Symbol.asyncDispose]: async () => {
+      await app[Symbol.asyncDispose]();
+      environment[Symbol.dispose]();
+    },
+  };
+}
+
 describe("in-chat Reply end-to-end flow", () => {
-  it("supports replying to assistant and user messages, swapping targets, Escape/× dismissal, thread scoping, sending, and jumping back", async () => {
-    await page.viewport(1400, 900);
-    clearPendingMatterMessageRevealForTests();
-    const threadA = threadWithHistory("reply-thread-a", 2);
-    const threadB = threadWithHistory("reply-thread-b", 1);
-    using _environment = installFakeEnvironment([threadA, threadB], { acceptCommands: true });
-    __setClientSettingsForTests({
-      ...DEFAULT_CLIENT_SETTINGS,
-      onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
-    });
+  it("replies to an assistant message, swaps to a user message, and cancels with Escape or ×", async () => {
+    await using screen = await openReplyThreads("reply-cancel");
+    const { editor, assistantReplyButton, userReplyButton } = screen;
 
-    const router = getRouter(
-      createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${threadA.id}`] }),
-    );
-    await router.load();
-    await using _app = await render(<AppRoot router={router} />, { router: false });
-
-    const editor = page.getByTestId("composer-editor");
-    await expect.element(editor).toBeVisible();
-
-    // 1. Click Reply on an assistant message -> shows reply bar & focuses editor.
-    const assistantReplyButton = page
-      .getByRole("button", { name: "Reply to this response" })
-      .first();
+    // Reply on an assistant message shows the reply bar and focuses the editor.
     await expect.element(assistantReplyButton).toBeVisible();
     await assistantReplyButton.click();
-
-    const replyBar = () => document.querySelector<HTMLElement>("[data-matter-reply-bar]");
     await vi.waitFor(() => expect(replyBar()).not.toBeNull());
     expect(replyBar()!.dataset.matterReplyRole).toBe("assistant");
     expect(replyBar()!.textContent).toContain("Replying to assistant");
@@ -178,28 +191,29 @@ describe("in-chat Reply end-to-end flow", () => {
       expect((editor.element() as HTMLElement).contains(document.activeElement)).toBe(true),
     );
 
-    // 2. Clicking Reply on a user message while already replying swaps cleanly to the user target.
-    const userReplyButton = page.getByRole("button", { name: "Reply to this message" }).first();
+    // Reply on a user message while already replying swaps to the user target.
     await expect.element(userReplyButton).toBeVisible();
     await userReplyButton.click();
-
     await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("user"));
     expect(replyBar()!.textContent).toContain("Replying to you");
-    const firstUserReplyTargetId = replyBar()!.dataset.matterReplyMessageId;
-    expect(firstUserReplyTargetId).toBeTruthy();
+    expect(replyBar()!.dataset.matterReplyMessageId).toBeTruthy();
 
-    // 3. Pressing Escape while draft is empty cancels the reply cleanly.
+    // Escape in an empty draft cancels the reply.
     await userEvent.click(editor);
     await userEvent.keyboard("{Escape}");
     await vi.waitFor(() => expect(replyBar()).toBeNull());
 
-    // 4. Re-open reply, click × button -> cancels cleanly.
+    // So does ×.
     await userReplyButton.click();
     await vi.waitFor(() => expect(replyBar()).not.toBeNull());
     await page.getByRole("button", { name: "Cancel reply" }).click();
     await vi.waitFor(() => expect(replyBar()).toBeNull());
+  });
 
-    // 5. Thread scoping: setting a reply on Thread A does not leak into Thread B.
+  it("keeps a reply on its own thread", async () => {
+    await using screen = await openReplyThreads("reply-scope");
+    const { router, threadA, threadB, assistantReplyButton } = screen;
+
     await assistantReplyButton.click();
     await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("assistant"));
     await act(() =>
@@ -213,7 +227,7 @@ describe("in-chat Reply end-to-end flow", () => {
     );
     expect(replyBar()).toBeNull();
 
-    // Switching back to Thread A preserves Thread A's own reply draft.
+    // Thread A still has its reply when we come back.
     await act(() =>
       router.navigate({
         to: "/$environmentId/$threadId",
@@ -221,10 +235,13 @@ describe("in-chat Reply end-to-end flow", () => {
       }),
     );
     await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("assistant"));
+  });
 
-    // 6. Swap to replying to a user message, send a reply -> wire context carries ResponseContextRecord,
-    //    reply bar clears immediately, and the sent message renders a clickable reply header above the bubble.
-    await page.getByRole("button", { name: "Reply to this message" }).first().click();
+  it("sends a reply with its context and jumps back from the sent reply header", async () => {
+    await using screen = await openReplyThreads("reply-send");
+    const { editor, userReplyButton } = screen;
+
+    await userReplyButton.click();
     await vi.waitFor(() => expect(replyBar()?.dataset.matterReplyRole).toBe("user"));
     const targetUserMessageId = replyBar()!.dataset.matterReplyMessageId!;
 
@@ -232,6 +249,7 @@ describe("in-chat Reply end-to-end flow", () => {
     await insertText("Following up directly on this");
     await userEvent.keyboard("{Enter}");
 
+    // The send carries the ResponseContextRecord and the reply bar clears.
     await vi.waitFor(() => expect(replyBar()).toBeNull());
     await vi.waitFor(() => {
       const sendCommands = dispatchedCommands().filter(
@@ -245,7 +263,7 @@ describe("in-chat Reply end-to-end flow", () => {
       );
     });
 
-    // Sent optimistic/timeline message renders the sleek reply reference header above its bubble.
+    // The sent message shows a reply header above its bubble.
     await vi.waitFor(() => {
       const sentHeader = document.querySelector<HTMLButtonElement>("[data-matter-reply-header]");
       expect(sentHeader).not.toBeNull();
@@ -254,7 +272,7 @@ describe("in-chat Reply end-to-end flow", () => {
       expect(sentHeader!.textContent).toContain("you");
     });
 
-    // Clicking the sent reply header highlights the original referenced user message.
+    // Clicking it highlights the original user message.
     const sentHeader = document.querySelector<HTMLButtonElement>("[data-matter-reply-header]")!;
     await act(() => sentHeader.click());
     await vi.waitFor(() => {
