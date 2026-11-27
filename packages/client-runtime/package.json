@@ -223,6 +223,10 @@
       "types": "./src/matter/promptPrediction.ts",
       "default": "./src/matter/promptPrediction.ts"
     },
+    "./matter/whisper": {
+      "types": "./src/matter/whisper.ts",
+      "default": "./src/matter/whisper.ts"
+    },
     "./matter/interaction-mode": {
       "types": "./src/matter/interactionMode.ts",
       "default": "./src/matter/interactionMode.ts"

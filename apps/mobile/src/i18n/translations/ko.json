@@ -5844,5 +5844,19 @@
   "65ca6ca43f7d2d66": "Keep",
   "13e6f2309e418404": "Settle",
   "73231e6bf79dde0d": "Use suggested prompt: {prompt}",
-  "d8698799ee901b97": "Use"
+  "d8698799ee901b97": "Use",
+  "6b2c1ffa65525987": "{count, plural, one {{count} agent running} other {{count} agents running}}",
+  "c90a3064e3cfd863": "Opens this thread's agents",
+  "5b95716a04319ac9": "{count, plural, one {{count} background command} other {{count} background commands}}",
+  "43e1ff999fbe8e35": "Opens this thread's background work",
+  "aa6ce725e42ea9ab": "Servers on ports {ports}",
+  "b2a84c790a2f3b36": "Opens the browser preview",
+  "45ff94430871a42a": "{count, plural, one {{count} server} other {{count} servers}}",
+  "781ec28de3444e29": "{count, plural, one {{count} automation running} other {{count} automations running}}",
+  "82b66357bb20e414": "Opens scheduled tasks",
+  "189c753a02fed5f2": "Uncommitted changes",
+  "48e226ee4c63e18e": "Changes against {base}",
+  "8c09359192f042d1": "{live} running · {finished} finished",
+  "17a584de12b4d1d3": "{count} finished",
+  "5aa7370a0255d599": "Unable to open PR"
 }

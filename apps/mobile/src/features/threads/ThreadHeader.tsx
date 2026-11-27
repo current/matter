@@ -13,6 +13,7 @@ import {
   useThreadGitMenuDefinition,
   type ThreadGitControlsProps,
 } from "./ThreadGitControls";
+import { useMatterRibbonGitMenu } from "../matter/ribbon/useMatterRibbonGitMenu";
 
 export function ThreadHeader(props: {
   readonly title: string;
@@ -29,7 +30,10 @@ export function ThreadHeader(props: {
   const goBack = useWorkspaceBackNavigation();
   const { toggleAuxiliaryPane, startNewTask } = useAdaptiveWorkspaceLayout();
   const { panes } = useWorkspacePaneState();
-  const gitMenu = useThreadGitMenuDefinition(props.gitControls);
+  const gitMenu = useMatterRibbonGitMenu(
+    useThreadGitMenuDefinition(props.gitControls),
+    props.gitControls,
+  );
   const terminalMenu = threadTerminalMenu(props.gitControls, m);
   const filesVisible = props.inspectorMode === "files" && panes.auxiliaryPaneVisible;
   const actions: AppBarAction[] = props.hasThreadCwd

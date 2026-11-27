@@ -219,6 +219,8 @@ import { ComposerPopoverHost } from "./ComposerPopoverHost";
 import { ThreadFeed, type ThreadFeedHistoryControls } from "./ThreadFeed";
 import { WorkspaceMutationIdProvider } from "./WorkspaceMutationIdProvider";
 import { useThreadTurnSubagents } from "./ThreadAgentsSheet";
+import { MatterWhisperPill } from "../matter/ribbon/MatterWhisperPill.matter";
+import { withoutMatterWhisperDuplicate } from "../matter/ribbon/matterWhisperHooks";
 import { ComposerQueuedEditBanner } from "./ComposerQueuedEdit";
 import { useThreadQueuedCount } from "./ThreadQueueControl";
 import { ThreadGuestShareBar } from "./ThreadGuestShareBar";
@@ -533,7 +535,9 @@ function ThreadDetailBody(
     : "showAll";
   const queuedCount = useThreadQueuedCount(props.selectedThreadDetailRef);
   const turnSubagents = useThreadTurnSubagents(props.selectedThreadDetailRef);
-  const agentsSegment = resolveSubagentPillSegment(turnSubagents, messages);
+  const agentsSegment = withoutMatterWhisperDuplicate(
+    resolveSubagentPillSegment(turnSubagents, messages),
+  );
   const defaultComposerEditorRef = useRef<ComposerEditorHandle>(null);
   const composerEditorRef = props.draftMode?.editorRef ?? defaultComposerEditorRef;
   const isProviderSubagent = isProviderNativeSubagentThread(props.selectedThread.source);
@@ -861,7 +865,9 @@ function ThreadDetailBody(
       },
     };
   })();
-  const statusLines = [backgroundLine, lifecycleLine].filter((line) => line !== null);
+  const statusLines = [withoutMatterWhisperDuplicate(backgroundLine), lifecycleLine].filter(
+    (line) => line !== null,
+  );
   const floatingStatus = ((): FloatingWorkingStatus | null => {
     const connectionStatus = connectionFloatingStatus(
       {
@@ -1975,6 +1981,19 @@ function ThreadDetailBody(
                         ) : null}
                       </Animated.View>
                     ) : null}
+                    <MatterWhisperPill
+                      environmentId={props.environmentId}
+                      threadId={props.selectedThread.id}
+                      subagents={turnSubagents?.subagents ?? []}
+                      backgroundTasks={props.selectedThread.pendingBackgroundTasks}
+                      providers={props.serverConfig?.providers}
+                      stop={{
+                        enabled: props.canOperateThread,
+                        pending: statusPending,
+                        run: () => void runStatusAction("stop"),
+                      }}
+                      hidden={Boolean(props.draftMode) || contentPresentationKind !== "ready"}
+                    />
                   </ComposerPanels>
                 </View>
 
