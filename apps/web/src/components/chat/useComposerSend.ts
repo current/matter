@@ -64,11 +64,13 @@ import {
 } from "../../composer-logic";
 import { type ChatMessage } from "../../types";
 import {
-  clearPersistedComposerInteractionMode,
   isGoalClearCommand,
   nativeGoalCommand,
   prependKeepingGoalCommand,
   resolveMatterModeSend,
+} from "@t3tools/client-runtime/matter/interaction-mode";
+import {
+  clearPersistedComposerInteractionMode,
   setComposerInteractionMode,
 } from "./matterInteractionMode.matter";
 import { recordPromptSent } from "../GitHubStarPrompt";

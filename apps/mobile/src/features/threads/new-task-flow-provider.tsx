@@ -10,10 +10,12 @@ import React, { useRef, useState } from "react";
 import type {
   EnvironmentId,
   ModelSelection,
+  ProviderInteractionMode,
   ProviderOptionSelection,
   RuntimeMode,
   ServerProvider,
 } from "@t3tools/contracts";
+import { resolveComposerInteractionMode } from "@t3tools/client-runtime/matter/interaction-mode";
 import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
@@ -173,6 +175,7 @@ type NewTaskFlowContextValue = {
   readonly availableBranches: ReadonlyArray<VcsRef>;
   readonly currentCheckoutBranchName: string | null;
   readonly runtimeMode: RuntimeMode;
+  readonly interactionMode: ProviderInteractionMode;
   readonly expandedProvider: string | null;
   readonly environments: ReadonlyArray<{
     readonly environmentId: EnvironmentId;
@@ -213,6 +216,8 @@ type NewTaskFlowContextValue = {
     metadata: TurnCommandMetadata,
     options?: {
       readonly currentCheckoutBranch?: string | null;
+      readonly textOverride?: string;
+      readonly interactionModeOverride?: ProviderInteractionMode;
     },
   ) => QueuedThreadMessage | null;
   readonly setPrompt: (value: string) => void;
@@ -227,6 +232,7 @@ type NewTaskFlowContextValue = {
   readonly setSubmitting: (value: boolean) => void;
   readonly loadBranches: () => void;
   readonly setRuntimeMode: (value: RuntimeMode) => void;
+  readonly setInteractionMode: (value: ProviderInteractionMode) => void;
   readonly setSelectedModelOptions: (
     value: ReadonlyArray<ProviderOptionSelection> | undefined,
   ) => void;
@@ -453,6 +459,10 @@ export function NewTaskFlowProvider(
     selectedProjectDraft.runtimeMode,
     defaultRuntimeMode,
     managedPolicy,
+  );
+  const interactionMode = resolveComposerInteractionMode(
+    selectedProjectDraft.interactionMode,
+    null,
   );
 
   // Antigravity keeps unavailable selections so sign-out or a catalog change
@@ -770,6 +780,12 @@ export function NewTaskFlowProvider(
     }
   };
 
+  const setInteractionMode = (value: ProviderInteractionMode) => {
+    if (selectedProjectDraftKey) {
+      updateComposerDraftSettings(selectedProjectDraftKey, { interactionMode: value });
+    }
+  };
+
   const worktreeCreation = (chosen: ReadonlyArray<string> | undefined) => {
     const repositories = resolveWorktreeRepositorySelection({
       choices: worktreeRepositoryChoices,
@@ -785,13 +801,17 @@ export function NewTaskFlowProvider(
 
   const buildPendingTaskMessage = (
     metadata: TurnCommandMetadata,
-    options?: { readonly currentCheckoutBranch?: string | null },
+    options?: {
+      readonly currentCheckoutBranch?: string | null;
+      readonly textOverride?: string;
+      readonly interactionModeOverride?: ProviderInteractionMode;
+    },
   ): QueuedThreadMessage | null => {
     if (!selectedProject || !selectedProjectDraftKey) {
       return null;
     }
     const draft = getComposerDraftSnapshot(selectedProjectDraftKey);
-    const text = draft.text.trim();
+    const text = (options?.textOverride ?? draft.text).trim();
     const draftModelSelection =
       resolveSelectableModelSelection(
         selectedEnvironmentServerConfig,
@@ -827,7 +847,9 @@ export function NewTaskFlowProvider(
         defaultRuntimeMode,
         managedPolicy,
       ),
-      interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+      interactionMode:
+        options?.interactionModeOverride ??
+        resolveComposerInteractionMode(draft.interactionMode, DEFAULT_PROVIDER_INTERACTION_MODE),
       creation: {
         projectId: selectedProject.id,
         projectTitle: selectedProject.title,
@@ -941,6 +963,7 @@ export function NewTaskFlowProvider(
     availableBranches,
     currentCheckoutBranchName,
     runtimeMode,
+    interactionMode,
     expandedProvider,
     environments,
     selectedProject,
@@ -981,6 +1004,7 @@ export function NewTaskFlowProvider(
     },
     loadBranches,
     setRuntimeMode,
+    setInteractionMode,
     setSelectedModelOptions,
     setExpandedProvider: (value: string | null) => updateFlow({ expandedProvider: value }),
   } satisfies NewTaskFlowContextValue;

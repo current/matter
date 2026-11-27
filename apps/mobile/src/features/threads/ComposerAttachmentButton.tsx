@@ -14,6 +14,7 @@ const ATTACHMENT_MENU_ACTIONS: MenuAction[] = [
 export function ComposerAttachmentButton(props: {
   readonly disabled?: boolean;
   readonly size?: "regular" | "large";
+  readonly compact?: boolean;
   readonly supportsFiles: boolean;
   readonly onPickMedia: () => Promise<void>;
   readonly onPickFiles: () => Promise<void>;
@@ -21,18 +22,26 @@ export function ComposerAttachmentButton(props: {
   const gt = useGT();
   const m = useMessages();
   const { scale } = useAndroidControlSizing();
+  const iconSize = props.compact
+    ? Math.round((props.size === "large" ? 20 : 17) * scale)
+    : Math.round((props.size === "large" ? 26 : 20) * scale);
   const button = (
     <Pressable
       accessibilityLabel={gt("Add attachment")}
       accessibilityRole="button"
       accessibilityState={{ disabled: props.disabled }}
-      className="size-[44px] shrink-0 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+      hitSlop={props.compact ? 6 : undefined}
+      className={
+        props.compact
+          ? "size-[32px] shrink-0 items-center justify-center rounded-[8px] active:opacity-70 disabled:opacity-50"
+          : "size-[44px] shrink-0 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+      }
       disabled={props.disabled}
       onPress={props.supportsFiles ? undefined : () => void props.onPickMedia()}
     >
       <SymbolView
         name="plus"
-        size={Math.round((props.size === "large" ? 26 : 20) * scale)}
+        size={iconSize}
         weight="regular"
         tintColorClassName="accent-icon"
         type="monochrome"

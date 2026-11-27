@@ -36,10 +36,13 @@ import { KeyboardController, KeyboardStickyView } from "react-native-keyboard-co
 
 import {
   AuthOrchestrationOperateScope,
-  DEFAULT_PROVIDER_INTERACTION_MODE,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
+import {
+  deriveMatterMobileInteractionMode,
+  resolveMatterMobileModeSend,
+} from "../matter/composer/matterComposerLogic";
 
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { composerContextImportsAtom } from "../../state/use-composer-drafts";
@@ -639,11 +642,33 @@ export function NewTaskDraftScreen(props: {
     const workspaceMode = workspaceSelection.mode;
     const selectedBranchName = workspaceSelection.branch;
     const initialMessageText = draft.text.trim();
+    const draftProvider =
+      selectedEnvironmentServerConfig?.providers.find(
+        (provider) => provider.instanceId === modelSelection?.instanceId,
+      ) ?? null;
+    const modeSend = resolveMatterMobileModeSend({
+      prompt: initialMessageText,
+      bypass: false,
+      editingQueuedMessage: false,
+      modeState: deriveMatterMobileInteractionMode({
+        draftInteractionMode: draft.interactionMode,
+        thread: undefined,
+        isServerThread: false,
+        provider: draftProvider,
+      }),
+      attachmentCount: draft.attachments.length,
+      contextCount: draft.context?.records.length ?? 0,
+    });
+    if (modeSend.kind === "switch") {
+      flow.setInteractionMode(modeSend.nextMode);
+      flow.setPrompt("");
+      return null;
+    }
 
     if (
       attachmentBlockReason !== null ||
       !modelSelection ||
-      (initialMessageText.length === 0 && draft.attachments.length === 0) ||
+      (modeSend.text.trim().length === 0 && draft.attachments.length === 0) ||
       flow.submitting ||
       (workspaceMode === "worktree" && flow.isGitRepo && !selectedBranchName)
     ) {
@@ -706,8 +731,13 @@ export function NewTaskDraftScreen(props: {
       return null;
     }
 
+    if (modeSend.switchTo !== null) {
+      flow.setInteractionMode(modeSend.switchTo);
+    }
     const message = flow.buildPendingTaskMessage(creationMetadata, {
       currentCheckoutBranch: queuesInsteadOfStarting ? null : flow.currentCheckoutBranchName,
+      textOverride: modeSend.text,
+      interactionModeOverride: modeSend.interactionMode,
     });
     if (!message) {
       return null;
@@ -739,6 +769,7 @@ export function NewTaskDraftScreen(props: {
     clearComposerDraftContent(draftKey, {
       clearModelSelection: true,
       clearWorkspaceSelection: true,
+      clearInteractionMode: true,
       deferAttachmentCleanup: true,
     });
     scheduleUnusedComposerAttachmentCleanup(draftSnapshot.attachments);
@@ -1034,7 +1065,9 @@ export function NewTaskDraftScreen(props: {
         </View>
       ) : null}
       {viewportHeight < SHORT_DRAFT_VIEWPORT_HEIGHT ? contextControls : null}
-      {flow.canChooseWorkspace ? workspaceControls : null}
+      {flow.canChooseWorkspace && (offersRepositoryChoice || (startsNewWorktree && !flow.isGitRepo))
+        ? workspaceControls
+        : null}
     </View>
   );
 
@@ -1077,7 +1110,7 @@ export function NewTaskDraftScreen(props: {
       threadId: ThreadId.make(creationMetadata.threadId),
       modelSelection: flow.selectedModel,
       runtimeMode: flow.runtimeMode,
-      interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+      interactionMode: flow.interactionMode,
       branch: flow.selectedBranchName,
       worktreePath: flow.selectedWorktreePath,
       createdAt: creationMetadata.createdAt,
@@ -1097,6 +1130,28 @@ export function NewTaskDraftScreen(props: {
           editorRef: promptInputRef,
           sendBlockedReason: setupBlockReason,
           interactionLocked: isComposerInteractionLocked,
+          underTray: {
+            isScratchProject: flow.isScratchDraft,
+            projectTitle: selectedProjectLabel ?? selectedProject.title,
+            onPressProject: chooseProject,
+            workspaceMode: flow.workspaceMode,
+            worktreePath: flow.selectedWorktreePath,
+            canToggleWorkspace:
+              flow.canChooseWorkspace &&
+              !isComposerInteractionLocked &&
+              (flow.isGitRepo || flow.tracksGitRepositories),
+            onToggleWorkspace: () =>
+              flow.setWorkspaceMode(flow.workspaceMode === "local" ? "worktree" : "local"),
+            onChangeRuntimeMode: flow.setRuntimeMode,
+            branchLabel:
+              startsNewWorktree && !flow.isGitRepo
+                ? null
+                : showBranchLoading
+                  ? gt("Loading branches…")
+                  : selectedBranchLabel,
+            onPressBranch: () => openContextPicker("NewTaskBranch"),
+            branchDisabled: isComposerInteractionLocked || !flow.isGitRepo,
+          },
         }}
         canOperateThread={canOperate}
         selectedThread={thread}
@@ -1152,6 +1207,7 @@ export function NewTaskDraftScreen(props: {
         onStopThread={() => {}}
         onResumeQueue={null}
         onSendMessage={handleStart}
+        onChangeInteractionMode={flow.setInteractionMode}
         offersSideChat={false}
         onSendCommand={async () => null}
         onReconnectEnvironment={() => onReconnectEnvironment(selectedProject.environmentId)}

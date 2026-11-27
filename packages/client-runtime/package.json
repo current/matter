@@ -211,6 +211,10 @@
       "types": "./src/matterVoiceHttp.ts",
       "default": "./src/matterVoiceHttp.ts"
     },
+    "./matter/interaction-mode": {
+      "types": "./src/matter/interactionMode.ts",
+      "default": "./src/matter/interactionMode.ts"
+    },
     "./t3ToolSummary": {
       "types": "./src/t3ToolSummary.ts",
       "default": "./src/t3ToolSummary.ts"

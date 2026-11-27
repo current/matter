@@ -140,10 +140,8 @@ import {
 } from "./MatterComposerParts.matter";
 import { MatterComposerReplyBar } from "./MatterComposerReplyBar.matter";
 import { MatterComposerModeControl } from "./MatterComposerModeControl.matter";
-import {
-  deriveMatterComposerInteractionMode,
-  type MatterPlanImplementation,
-} from "./matterInteractionMode.matter";
+import type { MatterPlanImplementation } from "@t3tools/client-runtime/matter/interaction-mode";
+import { deriveMatterComposerInteractionMode } from "./matterInteractionMode.matter";
 import { useMatterGooeySendSetting } from "../../matterGooeySend";
 import { CollapsedComposerPromptPreview } from "./CollapsedComposerPromptPreview";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "./ComposerBannerStack";

@@ -43,7 +43,7 @@ import { parseMatterPlanOverview } from "../components/chat/matterPlanParser.mat
 import {
   providerHasNativeGoals,
   withNativeGoalCommand,
-} from "../components/chat/matterInteractionMode.matter";
+} from "@t3tools/client-runtime/matter/interaction-mode";
 import { approveMatterPlan } from "../components/chat/useMatterPlanApproval.matter";
 import { createMatterTasksActions } from "../components/tasks/matterTasksStore";
 import { primaryServerProvidersAtom } from "../state/server";

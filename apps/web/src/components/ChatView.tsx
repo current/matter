@@ -429,10 +429,8 @@ import {
 import { useDraftHeroLayoutTransition } from "./chat/useDraftHeroLayoutTransition";
 import { useLocalDispatchState } from "./chat/useLocalDispatchState";
 import { draftFanoutSelectionsAtom, draftSendState } from "./chat/chatViewSend";
-import {
-  clearPersistedComposerInteractionMode,
-  latestProposedPlan,
-} from "./chat/matterInteractionMode.matter";
+import { latestProposedPlan } from "@t3tools/client-runtime/matter/interaction-mode";
+import { clearPersistedComposerInteractionMode } from "./chat/matterInteractionMode.matter";
 import {
   isCompactCommandMessage,
   type LocalThreadErrorEntry,
