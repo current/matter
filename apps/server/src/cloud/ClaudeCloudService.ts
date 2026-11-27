@@ -76,7 +76,10 @@ const STRIPPED_ENV_KEYS = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"] as const
 
 const SESSION_URL_IN_OUTPUT = /https:\/\/claude\.ai\/code\/((?:cse|session)_[A-Za-z0-9_-]{4,200})/;
 const SESSION_ID_IN_OUTPUT = /\b((?:cse|session)_[A-Za-z0-9]{8,200})\b/;
-const TRUST_PROMPT = /trust (?:this|the files in this) folder/i;
+// The trust dialog starts on "No, exit" when the folder declares hooks, and only the ❯ glyph moves
+// on redraw, so the keys are chosen from where the cursor starts.
+const TRUST_PROMPT_ON_NO = /❯\s*(?:\d\.\s*)?No,\s*exit\s*(?:\d\.\s*)?Yes\b/i;
+const TRUST_PROMPT_ON_YES = /❯\s*(?:\d\.\s*)?Yes,\s*(?:I\s+trust|proceed)/i;
 
 export class ClaudeCloudError extends Schema.TaggedError<ClaudeCloudError>()("ClaudeCloudError", {
   code: Schema.String,
@@ -712,13 +715,17 @@ export const make = Effect.gen(function* () {
     const run = yield* runner
       .runPty({
         command: launch.command,
-        args: ["--cloud", "-n", title, input.prompt],
+        // `--cloud` takes the task as its own value; a positional prompt is rejected.
+        args: ["-n", title, "--cloud", input.prompt],
         cwd,
         env: launch.env,
         timeoutMs: LAUNCH_TIMEOUT_MS,
         match: findLaunchedSessionId,
         // Matter already runs Claude in this project; the folder-trust prompt defaults to yes.
-        answers: [{ when: TRUST_PROMPT, send: "\r" }],
+        answers: [
+          { when: TRUST_PROMPT_ON_NO, send: "\u001b[B\r" },
+          { when: TRUST_PROMPT_ON_YES, send: "\r" },
+        ],
       })
       .pipe(
         Effect.mapError(
