@@ -305,8 +305,8 @@
 }
 
 /* Line 2 names the run beside the light on line 1: green while the agent works, quiet while it
-   waits on background work it resumes from. */
-.mts.mlf .mts-l2 .mlf-st[data-tone="running"] {
+   waits on background work it resumes from. It stays green on the selected row, like its spinner. */
+.mts.mlf .mlf-row .mts-l2 .mlf-st[data-tone="running"] {
   color: var(--mlf-running-ink);
 }
 
