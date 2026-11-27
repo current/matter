@@ -74,6 +74,7 @@ import { compactDynamicToolOutput } from "@t3tools/shared/toolOutput";
 import { htmlRenderReferencesEqual, type HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import { mcpAppReferencesEqual, type McpAppReference } from "@t3tools/shared/mcpApp";
 import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
+import { withMatterDuration, workEntriesSpanMs } from "./matterWorkDuration.matter";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { m, type MessageResolver } from "../../i18n/messages";
 import { collectToolFilePaths } from "@t3tools/shared/toolActivity";
@@ -574,6 +575,8 @@ type MessagesTimelineRowContent =
       hiddenCount: number;
       expanded: boolean;
       summary: string;
+      /** Matter: the group's run time, trailing its header. */
+      durationMs?: number;
       summaryKind: ToolGroupSummaryKind;
       toolSurface?: WorkLogEntry["toolSurface"];
       toolIcon?: WorkLogEntry["toolIcon"];
@@ -2179,6 +2182,7 @@ export function deriveMessagesTimelineRows(
               singleEntry !== null && !workLogEntryIsToolLike(singleEntry)
                 ? singleEntry.label
                 : summarizeToolGroup(visibleGroupedEntries, resolve).summary,
+            ...withMatterDuration(workEntriesSpanMs(visibleGroupedEntries)),
             summaryKind,
             ...(groupToolSurface ? { toolSurface: groupToolSurface } : {}),
             ...(groupToolIcon ? { toolIcon: groupToolIcon } : {}),
@@ -2895,6 +2899,7 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.hiddenCount === bw.hiddenCount &&
         a.expanded === bw.expanded &&
         a.summary === bw.summary &&
+        a.durationMs === bw.durationMs &&
         a.summaryKind === bw.summaryKind &&
         a.toolSurface === bw.toolSurface &&
         Equal.equals(a.toolIcon, bw.toolIcon) &&

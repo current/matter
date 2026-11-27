@@ -2,7 +2,27 @@
    (Settings → Appearance → AI status). Loops run only while a turn works and its row is on
    screen: they follow `--visible-animation-state` from observeVisibleAnimation, and the row
    unmounts when the turn ends. SVG internals repaint on the main thread, so loops are stepped
-   to about 30fps per keyframe segment, as upstream's shimmer is. Swaps play once. Reduced motion shows the end state. */
+   to about 30fps per keyframe segment, as upstream's shimmer is. Swaps play once. Reduced motion shows the end state.
+   Matter "Tighter": a 13px label and 11px timer, 200 ms slide-and-unblur swaps, and a stepped opacity
+   pulse in place of the shimmer overlay, so the label never repaints per frame. */
+
+.matter-ais {
+  font-size: 13px;
+  line-height: 20px;
+}
+.matter-ais [data-slot="matter-ai-status-timer"] {
+  font-size: 11px;
+}
+.matter-ais[data-active] [data-slot="matter-ai-status-label"] {
+  animation: matter-ais-pulse 2s steps(6) infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+}
+.matter-ais[data-active] [data-slot="matter-ai-status-label"].matter-ais-text-in {
+  animation:
+    matter-ais-text-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both,
+    matter-ais-pulse 2s steps(6) 200ms infinite;
+  animation-play-state: running, var(--visible-animation-state, paused);
+}
 
 .matter-ais-icon svg {
   overflow: visible;
@@ -56,19 +76,19 @@
 /* Label, detail and icon swaps: RareUI's springs as one-shot curves. The leaving copy sits
    on top of the new one so the row measures only the new label. */
 .matter-ais-text-in {
-  animation: matter-ais-text-in 500ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  animation: matter-ais-text-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 .matter-ais-text-out {
-  animation: matter-ais-text-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: matter-ais-text-out 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 .matter-ais-icon-in {
-  animation: matter-ais-icon-in 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: matter-ais-icon-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 .matter-ais-icon-out {
-  animation: matter-ais-icon-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: matter-ais-icon-out 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 .matter-ais-row {
-  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @keyframes matter-ais-sparkle {
@@ -122,32 +142,42 @@
     stroke-dasharray: 0 2;
   }
 }
+@keyframes matter-ais-pulse {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  50%,
+  90% {
+    opacity: 0.58;
+  }
+}
 @keyframes matter-ais-text-in {
   from {
-    transform: translateY(8px);
+    transform: translateY(4px);
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(2px);
   }
 }
 @keyframes matter-ais-text-out {
   to {
-    transform: translateY(-8px);
+    transform: translateY(-4px);
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(2px);
   }
 }
 @keyframes matter-ais-icon-in {
   from {
-    transform: scale(0.5) rotate(-30deg);
+    transform: scale(0.8);
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(2px);
   }
 }
 @keyframes matter-ais-icon-out {
   to {
-    transform: scale(0.5) rotate(30deg);
+    transform: scale(0.8);
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(2px);
   }
 }
 /* The pen draws a wave, holds it, and lifts back to the start; points sit at eased arc length

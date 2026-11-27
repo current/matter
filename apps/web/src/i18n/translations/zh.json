@@ -5035,6 +5035,7 @@
   "c6e000ea79ae6a2b": "{status, select, inProgress {正在读取会话“{title}”} completed {已读取会话“{title}”} failed {读取会话“{title}”失败} declined {已拒绝读取会话“{title}”} stopped {已停止读取会话“{title}”} other {正在读取会话“{title}”}}",
   "93435595c79fd659": "已达到用量限制。请在 {resetTime} 后重试。",
   "5a2d803b3ea43f18": "已达到用量上限。",
+  "4c36ab712143ad31": "思考了 {duration}",
   "1afc4f46bc0675aa": "{label}，工具调用失败",
   "e05d1bee2862c2be": "工具调用失败",
   "ce591b4de647ecda": "打开 {title}",

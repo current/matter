@@ -21,7 +21,7 @@ import {
   type TimelineRow,
   type TimelineRowActivityState,
 } from "./timelineRowContext";
-import { ActivityShimmerOverlay } from "./TimelineRowParts";
+import { noteWorkGroupToggle } from "./matterWorklog.matter";
 import { ThinkingTimelineRow, WorkingTimelineRow } from "./TimelineWorkGroupRows";
 import { formatWorkingTimerNow } from "./TimelineWorkGroupRows.logic";
 
@@ -140,7 +140,10 @@ export function MatterThinkingTimelineRow({
       type="button"
       className="group/live-work flex min-h-6 w-full max-w-full cursor-pointer items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
       aria-expanded={row.expanded === true}
-      onClick={() => ctx.onToggleWorkGroup(groupId, row.id)}
+      onClick={() => {
+        noteWorkGroupToggle(row.expanded === true);
+        ctx.onToggleWorkGroup(groupId, row.id);
+      }}
     >
       {status}
     </button>
@@ -222,8 +225,8 @@ function bindRowWidth(row: HTMLSpanElement | null) {
 }
 
 /**
- * RareUI's Inline AI Status: an animated icon per state and a shimmering label, swapping with a
- * blur-and-lift; loops run only while `active`.
+ * RareUI's Inline AI Status: an animated icon per state and a pulsing label, swapping with a
+ * slide-and-unblur; loops run only while `active`.
  */
 export function MatterAiStatus({
   icon,
@@ -296,7 +299,6 @@ export function MatterAiStatus({
               )}
             >
               {label}
-              {active ? <ActivityShimmerOverlay>{label}</ActivityShimmerOverlay> : null}
             </span>
           </span>
           {active && timer ? (

@@ -28,6 +28,7 @@ import {
   type NativeChildToolVerb,
 } from "./nativeChildWork.logic";
 import { WorkLogBlock, WorkLogDetails, WorkLogList, WorkLogRow } from "./WorkLog";
+import { useMatterDisclosure } from "./matterWorklog.matter";
 
 const LIVE_POLL_INTERVAL_MS = 2_500;
 
@@ -243,6 +244,7 @@ function NativeChildToolRow(props: {
   const { item } = props;
   const gt = useGT();
   const [expanded, setExpanded] = useState(false);
+  const disclosure = useMatterDisclosure(expanded);
 
   const verbLabel = (() => {
     switch (item.verb) {
@@ -269,6 +271,7 @@ function NativeChildToolRow(props: {
 
   return (
     <WorkLogRow
+      data-matter-disclosure={disclosure.phase ?? undefined}
       icon={item.running ? <Spinner className="size-3.5" /> : toolVerbIcon(item.verb)}
       label={
         <span className="inline-flex min-w-0 max-w-full items-baseline gap-1.5">
@@ -300,9 +303,9 @@ function NativeChildToolRow(props: {
           ) : null}
           {hasDetails ? (
             expanded ? (
-              <ChevronDownIcon aria-hidden="true" className="size-3.5" />
+              <ChevronDownIcon aria-hidden="true" className="size-3.5" data-matter-wl-chevron />
             ) : (
-              <ChevronRightIcon aria-hidden="true" className="size-3.5" />
+              <ChevronRightIcon aria-hidden="true" className="size-3.5" data-matter-wl-chevron />
             )
           ) : null}
         </span>
@@ -324,7 +327,7 @@ function NativeChildToolRow(props: {
           : undefined
       }
     >
-      {expanded && hasDetails ? (
+      {disclosure.present && hasDetails ? (
         <WorkLogDetails>
           {item.inputText.trim().length > 0 ? (
             <div className="flex flex-col gap-1">
@@ -354,9 +357,11 @@ function NativeChildOutputRow(props: {
   const { item } = props;
   const gt = useGT();
   const [expanded, setExpanded] = useState(false);
+  const disclosure = useMatterDisclosure(expanded);
 
   return (
     <WorkLogRow
+      data-matter-disclosure={disclosure.phase ?? undefined}
       icon={
         item.running ? (
           <Spinner className="size-3.5" />
@@ -383,9 +388,9 @@ function NativeChildOutputRow(props: {
             </span>
           ) : null}
           {expanded ? (
-            <ChevronDownIcon aria-hidden="true" className="size-3.5" />
+            <ChevronDownIcon aria-hidden="true" className="size-3.5" data-matter-wl-chevron />
           ) : (
-            <ChevronRightIcon aria-hidden="true" className="size-3.5" />
+            <ChevronRightIcon aria-hidden="true" className="size-3.5" data-matter-wl-chevron />
           )}
         </span>
       }
@@ -402,7 +407,7 @@ function NativeChildOutputRow(props: {
         },
       }}
     >
-      {expanded ? (
+      {disclosure.present ? (
         <WorkLogDetails>
           <pre className="max-h-64 overflow-auto rounded-md border border-border/50 bg-muted/30 p-2 font-mono text-xs whitespace-pre-wrap break-words text-foreground">
             {item.text}
