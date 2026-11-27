@@ -3,11 +3,7 @@ import { memo, type ComponentProps } from "react";
 import { useWindowDimensions, View } from "react-native";
 
 import { ProjectFavicon } from "../../../components/ProjectFavicon";
-import {
-  ProviderIcon,
-  ProviderInstanceIcon,
-  providerInstanceNameLabel,
-} from "../../../components/ProviderIcon";
+import { ProviderIcon, providerInstanceNameLabel } from "../../../components/ProviderIcon";
 import { SymbolView } from "../../../components/ui/AppSymbol";
 import { AppText as Text } from "../../../components/ui/AppText";
 import { cn } from "../../../lib/cn";
@@ -210,15 +206,13 @@ function MatterTimelineRowContent(
         {full ? (
           <View className="mt-0.5 flex-row items-center gap-1.5">
             {project && providerInstance ? (
-              <ProviderInstanceIcon
-                iconUrl={props.providerIconUrl}
-                provider={providerInstance.driverKind}
-                size={12}
-                displayName={providerInstance.displayName}
-                accentColor={providerInstance.accentColor}
-                showBadge={providerInstance.showBadge}
-                surfaceColor={appearance.providerIconSurfaceColor}
-              />
+              <View style={{ opacity: 0.6 }}>
+                <ProviderIcon
+                  iconUrl={props.providerIconUrl}
+                  provider={providerInstance.driverKind}
+                  size={12}
+                />
+              </View>
             ) : null}
             <Text
               className={cn("shrink text-2xs", secondary)}

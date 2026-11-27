@@ -735,7 +735,8 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         reportedSelection={props.reportedModelSelection}
         prompt={draftMessage}
         surfaceColor={composerPanel}
-        iconOnly={false}
+        iconOnly={Boolean(props.compactBeforeSend) && !showResumeAction && queuedEdit === null}
+        hideSummary={modeState.mode !== "default"}
         onPress={openSettings}
       />
     </View>

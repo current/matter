@@ -20,6 +20,8 @@ export function ComposerModelControl(props: {
   readonly disabled?: boolean;
   readonly size?: "regular" | "large";
   readonly iconOnly?: boolean;
+  /** Keeps the reasoning summary out of the visible label when the bar is crowded. */
+  readonly hideSummary?: boolean;
   readonly onPress: () => void;
 }) {
   const gt = useGT();
@@ -41,6 +43,7 @@ export function ComposerModelControl(props: {
         m,
       ).label
     : "";
+  const visibleSummary = props.hideSummary ? "" : summary;
   const badge = props.modelOption?.providerBadge;
   const label = props.modelOption?.label ?? props.selection?.model ?? gt("Choose model");
   const providerNameLabel = badge
@@ -99,9 +102,9 @@ export function ComposerModelControl(props: {
             numberOfLines={1}
           >
             {shortLabel}
-            {summary ? ` · ${summary}` : ""}
+            {visibleSummary ? ` · ${visibleSummary}` : ""}
           </Text>
-        ) : summary ? (
+        ) : visibleSummary ? (
           <Text
             className={
               props.size === "large"
@@ -110,7 +113,7 @@ export function ComposerModelControl(props: {
             }
             numberOfLines={1}
           >
-            {summary}
+            {visibleSummary}
           </Text>
         ) : undefined
       }

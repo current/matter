@@ -2051,7 +2051,7 @@ function renderFeedEntry(
 
   if (entry.type === "pending-fold") {
     return (
-      <View className="mb-1 flex-row items-center border-b border-border-subtle px-2">
+      <View className="mb-1 flex-row items-center px-2">
         <View
           className="min-h-11 min-w-0 flex-1 flex-row items-center"
           style={{
@@ -2072,7 +2072,7 @@ function renderFeedEntry(
 
   if (entry.type === "run-fold") {
     return (
-      <View className="mb-1 flex-row items-center border-b border-border-subtle px-2">
+      <View className="mb-1 flex-row items-center px-2">
         {entry.workingSince ? (
           <MatterAiStatusWorkingRow
             environmentId={props.environmentId}
