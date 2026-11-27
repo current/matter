@@ -40,6 +40,7 @@ interface Call {
   readonly args: ReadonlyArray<string>;
   readonly cwd: string;
   readonly env: NodeJS.ProcessEnv;
+  readonly answers?: ReadonlyArray<{ readonly when: RegExp; readonly send: string }>;
 }
 
 /** What the fake `claude` and `git` answer; reset before each test. */
@@ -309,9 +310,9 @@ describe("ClaudeCloudService", () => {
 
       const pty = scenario.calls.find((call) => call.kind === "pty");
       assert.deepStrictEqual(pty?.args, [
-        "--cloud",
         "-n",
         "Fix flaky tests",
+        "--cloud",
         "Run the full test suite and fix failures",
       ]);
       assert.strictEqual(pty?.cwd, ROOT);
@@ -338,6 +339,32 @@ describe("ClaudeCloudService", () => {
       );
       assert.isTrue(yield* restarted.forgetSession(`https://claude.ai/code/${CLOUD_ID}`));
       assert.deepStrictEqual(yield* restarted.listSessions(), []);
+    }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
+  );
+
+  it.effect("accepts the folder-trust dialog whichever option the cursor starts on", () =>
+    Effect.gen(function* () {
+      yield* configure(true);
+      const cloud = yield* ClaudeCloudService.make;
+      yield* cloud.launchSession({ prompt: "Smoke test", projectId: PROJECT, createdBy: "user" });
+      const answers = scenario.calls.find((call) => call.kind === "pty")?.answers ?? [];
+      const keysFor = (frame: string) => {
+        const output = ClaudeCloudRunner.stripAnsi(frame);
+        return answers.find((answer) => answer.when.test(output))?.send;
+      };
+
+      // Captured from claude 2.1.332 in a folder whose settings declare hooks.
+      const hooksDialog =
+        "\u001b[2GTrusting\u001b[11Gthis\u001b[16Gfolder\r\r\n\r\r\n" +
+        "\u001b[2G\u276f\u001b[4GNo,\u001b[8Gexit\r\r\n" +
+        "\u001b[4GYes,\u001b[9GI\u001b[11Gtrust\u001b[17Gthis\u001b[22Gfolder\r\r\n\r\r\n" +
+        "\u001b[2GEnter\u001b[8Gto\u001b[11Gconfirm\r\r\n";
+      assert.strictEqual(keysFor(hooksDialog), "\u001b[B\r");
+      assert.strictEqual(
+        keysFor("Do you trust the files in this folder?\n\u276f 1. Yes, proceed\n  2. No, exit\n"),
+        "\r",
+      );
+      assert.isUndefined(keysFor("Starting cloud session\u2026\n"));
     }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
   );
 
