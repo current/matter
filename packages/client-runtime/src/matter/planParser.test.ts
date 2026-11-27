@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseMatterPlanOverview, stripInlineMarkdown } from "./matterPlanParser.matter";
+import { parseMatterPlanOverview, stripInlineMarkdown } from "./planParser.ts";
 
 describe("parseMatterPlanOverview", () => {
   it("reads the title, first prose paragraph and checklist items", () => {

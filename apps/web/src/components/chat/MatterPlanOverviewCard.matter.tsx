@@ -34,7 +34,10 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { findRevealRef } from "./markdownFindContext";
 import { matterAnimatedHeightRef } from "./matterCardMotion.matter";
-import { parseMatterPlanOverview, type MatterPlanStep } from "./matterPlanParser.matter";
+import {
+  parseMatterPlanOverview,
+  type MatterPlanStep,
+} from "@t3tools/client-runtime/matter/plan-parser";
 
 const COLLAPSED_STEP_COUNT = 3;
 const COUNTDOWN_TICK_MS = 250;

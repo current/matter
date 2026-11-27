@@ -4,7 +4,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, PlanId } from "@t3tools/contracts";
 import { proposedPlanTitle, stripDisplayedPlanMarkdown } from "@t3tools/shared/proposedPlanText";
 import { useGT } from "gt-react-native";
 import { m } from "../../i18n/messages";
@@ -16,9 +16,21 @@ import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
 import { projectEnvironment } from "../../state/projects";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { MatterPlanOverviewCard } from "../matter/cards/MatterPlanOverviewCard.matter";
 import { CopyTextButton } from "./CopyTextButton";
 
 export function ProposedPlanCard(props: {
+  readonly environmentId: EnvironmentId;
+  readonly planId?: PlanId | undefined;
+  readonly workspaceRoot: string | null | undefined;
+  readonly markdown: string;
+  readonly renderMarkdown: (text: string) => ReactNode;
+}) {
+  return <MatterPlanOverviewCard {...props} />;
+}
+
+// oxlint-disable-next-line no-unused-vars -- retained upstream body to minimize merge conflicts
+function UpstreamProposedPlanCard(props: {
   readonly environmentId: EnvironmentId;
   readonly workspaceRoot: string | null | undefined;
   readonly markdown: string;

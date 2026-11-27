@@ -686,6 +686,10 @@
     "./pull-request-references": {
       "types": "./src/pullRequestReferences.ts",
       "default": "./src/pullRequestReferences.ts"
+    },
+    "./matter/plan-parser": {
+      "types": "./src/matter/planParser.ts",
+      "default": "./src/matter/planParser.ts"
     }
   },
   "scripts": {
