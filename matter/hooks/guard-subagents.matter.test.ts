@@ -13,6 +13,19 @@ describe("matter/hooks/guard-subagents", () => {
     }
   });
 
+  it("blocks Antigravity while it is paused, by instance or driver", () => {
+    for (const target of [
+      { providerInstanceId: "antigravity", model: "gemini-4-neon" },
+      { providerInstanceId: "agy-work", driverKind: "antigravity" },
+    ]) {
+      const res = evaluateGuard({
+        tool_name: "mcp__t3-code__delegate_task",
+        tool_input: { target, role: "implementation" },
+      });
+      expect(res.allow).toBe(false);
+    }
+  });
+
   it("blocks Sonnet and Haiku coding subagents in delegate_task and Agent", () => {
     expect(
       evaluateGuard({
@@ -39,22 +52,12 @@ describe("matter/hooks/guard-subagents", () => {
     ).toBe(false);
   });
 
-  it("allows Opus, Antigravity, and read-only research/Explore subagents", () => {
+  it("allows Opus and read-only research/Explore subagents", () => {
     expect(
       evaluateGuard({
         tool_name: "mcp__t3-code__delegate_task",
         tool_input: {
           target: { providerInstanceId: "claude-alt", model: "claude-opus-5-5" },
-          role: "implementation",
-        },
-      }).allow,
-    ).toBe(true);
-
-    expect(
-      evaluateGuard({
-        tool_name: "mcp__t3-code__delegate_task",
-        tool_input: {
-          target: { providerInstanceId: "antigravity", model: "gemini-4-neon" },
           role: "implementation",
         },
       }).allow,
