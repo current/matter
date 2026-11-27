@@ -136,6 +136,8 @@
         "src/features/devices/device-stream.browser.ts!",
         "src/features/browser/preview-stream.browser.ts!",
       ],
+      // Matter: the home list shows MatterTimelineScopeLine; upstream's chips stay unedited.
+      "ignore": ["src/features/home/ThreadListFilters.tsx"],
       // Fonts are configured as asset paths; Expo autolinks the native packages.
       "ignoreDependencies": [
         "@expo-google-fonts/dm-sans",

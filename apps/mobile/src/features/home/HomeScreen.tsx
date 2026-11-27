@@ -110,7 +110,7 @@ import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-sw
 import { useFabScroll } from "./FabScrollContext";
 import { holdLaunchSplashForHomeRows, settleLaunchSplashHomeRows } from "./home-launch-splash";
 import { useWorkspaceTabs } from "../layout/workspace/WorkspaceTabsContext";
-import { ThreadListFilters } from "./ThreadListFilters";
+import { MatterTimelineScopeLine } from "../matter/timeline/MatterTimelineScopeLine";
 import { deriveHomeEmptyState } from "./home-empty-state";
 
 interface HomeScreenProps {
@@ -712,7 +712,7 @@ export function HomeScreen(props: HomeScreenProps) {
     <>
       {listHeader}
       {Platform.OS === "ios" && workspace ? (
-        <ThreadListFilters
+        <MatterTimelineScopeLine
           gutter={sidebarSurface ? 8 : 0}
           environments={props.environments}
           projects={pickableProjectGroups(

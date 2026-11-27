@@ -7,7 +7,6 @@ import { ProviderIcon, providerInstanceNameLabel } from "../../../components/Pro
 import { SymbolView } from "../../../components/ui/AppSymbol";
 import { AppText as Text } from "../../../components/ui/AppText";
 import { cn } from "../../../lib/cn";
-import { useScaledTextRole } from "../../settings/appearance/useScaledTextRole";
 import { QueuedMessageIcon } from "../../threads/queued-message-icon";
 import { ThreadListV2Row } from "../../threads/thread-list-v2-items";
 import {
@@ -18,9 +17,16 @@ import {
   matterTimelineRowAccessibilityLabel,
   matterTimelineStateLabel,
 } from "./matterTimelineCopy";
+import { MatterProviderMark } from "./MatterProviderMark";
 import type { MatterTimelineRowInfo } from "./matterTimelineList";
 
 type RowProps = ComponentProps<typeof ThreadListV2Row>;
+
+// text-sm and text-2xs line heights; the icon sits one step above the 14px title.
+const TITLE_LINE_HEIGHT = 19;
+const LINE_TWO_LINE_HEIGHT = 16;
+const TITLE_ICON_SIZE = 16;
+const LINE_TWO_MARK_SIZE = 12;
 
 const NO_PROJECT = msg("No project", { $context: "a thread that belongs to no project" });
 
@@ -113,11 +119,15 @@ function MatterTimelineRowContent(
 ) {
   const m = useMessages();
   const { fontScale } = useWindowDimensions();
-  const titleTypography = useScaledTextRole("body");
   const { appearance, info, thread, project, providerInstance } = props;
   const sidebarPane = props.pane === "sidebar";
   const selected = props.selected === true;
-  const iconSize = Math.round(titleTypography.fontSize * fontScale);
+  // The Mac sidebar's proportions: a title-sized project icon over a smaller gray provider mark,
+  // both in one column, so line 2's text starts on the title's rail.
+  const iconSize = Math.round(TITLE_ICON_SIZE * fontScale);
+  const markSize = Math.round(LINE_TWO_MARK_SIZE * fontScale);
+  const titleLineHeight = TITLE_LINE_HEIGHT * fontScale;
+  const lineTwoHeight = LINE_TWO_LINE_HEIGHT * fontScale;
   const full = info.density === "full";
   const stateLabel = matterTimelineStateLabel(info, m);
   const ink = selected
@@ -139,9 +149,11 @@ function MatterTimelineRowContent(
           ? STATE_TEXT_CLASS[info.tone]
           : secondary;
   const titleClass = cn(
-    "min-w-0 flex-1 text-base",
+    "min-w-0 flex-1 text-sm",
     selected || info.unread ? ink : full && !info.quiet ? ink : appearance.mutedForegroundClassName,
-    info.unread ? "font-t3-bold" : selected && "font-t3-medium",
+    info.unread ? "font-t3-semibold" : selected && "font-t3-medium",
+    // Read titles sit a step under full ink, as on the Mac, so unread ones stand out.
+    full && !info.quiet && !info.unread && !selected && "opacity-[0.86]",
     thread.titleRegeneration != null && "opacity-55",
   );
   const leading = project ? (
@@ -162,22 +174,44 @@ function MatterTimelineRowContent(
   ) : (
     <View style={{ width: iconSize }} />
   );
+  const showMark = full && project !== undefined && project !== null && providerInstance != null;
   return (
     <View
       className={cn(
         "flex-row gap-2.5",
-        full ? "items-start py-2" : "min-h-[40px] items-center py-1.5",
+        full ? "items-start py-[7px]" : "min-h-[40px] items-center py-1.5",
         sidebarPane ? "px-3" : "px-5",
       )}
     >
       <View
-        className={cn("justify-center", info.quiet && !selected && "opacity-45")}
-        style={full ? { height: titleTypography.lineHeight * fontScale } : undefined}
+        className={cn("items-center", info.quiet && !selected && "opacity-45")}
+        style={{ width: iconSize }}
       >
-        {leading}
+        <View className="justify-center" style={full ? { height: titleLineHeight } : undefined}>
+          {leading}
+        </View>
+        {showMark ? (
+          <View className="mt-0.5 justify-center" style={{ height: lineTwoHeight, opacity: 0.8 }}>
+            <MatterProviderMark
+              iconUrl={props.providerIconUrl}
+              provider={providerInstance.driverKind}
+              size={markSize}
+              fillClassName={
+                selected
+                  ? "bg-thread-selected-foreground-muted"
+                  : sidebarPane
+                    ? "bg-drawer-foreground-muted"
+                    : "bg-foreground-tertiary"
+              }
+            />
+          </View>
+        ) : null}
       </View>
       <View className="min-w-0 flex-1">
-        <View className="flex-row items-center gap-1.5">
+        <View
+          className="flex-row items-center gap-1.5"
+          style={full ? { height: titleLineHeight } : undefined}
+        >
           <Text className={titleClass} numberOfLines={1}>
             {thread.title}
           </Text>
@@ -204,16 +238,7 @@ function MatterTimelineRowContent(
           />
         </View>
         {full ? (
-          <View className="mt-0.5 flex-row items-center gap-1.5">
-            {project && providerInstance ? (
-              <View style={{ opacity: 0.6 }}>
-                <ProviderIcon
-                  iconUrl={props.providerIconUrl}
-                  provider={providerInstance.driverKind}
-                  size={12}
-                />
-              </View>
-            ) : null}
+          <View className="mt-0.5 flex-row items-center" style={{ height: lineTwoHeight }}>
             <Text
               className={cn("shrink text-2xs", secondary)}
               numberOfLines={1}
@@ -222,10 +247,10 @@ function MatterTimelineRowContent(
               {info.projectName ?? m(NO_PROJECT)}
             </Text>
             {info.branchLabel !== null ? (
-              <View className="min-w-0 shrink flex-row items-center gap-1">
+              <View className="ml-2 min-w-0 shrink flex-row items-center gap-1">
                 <SymbolView
                   name="arrow.triangle.branch"
-                  size={10}
+                  size={11}
                   type="monochrome"
                   tintColorClassName={secondaryTint}
                 />
@@ -234,7 +259,7 @@ function MatterTimelineRowContent(
                 </Text>
               </View>
             ) : null}
-            <View className="flex-1" />
+            <View className="min-w-2 flex-1" />
             {stateLabel !== null ? (
               <Text className={cn("text-2xs font-t3-medium", stateTextClass)} numberOfLines={1}>
                 {stateLabel}
