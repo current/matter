@@ -81,6 +81,13 @@ export const ClockGlyph = (props: IconProps) => (
   </Glyph>
 );
 
+/** Waiting on background work the agent resumes from: the spinner's ring, dotted and still. */
+export const WaitingGlyph = (props: IconProps) => (
+  <Glyph {...props}>
+    <circle cx="8" cy="8" r="5.5" strokeDasharray="0.01 2.88" />
+  </Glyph>
+);
+
 export const SearchGlyph = (props: IconProps) => (
   <Glyph {...props}>
     <circle cx="7.1" cy="7.1" r="4.35" />

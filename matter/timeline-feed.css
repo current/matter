@@ -1,0 +1,319 @@
+/* Timeline's feed: state-first sections, rows led by their project, dated folds and a one-row
+   usage footer. The root also carries .mts and .mfs, so the brand row, nav, scope row, footer
+   and popovers keep timeline-sidebar.css and sidebar.css. This file holds what the feed changes,
+   scoped `.mts.mlf` so each rule outranks the timeline-sidebar.css rule it adjusts. */
+
+.mts.mlf {
+  /* Amber text sits on the bare shell, so it leans toward the ink to stay readable when small. */
+  --mlf-needs-ink: color-mix(in srgb, var(--mts-needs) 80%, var(--mts-ink));
+}
+
+/* sidebar.css hides the titlebar wordmark; back and forward then start where it did. */
+@media (min-width: 768px) {
+  [data-slot="sidebar-inner"]
+    [data-matter-sidebar-layout="timeline"]
+    .drag-region
+    div:has(> button > svg.lucide-arrow-left) {
+    margin-inline-start: var(--workspace-titlebar-content-left);
+  }
+}
+
+.mts.mlf .mts-so[data-popup-open] {
+  background: var(--mts-hover);
+  color: var(--mts-ink);
+}
+
+/* Section headers: label, a quiet count, and a chevron that shows on hover or while folded. */
+.mts.mlf .mlf-sec {
+  gap: 6px;
+  padding: 12px 16px 5px;
+}
+
+.mts.mlf .mlf-sec .mts-fold {
+  gap: 6px;
+}
+
+.mts.mlf .mlf-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 450;
+  opacity: 0.72;
+}
+
+.mts.mlf .mlf-sec[data-kind="needs"] {
+  color: var(--mlf-needs-ink);
+}
+
+.mts.mlf .mlf-sec .mts-cr {
+  margin-left: -3px;
+  opacity: 0;
+}
+
+.mts.mlf .mlf-sec .mts-fold:is(:hover, :focus-visible, [aria-expanded="false"]) .mts-cr {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mts.mlf .mlf-sec .mts-cr {
+    transition:
+      opacity 120ms ease,
+      rotate 140ms ease;
+  }
+
+  .mts.mlf .mlf-more {
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+}
+
+/* Two-line rows, a little tighter than Timeline's 55px. */
+.mts.mlf .mlf-row {
+  margin-bottom: 1px;
+  padding: 7px 8px;
+}
+
+.mts.mlf .mlf-row .mts-l2 {
+  height: 16px;
+  margin-top: 1px;
+}
+
+/* History drops to one 30px line: provider, title, pull request state, age. */
+.mts.mlf .mlf-row[data-density="compact"] {
+  height: 30px;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.mts.mlf .mlf-row[data-density="compact"] .mts-t {
+  color: color-mix(in srgb, var(--mts-ink) 80%, transparent);
+}
+
+/* Offscreen history skips layout and paint, so a long open fold costs what is on screen. */
+.mts.mlf .mlf-rows[data-density="compact"] > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 31px;
+}
+
+/* Bold means unread and nothing else; the open row is marked by its pill. */
+.mts.mlf .mlf-row[data-active] .mts-t {
+  color: var(--mts-ink);
+  font-weight: 500;
+}
+
+.mts.mlf .mlf-row[data-unread] .mts-t {
+  color: var(--mts-ink);
+  font-weight: 600;
+}
+
+/* The right edge is one status column. Line 1 holds the light (amber waits on you, green runs,
+   red failed, blue unread) beside a run's elapsed time; line 2 names what a thread waits on, so
+   its title keeps the full width. */
+.mts.mlf .mlf-st {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--mts-secondary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mts.mlf .mlf-st[data-tone="needs"] {
+  color: var(--mlf-needs-ink);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.mts.mlf .mlf-st[data-tone="failed"] {
+  color: var(--destructive);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.mts.mlf .mlf-row .mts-fail {
+  pointer-events: none;
+  cursor: inherit;
+}
+
+.mts.mlf .mts-l2 .mlf-st {
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.mts.mlf .mlf-row .mts-spin,
+.mts.mlf .mlf-row[data-active] .mts-spin {
+  color: var(--success);
+}
+
+.mts.mlf .mlf-row[data-active] .mlf-st[data-tone="running"] {
+  color: var(--mts-ink);
+}
+
+/* Line 2 reads project, then branch, with the pull request held to the right edge. */
+.mts.mlf .mlf-row .mts-proj {
+  min-width: 0;
+  max-width: 44%;
+  flex: none;
+}
+
+/* A thread without a project has no workspace glyph; its label still starts on the text rail. */
+.mts.mlf .mlf-row .mts-l2 > .mts-proj:first-child {
+  margin-left: 22px;
+}
+
+.mts.mlf .mlf-row .mts-br {
+  margin-left: 8px;
+  padding-left: 0;
+}
+
+.mts.mlf .mlf-row .mts-mi + .mts-br {
+  margin-left: 0;
+}
+
+.mts.mlf .mlf-row .mts-pr {
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.mts.mlf .mlf-row .mlf-pr-mark {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+/* Subagents: what each waits on, and one row for the rest once a thread runs more than a few. */
+.mts.mlf .mts-sm[data-tone="needs"] {
+  color: var(--mlf-needs-ink);
+}
+
+.mts.mlf .mts-sm[data-tone="failed"] {
+  color: var(--destructive);
+}
+
+.mts.mlf .mlf-more {
+  gap: 2px;
+  color: var(--mts-muted);
+  font-size: 11.5px;
+}
+
+.mts.mlf .mlf-more:hover {
+  color: var(--mts-ink);
+}
+
+.mts.mlf .mlf-more .mts-st {
+  flex: 0 1 auto;
+}
+
+.mts.mlf .mlf-more .mts-cr {
+  margin-left: 0;
+  rotate: 90deg;
+}
+
+.mts.mlf .mlf-more:has(> .mts-hit[aria-expanded="true"]) .mts-cr {
+  rotate: -90deg;
+}
+
+@media (pointer: coarse) {
+  .mts.mlf .mlf-row[data-density="compact"] {
+    height: 40px;
+  }
+
+  .mts.mlf .mlf-rows[data-density="compact"] > li {
+    contain-intrinsic-size: auto 41px;
+  }
+}
+
+/* Line 2 names the run beside the light on line 1: green while the agent works, quiet while it
+   waits on background work it resumes from. */
+.mts.mlf .mts-l2 .mlf-st[data-tone="running"] {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.mts.mlf .mts-l2 .mlf-st[data-tone="background"] {
+  font-weight: 500;
+}
+
+.mts.mlf .mlf-row .mlf-wait {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--mts-secondary);
+}
+
+.mts.mlf .mlf-row[data-active] .mlf-st[data-tone="background"] {
+  color: var(--mts-ink);
+}
+
+/* The project's icon leads the row; its provider moves to the start of line 2. */
+.mts.mlf .mlf-proj-icon {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  place-items: center;
+}
+
+.mts.mlf .mts-l2 .mlf-l2-provider {
+  width: 14px;
+  height: 12px;
+  margin-right: 8px;
+}
+
+.mts.mlf .mts-l2 .mlf-l2-provider svg,
+.mts.mlf .mts-l2 .mlf-l2-provider img {
+  width: 11px;
+  height: 11px;
+}
+
+.mts.mlf .mts-l2 .mlf-l2-provider + .mts-mi {
+  margin-left: -2px;
+}
+
+/* Every provider's tightest limit on one row. */
+.mts.mlf .mlf-use-row {
+  column-gap: 12px;
+  padding: 9px 14px 10px;
+}
+
+.mts.mlf .mlf-use-row .mts-mh {
+  gap: 5px;
+}
+
+.mts.mlf .mlf-use-row .mts-v {
+  margin-left: 0;
+}
+
+.mts.mlf .mlf-use-row .mts-tr {
+  height: 3px;
+  margin-top: 4px;
+}
+
+/* The update button sits in the Settings row instead of taking a row of its own. */
+.mts.mlf .mlf-foot-update {
+  display: flex;
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.mts.mlf .mlf-foot-update:empty {
+  display: none;
+}
+
+.mts.mlf .mts-foot:has(.mlf-foot-update:not(:empty)) .mts-help {
+  margin-left: 2px;
+}
+
+/* The scope menu shows each project's icon, the key to the icons that lead the rows. */
+.mlf-menu-proj {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.mlf-menu-proj > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

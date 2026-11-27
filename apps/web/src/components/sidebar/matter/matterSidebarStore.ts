@@ -10,7 +10,6 @@ const MATTER_SIDEBAR_SORT_STORAGE_KEY = "mattr:sidebar:sort:v1";
 const MATTER_SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "mattr:sidebar:collapsed-groups:v1";
 export const MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY = "mattr:sidebar:timeline-subagents:v1";
 const MATTER_TIMELINE_SORT_STORAGE_KEY = "mattr:sidebar:timeline-sort:v1";
-const MATTER_TIMELINE_EARLIER_STORAGE_KEY = "mattr:sidebar:timeline-earlier:v1";
 
 export const MatterSidebarLayout = Schema.Literals(["inbox", "spaces", "timeline", "classic"]);
 export type MatterSidebarLayout = typeof MatterSidebarLayout.Type;
@@ -83,8 +82,4 @@ const MatterTimelineSort = Schema.Literals(["updated", "created"]);
 /** Timeline's feed order and day buckets: by last activity or by when threads began. */
 export function useMatterTimelineSort() {
   return useLocalStorage(MATTER_TIMELINE_SORT_STORAGE_KEY, "updated", MatterTimelineSort);
-}
-
-export function useMatterTimelineEarlierExpanded() {
-  return useLocalStorage(MATTER_TIMELINE_EARLIER_STORAGE_KEY, false, Schema.Boolean);
 }

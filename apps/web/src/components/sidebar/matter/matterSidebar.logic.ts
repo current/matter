@@ -7,6 +7,7 @@ import type {
   ProviderInteractionMode,
   ScopedThreadRef,
 } from "@t3tools/contracts";
+import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 
 import { hasUnseenCompletion, resolveSidebarRowStatus } from "../../Sidebar.logic";
 
@@ -31,6 +32,8 @@ export interface MatterThreadItem {
   readonly activityAt: string;
   /** When the current run started, while one is running. */
   readonly runningSince: string | null;
+  /** Running only because the agent resumes when its background work ends, not mid-turn. */
+  readonly waitsOnBackground: boolean;
   readonly providerName: string | null;
   /** The provider driving the thread now, for its brand mark; null when unknown. */
   readonly driver: ProviderDriverKind | null;
@@ -67,6 +70,7 @@ export function toMatterThreadItem(
   const ref = scopeThreadRef(thread.environmentId, thread.id);
   const status = resolveSidebarRowStatus(thread);
   const unread = hasUnseenCompletion(thread);
+  const heldByBackground = backgroundWorkHoldsCompletion(thread.pendingBackgroundTasks);
   let attention: MatterThreadAttention;
   let needsKind: MatterNeedsKind | null = null;
   switch (status) {
@@ -82,15 +86,27 @@ export function toMatterThreadItem(
       attention = "running";
       break;
     case "waiting":
-      // Blocked on a child thread is still this turn; parked background work stays quiet.
-      attention = thread.runtime?.status === "running" ? "running" : unread ? "review" : "idle";
+      // Blocked on a child thread is still this turn, and so is work the agent resumes from;
+      // a dev server or monitor left running only holds when the agent marked it awaited.
+      attention =
+        thread.runtime?.status === "running" || heldByBackground
+          ? "running"
+          : unread
+            ? "review"
+            : "idle";
       break;
     case "failed":
       attention = "review";
       break;
     default:
-      attention = unread ? "review" : "idle";
+      attention = heldByBackground ? "running" : unread ? "review" : "idle";
   }
+  const waitsOnBackground =
+    heldByBackground &&
+    attention === "running" &&
+    status !== "preparing" &&
+    status !== "working" &&
+    thread.runtime?.status !== "running";
   return {
     key: scopedThreadKey(ref),
     ref,
@@ -113,6 +129,7 @@ export function toMatterThreadItem(
       attention === "running"
         ? (thread.runtime?.activityStartedAt ?? thread.latestRun?.startedAt ?? null)
         : null,
+    waitsOnBackground,
     providerName: thread.runtime?.providerName ?? null,
     driver,
     pullRequest: resolvePullRequestBadge(thread),

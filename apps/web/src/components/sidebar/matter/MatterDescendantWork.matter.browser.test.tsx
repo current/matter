@@ -78,7 +78,7 @@ function thread(title: string, overrides: ThreadFixtureOverrides = {}) {
       id: ThreadId.make(title),
       projectId: ProjectId.make(MATTER.key),
       title,
-      // Yesterday, so only running work keeps it in Recent.
+      // Yesterday, so only running work lists it under Working.
       latestUserMessageAt: local(9, 15),
       createdAt: local(9, 15),
       ...overrides,
@@ -169,7 +169,7 @@ const timelineRow = (container: HTMLElement) =>
 
 describe("Timeline parent with working subagents", () => {
   it.each([true, false])(
-    "spins and stays in Recent while a subagent runs (Show active subagents %s)",
+    "spins and stays in Working while a subagent runs (Show active subagents %s)",
     async (showSubagents) => {
       using _server = useServer({ [MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY]: showSubagents });
       const timeline = (children: ReadonlyArray<MatterChildItem>) => (
@@ -178,9 +178,11 @@ describe("Timeline parent with working subagents", () => {
         </SidebarProvider>
       );
       await using screen = await render(timeline([subagent("Audit adapters", "running")]));
-      const recent = page.getByRole("region", { name: "Recent" });
-      await expect.element(recent.getByRole("button", { name: parent.title })).toBeVisible();
-      await expect.element(recent.getByRole("img", { name: "Running", exact: true })).toBeVisible();
+      const working = page.getByRole("region", { name: "Working" });
+      await expect.element(working.getByRole("button", { name: parent.title })).toBeVisible();
+      await expect
+        .element(working.getByRole("img", { name: "Running", exact: true }))
+        .toBeVisible();
       expect(timelineRow(screen.container)!.querySelector(".mts-spin")).not.toBeNull();
       expect(screen.container.querySelector("[data-matter-timeline-subagent]") !== null).toBe(
         showSubagents,
@@ -212,7 +214,7 @@ describe("Timeline parent with working subagents", () => {
     );
     await expect
       .element(
-        page.getByRole("region", { name: "Recent" }).getByRole("button", { name: parent.title }),
+        page.getByRole("region", { name: "Working" }).getByRole("button", { name: parent.title }),
       )
       .toBeVisible();
     expect(timelineRow(screen.container)!.querySelector(".mts-spin")).not.toBeNull();

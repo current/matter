@@ -6,23 +6,17 @@ import { attachListedAncestors } from "./matterFinalSidebar.logic";
 import { toMatterThreadItem } from "./matterSidebar.logic";
 import {
   activeSubagentsByParent,
-  buildTimelineBuckets,
   compactWindowLabel,
   isActiveSubagent,
-  subagentElapsed,
   usageMeterTone,
   workspaceKind,
 } from "./matterTimelineSidebar.logic";
 
-// Buckets follow local calendar days, so the fixtures are built in local time. Threads start on
-// the 1st, so their last message decides the bucket.
 const local = (day: number, hour: number, minute = 0) =>
   new Date(2026, 2, day, hour, minute).toISOString();
 const NOW_ISO = local(10, 15);
-const NOW_MS = Date.parse(NOW_ISO);
 const env = EnvironmentId.make("local");
 const MATTER = { key: "local:matter", name: "Matter" };
-const LILT = { key: "local:lilt", name: "Lilt" };
 
 function item(
   id: string,
@@ -81,133 +75,6 @@ function children(...items: ReturnType<typeof item>[]) {
   return attachListedAncestors(items, threads);
 }
 
-const bucketTitles = (buckets: ReturnType<typeof buildTimelineBuckets>) => ({
-  pinned: buckets.pinned.map((entry) => entry.title),
-  recent: buckets.recent.map((entry) => entry.title),
-  yesterday: buckets.yesterday.map((entry) => entry.title),
-  earlier: buckets.earlier.map((entry) => entry.title),
-});
-
-const options = {
-  nowMs: NOW_MS,
-  sort: "updated",
-  projectFilter: null,
-  filter: "all",
-} as const;
-
-describe("buildTimelineBuckets", () => {
-  it("splits threads by local calendar day, newest first", () => {
-    const buckets = buildTimelineBuckets(
-      [
-        item("today early", { latestUserMessageAt: local(10, 0, 30) }),
-        item("today late", { latestUserMessageAt: local(10, 14) }),
-        item("yesterday", { latestUserMessageAt: local(9, 23, 59) }),
-        item("last week", { latestUserMessageAt: local(3, 12) }),
-      ],
-      options,
-    );
-    expect(bucketTitles(buckets)).toEqual({
-      pinned: [],
-      recent: ["today late", "today early"],
-      yesterday: ["yesterday"],
-      earlier: ["last week"],
-    });
-  });
-
-  it("places pinned threads in their own top bucket, respecting filters and sort", () => {
-    const pinnedOld = item("pinned old", {
-      pinnedAt: local(1, 9),
-      latestUserMessageAt: local(2, 9),
-    });
-    const pinnedNew = item("pinned new", {
-      pinnedAt: local(1, 9),
-      latestUserMessageAt: local(10, 14),
-    });
-    const pinnedLilt = item("pinned lilt", { pinnedAt: local(1, 9) }, LILT);
-    const regular = item("regular");
-    const all = [pinnedOld, pinnedNew, pinnedLilt, regular];
-
-    expect(bucketTitles(buildTimelineBuckets(all, options))).toEqual({
-      pinned: ["pinned new", "pinned lilt", "pinned old"],
-      recent: ["regular"],
-      yesterday: [],
-      earlier: [],
-    });
-    expect(
-      bucketTitles(buildTimelineBuckets(all, { ...options, projectFilter: LILT.key })),
-    ).toEqual({
-      pinned: ["pinned lilt"],
-      recent: [],
-      yesterday: [],
-      earlier: [],
-    });
-  });
-
-  it("keeps running and waiting threads in Recent whatever their age", () => {
-    const buckets = buildTimelineBuckets(
-      [
-        item("old running", { latestUserMessageAt: local(2, 9), ...runtime("running") }),
-        item("old approval", { latestUserMessageAt: local(2, 9), hasPendingApprovals: true }),
-      ],
-      options,
-    );
-    expect(buckets.recent.map((entry) => entry.title).toSorted()).toEqual([
-      "old approval",
-      "old running",
-    ]);
-    expect(buckets.earlier).toEqual([]);
-  });
-
-  it("buckets by creation time when sorted by created", () => {
-    const thread = item("made yesterday", {
-      createdAt: local(9, 10),
-      latestUserMessageAt: local(10, 14),
-    });
-    expect(buildTimelineBuckets([thread], options).recent).toHaveLength(1);
-    expect(buildTimelineBuckets([thread], { ...options, sort: "created" }).yesterday).toHaveLength(
-      1,
-    );
-  });
-
-  it("leaves out settled threads and honors the project and Needs you filters", () => {
-    const quiet = item("quiet");
-    const settled = item("settled", { settledOverride: "settled" });
-    const lilt = item("lilt", {}, LILT);
-    const waiting = item("waiting", { hasPendingApprovals: true });
-    const all = [quiet, settled, lilt, waiting];
-    expect(buildTimelineBuckets(all, options).recent.map((entry) => entry.title)).not.toContain(
-      "settled",
-    );
-    expect(
-      buildTimelineBuckets(all, { ...options, projectFilter: LILT.key }).recent.map(
-        (entry) => entry.title,
-      ),
-    ).toEqual(["lilt"]);
-    expect(
-      buildTimelineBuckets(all, { ...options, filter: "needs" }).recent.map((entry) => entry.title),
-    ).toEqual(["waiting"]);
-  });
-
-  it("keeps an older thread in Recent while a subagent of it is still working", () => {
-    const parent = item("parent", { latestUserMessageAt: local(2, 9) });
-    const quiet = { ...options, activeChildParents: new Set<string>() };
-    expect(buildTimelineBuckets([parent], quiet).earlier).toHaveLength(1);
-    const working = { ...options, activeChildParents: new Set([parent.key]) };
-    expect(buildTimelineBuckets([parent], working).recent).toHaveLength(1);
-    expect(buildTimelineBuckets([parent], { ...working, sort: "created" }).recent).toHaveLength(1);
-  });
-
-  it("lists a quiet parent under Needs you while its subagent waits", () => {
-    const parent = item("parent");
-    const buckets = buildTimelineBuckets([parent, item("other")], {
-      ...options,
-      filter: "needs",
-      needsChildParents: new Set([parent.key]),
-    });
-    expect(buckets.recent.map((entry) => entry.title)).toEqual(["parent"]);
-  });
-});
-
 describe("activeSubagentsByParent", () => {
   const running = item("running child", { ...subagentOf("parent"), ...runtime("running") });
   const waiting = item("waiting child", { ...subagentOf("parent"), hasPendingApprovals: true });
@@ -241,10 +108,6 @@ describe("activeSubagentsByParent", () => {
 
   it("shows nothing while the setting is off", () => {
     expect(activeSubagentsByParent(children(running, waiting), false).size).toBe(0);
-  });
-
-  it("reports elapsed time from the run start", () => {
-    expect(subagentElapsed(running, NOW_MS)).toBe("8m");
   });
 });
 

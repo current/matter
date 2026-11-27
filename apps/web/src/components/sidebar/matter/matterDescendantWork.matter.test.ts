@@ -12,7 +12,7 @@ import {
   workingNativeSubagentKeys,
   type MatterThreadItem,
 } from "./matterSidebar.logic";
-import { buildTimelineBuckets } from "./matterTimelineSidebar.logic";
+import { buildTimelineSections } from "./matterTimelineFeed.logic";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
 const NOW_MS = Date.parse(NOW_ISO);
@@ -24,7 +24,7 @@ function item(id: string, overrides: ThreadFixtureOverrides = {}) {
       id: ThreadId.make(id),
       projectId: ProjectId.make(MATTER.key),
       title: id,
-      // Yesterday, so only running work keeps a row in Recent.
+      // Yesterday, so only running work lists it under Working.
       latestUserMessageAt: "2026-03-09T14:00:00.000Z",
       createdAt: "2026-03-09T14:00:00.000Z",
       ...overrides,
@@ -123,16 +123,18 @@ describe("descendant work", () => {
     expect([...since.keys()]).toEqual([b.key]);
   });
 
-  it("keeps the parent in Recent, in its project's running dot and in the Default list", () => {
+  it("keeps the parent in Working, in its project's running dot and in the Default list", () => {
     const child = subagentOf("Parent", "Child", { runtime: runtime("running") });
     const { items } = lift([parent], [child]);
-    const buckets = buildTimelineBuckets(items, {
+    const sections = buildTimelineSections(items, {
       nowMs: NOW_MS,
       sort: "updated",
       projectFilter: null,
       filter: "all",
     });
-    expect(buckets.recent.map((entry) => entry.key)).toEqual([parent.key]);
+    expect(
+      sections.find((section) => section.kind === "working")?.items.map((entry) => entry.key),
+    ).toEqual([parent.key]);
     expect(resolveProjectAttention(items, MATTER.key)).toBe("running");
     const groups = buildThreadGroups(items, [MATTER], {
       sort: "project",

@@ -1,16 +1,24 @@
-/* oxlint-disable shadcn/no-unknown-classes -- the `mts-*` and `mfs-*` classes come from the fork stylesheets matter/timeline-sidebar.css and matter/sidebar.css, which load outside Tailwind. */
+/* oxlint-disable shadcn/no-unknown-classes -- the `mlf-*`, `mts-*` and `mfs-*` classes come from the fork stylesheets matter/timeline-feed.css, matter/timeline-sidebar.css and matter/sidebar.css, which load outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { useLocation, useNavigate } from "@tanstack/react-router";
+import * as Schema from "effect/Schema";
 import { useGT } from "gt-react";
-import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import { CheckIcon, FolderPlusIcon, LayersIcon, SettingsIcon } from "lucide-react";
+import {
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 
 import { openCommandPalette } from "../../../commandPaletteBus";
 import { contextMenuSourceOf } from "../../../contextMenuSource";
+import { useLocalStorage } from "../../../hooks/useLocalStorage";
 import { shortcutLabelForCommand } from "../../../keybindings";
 import { observeResize } from "../../../lib/observeResize";
 import { readLocalApi } from "../../../localApi";
 import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../../../state/environments";
 import { providerLogoColor } from "../../chat/ProviderInstanceIcon";
+import { ProjectFavicon } from "../../ProjectFavicon";
 import { readIssueListPreferences } from "../../issue/issueListPreferences";
 import { readPullRequestListPreferences } from "../../pullRequest/pullRequestListPreferences";
 import { useSidebar } from "../../ui/sidebar";
@@ -30,22 +38,30 @@ import {
   useCrewBots,
 } from "./MatterDefaultSidebarParts";
 import {
-  compactAge,
   countNeedsYou,
   formatResetLabel,
   indexChildrenByParent,
   parentsWithNeedsChild,
   pickUsageMeters,
+  subagentStatus,
   summarizeProjects,
   type MatterChildItem,
   type MatterListFilter,
   type MatterUsageMeter,
 } from "./matterFinalSidebar.logic";
+import {
+  buildTimelineSections,
+  isTimelineSectionOpen,
+  timelineRowState,
+  shortTimelineBranchLabel,
+  visibleTimelineSubagents,
+  type MatterTimelineNeedsKind,
+  type MatterTimelineSection,
+} from "./matterTimelineFeed.logic";
 import type { MatterPullRequestState, MatterThreadItem } from "./matterSidebar.logic";
 import { MatterTip } from "./MatterSidebarParts";
 import {
   useMatterInboxProjectFilter,
-  useMatterTimelineEarlierExpanded,
   useMatterTimelineSort,
   useMatterTimelineSubagents,
 } from "./matterSidebarStore";
@@ -71,21 +87,28 @@ import {
   SortGlyph,
   SpinnerGlyph,
   TargetGlyph,
+  WaitingGlyph,
   WorktreeGlyph,
 } from "./MatterTimelineIcons";
 import {
   activeSubagentsByParent,
-  buildTimelineBuckets,
   compactWindowLabel,
-  formatTimelineBranchLabel,
-  subagentElapsed,
   usageMeterTone,
   workspaceKind,
   type MatterTimelineSort,
 } from "./matterTimelineSidebar.logic";
-import type { MatterSidebarModel, MatterThreadMenuAction } from "./useMatterSidebarModel";
+import type {
+  MatterSidebarModel,
+  MatterSidebarProject,
+  MatterThreadMenuAction,
+} from "./useMatterSidebarModel";
 
 const ALL_ACTIVITY = "__all__";
+const FOLDS_STORAGE_KEY = "mattr:sidebar:timeline-folds:v1";
+const METER_LIMIT = 5;
+const Folds = Schema.Record(Schema.String, Schema.Boolean);
+const NO_FOLDS: Readonly<Record<string, boolean>> = {};
+const ROW_FOCUS_STOPS = "button.mts-hit, button.mts-fold";
 
 const PR_GLYPH: Record<MatterPullRequestState, typeof PullRequestOpenGlyph> = {
   open: PullRequestOpenGlyph,
@@ -94,12 +117,15 @@ const PR_GLYPH: Record<MatterPullRequestState, typeof PullRequestOpenGlyph> = {
   closed: PullRequestClosedGlyph,
 };
 
+type GT = ReturnType<typeof useGT>;
+type MenuAnchor = MenuPrimitive.Positioner.Props["anchor"];
+
 interface WebThreadMenuState {
   readonly item: MatterThreadItem;
-  readonly anchor: MenuPrimitive.Positioner.Props["anchor"];
+  readonly anchor: MenuAnchor;
 }
 
-function pointAnchor(x: number, y: number): MenuPrimitive.Positioner.Props["anchor"] {
+function pointAnchor(x: number, y: number): MenuAnchor {
   return {
     getBoundingClientRect: () => DOMRect.fromRect({ x, y, width: 0, height: 0 }),
   };
@@ -131,19 +157,85 @@ function observeScrollFade(element: HTMLDivElement | null) {
   };
 }
 
+/** Up, Down, Home and End walk the rows and section folds, like a native source list. */
+function moveRowFocus(event: ReactKeyboardEvent<HTMLDivElement>) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const { key, target } = event;
+  if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+  if (!(target instanceof HTMLElement) || !target.matches(ROW_FOCUS_STOPS)) return;
+  const stops = [...event.currentTarget.querySelectorAll<HTMLElement>(ROW_FOCUS_STOPS)];
+  const next =
+    key === "Home"
+      ? stops[0]
+      : key === "End"
+        ? stops.at(-1)
+        : stops[stops.indexOf(target) + (key === "ArrowDown" ? 1 : -1)];
+  if (next === undefined) return;
+  event.preventDefault();
+  next.focus();
+}
+
+function needsLabel(kind: MatterTimelineNeedsKind, gt: GT): string {
+  switch (kind) {
+    case "approval":
+      return gt("Approval", { $context: "a thread is waiting for the user to approve an action" });
+    case "input":
+      return gt("Question", { $context: "a thread is waiting for the user to answer a question" });
+    case "limited":
+      return gt("Usage limit", { $context: "a thread stopped at its provider's usage limit" });
+    case "subagent":
+      return gt("Subagent", { $context: "one of a thread's subagents is waiting for the user" });
+    case "request":
+      return gt("Guest", { $context: "a guest of a thread is waiting for its owner" });
+  }
+}
+
+function sectionLabel(section: MatterTimelineSection, nowMs: number, gt: GT): string {
+  switch (section.kind) {
+    case "needs":
+      return gt("Needs you");
+    case "pinned":
+      return gt("Pinned");
+    case "working":
+      return gt("Working", { $context: "threads whose agents are running now" });
+    case "today":
+      return gt("Today");
+    case "yesterday":
+      return gt("Yesterday");
+    case "week":
+      return gt("Previous 7 days");
+    case "days30":
+      return gt("Previous 30 days");
+    case "month": {
+      const month = new Date(section.monthStartMs ?? nowMs);
+      return new Intl.DateTimeFormat(
+        undefined,
+        month.getFullYear() === new Date(nowMs).getFullYear()
+          ? { month: "long" }
+          : { month: "long", year: "numeric" },
+      ).format(month);
+    }
+  }
+}
+
 interface TimelineRowContext {
   readonly subagents: ReadonlyMap<string, ReadonlyArray<MatterChildItem>>;
   readonly needsChildParents: ReadonlySet<string>;
   /** The row to highlight when the open thread is a subagent the list doesn't show. */
   readonly hiddenActiveParent: string | null;
+  /** The open thread when it is a finished subagent, which still gets a row under its thread. */
+  readonly openFinishedChild: MatterChildItem | null;
+  /** The row a folded section still shows: the open thread, or the thread its subagent runs under. */
+  readonly openRowKey: string | null;
+  readonly expandedSubagents: ReadonlySet<string>;
+  readonly toggleSubagents: (parentKey: string) => void;
   readonly sort: MatterTimelineSort;
-  readonly hideProjectName: boolean;
+  /** The list shows one project, so rows lead with their provider instead of its icon. */
+  readonly projectScoped: boolean;
   readonly showRowMenuButton: boolean;
-  readonly openWebMenu: (
-    item: MatterThreadItem,
-    anchor: MenuPrimitive.Positioner.Props["anchor"],
-  ) => void;
+  readonly openWebMenu: (item: MatterThreadItem, anchor: MenuAnchor) => void;
   readonly revealActiveRow: (row: HTMLElement | null, rowKey: string) => (() => void) | undefined;
+  readonly projectByKey: ReadonlyMap<string, MatterSidebarProject>;
 }
 
 function hasNativeContextMenu(): boolean {
@@ -170,38 +262,50 @@ function openRowContextMenu(
   openWebMenu(item, pointAnchor(event.clientX, event.clientY));
 }
 
+function TimelineProjectIcon({ project }: { project: MatterSidebarProject }) {
+  return (
+    <MatterTip label={project.name} side="top">
+      <span className="mlf-proj-icon" role="img" aria-label={project.name}>
+        <ProjectFavicon project={project.group} className="size-3.5" />
+      </span>
+    </MatterTip>
+  );
+}
+
 function TimelineRow({
   model,
   item,
-  childNeedsYou,
-  holdsActive,
+  density,
   context,
 }: {
   model: MatterSidebarModel;
   item: MatterThreadItem;
-  childNeedsYou: boolean;
-  /** The open thread is a subagent of this row that the list doesn't show. */
-  holdsActive: boolean;
+  density: MatterTimelineSection["density"];
   context: TimelineRowContext;
 }) {
   const gt = useGT();
   const active = item.key === model.activeThreadKey;
+  const holdsActive = context.hiddenActiveParent === item.key;
+  const state = timelineRowState(item, {
+    childNeedsYou: context.needsChildParents.has(item.key),
+    sort: context.sort,
+    nowMs: model.nowMs,
+  });
   const kind = workspaceKind(item);
   const pr = item.pullRequest;
   const PrGlyph = pr === null ? null : PR_GLYPH[pr.state];
-  const needs = item.attention === "needs" || childNeedsYou;
-  const running = !needs && item.attention === "running";
-  const failed = !needs && !running && item.failed;
-  const idle = !needs && !running && !failed;
-  const age = idle
-    ? compactAge(context.sort === "created" ? item.createdAt : item.activityAt, model.nowMs)
-    : "";
   const revealKey = active ? item.key : holdsActive ? model.activeThreadKey : null;
+  const project =
+    context.projectScoped || item.projectKey === null
+      ? undefined
+      : context.projectByKey.get(item.projectKey);
   return (
     <div
       ref={revealKey !== null ? (row) => context.revealActiveRow(row, revealKey) : undefined}
-      className="mts-row"
+      className="mts-row mlf-row"
       data-matter-timeline-row={item.key}
+      data-density={density}
+      data-state={state.tone}
       data-active={active || holdsActive ? "" : undefined}
       data-unread={item.unread ? "" : undefined}
       data-pinned={item.pinned ? "" : undefined}
@@ -216,29 +320,50 @@ function TimelineRow({
       />
       <span className="mts-l1">
         <span className="mts-pi">
-          <MatterProviderMark driver={item.driver} />
+          {project !== undefined ? (
+            <TimelineProjectIcon project={project} />
+          ) : (
+            <MatterProviderMark driver={item.driver} />
+          )}
         </span>
         <span className="mts-t">{item.title}</span>
         {item.interactionMode === "goal" ? (
           <TargetGlyph className="mts-goal" role="img" aria-label={gt("Goal mode")} />
         ) : null}
         {item.pinned ? <PinGlyph className="mts-pin" role="img" aria-label={gt("Pinned")} /> : null}
-        {needs ? (
+        {density === "compact" && pr !== null && PrGlyph !== null ? (
+          <span className="mts-pr mlf-pr-mark" data-state={pr.state}>
+            <PrGlyph role="img" aria-label={`#${pr.number}`} />
+          </span>
+        ) : null}
+        {state.tone === "needs" ? (
           <span className="mts-need" role="img" aria-label={gt("Needs you")} />
-        ) : running ? (
-          <SpinnerGlyph className="mts-spin" role="img" aria-label={gt("Running")} />
-        ) : failed ? (
-          <MatterTip label={gt("Failed")}>
-            <span
-              className="mts-fail"
+        ) : state.tone === "running" ? (
+          <span className="mlf-st" data-tone="running">
+            {state.elapsed}
+            <SpinnerGlyph className="mts-spin" role="img" aria-label={gt("Running")} />
+          </span>
+        ) : state.tone === "background" ? (
+          <span className="mlf-st" data-tone="background">
+            {state.elapsed}
+            <WaitingGlyph
+              className="mlf-wait"
               role="img"
-              aria-label={gt("Failed")}
-              onClick={() => model.actions.openThread(item)}
+              aria-label={gt("Waiting on background work")}
             />
-          </MatterTip>
+          </span>
+        ) : state.tone === "failed" ? (
+          density === "full" ? (
+            <span className="mts-fail" aria-hidden />
+          ) : (
+            <span className="mlf-st" data-tone="failed">
+              {gt("Failed")}
+              <span className="mts-fail" aria-hidden />
+            </span>
+          )
         ) : (
           <>
-            {age !== "" ? <span className="mts-age">{age}</span> : null}
+            {state.age !== "" ? <span className="mts-age">{state.age}</span> : null}
             {item.unread ? (
               <span className="mts-unread" role="img" aria-label={gt("Unread")} />
             ) : null}
@@ -259,30 +384,55 @@ function TimelineRow({
           </button>
         ) : null}
       </span>
-      <span className="mts-l2">
-        {kind === "worktree" ? (
-          <WorktreeGlyph className="mts-mi" data-matter-workspace="worktree" />
-        ) : kind === "local" ? (
-          <FolderGlyph className="mts-mi" data-matter-workspace="local" />
-        ) : null}
-        {!context.hideProjectName ? (
-          <span className="mts-proj">{item.projectName ?? gt("No project")}</span>
-        ) : null}
-        {pr !== null && PrGlyph !== null ? (
-          <span className="mts-pr" data-state={pr.state}>
-            <PrGlyph />
-            {`#${pr.number}`}
-          </span>
-        ) : null}
-        {item.branch !== null ? (
-          <MatterTip label={item.branch} side="top">
-            <span className="mts-br" onClick={() => model.actions.openThread(item)}>
-              <BranchGlyph />
-              <span>{formatTimelineBranchLabel(item.branch, item.projectName)}</span>
+      {density === "full" ? (
+        <span className="mts-l2">
+          {project !== undefined ? (
+            <span className="mts-pi mlf-l2-provider">
+              <MatterProviderMark driver={item.driver} />
             </span>
-          </MatterTip>
-        ) : null}
-      </span>
+          ) : null}
+          {kind === "worktree" ? (
+            <WorktreeGlyph className="mts-mi" data-matter-workspace="worktree" />
+          ) : kind === "local" ? (
+            <FolderGlyph className="mts-mi" data-matter-workspace="local" />
+          ) : null}
+          {!context.projectScoped ? (
+            <span className="mts-proj">{item.projectName ?? gt("No project")}</span>
+          ) : null}
+          {item.branch !== null ? (
+            <MatterTip label={item.branch} side="top">
+              <span className="mts-br" onClick={() => model.actions.openThread(item)}>
+                <BranchGlyph />
+                <span>{shortTimelineBranchLabel(item.branch, item.projectName)}</span>
+              </span>
+            </MatterTip>
+          ) : null}
+          {state.tone === "needs" ? (
+            <span className="mlf-st" data-tone="needs">
+              {needsLabel(state.kind, gt)}
+            </span>
+          ) : state.tone === "failed" ? (
+            <span className="mlf-st" data-tone="failed">
+              {gt("Failed")}
+            </span>
+          ) : state.tone === "running" ? (
+            <span className="mlf-st" data-tone="running">
+              {gt("Working", { $context: "a thread's agent is running now" })}
+            </span>
+          ) : state.tone === "background" ? (
+            <span className="mlf-st" data-tone="background">
+              {gt("Waiting", {
+                $context: "a thread's agent resumes by itself once its background work ends",
+              })}
+            </span>
+          ) : pr !== null && PrGlyph !== null ? (
+            <span className="mts-pr" data-state={pr.state}>
+              <PrGlyph />
+              {`#${pr.number}`}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -298,7 +448,7 @@ function TimelineSubagent({
 }) {
   const gt = useGT();
   const active = item.key === model.activeThreadKey;
-  const needs = item.attention === "needs";
+  const status = subagentStatus(item, model.nowMs);
   return (
     <div
       ref={active ? (row) => context.revealActiveRow(row, item.key) : undefined}
@@ -319,78 +469,140 @@ function TimelineSubagent({
         <MatterProviderMark driver={item.driver} />
       </span>
       <span className="mts-st">{item.title}</span>
-      <span className="mts-sm" data-tone={needs ? "needs" : "running"}>
-        {needs ? (
-          gt("Needs you")
-        ) : (
+      <span className="mts-sm" data-tone={status.tone}>
+        {status.tone === "needs" ? (
+          needsLabel(item.needsKind ?? "request", gt)
+        ) : status.tone === "running" ? (
           <>
             <span className="mts-sub-dot" aria-hidden />
-            {subagentElapsed(item, model.nowMs)}
+            {status.age}
           </>
+        ) : status.tone === "failed" ? (
+          gt("Failed")
+        ) : (
+          gt("Done")
         )}
       </span>
     </div>
   );
 }
 
-function TimelineRows({
+function TimelineSubagents({
   model,
-  items,
+  parent,
   context,
 }: {
   model: MatterSidebarModel;
-  items: ReadonlyArray<MatterThreadItem>;
+  parent: MatterThreadItem;
   context: TimelineRowContext;
 }) {
-  const { subagents } = context;
   const gt = useGT();
+  const active = context.subagents.get(parent.key) ?? [];
+  const openFinished =
+    context.openFinishedChild?.ancestorKey === parent.key ? context.openFinishedChild : null;
+  if (active.length === 0 && openFinished === null) return null;
+  const expanded = context.expandedSubagents.has(parent.key);
+  const collapsed = visibleTimelineSubagents(active, {
+    expanded: false,
+    activeThreadKey: model.activeThreadKey,
+  });
+  const rows = expanded ? active : collapsed.shown;
   return (
-    <ul className="mts-rows">
-      {items.map((item) => {
-        const active = subagents.get(item.key) ?? [];
-        return (
-          <li key={item.key}>
-            <TimelineRow
-              model={model}
-              item={item}
-              childNeedsYou={context.needsChildParents.has(item.key)}
-              holdsActive={context.hiddenActiveParent === item.key}
-              context={context}
-            />
-            {active.length > 0 ? (
-              <div role="group" aria-label={gt("Subagents of {title}", { title: item.title })}>
-                {active.map((child) => (
-                  <TimelineSubagent key={child.key} model={model} item={child} context={context} />
-                ))}
-              </div>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
+    <div role="group" aria-label={gt("Subagents of {title}", { title: parent.title })}>
+      {rows.map((child) => (
+        <TimelineSubagent key={child.key} model={model} item={child} context={context} />
+      ))}
+      {openFinished !== null ? (
+        <TimelineSubagent model={model} item={openFinished} context={context} />
+      ) : null}
+      {collapsed.hiddenCount > 0 ? (
+        <div className="mts-sub mlf-more">
+          <button
+            type="button"
+            className="mts-hit"
+            aria-expanded={expanded}
+            aria-label={
+              expanded
+                ? gt("Show fewer subagents")
+                : gt("Show {count} more running subagents", { count: collapsed.hiddenCount })
+            }
+            onClick={() => context.toggleSubagents(parent.key)}
+          />
+          <span className="mts-conn" aria-hidden />
+          <span className="mts-st">
+            {expanded
+              ? gt("Show fewer")
+              : gt("{count} more running", { count: collapsed.hiddenCount })}
+          </span>
+          <ChevronGlyph className="mts-cr" />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-function TimelineBucket({
+function TimelineSection({
   model,
-  label,
-  items,
+  section,
+  open,
+  onToggle,
   context,
 }: {
   model: MatterSidebarModel;
-  label: string;
-  items: ReadonlyArray<MatterThreadItem>;
+  section: MatterTimelineSection;
+  open: boolean;
+  onToggle: () => void;
   context: TimelineRowContext;
 }) {
-  if (items.length === 0) return null;
+  const gt = useGT();
+  const label = sectionLabel(section, model.nowMs, gt);
+  const rows = open
+    ? section.items
+    : section.items.filter((item) => item.key === context.openRowKey);
   return (
-    <section aria-label={label}>
-      <h3 className="mts-sec">{label}</h3>
-      <TimelineRows model={model} items={items} context={context} />
+    <section aria-label={label} data-matter-timeline-section={section.id}>
+      <h3 className="mts-sec mlf-sec" data-kind={section.kind}>
+        {section.foldable ? (
+          <button
+            type="button"
+            className="mts-fold"
+            aria-label={`${label}, ${section.items.length}`}
+            aria-expanded={open}
+            onClick={onToggle}
+          >
+            <span>{label}</span>
+            <span className="mlf-count">{section.items.length}</span>
+            <ChevronGlyph className="mts-cr" />
+          </button>
+        ) : (
+          <>
+            <span>{label}</span>
+            <span className="mlf-count">{section.items.length}</span>
+          </>
+        )}
+      </h3>
+      {rows.length > 0 ? (
+        <ul className="mts-rows mlf-rows" data-density={section.density}>
+          {rows.map((item) => (
+            <li key={item.key}>
+              <TimelineRow model={model} item={item} density={section.density} context={context} />
+              <TimelineSubagents model={model} parent={item} context={context} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }
 
+function meterTip(meter: MatterUsageMeter, nowMs: number, gt: GT): string {
+  const used = gt("{percent}% used", { percent: meter.usedPercent });
+  const soon = formatResetLabel(meter.resetsAt, nowMs);
+  const head = `${meter.accountName} · ${compactWindowLabel(meter.windowLabel)} · ${used}`;
+  return soon === null ? head : `${head} · ${gt("Resets in {duration}", { duration: soon })}`;
+}
+
+/** Every provider's tightest limit in one row: its logo, percent and bar. */
 function TimelineMeters({
   meters,
   nowMs,
@@ -404,43 +616,35 @@ function TimelineMeters({
   if (meters.length === 0) return null;
   return (
     <div
-      className="mts-use"
+      className="mts-use mlf-use-row"
       role="group"
       aria-label={gt("Usage limits")}
-      data-count={meters.length}
+      style={{ gridTemplateColumns: `repeat(${meters.length}, minmax(0, 1fr))` }}
     >
-      {meters.map((meter) => {
-        const label = `${meter.providerName} · ${compactWindowLabel(meter.windowLabel)}`;
-        const tone = usageMeterTone(meter.usedPercent);
-        const monochrome = providerLogoColor(meter.driver) === null;
-        const soon = formatResetLabel(meter.resetsAt, nowMs);
-        const tip =
-          soon === null
-            ? `${meter.accountName} · ${gt("{percent}% used", { percent: meter.usedPercent })} · ${gt("{percent}% left", { percent: 100 - meter.usedPercent })}`
-            : `${meter.accountName} · ${gt("{percent}% used", { percent: meter.usedPercent })} · ${gt("Resets in {duration}", { duration: soon })}`;
-        return (
-          <MatterTip key={meter.key} label={tip} side="top">
-            <button
-              type="button"
-              className="mts-m"
-              data-tone={tone}
-              aria-label={gt("{label}: {percent}% used", { label, percent: meter.usedPercent })}
-              onClick={onOpen}
-            >
-              <span className="mts-mh">
-                <span className="mts-pi" data-monochrome={monochrome ? "" : undefined}>
-                  <MatterProviderMark driver={meter.driver} />
-                </span>
-                <span className="mts-ml">{label}</span>
-                <span className="mts-v">{`${meter.usedPercent}%`}</span>
+      {meters.map((meter) => (
+        <MatterTip key={meter.key} label={meterTip(meter, nowMs, gt)} side="top">
+          <button
+            type="button"
+            className="mts-m"
+            data-tone={usageMeterTone(meter.usedPercent)}
+            aria-label={meterTip(meter, nowMs, gt)}
+            onClick={onOpen}
+          >
+            <span className="mts-mh">
+              <span
+                className="mts-pi"
+                data-monochrome={providerLogoColor(meter.driver) === null ? "" : undefined}
+              >
+                <MatterProviderMark driver={meter.driver} />
               </span>
-              <span className="mts-tr" aria-hidden>
-                <i style={{ width: `${meter.usedPercent}%` }} />
-              </span>
-            </button>
-          </MatterTip>
-        );
-      })}
+              <span className="mts-v">{`${meter.usedPercent}%`}</span>
+            </span>
+            <span className="mts-tr" aria-hidden>
+              <i style={{ width: `${meter.usedPercent}%` }} />
+            </span>
+          </button>
+        </MatterTip>
+      ))}
     </div>
   );
 }
@@ -483,6 +687,12 @@ function TimelineWebContextMenu({
               onClick={() => run(item.settled ? "unsettle" : "settle")}
             />
             <MatterMenuItem label={gt("Copy link")} onClick={() => run("copy-link")} />
+            {item.projectKey !== null ? (
+              <MatterMenuItem
+                label={gt("Project settings")}
+                onClick={() => run("project-settings")}
+              />
+            ) : null}
             <div className="mfs-menu-sep" />
             <MatterMenuItem label={gt("Archive")} onClick={() => run("archive")} />
           </>
@@ -493,9 +703,9 @@ function TimelineWebContextMenu({
 }
 
 /**
- * The Timeline rail (Synara frames 04 and 05): brand row, four nav rows, the activity scope,
- * threads by day with workspace, pull request and branch, and running subagents nested under
- * their thread while "Show active subagents" is on.
+ * The feed leads with what waits on you and what is working, rows lead with their project's icon
+ * and say what they wait on or how long they have run, older threads drop to one line under dated
+ * folds, and a thread's subagents stay to a few rows.
  */
 export function MatterTimelineSidebar({
   model,
@@ -512,9 +722,13 @@ export function MatterTimelineSidebar({
   const { items, children, projects, activeThreadKey, nowMs, keybindings, actions } = model;
   const [storedProjectFilter, setProjectFilter] = useMatterInboxProjectFilter();
   const [sort, setSort] = useMatterTimelineSort();
-  const [earlierExpanded, setEarlierExpanded] = useMatterTimelineEarlierExpanded();
-  const [showSubagents] = useMatterTimelineSubagents();
+  const [showSubagents, setShowSubagents] = useMatterTimelineSubagents();
+  const [folds, setFolds] = useLocalStorage<
+    Readonly<Record<string, boolean>>,
+    Readonly<Record<string, boolean>>
+  >(FOLDS_STORAGE_KEY, NO_FOLDS, Folds);
   const [filter, setFilter] = useState<MatterListFilter>("all");
+  const [expandedSubagents, setExpandedSubagents] = useState<ReadonlySet<string>>(new Set());
   const [webMenu, setWebMenu] = useState<WebThreadMenuState | null>(null);
   const [fallbackReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
@@ -526,7 +740,7 @@ export function MatterTimelineSidebar({
   const providers = useEnvironmentProviders();
   const meters = pickUsageMeters(
     primaryId === null ? [] : (providers.get(primaryId) ?? []),
-    Number.POSITIVE_INFINITY,
+    METER_LIMIT,
   );
 
   const closeMobile = () => {
@@ -542,29 +756,38 @@ export function MatterTimelineSidebar({
       : null;
   const needsChildParents = parentsWithNeedsChild(indexChildrenByParent(children));
   const subagents = activeSubagentsByParent(children, showSubagents);
-  const buckets = buildTimelineBuckets(items, {
+  const sections = buildTimelineSections(items, {
     nowMs,
     sort,
     projectFilter,
     filter,
     needsChildParents,
-    activeChildParents: new Set(subagents.keys()),
   });
   const activeChild = children.find((child) => child.key === activeThreadKey);
-  const showRowMenuButton = !hasNativeContextMenu() || isMobile;
+  const activeChildHasRow =
+    activeChild !== undefined &&
+    (subagents.get(activeChild.ancestorKey) ?? []).some((child) => child.key === activeChild.key);
   const rowContext: TimelineRowContext = {
     subagents,
     needsChildParents,
     hiddenActiveParent:
-      activeChild !== undefined &&
-      !(subagents.get(activeChild.ancestorKey) ?? []).some((child) => child.key === activeChild.key)
-        ? activeChild.ancestorKey
-        : null,
+      activeChild !== undefined && !showSubagents ? activeChild.ancestorKey : null,
+    openFinishedChild:
+      activeChild !== undefined && showSubagents && !activeChildHasRow ? activeChild : null,
+    openRowKey: activeChild?.ancestorKey ?? activeThreadKey,
+    expandedSubagents,
+    toggleSubagents: (parentKey) =>
+      setExpandedSubagents((current) => {
+        const next = new Set(current);
+        if (!next.delete(parentKey)) next.add(parentKey);
+        return next;
+      }),
     sort,
-    hideProjectName: projectFilter !== null,
-    showRowMenuButton,
+    projectScoped: projectFilter !== null,
+    showRowMenuButton: !hasNativeContextMenu() || isMobile,
     openWebMenu: (item, anchor) => setWebMenu({ item, anchor }),
     revealActiveRow,
+    projectByKey: new Map(projects.map((project) => [project.key, project])),
   };
   const needsCount = countNeedsYou(items, children) + crew.needsCount;
   const projectSummary = summarizeProjects(items);
@@ -574,15 +797,10 @@ export function MatterTimelineSidebar({
       : (projects.find((project) => project.key === projectFilter)?.name ?? gt("All activity"));
   const activeProjectKey =
     items.find((item) => item.key === activeThreadKey)?.projectKey ??
-    children.find((item) => item.key === activeThreadKey)?.projectKey ??
+    activeChild?.projectKey ??
     null;
   const newThreadHint = shortcutLabelForCommand(keybindings, "chat.new");
   const onSettings = pathname.startsWith("/settings");
-  const nothingListed =
-    buckets.pinned.length === 0 &&
-    buckets.recent.length === 0 &&
-    buckets.yesterday.length === 0 &&
-    buckets.earlier.length === 0;
 
   const handleWebAction = (item: MatterThreadItem, action: MatterThreadMenuAction) => {
     if (actions.runThreadAction) {
@@ -593,7 +811,7 @@ export function MatterTimelineSidebar({
   };
 
   return (
-    <div className="mfs mts" data-matter-sidebar="timeline">
+    <div className="mfs mts mlf" data-matter-sidebar="timeline">
       <div className="mts-brand">
         <MatterBrandMenu
           onNavigate={closeMobile}
@@ -702,19 +920,52 @@ export function MatterTimelineSidebar({
                 setProjectFilter(value === ALL_ACTIVITY ? null : value)
               }
             >
-              <MatterMenuRadioItem value={ALL_ACTIVITY} label={gt("All activity")} />
+              <MatterMenuRadioItem
+                value={ALL_ACTIVITY}
+                label={
+                  <span className="mlf-menu-proj">
+                    <LayersIcon aria-hidden className="size-3.5 text-muted-foreground" />
+                    <span>{gt("All activity")}</span>
+                  </span>
+                }
+              />
               {projects.map((project) => {
                 const summary = projectSummary.get(project.key);
                 return (
                   <MatterMenuRadioItem
                     key={project.key}
                     value={project.key}
-                    label={project.name}
+                    label={
+                      <span className="mlf-menu-proj">
+                        <ProjectFavicon project={project.group} className="size-3.5" />
+                        <span>{project.name}</span>
+                      </span>
+                    }
                     hint={summary ? <em>{summary.count}</em> : null}
                   />
                 );
               })}
             </MenuPrimitive.RadioGroup>
+            <div className="mfs-menu-sep" />
+            <MatterMenuItem
+              icon={<FolderPlusIcon aria-hidden />}
+              label={gt("Add project")}
+              onClick={() => go(() => openCommandPalette({ open: "add-project" }))}
+            />
+            <MatterMenuItem
+              icon={<SettingsIcon aria-hidden />}
+              label={gt("Project settings")}
+              onClick={() =>
+                go(() =>
+                  projectFilter === null
+                    ? void navigate({ to: "/settings/projects" })
+                    : void navigate({
+                        to: "/projects/$projectKey",
+                        params: { projectKey: projectFilter },
+                      }),
+                )
+              }
+            />
           </MatterMenuPopup>
         </MenuPrimitive.Root>
         {filter === "needs" ? (
@@ -728,60 +979,63 @@ export function MatterTimelineSidebar({
             <CloseGlyph />
           </button>
         ) : null}
-        <MatterTip
-          label={sort === "updated" ? gt("Sorted by last update") : gt("Sorted by created")}
-        >
-          <button
-            type="button"
+        <MenuPrimitive.Root>
+          <MenuPrimitive.Trigger
             className="mts-so"
-            aria-label={sort === "updated" ? gt("Sort by created") : gt("Sort by last update")}
+            aria-label={gt("View options")}
             data-sort={sort}
-            onClick={() => setSort(sort === "updated" ? "created" : "updated")}
           >
             <SortGlyph />
             {sort === "created" ? <span className="mts-so-lab">{gt("Created")}</span> : null}
-          </button>
-        </MatterTip>
+          </MenuPrimitive.Trigger>
+          <MatterMenuPopup align="end">
+            <MenuPrimitive.Group>
+              <MenuPrimitive.GroupLabel className="mfs-menu-label">
+                {gt("Sort by")}
+              </MenuPrimitive.GroupLabel>
+              <MenuPrimitive.RadioGroup
+                value={sort}
+                onValueChange={(value: MatterTimelineSort) => setSort(value)}
+              >
+                <MatterMenuRadioItem value="updated" label={gt("Last update")} />
+                <MatterMenuRadioItem
+                  value="created"
+                  label={gt("Created", { $context: "sort threads by when they were created" })}
+                />
+              </MenuPrimitive.RadioGroup>
+            </MenuPrimitive.Group>
+            <div className="mfs-menu-sep" />
+            <MenuPrimitive.CheckboxItem
+              className="mfs-menu-item"
+              checked={showSubagents}
+              onCheckedChange={(checked: boolean) => setShowSubagents(checked)}
+            >
+              <span className="inline-flex size-3.5 items-center justify-center">
+                <MenuPrimitive.CheckboxItemIndicator>
+                  <CheckIcon aria-hidden className="mfs-menu-check" />
+                </MenuPrimitive.CheckboxItemIndicator>
+              </span>
+              <span className="mfs-menu-text">{gt("Show active subagents")}</span>
+            </MenuPrimitive.CheckboxItem>
+          </MatterMenuPopup>
+        </MenuPrimitive.Root>
       </div>
 
-      <div ref={observeScrollFade} className="mts-list">
-        <TimelineBucket
-          model={model}
-          label={gt("Pinned")}
-          items={buckets.pinned}
-          context={rowContext}
-        />
-        <TimelineBucket
-          model={model}
-          label={gt("Recent")}
-          items={buckets.recent}
-          context={rowContext}
-        />
-        <TimelineBucket
-          model={model}
-          label={gt("Yesterday")}
-          items={buckets.yesterday}
-          context={rowContext}
-        />
-        {buckets.earlier.length > 0 ? (
-          <section aria-label={gt("Earlier")}>
-            <h3 className="mts-sec">
-              <button
-                type="button"
-                className="mts-fold"
-                aria-expanded={earlierExpanded}
-                onClick={() => setEarlierExpanded(!earlierExpanded)}
-              >
-                <span>{gt("Earlier")}</span>
-                <ChevronGlyph className="mts-cr" />
-              </button>
-            </h3>
-            {earlierExpanded ? (
-              <TimelineRows model={model} items={buckets.earlier} context={rowContext} />
-            ) : null}
-          </section>
-        ) : null}
-        {nothingListed ? (
+      <div ref={observeScrollFade} className="mts-list" onKeyDown={moveRowFocus}>
+        {sections.map((section) => {
+          const open = isTimelineSectionOpen(section, folds);
+          return (
+            <TimelineSection
+              key={section.id}
+              model={model}
+              section={section}
+              open={open}
+              onToggle={() => setFolds((current) => ({ ...current, [section.id]: !open }))}
+              context={rowContext}
+            />
+          );
+        })}
+        {sections.length === 0 ? (
           <p className="mfs-empty">
             {filter === "needs" ? gt("Nothing needs you right now.") : gt("No threads yet.")}
           </p>
@@ -798,7 +1052,6 @@ export function MatterTimelineSidebar({
       <div className="mfs-notices">
         <SidebarProviderUpdatePill />
         <SidebarUpdateArchitectureWarning />
-        <MatterUpdateNotice />
         <SidebarThreadUndoNotice />
       </div>
       <TimelineMeters
@@ -818,6 +1071,9 @@ export function MatterTimelineSidebar({
           <GearGlyph />
           <span>{gt("Settings")}</span>
         </button>
+        <ul className="mlf-foot-update">
+          <MatterUpdateNotice />
+        </ul>
         <MatterTip label={gt("Keyboard shortcuts")} side="top">
           <button
             type="button"

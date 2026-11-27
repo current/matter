@@ -94,6 +94,28 @@ describe("toMatterThreadItem", () => {
       "idle",
     );
   });
+
+  it("counts work the agent resumes from as running, but not a dev server left behind", () => {
+    const parked = { runtime: { ...runtime("completed"), status: "idle" as const } };
+    const awaited = item("awaited", {
+      ...parked,
+      pendingBackgroundTasks: [{ taskId: "replay", kind: "command", awaited: true }],
+    });
+    expect(awaited).toMatchObject({ attention: "running", waitsOnBackground: true });
+    expect(
+      item("task", {
+        ...parked,
+        pendingBackgroundTasks: [{ taskId: "task", kind: "background_task" }],
+      }),
+    ).toMatchObject({ attention: "running", waitsOnBackground: true });
+    expect(
+      item("server", {
+        ...parked,
+        pendingBackgroundTasks: [{ taskId: "dev", kind: "command" }],
+      }),
+    ).toMatchObject({ attention: "idle", waitsOnBackground: false });
+    expect(item("r", { runtime: runtime("running") }).waitsOnBackground).toBe(false);
+  });
 });
 
 describe("resolveProjectAttention", () => {

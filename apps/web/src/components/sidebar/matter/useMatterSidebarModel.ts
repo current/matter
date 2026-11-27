@@ -53,7 +53,8 @@ export type MatterThreadMenuAction =
   | "settle"
   | "unsettle"
   | "archive"
-  | "copy-link";
+  | "copy-link"
+  | "project-settings";
 
 export interface MatterSidebarActions {
   readonly openThread: (item: MatterThreadItem) => void;
@@ -208,6 +209,14 @@ export function useMatterSidebarModel(): MatterSidebarModel {
         case "archive":
           reportFailure(await archiveThread(item.ref));
           return;
+        case "project-settings":
+          if (item.projectKey === null) return;
+          closeMobile();
+          void router.navigate({
+            to: "/projects/$projectKey",
+            params: { projectKey: item.projectKey },
+          });
+          return;
       }
     })();
   };
@@ -228,6 +237,9 @@ export function useMatterSidebarModel(): MatterSidebarModel {
               ? { id: "unsettle", label: gt("Unsettle") }
               : { id: "settle", label: gt("Settle") },
             { id: "copy-link", label: gt("Copy link") },
+            ...(item.projectKey === null
+              ? []
+              : [{ id: "project-settings" as const, label: gt("Project settings") }]),
             { id: "archive", label: gt("Archive"), separatorBefore: true },
           ],
           position,
