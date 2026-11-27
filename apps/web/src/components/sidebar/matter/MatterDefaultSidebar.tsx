@@ -1,5 +1,6 @@
 /* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet matter/sidebar.css, which loads outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
+import type { MatterCloudRun } from "@t3tools/client-runtime/matter/cloud-runs";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { useGT } from "gt-react";
 import {
@@ -47,6 +48,7 @@ import {
   MatterProviderMark,
   useCrewBots,
 } from "./MatterDefaultSidebarParts";
+import { MatterDefaultCloudRunRow } from "./MatterCloudRunRows.matter";
 import { MatterTip } from "./MatterSidebarParts";
 import {
   useMatterCollapsedGroups,
@@ -57,6 +59,7 @@ import { MatterGoalModeGlyph } from "../../chat/MatterComposerModeControl.matter
 import type { MatterSidebarModel } from "./useMatterSidebarModel";
 
 const SUBAGENT_PREVIEW_LIMIT = 5;
+const NO_CLOUD_RUNS: ReadonlyArray<MatterCloudRun> = [];
 const SEARCH_RESULT_LIMIT = 50;
 const ALL_ACTIVITY = "__all__";
 const NO_PROJECT_GROUP = "__none__";
@@ -149,12 +152,14 @@ function ThreadRow({
   model,
   item,
   subagents,
+  cloudRuns,
   expanded,
   onToggle,
 }: {
   model: MatterSidebarModel;
   item: MatterThreadItem;
   subagents: ReadonlyArray<MatterThreadItem>;
+  cloudRuns: ReadonlyArray<MatterCloudRun>;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -162,7 +167,7 @@ function ThreadRow({
   const onContextMenu = rowMenuHandler(model, item);
   const [showAll, setShowAll] = useState(false);
   const active = item.key === model.activeThreadKey;
-  const hasSubagents = subagents.length > 0;
+  const hasSubagents = subagents.length > 0 || cloudRuns.length > 0;
   const visible = showAll ? subagents : subagents.slice(0, SUBAGENT_PREVIEW_LIMIT);
   const hidden = subagents.length - visible.length;
   return (
@@ -191,7 +196,7 @@ function ThreadRow({
                 expanded
                   ? gt("Hide subagents of {title}", { title: item.title })
                   : gt("Show {count} subagents of {title}", {
-                      count: subagents.length,
+                      count: subagents.length + cloudRuns.length,
                       title: item.title,
                     })
               }
@@ -207,6 +212,9 @@ function ThreadRow({
       </div>
       {hasSubagents && expanded ? (
         <ul className="mfs-tree" aria-label={gt("Subagents of {title}", { title: item.title })}>
+          {cloudRuns.map((run) => (
+            <MatterDefaultCloudRunRow key={run.id} run={run} nowMs={model.nowMs} />
+          ))}
           {visible.map((child) => (
             <SubagentRow key={child.key} model={model} item={child} nowMs={model.nowMs} />
           ))}
@@ -243,7 +251,11 @@ function ThreadGroup({
   childrenByParent: ReadonlyMap<string, ReadonlyArray<MatterThreadItem>>;
   collapsed: boolean;
   onToggleCollapsed: (() => void) | null;
-  isExpanded: (item: MatterThreadItem, subagents: ReadonlyArray<MatterThreadItem>) => boolean;
+  isExpanded: (
+    item: MatterThreadItem,
+    subagents: ReadonlyArray<MatterThreadItem>,
+    hasCloudRuns: boolean,
+  ) => boolean;
   onToggleExpanded: (item: MatterThreadItem, expanded: boolean) => void;
 }) {
   const gt = useGT();
@@ -281,13 +293,15 @@ function ThreadGroup({
         <ul>
           {group.items.map((item) => {
             const subagents = childrenByParent.get(item.key) ?? [];
-            const expanded = isExpanded(item, subagents);
+            const cloudRuns = model.cloudRuns.get(item.key) ?? NO_CLOUD_RUNS;
+            const expanded = isExpanded(item, subagents, cloudRuns.length > 0);
             return (
               <ThreadRow
                 key={item.key}
                 model={model}
                 item={item}
                 subagents={subagents}
+                cloudRuns={cloudRuns}
                 expanded={expanded}
                 onToggle={() => onToggleExpanded(item, !expanded)}
               />
@@ -364,8 +378,11 @@ export function MatterDefaultSidebar({ model }: { model: MatterSidebarModel }) {
   if (activeTreeKey !== null && expansion[activeTreeKey] === undefined) {
     setExpansion((current) => ({ ...current, [activeTreeKey]: true }));
   }
-  const isExpanded = (item: MatterThreadItem, subagents: ReadonlyArray<MatterThreadItem>) =>
-    expansion[item.key] ?? shouldAutoExpand(item, subagents, activeThreadKey);
+  const isExpanded = (
+    item: MatterThreadItem,
+    subagents: ReadonlyArray<MatterThreadItem>,
+    hasCloudRuns: boolean,
+  ) => expansion[item.key] ?? (hasCloudRuns || shouldAutoExpand(item, subagents, activeThreadKey));
   const onToggleExpanded = (item: MatterThreadItem, next: boolean) =>
     setExpansion((current) => ({ ...current, [item.key]: next }));
   const toggleGroup = (key: string) =>

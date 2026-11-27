@@ -4318,6 +4318,8 @@
   "34b5ccf452e1dc18": "Use the classic details card",
   "a06eb47a82969918": "서브에이전트",
   "3e96cf915b1d079b": "Stop {title}",
+  "9fb30dbeae76b935": "{title}, cloud run, needs input",
+  "3acf475328d56252": "{title}, cloud run",
   "ba2cf3dd6de0d1a6": "서브에이전트를 중지할 수 없습니다",
   "bc5f7c6821578b8f": "이전 에이전트",
   "dc28386e0a961d4d": "사이드 채팅",
@@ -4339,6 +4341,8 @@
     "에서"
   ],
   "25da730aa6ca43c3": "Stop",
+  "74b2c584cc69b5c9": "Needs input",
+  "d0f54c94bc193a89": "Cloud",
   "a3db5fd6c4b955ec": "Back",
   "a33df1497c9fa65b": [
     "Lineage · ",
@@ -5824,6 +5828,15 @@
   "21d0ab2cb7685f9c": "나중에",
   "fb4516dffeebe159": "완료",
   "a4461ecfdea68985": "아직 계정에 게시된 다른 환경이 없습니다. 다른 기기에서 게시하면 여기에 표시됩니다.",
+  "aa34e64ede248096": "Ran in cloud, from {title}",
+  "96ea6b508e827db2": [
+    "Ran in cloud for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "45fb5ac2c21df202": "현재 설치 확인 중",
   "0afc8b32e04965cf": "설치 프로그램 대기 중",
   "08e68823178c1e89": "릴레이 클라이언트 다운로드 중",
@@ -13745,6 +13758,8 @@
   "d3b196a6b0c4c7c9": "Claude Cloud sessions",
   "ca9617cd3b34471c": "Show {count} more cloud sessions",
   "51a6253a30722d04": "{count} more",
+  "c7440a0bc42a782f": "Needs input",
+  "b24b57bdf1b68b1b": "{title}, cloud run, working for {duration}",
   "29a9beca8f378a2e": "Hide subagents of {title}",
   "32910347d718b7cf": "Show {count} subagents of {title}",
   "e8e7b6206aa41761": "Subagents of {title}",

@@ -242,18 +242,28 @@ export function withNativeSubagentWork<T extends MatterThreadItem>(
 /**
  * Threads with a subagent or delegated task still running anywhere below them, keyed to when
  * the earliest of those runs started. Walks `parentKey` up from each running thread, so a
- * grandchild counts for every ancestor; a lineage cycle stops at the first repeat.
+ * grandchild counts for every ancestor; a lineage cycle stops at the first repeat. `external`
+ * is work that isn't a thread (a Claude Cloud run), counted for its thread and every ancestor.
  */
 export function workingDescendantSince(
   lineage: ReadonlyArray<MatterThreadItem>,
+  external: ReadonlyArray<{ readonly parentKey: string; readonly since: string }> = [],
 ): ReadonlyMap<string, string> {
   const parentOf = new Map(lineage.map((item) => [item.key, item.parentKey]));
   const since = new Map<string, string>();
-  for (const item of lineage) {
-    if (item.attention !== "running") continue;
-    const started = item.runningSince ?? item.activityAt;
-    const visited = new Set([item.key]);
-    let ancestor = item.parentKey;
+  const roots = [
+    ...lineage
+      .filter((item) => item.attention === "running")
+      .map((item) => ({
+        key: item.key,
+        parentKey: item.parentKey,
+        started: item.runningSince ?? item.activityAt,
+      })),
+    ...external.map((work) => ({ key: null, parentKey: work.parentKey, started: work.since })),
+  ];
+  for (const { key, parentKey, started } of roots) {
+    const visited = new Set<string>(key === null ? [] : [key]);
+    let ancestor: string | null = parentKey;
     while (ancestor !== null && !visited.has(ancestor)) {
       visited.add(ancestor);
       const current = since.get(ancestor);

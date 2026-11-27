@@ -70,6 +70,7 @@ import {
   useClaudeCloudTranscript,
 } from "./claudeCloudStore";
 import { ClaudeCloudTimeline } from "./ClaudeCloudTimeline";
+import { MatterCloudSourceChip } from "./MatterCloudSourceChip.matter";
 import {
   cloudEchoMessage,
   cloudSessionSource,
@@ -140,6 +141,7 @@ export function ClaudeCloudSessionView({
               <WorkspaceBreadcrumbText>{session?.title || sessionId}</WorkspaceBreadcrumbText>
             </h1>
             {session ? <CloudSessionMeta session={session} sending={sending} /> : null}
+            <MatterCloudSourceChip session={session} />
           </WorkspaceBreadcrumbItem>
         </WorkspaceBreadcrumb>
         {config !== null ? <CloudSessionActions sessionId={sessionId} session={session} /> : null}

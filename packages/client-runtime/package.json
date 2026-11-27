@@ -223,6 +223,10 @@
       "types": "./src/matter/promptPrediction.ts",
       "default": "./src/matter/promptPrediction.ts"
     },
+    "./matter/cloud-runs": {
+      "types": "./src/matter/cloudRuns.ts",
+      "default": "./src/matter/cloudRuns.ts"
+    },
     "./matter/whisper": {
       "types": "./src/matter/whisper.ts",
       "default": "./src/matter/whisper.ts"

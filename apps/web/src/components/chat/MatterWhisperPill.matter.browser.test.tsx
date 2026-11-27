@@ -9,11 +9,17 @@ const state = vi.hoisted(() => ({
   servers: [] as unknown[],
   providers: [] as unknown[],
   interrupts: [] as unknown[],
+  cloudRuns: [] as unknown[],
 }));
 
 vi.mock(import("~/state/environments"), async (importOriginal) => ({
   ...(await importOriginal()),
   useEnvironmentProviders: (() => new Map([["environment", state.providers]])) as never,
+  usePrimaryEnvironmentId: (() => "environment") as never,
+}));
+vi.mock(import("../cloud/useMatterCloudRuns.matter"), () => ({
+  useMatterCloudRuns: (() => state.cloudRuns) as never,
+  useMatterCloudRunNudge: () => {},
 }));
 vi.mock(import("~/state/entities"), async (importOriginal) => ({
   ...(await importOriginal()),
@@ -90,6 +96,7 @@ function withStyles() {
       state.servers = [];
       state.providers = [];
       state.interrupts = [];
+      state.cloudRuns = [];
       document.documentElement.classList.remove("dark");
     },
   };
@@ -214,6 +221,43 @@ describe("MatterWhisperPill", () => {
     await expect.element(page.getByText("vp run dev")).toBeVisible();
     await page.getByRole("button", { name: "Stop all" }).click();
     expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists the chat's live cloud runs, waiting ones first, each opening its session page", async () => {
+    using _styles = withStyles();
+    const cloudRun = (id: string, title: string, state: string, threadId = THREAD) => ({
+      id,
+      title,
+      state,
+      sourceThreadId: threadId,
+      instanceId: "claudeAgent",
+      needsAction: null,
+      startedAt: new Date(NOW - 7 * 60_000).toISOString(),
+      updatedAt: new Date(NOW).toISOString(),
+    });
+    state.cloudRuns = [
+      cloudRun("cse_build", "Full test suite", "running"),
+      cloudRun("cse_ask", "Schema question", "needs_input"),
+      cloudRun("cse_other", "Another chat's run", "running", ThreadId.make("other")),
+    ];
+    await using screen = await render(
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+    );
+    await expect.element(screen.getByText("7m")).toBeVisible();
+    const avatar = screen.container.querySelector<HTMLElement>("[data-matter-whisper-avatar]");
+    expect(avatar?.hasAttribute("data-cloud")).toBe(true);
+    expect(avatar?.hasAttribute("data-needs")).toBe(true);
+    await page.getByRole("button", { name: "Lineage: 2 running" }).click();
+    const ask = page.getByRole("link", { name: "Schema question, cloud run, needs input" });
+    await expect.element(ask).toHaveAttribute("href", "/cloud/cse_ask?instanceId=claudeAgent");
+    await expect.element(page.getByText("Needs input")).toBeVisible();
+    const rows = document.querySelectorAll("[data-matter-lineage-row][data-kind='cloud']");
+    expect(Array.from(rows, (row) => row.getAttribute("data-state"))).toEqual([
+      "needs_input",
+      "running",
+    ]);
+    await page.getByRole("link", { name: "Full test suite, cloud run" }).click();
+    expect(readMatterLineagePopover().threadKey).toBeNull();
   });
 
   it("marks running dev servers with a globe and keeps their ports for screen readers, in dark mode too", async () => {

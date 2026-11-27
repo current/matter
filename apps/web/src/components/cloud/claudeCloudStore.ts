@@ -1,3 +1,4 @@
+import { shouldWatchMatterCloudRuns } from "@t3tools/client-runtime/matter/cloud-runs";
 import type {
   ClaudeCloudAccountProblemNote,
   ClaudeCloudPendingRequest,
@@ -51,7 +52,9 @@ function ensureVisibilityListener() {
       for (const entry of transcripts.values()) clearTimer(entry);
       return;
     }
-    if (listRefs > 0) void loadList();
+    if (listRefs > 0 || (watchRefs > 0 && shouldWatchMatterCloudRuns(list.sessions))) {
+      void loadList();
+    }
     for (const entry of transcripts.values()) {
       if (entry.refs > 0) void pollTranscript(entry);
     }
@@ -72,6 +75,8 @@ const LIST_IDLE_POLL_MS = 60_000;
 
 let list: ClaudeCloudSessionsState = { sessions: null, problems: [], error: null };
 let listRefs = 0;
+/** Holders that only follow chats' cloud runs (the pill, the sidebars), not the whole list. */
+let watchRefs = 0;
 let listConfig: MatterApiConfig | null = null;
 let listTimer: ReturnType<typeof setTimeout> | null = null;
 let listController: AbortController | null = null;
@@ -83,9 +88,23 @@ function stopListTimer() {
 
 function scheduleList() {
   stopListTimer();
-  if (listRefs === 0 || pageHidden()) return;
-  const active = list.sessions?.some((session) => isCloudSessionActive(session.state));
-  listTimer = setTimeout(() => void loadList(), active ? LIST_ACTIVE_POLL_MS : LIST_IDLE_POLL_MS);
+  if (pageHidden()) return;
+  if (listRefs > 0) {
+    const active = list.sessions?.some((session) => isCloudSessionActive(session.state));
+    listTimer = setTimeout(() => void loadList(), active ? LIST_ACTIVE_POLL_MS : LIST_IDLE_POLL_MS);
+  } else if (watchRefs > 0 && shouldWatchMatterCloudRuns(list.sessions)) {
+    listTimer = setTimeout(() => void loadList(), LIST_ACTIVE_POLL_MS);
+  }
+}
+
+function releaseList() {
+  if (listRefs > 0 || watchRefs > 0) {
+    scheduleList();
+    return;
+  }
+  stopListTimer();
+  listController?.abort();
+  listController = null;
 }
 
 async function loadList() {
@@ -115,19 +134,46 @@ export function retainClaudeCloudSessions(config: MatterApiConfig): () => void {
   listRefs += 1;
   const changed = listConfig !== config;
   listConfig = config;
-  if (changed || list.sessions === null) void loadList();
-  else if (listTimer === null) scheduleList();
+  if (changed || (list.sessions === null && listController === null)) void loadList();
+  else if (listTimer === null && listController === null) scheduleList();
   return () => {
     listRefs -= 1;
-    if (listRefs > 0) return;
-    stopListTimer();
-    listController?.abort();
-    listController = null;
+    releaseList();
+  };
+}
+
+/**
+ * Follows the cloud runs chats started: one read when first held, then reads only while one of
+ * them was last seen running or waiting on input, and on `nudgeClaudeCloudRuns`.
+ */
+export function retainClaudeCloudRunWatch(config: MatterApiConfig): () => void {
+  ensureVisibilityListener();
+  watchRefs += 1;
+  const changed = listConfig !== config;
+  listConfig = config;
+  if (changed || (list.sessions === null && listController === null)) void loadList();
+  else if (listTimer === null && listController === null) scheduleList();
+  return () => {
+    watchRefs -= 1;
+    releaseList();
   };
 }
 
 export function refreshClaudeCloudSessions(): void {
-  if (listRefs > 0) void loadList();
+  if (listRefs > 0 || watchRefs > 0) void loadList();
+}
+
+const nudgeKeys = new Map<string, string>();
+
+/**
+ * A chat's run started or ended, so it may have launched a cloud run: read once now. The first
+ * key seen for a chat only records it, so opening a chat doesn't read.
+ */
+export function nudgeClaudeCloudRuns(threadKey: string, runKey: string): void {
+  const previous = nudgeKeys.get(threadKey);
+  nudgeKeys.set(threadKey, runKey);
+  if (previous === undefined || previous === runKey) return;
+  if (watchRefs > 0 && listController === null && !pageHidden()) void loadList();
 }
 
 const getList = () => list;
@@ -325,6 +371,8 @@ export function resetClaudeCloudStoreForTests(): void {
   listController = null;
   list = { sessions: null, problems: [], error: null };
   listRefs = 0;
+  watchRefs = 0;
+  nudgeKeys.clear();
   listConfig = null;
   emit();
 }

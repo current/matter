@@ -170,6 +170,7 @@ function model(overrides: Partial<MatterSidebarModel> = {}): MatterSidebarModel 
   return {
     items,
     children: [],
+    cloudRuns: new Map(),
     projects: [MATTER],
     activeThreadKey: today.key,
     nowMs: NOW_MS,
@@ -419,6 +420,44 @@ describe("MatterTimelineSidebar", () => {
       await expect.element(page.getByRole("button", { name: "Port the composer" })).toBeVisible();
       expect(screen.container.querySelector("[data-matter-timeline-subagent]")).toBeNull();
       expect(row(screen.container, working)!.hasAttribute("data-active")).toBe(true);
+    }
+  });
+
+  it("nests a chat's live cloud runs like active subagents, behind the same switch", async () => {
+    const cloudRuns = new Map([
+      [
+        working.key,
+        [
+          {
+            id: "cse_build",
+            title: "Full test suite",
+            state: "running" as const,
+            sourceThreadId: ThreadId.make(working.title),
+            instanceId: "claudeAgent",
+            needsAction: null,
+            startedAt: new Date(NOW_MS - 12 * 60_000).toISOString(),
+            updatedAt: new Date(NOW_MS).toISOString(),
+          },
+        ],
+      ],
+    ]);
+    {
+      using _server = useServer();
+      await using screen = await renderTimeline(model({ cloudRuns }));
+      await expect
+        .element(page.getByRole("link", { name: "Full test suite, cloud run, working for 12m" }))
+        .toHaveAttribute("href", "/cloud/cse_build?instanceId=claudeAgent");
+      const cloud = screen.container.querySelector("[data-matter-cloud-run]");
+      expect(cloud?.closest("ul")?.getAttribute("aria-label")).toBe(
+        "Subagents of Port the composer",
+      );
+      expect(cloud?.querySelector(".mts-sm")?.textContent).toBe("12m");
+    }
+    {
+      using _server = useServer({ [MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY]: false });
+      await using screen = await renderTimeline(model({ cloudRuns }));
+      await expect.element(page.getByRole("button", { name: "Port the composer" })).toBeVisible();
+      expect(screen.container.querySelector("[data-matter-cloud-run]")).toBeNull();
     }
   });
 

@@ -1,5 +1,6 @@
 /* oxlint-disable shadcn/no-unknown-classes -- the `mlf-*`, `mts-*` and `mfs-*` classes come from the fork stylesheets matter/timeline-feed.css, matter/timeline-sidebar.css and matter/sidebar.css, which load outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
+import type { MatterCloudRun } from "@t3tools/client-runtime/matter/cloud-runs";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import * as Schema from "effect/Schema";
 import { useGT } from "gt-react";
@@ -62,6 +63,7 @@ import {
   type MatterTimelineSection,
 } from "@t3tools/client-runtime/matter/timeline-feed";
 import type { MatterPullRequestState, MatterThreadItem } from "./matterSidebar.logic";
+import { MatterTimelineCloudRunRow } from "./MatterCloudRunRows.matter";
 import { MatterTip } from "./MatterSidebarParts";
 import {
   useMatterInboxProjectFilter,
@@ -111,6 +113,7 @@ const FOLDS_STORAGE_KEY = "mattr:sidebar:timeline-folds:v1";
 const METER_LIMIT = 5;
 const Folds = Schema.Record(Schema.String, Schema.Boolean);
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
+const NO_CLOUD_RUNS: ReadonlyMap<string, ReadonlyArray<MatterCloudRun>> = new Map();
 const ROW_FOCUS_STOPS =
   "button.mts-hit, button.mts-fold, button.mlf-elsewhere, button.mlf-show-more, button.mfs-hit, a.mfs-row";
 
@@ -264,6 +267,8 @@ const summaryId = (key: string) => `mlf-desc-${key}`;
 
 interface TimelineRowContext {
   readonly subagents: ReadonlyMap<string, ReadonlyArray<MatterChildItem>>;
+  /** Cloud runs nest like active subagents, behind the same Show active subagents switch. */
+  readonly cloudRuns: ReadonlyMap<string, ReadonlyArray<MatterCloudRun>>;
   readonly needsChildParents: ReadonlySet<string>;
   /** The row to highlight when the open thread is a subagent the list doesn't show. */
   readonly hiddenActiveParent: string | null;
@@ -602,9 +607,10 @@ function TimelineSubagents({
 }) {
   const gt = useGT();
   const active = context.subagents.get(parent.key) ?? [];
+  const cloudRuns = context.cloudRuns.get(parent.key) ?? [];
   const openFinished =
     context.openFinishedChild?.ancestorKey === parent.key ? context.openFinishedChild : null;
-  if (active.length === 0 && openFinished === null) return null;
+  if (active.length === 0 && cloudRuns.length === 0 && openFinished === null) return null;
   const expanded = context.expandedSubagents.has(parent.key);
   const collapsed = visibleTimelineSubagents(active, {
     expanded: false,
@@ -617,6 +623,9 @@ function TimelineSubagents({
       className="mlf-subs"
       aria-label={gt("Subagents of {title}", { title: parent.title })}
     >
+      {cloudRuns.map((run) => (
+        <MatterTimelineCloudRunRow key={run.id} run={run} nowMs={model.nowMs} />
+      ))}
       {rows.map((child) => (
         <TimelineSubagent key={child.key} model={model} item={child} context={context} />
       ))}
@@ -918,6 +927,7 @@ export function MatterTimelineSidebar({
     (subagents.get(activeChild.ancestorKey) ?? []).some((child) => child.key === activeChild.key);
   const rowContext: TimelineRowContext = {
     subagents,
+    cloudRuns: showSubagents ? model.cloudRuns : NO_CLOUD_RUNS,
     needsChildParents,
     hiddenActiveParent:
       activeChild !== undefined && !showSubagents ? activeChild.ancestorKey : null,

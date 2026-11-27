@@ -1,4 +1,9 @@
-import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+import {
+  groupMatterCloudRuns,
+  matterCloudRunWork,
+  type MatterCloudRun,
+} from "@t3tools/client-runtime/matter/cloud-runs";
+import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { pickableProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { isShownUnderParent } from "@t3tools/client-runtime/state/threads";
@@ -7,6 +12,7 @@ import type {
   ContextMenuSource,
   ProviderDriverKind,
   ResolvedKeybindingsConfig,
+  ThreadId,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useRouter } from "@tanstack/react-router";
@@ -24,9 +30,10 @@ import { copyThreadReference } from "../../../lib/copyThreadReference";
 import { readLocalApi } from "../../../localApi";
 import type { SidebarProjectSnapshot } from "../../../sidebarProjectGrouping";
 import { useDelegatedUnderParent, useQuietThreadShells } from "../../../state/entities";
-import { useEnvironmentProviders } from "../../../state/environments";
+import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../../../state/environments";
 import { primaryServerKeybindingsAtom } from "../../../state/server";
 import { buildThreadRouteParams } from "../../../threadRoutes";
+import { useMatterCloudRuns } from "../../cloud/useMatterCloudRuns.matter";
 import { filterSidebarV2VisibleThreads } from "../../Sidebar.logic";
 import { stackedThreadToast, toastManager } from "../../ui/toast";
 import { useSidebar } from "../../ui/sidebar";
@@ -73,6 +80,8 @@ export interface MatterSidebarModel {
   readonly items: ReadonlyArray<MatterThreadItem>;
   /** Subagents and delegated tasks, which the rail nests under their listed ancestor. */
   readonly children: ReadonlyArray<MatterChildItem>;
+  /** Claude Cloud runs a chat started that still run or wait, keyed by the row they nest under. */
+  readonly cloudRuns: ReadonlyMap<string, ReadonlyArray<MatterCloudRun>>;
   readonly projects: ReadonlyArray<MatterSidebarProject>;
   readonly activeThreadKey: string | null;
   readonly nowMs: number;
@@ -89,6 +98,8 @@ export function useMatterSidebarModel(): MatterSidebarModel {
   const delegatedUnderParent = useDelegatedUnderParent();
   const projectGroups = useSidebarProjectGroups();
   const providersByEnvironment = useEnvironmentProviders();
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const cloudRunList = useMatterCloudRuns();
   const nowMinute = useNowMinute();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const routeTarget = useShownThreadRouteTarget().shownTarget;
@@ -148,7 +159,22 @@ export function useMatterSidebarModel(): MatterSidebarModel {
     threads,
   );
   const childItems = withNativeSubagentWork(listedChildren, workingNativeSubagentKeys(threads));
-  const workingSince = workingDescendantSince([...listedItems, ...childItems]);
+  // Cloud sessions belong to the primary environment's server, like the rest of Matter's API.
+  const cloudThreadKey = (threadId: ThreadId) =>
+    primaryEnvironmentId === null
+      ? ""
+      : scopedThreadKey(scopeThreadRef(primaryEnvironmentId, threadId));
+  const listedKeys = new Set(listedItems.map((item) => item.key));
+  const ancestorOf = new Map(childItems.map((child) => [child.key, child.ancestorKey]));
+  const cloudRuns = groupMatterCloudRuns(cloudRunList, (threadId) => {
+    const key = cloudThreadKey(threadId);
+    if (listedKeys.has(key)) return key;
+    return ancestorOf.get(key) ?? null;
+  });
+  const workingSince = workingDescendantSince(
+    [...listedItems, ...childItems],
+    matterCloudRunWork(cloudRunList, cloudThreadKey),
+  );
   const items = withDescendantWork(listedItems, workingSince);
   const children = withDescendantWork(childItems, workingSince);
 
@@ -261,6 +287,7 @@ export function useMatterSidebarModel(): MatterSidebarModel {
   return {
     items,
     children,
+    cloudRuns,
     projects,
     activeThreadKey: routeTarget?.kind === "server" ? scopedThreadKey(routeTarget.threadRef) : null,
     nowMs,
