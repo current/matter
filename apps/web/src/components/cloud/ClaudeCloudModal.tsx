@@ -7,7 +7,7 @@ import {
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
 import { T, useGT } from "gt-react";
-import { CloudIcon, ExternalLinkIcon } from "lucide-react";
+import { CloudIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -23,6 +23,7 @@ import {
 } from "../../addons/claudeCloudApi";
 import { useMatterApiConfig } from "../../addons/matterApi";
 import { useIsAddonEnabled } from "../../addons/useAddonRegistry";
+import { refreshClaudeCloudSessions } from "./claudeCloudStore";
 import { useProjects } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { buildThreadRouteParams } from "../../threadRoutes";
@@ -54,7 +55,6 @@ export function ClaudeCloudModalHost() {
 }
 
 type Outcome =
-  | { readonly kind: "launched"; readonly url: string; readonly pushed: boolean }
   | { readonly kind: "replied"; readonly reply: string | null }
   | { readonly kind: "teleported"; readonly worktreePath: string };
 
@@ -130,7 +130,14 @@ function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
         ...(title.trim() === "" ? {} : { title: title.trim() }),
         ...(pushFirst ? { pushFirst } : {}),
       });
-      return { kind: "launched", url: result.session.url, pushed: result.pushed };
+      closeClaudeCloudDialog();
+      refreshClaudeCloudSessions();
+      await navigate({
+        to: "/cloud/$sessionId",
+        params: { sessionId: result.session.id },
+        search: { instanceId: result.session.instanceId },
+      });
+      return null;
     }
     if (mode === "followup" && sessionId !== null) {
       const result = await sendClaudeCloudFollowUp(config, { sessionId, prompt: prompt.trim() });
@@ -281,23 +288,25 @@ function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
               </div>
             ) : null}
 
-            {outcome?.kind === "launched" ? (
-              <p className="text-sm" role="status">
-                <T>The cloud session is running.</T>{" "}
-                <a
-                  className="inline-flex items-center gap-1 underline"
-                  href={outcome.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <T>Open in claude.ai</T>
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              </p>
-            ) : outcome?.kind === "replied" ? (
-              <p className="text-sm whitespace-pre-wrap" role="status">
-                {outcome.reply ?? gt("Sent. The session didn't reply yet.")}
-              </p>
+            {outcome?.kind === "replied" ? (
+              <div className="flex flex-col items-start gap-2" role="status">
+                <p className="text-sm whitespace-pre-wrap">
+                  {outcome.reply ?? gt("Sent. The session didn't reply yet.")}
+                </p>
+                {sessionId !== null ? (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => {
+                      closeClaudeCloudDialog();
+                      void navigate({ to: "/cloud/$sessionId", params: { sessionId } });
+                    }}
+                  >
+                    <T>Open session</T>
+                  </Button>
+                ) : null}
+              </div>
             ) : outcome?.kind === "teleported" ? (
               <p className="text-sm" role="status">
                 {gt("Teleported into {path}. Its thread will appear once the session imports.", {

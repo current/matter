@@ -4,14 +4,18 @@ import type {
   ClaudeCloudEligibilityRequest,
   ClaudeCloudFollowUpRequest,
   ClaudeCloudFollowUpResult,
+  ClaudeCloudInterruptRequest,
   ClaudeCloudLaunchRequest,
   ClaudeCloudLaunchResult,
+  ClaudeCloudRemoteSessionsResponse,
   ClaudeCloudSettingsPatch,
   ClaudeCloudStatus,
   ClaudeCloudTeleportRequest,
   ClaudeCloudTeleportResult,
   ProjectId,
 } from "@t3tools/contracts";
+import { ClaudeCloudTranscriptResponse } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { useSyncExternalStore } from "react";
 
 import { type MatterApiConfig, matterApiRequest } from "./matterApi";
@@ -78,6 +82,50 @@ export async function forgetClaudeCloudSession(
   await matterApiRequest(config, `${BASE}/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
   });
+}
+
+export function fetchClaudeCloudRemoteSessions(
+  config: MatterApiConfig,
+  options: { readonly archived?: boolean; readonly signal?: AbortSignal } = {},
+): Promise<ClaudeCloudRemoteSessionsResponse> {
+  return matterApiRequest<ClaudeCloudRemoteSessionsResponse>(
+    config,
+    `${BASE}/remote-sessions${options.archived ? "?archived=1" : ""}`,
+    options.signal ? { signal: options.signal } : {},
+  );
+}
+
+const decodeTranscript = Schema.decodeUnknownSync(
+  Schema.toCodecJson(ClaudeCloudTranscriptResponse),
+);
+
+/** Turn items carry DateTimes, so the response is decoded rather than cast. */
+export async function fetchClaudeCloudTranscript(
+  config: MatterApiConfig,
+  sessionId: string,
+  options: {
+    readonly sinceRev?: number | null;
+    readonly instanceId?: string | null;
+    readonly signal?: AbortSignal;
+  } = {},
+): Promise<ClaudeCloudTranscriptResponse> {
+  const query = new URLSearchParams();
+  if (options.sinceRev != null) query.set("sinceRev", String(options.sinceRev));
+  if (options.instanceId) query.set("instanceId", options.instanceId);
+  const search = query.size > 0 ? `?${query.toString()}` : "";
+  const raw = await matterApiRequest<unknown>(
+    config,
+    `${BASE}/remote-sessions/${encodeURIComponent(sessionId)}/transcript${search}`,
+    options.signal ? { signal: options.signal } : {},
+  );
+  return decodeTranscript(raw);
+}
+
+export async function interruptClaudeCloudSession(
+  config: MatterApiConfig,
+  request: ClaudeCloudInterruptRequest,
+): Promise<void> {
+  await matterApiRequest(config, `${BASE}/interrupt`, { method: "POST", body: request });
 }
 
 /** A request's value or its error text, so components need no try/finally (React Compiler). */
