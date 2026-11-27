@@ -248,9 +248,9 @@ describe("MatterWhisperPill", () => {
     expect(avatar?.hasAttribute("data-cloud")).toBe(true);
     expect(avatar?.hasAttribute("data-needs")).toBe(true);
     await page.getByRole("button", { name: "Lineage: 2 running" }).click();
-    const ask = page.getByRole("link", { name: "Schema question, cloud run, needs input" });
+    const ask = page.getByRole("link", { name: "Schema question, cloud run, needs you" });
     await expect.element(ask).toHaveAttribute("href", "/cloud/cse_ask?instanceId=claudeAgent");
-    await expect.element(page.getByText("Needs input")).toBeVisible();
+    await expect.element(page.getByText("Needs you")).toBeVisible();
     const rows = document.querySelectorAll("[data-matter-lineage-row][data-kind='cloud']");
     expect(Array.from(rows, (row) => row.getAttribute("data-state"))).toEqual([
       "needs_input",

@@ -258,7 +258,7 @@ function CloudRunLineageRow({ run }: { readonly run: MatterCloudRun }) {
         data-matter-lineage-row-open
         aria-label={
           needsInput
-            ? gt("{title}, cloud run, needs input", { title: run.title })
+            ? gt("{title}, cloud run, needs you", { title: run.title })
             : gt("{title}, cloud run", { title: run.title })
         }
         onClick={() => closeMatterLineagePopover()}
@@ -267,11 +267,11 @@ function CloudRunLineageRow({ run }: { readonly run: MatterCloudRun }) {
         <span data-matter-lineage-row-title>{run.title}</span>
         {needsInput ? (
           <span data-matter-lineage-row-meta data-tone="needs">
-            <T context="a cloud run waits for the user">Needs input</T>
+            <T>Needs you</T>
           </span>
         ) : (
           <span data-matter-lineage-row-meta>
-            <T context="where a run executes: on a Claude Cloud VM">Cloud</T>
+            <T>on Claude Cloud</T>
           </span>
         )}
         <span data-matter-lineage-row-time>

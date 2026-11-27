@@ -28,9 +28,9 @@ describe("MatterCloudSourceChip", () => {
   it("links a cloud run back to the chat that started it", async () => {
     shells.set("chat-1", { title: "Port the composer" });
     await using _screen = await render(<MatterCloudSourceChip session={tracked("chat-1")} />);
-    const chip = page.getByRole("link", { name: "Ran in cloud, from Port the composer" });
+    const chip = page.getByRole("link", { name: "Started from Port the composer" });
     await expect.element(chip).toHaveAttribute("href", "/local/chat-1");
-    await expect.element(page.getByText("From Port the composer")).toBeVisible();
+    await expect.element(page.getByText("Port the composer")).toBeVisible();
     shells.clear();
   });
 

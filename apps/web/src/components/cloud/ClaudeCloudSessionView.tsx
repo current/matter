@@ -255,6 +255,7 @@ function CloudSessionActions({
         size="xs"
         variant="outline"
         data-claude-cloud-teleport=""
+        title={gt("Pull this session's branch into a local worktree and continue it here")}
         onClick={() =>
           openClaudeCloudDialog({
             mode: "teleport",

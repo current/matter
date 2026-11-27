@@ -197,7 +197,7 @@ describe("ClaudeCloudModalHost", () => {
     openClaudeCloudDialog({ mode: "launch", projectId: PROJECT_ID, threadId: THREAD_ID });
     await expect.element(page.getByRole("dialog")).toBeVisible();
     await expect
-      .element(page.getByText("Matter will report back to this chat when the run ends."))
+      .element(page.getByText("Matter will post the result in this chat when the run ends."))
       .toBeVisible();
 
     await userEvent.fill(page.getByRole("textbox", { name: "Message" }), "Run the full suite");

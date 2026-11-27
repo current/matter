@@ -2,11 +2,12 @@ import {
   CLAUDE_CLOUD_ADDON_ID,
   type ClaudeCloudEligibility,
   type ProjectId,
+  type ThreadId,
   parseClaudeCloudSessionRef,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
-import { T, useGT } from "gt-react";
+import { T, useGT, Var } from "gt-react";
 import { CloudIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -24,7 +25,7 @@ import {
 import { useMatterApiConfig } from "../../addons/matterApi";
 import { useIsAddonEnabled } from "../../addons/useAddonRegistry";
 import { refreshClaudeCloudSessions } from "./claudeCloudStore";
-import { useProjects } from "../../state/entities";
+import { useProjects, useQuietThreadShell } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { Button } from "../ui/button";
@@ -276,7 +277,7 @@ function ClaudeCloudModal({ dialog }: { dialog: ClaudeCloudDialogState }) {
 
             {mode === "launch" && dialog.threadId !== null ? (
               <p className="text-xs text-muted-foreground" data-claude-cloud-thread-note="">
-                <T>Matter will report back to this chat when the run ends.</T>
+                <ThreadReportNote threadId={dialog.threadId} />
               </p>
             ) : null}
 
@@ -425,5 +426,21 @@ function EligibilityNotes({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** Names the chat a launch reports back to. */
+function ThreadReportNote({ threadId }: { readonly threadId: ThreadId }) {
+  const environmentId = usePrimaryEnvironmentId();
+  const thread = useQuietThreadShell(
+    environmentId === null ? null : scopeThreadRef(environmentId, threadId),
+  );
+  const title = thread?.title.trim() ?? "";
+  return title === "" ? (
+    <T>Matter will post the result in this chat when the run ends.</T>
+  ) : (
+    <T>
+      Matter will post the result in <Var>{title}</Var> when the run ends.
+    </T>
   );
 }

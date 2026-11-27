@@ -115,7 +115,7 @@ function OffloadPresetRow() {
           <SelectTrigger size="sm" className="w-40 shrink-0" aria-label={gt("Offload heavy work")}>
             <SelectValue>{m(CLAUDE_CLOUD_OFFLOAD_POLICY_LABELS[policy ?? "balanced"])}</SelectValue>
           </SelectTrigger>
-          <SelectPopup align="end">
+          <SelectPopup align="end" alignItemWithTrigger={false}>
             {CLAUDE_CLOUD_OFFLOAD_POLICY_ORDER.map((option) => (
               <SelectItem key={option} value={option} data-claude-cloud-preset={option}>
                 <span className="flex flex-col py-0.5">

@@ -3614,10 +3614,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "på datorn som öppnade den här sidan"
-      ]
+      "c": [" ", "på datorn som öppnade den här sidan"]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3629,10 +3626,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· den som kör den får den här åtkomsten"
-      ]
+      "c": [" ", "· den som kör den får den här åtkomsten"]
     }
   ],
   "c54cc9c75db9dc58": "Godkänn bara en inloggning som du själv precis har startat.",
@@ -4329,7 +4323,7 @@
   "34b5ccf452e1dc18": "Use the classic details card",
   "a06eb47a82969918": "Subagent",
   "3e96cf915b1d079b": "Stop {title}",
-  "9fb30dbeae76b935": "{title}, cloud run, needs input",
+  "1bdb7b0d53f2f8bf": "{title}, cloud run, needs you",
   "3acf475328d56252": "{title}, cloud run",
   "ba2cf3dd6de0d1a6": "Kunde inte stoppa subagenten",
   "bc5f7c6821578b8f": "Tidigare agenter",
@@ -4352,8 +4346,8 @@
     }
   ],
   "25da730aa6ca43c3": "Stop",
-  "74b2c584cc69b5c9": "Needs input",
-  "d0f54c94bc193a89": "Cloud",
+  "1b7c524fccf06537": "Needs you",
+  "e5f3b4b52c30a58f": "on Claude Cloud",
   "a3db5fd6c4b955ec": "Back",
   "a33df1497c9fa65b": [
     "Lineage · ",
@@ -5779,7 +5773,6 @@
   "3ac8ed47fe50bd34": "Title",
   "0603377ae4a632d1": "First message (optional)",
   "6b3e8bc1f3ded083": "Meddelande",
-  "a6e2c7a150ab3332": "Matter will report back to this chat when the run ends.",
   "77e522be9b10d484": "Starting the cloud session…",
   "0a6f4f143cab3a62": "Creating a worktree and teleporting…",
   "1a7e7519f16c0af1": "Waiting for the cloud session to reply…",
@@ -5788,10 +5781,21 @@
   "edccf8a9a1c53e65": "Check out a branch first.",
   "0fb3ec7b1900cc02": "Push first",
   "0ce18047d5e43578": "Uncommitted changes stay on this Mac; the cloud session starts from the pushed branch.",
+  "bb31bc969c347f04": "Matter will post the result in this chat when the run ends.",
+  "09297c70ff218ca9": [
+    "Matter will post the result in ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " when the run ends."
+  ],
   "fa4666bcfd45d0d2": "Claude Cloud breadcrumb",
   "81989e26a16ae773": "This cloud session isn't available",
   "21ed03722da196ea": "It may have been deleted, or none of your Claude accounts can read it.",
   "8a51ee5e4662b88d": "Link copied",
+  "7ba85468f8ac7752": "Pull this session's branch into a local worktree and continue it here",
   "7a2f15196a4de248": "Bring it back",
   "1449e669f8ba10a6": "Open in claude.ai",
   "d54cd153f6e13f09": "More actions",
@@ -5852,9 +5856,9 @@
   "21d0ab2cb7685f9c": "Inte nu",
   "fb4516dffeebe159": "Klar",
   "a4461ecfdea68985": "Inga andra miljöer är publicerade på ditt konto än. Publicera en från en annan enhet så visas den här.",
-  "aa34e64ede248096": "Ran in cloud, from {title}",
-  "96ea6b508e827db2": [
-    "Ran in cloud for ",
+  "bf97e784a18b9431": "Started from {title}",
+  "259c9b5d665b3cd4": [
+    "Started from ",
     {
       "i": 1,
       "k": "_gt_value_1",
@@ -13829,12 +13833,11 @@
   "b7df38b7d8792d78": "Öppna guiden",
   "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide",
   "f867178a9ef1d750": "New cloud session",
-  "53b6a1bb66a65417": "{count} waiting",
+  "4d5bf65f7b3a7e59": "{count} need you",
   "7fe6ac101c7980f3": "{count} live",
   "d3b196a6b0c4c7c9": "Claude Cloud sessions",
   "ca9617cd3b34471c": "Show {count} more cloud sessions",
   "51a6253a30722d04": "{count} more",
-  "c7440a0bc42a782f": "Needs input",
   "b24b57bdf1b68b1b": "{title}, cloud run, working for {duration}",
   "29a9beca8f378a2e": "Hide subagents of {title}",
   "32910347d718b7cf": "Show {count} subagents of {title}",

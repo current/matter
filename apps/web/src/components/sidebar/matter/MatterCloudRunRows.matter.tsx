@@ -21,9 +21,9 @@ function useCloudRunRow(run: MatterCloudRun, nowMs: number) {
     active: pathname === `/cloud/${encodeURIComponent(run.id)}`,
     needsInput,
     age,
-    status: needsInput ? gt("Needs input", { $context: "a cloud run waits for the user" }) : age,
+    status: needsInput ? gt("Needs you") : age,
     label: needsInput
-      ? gt("{title}, cloud run, needs input", { title: run.title })
+      ? gt("{title}, cloud run, needs you", { title: run.title })
       : gt("{title}, cloud run, working for {duration}", { title: run.title, duration: age }),
   };
 }
@@ -44,7 +44,6 @@ export function MatterDefaultCloudRunRow({ run, nowMs }: { run: MatterCloudRun; 
         {...linkProps(run)}
         className="mfs-sub"
         data-active={row.active ? "" : undefined}
-        data-unread={row.needsInput ? "" : undefined}
         aria-current={row.active ? "page" : undefined}
         aria-label={row.label}
       >

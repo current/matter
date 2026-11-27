@@ -342,7 +342,7 @@ describe("MatterDefaultSidebar", () => {
       "Audit adapters",
       "Write matrix doc",
     ]);
-    expect(rows[0]!.querySelector(".mfs-st")?.textContent).toBe("Needs input");
+    expect(rows[0]!.querySelector(".mfs-st")?.textContent).toBe("Needs you");
     expect(rows[1]!.querySelector(".mfs-st")?.getAttribute("data-tone")).toBe("running");
     await expect
       .element(page.getByRole("link", { name: "Full test suite, cloud run, working for 10m" }))

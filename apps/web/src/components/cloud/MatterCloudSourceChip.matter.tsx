@@ -2,15 +2,14 @@ import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { ClaudeCloudRemoteSession } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { T, useGT, Var } from "gt-react";
-import { CloudIcon } from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 
 import { useQuietThreadShell } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { buildThreadRouteParams } from "../../threadRoutes";
-import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
-/** "Ran in cloud · From <chat>": links a cloud session's page back to the chat that started it. */
+/** Links a cloud session's page back to the chat that started it. */
 export function MatterCloudSourceChip({
   session,
 }: {
@@ -30,29 +29,21 @@ export function MatterCloudSourceChip({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Badge
-            variant="outline"
+          <Link
+            to="/$environmentId/$threadId"
+            params={buildThreadRouteParams(ref)}
             data-matter-cloud-source=""
-            render={
-              <Link
-                to="/$environmentId/$threadId"
-                params={buildThreadRouteParams(ref)}
-                aria-label={gt("Ran in cloud, from {title}", { title })}
-              />
-            }
+            aria-label={gt("Started from {title}", { title })}
+            className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           />
         }
       >
-        <CloudIcon aria-hidden />
-        <span className="max-w-48 truncate">
-          <T>
-            From <Var>{title}</Var>
-          </T>
-        </span>
+        <MessageSquareIcon aria-hidden className="size-3 shrink-0" />
+        <span className="max-w-56 truncate">{title}</span>
       </TooltipTrigger>
       <TooltipPopup>
         <T>
-          Ran in cloud for <Var>{title}</Var>
+          Started from <Var>{title}</Var>
         </T>
       </TooltipPopup>
     </Tooltip>

@@ -68,7 +68,7 @@ export function MatterCloudCrew({
         <span className="mfs-t">{gt("Claude Cloud")}</span>
         {waiting > 0 ? (
           <span className="mfs-a" data-tone="needs">
-            {gt("{count} waiting", { count: waiting })}
+            {gt("{count} need you", { count: waiting })}
           </span>
         ) : live > 0 ? (
           <span className="mfs-a" data-tone="running">
