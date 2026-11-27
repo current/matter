@@ -3,7 +3,9 @@
 const CLIENT_SOURCE = /\/(apps\/mobile\/src|packages\/[^/]+\/src)\//;
 // Thread lifecycle words follow the web build: upstream's "Archive" reads "Hide", "Settle" reads
 // "Archive". Only translated copy (msg/gt arguments and <T> text) changes, never keys or values.
-const { rebrandTerminologyText } = require("./rebrand.ts");
+// A non-literal path keeps the mobile typecheck from following it into the web build's Vite types.
+const REBRAND_MODULE = "./rebrand.ts";
+const { rebrandTerminologyText } = require(REBRAND_MODULE);
 const I18N_CALLS = new Set(["msg", "gt"]);
 const PROJECT_CONTEXT = /project/i;
 
