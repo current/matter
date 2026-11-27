@@ -333,13 +333,42 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   // --no-renames lists a rename as its old and new path, as CI does.
   const changedFiles = lines("diff", "--name-only", "--no-renames", base, "--");
   const untrackedFiles = lines("ls-files", "--others", "--exclude-standard");
-  const files = [...new Set([...(yield* changedFiles), ...(yield* untrackedFiles)])].sort();
+  // git lists an untracked nested repository or worktree (an agent's `.claude/worktrees/*`) as
+  // one directory; its files belong to that checkout, so no check here reads them.
+  const untracked = (yield* untrackedFiles).filter((file) => !file.endsWith("/"));
+  const files = [...new Set([...(yield* changedFiles), ...untracked])].sort();
 
   if (files.length === 0) {
     yield* Console.log(`check:changed: no changes since ${base.slice(0, 12)} (${ref}).`);
     return true;
   }
   yield* Console.log(`check:changed: ${files.length} files since ${base.slice(0, 12)} (${ref})`);
+
+  // pnpm rewrites .modules.yaml on every install and git rewrites a file only when it changes, so
+  // a newer lockfile or patch means dependencies changed since the last install.
+  const modifiedAt = (file: string) =>
+    fs.stat(inRoot(file)).pipe(
+      Effect.map((info) =>
+        Option.match(info.mtime, { onNone: () => 0, onSome: (date) => date.getTime() }),
+      ),
+      Effect.orElseSucceed(() => 0),
+    );
+  const installedAt = yield* modifiedAt("node_modules/.modules.yaml");
+  if (installedAt > 0) {
+    const patches = (yield* fs
+      .readDirectory(inRoot("patches"))
+      .pipe(Effect.orElseSucceed((): Array<string> => []))).map((name) =>
+      path.join("patches", name),
+    );
+    for (const file of ["pnpm-lock.yaml", ...patches]) {
+      if ((yield* modifiedAt(file)) > installedAt) {
+        yield* Console.warn(
+          `check:changed: ${file} changed after the last install. Run \`vp i\` if a check fails on a missing module.`,
+        );
+        break;
+      }
+    }
+  }
 
   const present = yield* Effect.filter(files, (file) => fs.exists(inRoot(file)));
   const code = present.filter((file) => CODE.test(file));

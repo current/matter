@@ -7,6 +7,8 @@ import { cachedTestTasks } from "./scripts/lib/cached-tests.ts";
 const TEST_EXCLUDE = [
   "**/.repos/**",
   "**/.t3/**",
+  // Agents' nested worktrees hold copies of every test, and file filters match them as substrings.
+  "**/.claude/**",
   "**/node_modules/**",
   "**/dist/**",
   "**/dist-electron/**",

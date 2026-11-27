@@ -580,6 +580,40 @@ it("checks changed source paths through the Windows launcher", () => {
   expect(result.stdout).toContain("fixture stderr: lint");
 });
 
+it("leaves an untracked nested worktree to its own checkout", () => {
+  using project = launcherFixture();
+  project.write(project.source, "export const value = 2;\n");
+  project.write(".claude/worktrees/agent-a/packages/example/copy.ts", "export const copy = 1;\n");
+  NodeChildProcess.execFileSync("git", ["init"], {
+    cwd: NodePath.join(project.root, ".claude/worktrees/agent-a"),
+    stdio: "pipe",
+    env,
+  });
+  const result = project.run();
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const fmt = project.calls().find(({ args }) => args[0] === "fmt");
+  expect(fmt?.args).toEqual(["fmt", "--check", "--no-error-on-unmatched-pattern", project.source]);
+});
+
+it("warns when the lockfile changed after the last install", () => {
+  using project = launcherFixture();
+  project.write(project.source, "export const value = 2;\n");
+  project.write("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+  project.write("node_modules/.modules.yaml", "{}\n");
+  const lockfile = NodePath.join(project.root, "pnpm-lock.yaml");
+  const installState = NodePath.join(project.root, "node_modules/.modules.yaml");
+  NodeFS.utimesSync(lockfile, 1_000, 1_000);
+  NodeFS.utimesSync(installState, 2_000, 2_000);
+  const fresh = project.run();
+  expect(fresh.status, fresh.stdout + fresh.stderr).toBe(0);
+  expect(fresh.stderr).not.toContain("changed after the last install");
+
+  NodeFS.utimesSync(lockfile, 3_000, 3_000);
+  const stale = project.run();
+  expect(stale.status, stale.stdout + stale.stderr).toBe(0);
+  expect(stale.stderr).toContain("pnpm-lock.yaml changed after the last install");
+});
+
 it("lints an Astro component and runs knip when only it changed", () => {
   using project = launcherFixture();
   const page = "packages/example/Page.astro";
