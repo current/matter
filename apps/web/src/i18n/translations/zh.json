@@ -4251,6 +4251,11 @@
   "d18b397a0d928796": "回复此消息",
   "870fbe2e87c34c02": "取消回复",
   "8dd1af28f77c440a": "回复",
+  "a54686c89f74dd93": "Could not update the thread",
+  "6ef512c379079a7d": "Pull request #{number} merged",
+  "0b1fc352a397ca0d": "Settle this thread? It moves to Settled in the sidebar.",
+  "65ca6ca43f7d2d66": "Keep",
+  "13e6f2309e418404": "Settle",
   "9948d3b17dd082a1": "Could not approve plan",
   "7984f23b2abec780": "An error occurred while approving.",
   "8ec3e03017dd99b2": "Plan Overview",
@@ -13816,7 +13821,6 @@
   "b8736743b1ab48f3": "Mark as read",
   "ea6e3133277fe5f2": "Mark as unread",
   "0aa392a977c7301b": "Unsettle",
-  "13e6f2309e418404": "Settle",
   "af59c7fd7a0947b0": "Show all threads",
   "cf1ce74bd0806a0d": "Show only what needs you",
   "d74611223b6618c2": "Nothing needs you",
@@ -13835,6 +13839,5 @@
   "a803d70fb1c159b9": "Needs you in other projects",
   "39e0eec9b3604395": "Nothing in {project} needs you.",
   "72bd3a0f1e095070": "No threads in {project} yet.",
-  "1ab50db28dbddd0d": "键盘快捷键",
-  "a54686c89f74dd93": "Could not update the thread"
+  "1ab50db28dbddd0d": "键盘快捷键"
 }

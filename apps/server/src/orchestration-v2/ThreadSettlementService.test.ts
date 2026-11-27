@@ -603,7 +603,10 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
   const snapshotReadCount = yield* Ref.make(0);
   const snapshotReads = yield* Queue.unbounded<number>();
   const candidateReads = yield* Ref.make<ReadonlyArray<string | undefined>>([]);
-  const settings = yield* Ref.make(options.settings ?? DEFAULT_SERVER_SETTINGS);
+  // Matter defaults auto-settle-on-merge off; these cases cover the setting turned on.
+  const settings = yield* Ref.make(
+    options.settings ?? { ...DEFAULT_SERVER_SETTINGS, sidebarAutoSettleOnMerge: true },
+  );
   const settingsReadCount = yield* Ref.make(0);
   const settingsChanges = yield* PubSub.unbounded<ContractServerSettings>();
   const mergedPullRequests = yield* PubSub.unbounded<PullRequestService.PullRequestMergeEvent>();
@@ -924,7 +927,11 @@ describe("ThreadSettlementServiceV2 worker", () => {
       });
       const fixture = yield* makeHarness({
         snapshot: makeSnapshot([thread]),
-        settings: { ...DEFAULT_SERVER_SETTINGS, sidebarAutoSettleAfterDays: null },
+        settings: {
+          ...DEFAULT_SERVER_SETTINGS,
+          sidebarAutoSettleAfterDays: null,
+          sidebarAutoSettleOnMerge: true,
+        },
       });
 
       yield* Effect.gen(function* () {
@@ -2181,7 +2188,11 @@ describe("ThreadSettlementServiceV2 worker", () => {
             latestResumingMessageAt: DateTime.makeUnsafe("2026-08-28T06:00:00.000Z"),
           }),
         ]),
-        settings: { ...DEFAULT_SERVER_SETTINGS, sidebarAutoSettleAfterDays: null },
+        settings: {
+          ...DEFAULT_SERVER_SETTINGS,
+          sidebarAutoSettleAfterDays: null,
+          sidebarAutoSettleOnMerge: true,
+        },
         branchPullRequest: (_input, lookupOptions) =>
           Ref.update(
             freshReads,
@@ -2214,7 +2225,11 @@ describe("ThreadSettlementServiceV2 worker", () => {
       const freshState = yield* Ref.make<"open" | "merged">("open");
       const fixture = yield* makeHarness({
         snapshot: makeSnapshot([makeThread("merged-branch", { branch: "merged-feature" })]),
-        settings: { ...DEFAULT_SERVER_SETTINGS, sidebarAutoSettleAfterDays: null },
+        settings: {
+          ...DEFAULT_SERVER_SETTINGS,
+          sidebarAutoSettleAfterDays: null,
+          sidebarAutoSettleOnMerge: true,
+        },
         branchPullRequest: (_input, lookupOptions) =>
           readsFreshGitState(lookupOptions)
             ? Ref.get(freshState).pipe(Effect.map(makeBranchPullRequest))
