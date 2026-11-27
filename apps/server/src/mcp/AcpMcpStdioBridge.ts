@@ -7,8 +7,13 @@ import * as Fiber from "effect/Fiber";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-import { MCP_TOOL_EXPOSURE_HEADER } from "@t3tools/provider-core/server/mcpSession";
 import { discardResponseBody, responsePayloads } from "@t3tools/shared/mcpResponsePayloads";
+
+import {
+  MCP_TOOL_EXPOSURE_HEADER,
+  type McpToolExposureMode,
+  parseMcpToolExposureMode,
+} from "@t3tools/provider-core/server/mcpSession";
 
 /** ACP mandates stdio MCP support; HTTP/SSE support varies. */
 
@@ -50,8 +55,7 @@ const MCP_PROTOCOL_VERSION = "2025-06-18";
 export interface AcpMcpStdioBridgeOptions {
   readonly endpoint: string;
   readonly authorization: string;
-  /** Sent as `MCP_TOOL_EXPOSURE_HEADER`, as the adapter does for its HTTP servers. */
-  readonly toolExposure?: string | undefined;
+  readonly toolExposure?: McpToolExposureMode | undefined;
   readonly input: NodeJS.ReadableStream;
   readonly output: { write(chunk: string): unknown };
   readonly fetchImplementation?: (url: string, init?: RequestInit) => Promise<Response>;
@@ -380,11 +384,12 @@ export async function runAcpMcpCliFastPath(
     return;
   }
   if (command === "acp-mcp-bridge") {
+    const toolExposure = parseMcpToolExposureMode(process.env.T3_ACP_MCP_TOOL_EXPOSURE);
     await Effect.runPromise(
       runAcpMcpStdioBridge({
         endpoint,
         authorization,
-        toolExposure: process.env.T3_ACP_MCP_TOOL_EXPOSURE,
+        ...(toolExposure === undefined ? {} : { toolExposure }),
         input: process.stdin,
         output: process.stdout,
       }),

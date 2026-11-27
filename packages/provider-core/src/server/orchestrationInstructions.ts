@@ -1,12 +1,17 @@
 import type { ProviderInteractionMode } from "@t3tools/contracts";
+import type { McpToolExposureMode } from "./mcpSession.ts";
 
 // Codex truncates entries over 4,000 bytes; keep each section self-contained and below that limit.
-export const T3_CODE_ORCHESTRATION_SECTIONS: ReadonlyArray<string> = [
+export const t3CodeOrchestrationSections = (nativeSubagents = true): ReadonlyArray<string> => [
   `## T3 Code orchestration
 
 Ordinary coding tasks need no T3 tools.
 
-- Subagents: if a \`<matter_delegation>\` block is present, follow it; otherwise use your native tool when the child uses your provider, a model it offers and no settings beyond yours (Claude \`Agent\`, \`run_in_background:false\`; Codex \`spawn_agent\`, then wait). Use \`delegate_task\` for another provider's model, user-asked settings, a separate checkout (\`isolation:"worktree"\`), or \`delegate_task\` by name. A native type on another provider's model counts too. Background agent: \`delegate_task\`, never a background \`Agent\`. Workflow only when asked.
+- ${
+    nativeSubagents
+      ? `Subagents: if a \`<matter_delegation>\` block is present, follow it; otherwise use your native tool when the child uses your provider, a model it offers and no settings beyond yours (Claude \`Agent\`, \`run_in_background:false\`; Codex \`spawn_agent\`, then wait). Use \`delegate_task\` for another provider's model, user-asked settings, a separate checkout (\`isolation:"worktree"\`), or \`delegate_task\` by name. A native type on another provider's model counts too. Background agent: \`delegate_task\`, never a background \`Agent\`.`
+      : `Subagents: if a \`<matter_delegation>\` block is present, follow it. Use \`delegate_task\` for subagents otherwise, including when the child uses your provider and model. Set \`isolation:"worktree"\` for a separate checkout.`
+  } Workflow only when asked.
 - Call \`orchestrator_capabilities\` once per thread, before the first \`delegate_task\`. Again only after an error or a user-named provider change. Settings go in \`target.options\`. Provider or model unavailable: say so. Never switch unasked or fall back to native tools, Workflow or CLIs. Never make a child's checkout in the shell or in \`task\`.
 - Every new delegate review or re-check is a new \`delegate_task\` (brief, findings, objections), never a \`t3_thread_send\`. Fix small review findings yourself; start no delegate for them. When told to proceed without a delegate, or to run fewer, \`task_cancel\` the extras. Start no replacement.
 - Follow a running delegate's \`next\`. Don't poll it (\`task_status\`, \`sleep\`, watchers, Monitor, ScheduleWakeup). Stop a delegate run you replace or no longer need with \`task_cancel\`, never \`t3_thread_interrupt\` on a \`childThreadId\`.
@@ -26,7 +31,7 @@ Ordinary coding tasks need no T3 tools.
 
 export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
 
-${T3_CODE_ORCHESTRATION_SECTIONS.join("\n\n")}
+${t3CodeOrchestrationSections().join("\n\n")}
 `;
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
@@ -55,6 +60,9 @@ export const T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH = deviceToolInstr
   ` Load them with ToolSearch \`select:${T3_CODE_DEVICE_TOOLS.map((tool) => `mcp__t3-code__${tool}`).join(",")}\`.`,
 );
 
+const T3_CODE_ACP_DEFERRED_PROXY_INSTRUCTIONS =
+  "Deferred T3 tools: only core orchestration tools, `tool_search`, and `tool_call` are declared directly. For any T3 tool not declared directly (including `delegate_task` if omitted, or optional tools like `preview_*`, `device_*`, `html_preview`, `html_render`, `t3_thread_*`, `t3_project_*`, `t3_worktree_*`, pull requests, `schedule_task`, `request_secret`, etc.), call `tool_search` to get its schema and `tool_call({ name, arguments })` to run it.";
+
 // ACP only: some ACP agents accept the injected MCP server but never expose
 // its tools, so they need the terminal transport other harnesses never use.
 const T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS = `ACP fallback: if the T3 tools are absent and \`T3_ACP_MCP_NODE\` is present, call them through the terminal: \`ELECTRON_RUN_AS_NODE=1 "$T3_ACP_MCP_NODE" \${T3_ACP_MCP_ENTRYPOINT:+"$T3_ACP_MCP_ENTRYPOINT"} acp-mcp-call orchestrator_capabilities '{}'\` (\`T3_ACP_MCP_ENTRYPOINT\` is unset for a standalone executable). Delegate with \`acp-mcp-call delegate_task '{"task":"...","target":{"providerInstanceId":"...","model":"..."},"mode":"async","clientRequestId":"..."}'\`. On Windows, run \`T3_ACP_MCP_CALL\` instead and pipe the JSON to stdin, as in PowerShell \`'{}' | & $env:T3_ACP_MCP_CALL orchestrator_capabilities -\`, writing non-ASCII characters as \`\\uXXXX\` escapes.`;
@@ -73,6 +81,7 @@ export interface T3AcpInstructionState {
   readonly hasDeviceTools: boolean;
   /** False when T3 MCP is connected directly over HTTP, so the shell fallback is inapplicable. */
   readonly includeMcpFallback?: boolean;
+  readonly toolExposure?: McpToolExposureMode | undefined;
 }
 
 /** ACP agents only know Plan and Default; Matter's Goal runs in the agent's Default mode. */
@@ -88,21 +97,26 @@ const acpInstructionStatesEqual = (
     acpEffectiveInteractionMode(right.interactionMode) &&
   left.hasT3Mcp === right.hasT3Mcp &&
   left.hasDeviceTools === right.hasDeviceTools &&
-  (left.includeMcpFallback ?? true) === (right.includeMcpFallback ?? true);
+  (left.includeMcpFallback ?? true) === (right.includeMcpFallback ?? true) &&
+  left.toolExposure === right.toolExposure;
+
+const deliversDeferredProxy = (state: T3AcpInstructionState | undefined): boolean =>
+  state?.hasT3Mcp === true && state.toolExposure === "deferred-proxy";
+
+const t3AcpMcpInstructions = (state: T3AcpInstructionState): ReadonlyArray<string> => [
+  T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
+  ...(state.hasDeviceTools ? [T3_CODE_DEVICE_TOOL_INSTRUCTIONS] : []),
+  T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
+  ...(state.toolExposure === "deferred-proxy" ? [T3_CODE_ACP_DEFERRED_PROXY_INSTRUCTIONS] : []),
+  ...(state.includeMcpFallback === false ? [] : [T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]),
+];
 
 export function buildT3AcpInstructions(state: T3AcpInstructionState): string {
   const instructions = [
     state.interactionMode === "plan"
       ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
       : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
-    ...(state.hasT3Mcp
-      ? [
-          T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
-          ...(state.hasDeviceTools ? [T3_CODE_DEVICE_TOOL_INSTRUCTIONS] : []),
-          T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
-          ...(state.includeMcpFallback === false ? [] : [T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]),
-        ]
-      : []),
+    ...(state.hasT3Mcp ? t3AcpMcpInstructions(state) : []),
   ];
   return instructions.join("\n\n");
 }
@@ -138,17 +152,17 @@ export function t3AcpPromptWithInstructions(input: {
     const devicesAlreadyDelivered =
       (input.systemPromptState.hasT3Mcp && input.systemPromptState.hasDeviceTools) ||
       (input.previousState?.hasT3Mcp === true && input.previousState.hasDeviceTools);
+    const proxyAlreadyDelivered =
+      deliversDeferredProxy(input.systemPromptState) || deliversDeferredProxy(input.previousState);
     if (input.state.hasT3Mcp && !mcpAlreadyDelivered) {
-      delta.push(
-        T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
-        ...(input.state.hasDeviceTools ? [T3_CODE_DEVICE_TOOL_INSTRUCTIONS] : []),
-        T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
-        ...(input.state.includeMcpFallback === false
-          ? []
-          : [T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]),
-      );
-    } else if (input.state.hasT3Mcp && input.state.hasDeviceTools && !devicesAlreadyDelivered) {
-      delta.push(T3_CODE_DEVICE_TOOL_INSTRUCTIONS);
+      delta.push(...t3AcpMcpInstructions(input.state));
+    } else if (input.state.hasT3Mcp) {
+      if (input.state.hasDeviceTools && !devicesAlreadyDelivered) {
+        delta.push(T3_CODE_DEVICE_TOOL_INSTRUCTIONS);
+      }
+      if (input.state.toolExposure === "deferred-proxy" && !proxyAlreadyDelivered) {
+        delta.push(T3_CODE_ACP_DEFERRED_PROXY_INSTRUCTIONS);
+      }
     }
     if (delta.length === 0) return input.prompt;
     return `<t3_code_instructions>\n${delta.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
