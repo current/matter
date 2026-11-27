@@ -28,7 +28,17 @@ import { scopedProjectKey, scopedThreadKey } from "../../lib/scopedEntities";
 import { useProjects } from "../../state/entities";
 import { steadyNavigationThreadShellsAtom } from "../../state/threads";
 import { useThreadSearch } from "../../state/queries";
-import { useThreadListV2ShelfPreferences } from "./use-thread-list-v2-shelf-preferences";
+import { MatterTimelineRow } from "../matter/timeline/MatterTimelineRow";
+import { MatterTimelineSectionHeader } from "../matter/timeline/MatterTimelineSectionHeader";
+import {
+  matterTimelineListItemsAreEqual,
+  threadListItemsOf,
+  type MatterTimelineListItem,
+} from "../matter/timeline/matterTimelineList";
+import {
+  useMatterTimelineListItems,
+  useMatterTimelineShelfPreferences,
+} from "../matter/timeline/useMatterTimeline";
 import { useThreadListNow } from "./use-thread-list-now";
 import { usePendingThreadOrder } from "../../state/thread-order";
 import { threadListEnvironmentsAtom } from "../../state/presentation";
@@ -63,7 +73,6 @@ import { WorkspaceListHeader } from "../layout/workspace/WorkspaceListHeader";
 import { WorkspaceSidebarColumn } from "../layout/workspace/WorkspaceSidebarColumn";
 import {
   ThreadListV2PendingRow,
-  ThreadListV2Row,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
@@ -73,17 +82,14 @@ import { useThreadRowProviderInstanceResolver } from "./thread-provider-instance
 import type { ThreadPrPresentation } from "../../state/thread-pr-presentation";
 import { ThreadPrDemandProvider } from "../../state/thread-pr-demand";
 import {
-  isThreadListV2ListItem,
-  threadListV2ListItemsAreEqual,
   THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   THREAD_LIST_V2_SETTLED_PAGE_COUNT,
-  type ThreadListV2ListItem,
 } from "./threadListV2";
 import { useSelectWorkspaceDetail } from "../layout/workspace/useSelectWorkspaceDetail";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 
 type SidebarListItem =
-  | ThreadListV2ListItem
+  | MatterTimelineListItem
   | {
       readonly type: "v2-show-more";
       readonly key: string;
@@ -254,7 +260,8 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     toggleSettledShelf,
     toggleSnoozedShelf,
     toggleWorkingShelf,
-  } = useThreadListV2ShelfPreferences();
+    matterTimeline,
+  } = useMatterTimelineShelfPreferences(props.searchQuery);
   const now = useThreadListNow(threads);
   const listEnvironments = useAtomValue(threadListEnvironmentsAtom);
   const {
@@ -273,7 +280,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   const pendingOrder = usePendingThreadOrder();
   const {
     layout: threadListV2Layout,
-    items: threadListV2Items,
+    items: upstreamThreadListItems,
     contentOnlyThreadKeys,
     olderSettledShelf,
   } = useThreadListV2({
@@ -296,6 +303,15 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     workingShelfExpanded,
     snoozedShelfExpanded,
     settledShelfExpanded,
+    selectedThreadKey,
+  });
+  const threadListV2Items = useMatterTimelineListItems({
+    timeline: matterTimeline,
+    items: upstreamThreadListItems,
+    layout: threadListV2Layout,
+    threads: launchingThreads,
+    projectNameByKey: projectTitleByProjectKey,
+    now,
     selectedThreadKey,
   });
   const listItems: readonly SidebarListItem[] =
@@ -367,10 +383,10 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
     threadSearchMatchByKey,
     workingShelfEnabled,
   };
-  useThreadJumpShortcuts(listItems, handleSelectThread, props.onOpenPendingTask);
+  useThreadJumpShortcuts(threadListItemsOf(listItems), handleSelectThread, props.onOpenPendingTask);
   const sidebarItemsAreEqual = (previous: SidebarListItem, item: SidebarListItem): boolean => {
-    if (isThreadListV2ListItem(previous) && isThreadListV2ListItem(item)) {
-      return threadListV2ListItemsAreEqual(previous, item);
+    if (previous.type !== "v2-show-more" && item.type !== "v2-show-more") {
+      return matterTimelineListItemsAreEqual(previous, item);
     }
     if (previous.type === "v2-show-more" && item.type === "v2-show-more") {
       return previous.hiddenCount === item.hiddenCount && previous.state === item.state;
@@ -379,6 +395,8 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   };
   const renderListItem = ({ item }: { readonly item: SidebarListItem }) => {
     switch (item.type) {
+      case "matter-timeline-section":
+        return <MatterTimelineSectionHeader item={item} pane="sidebar" />;
       case "v2-pending": {
         const pendingScopeKey = scopedProjectKey(
           item.pendingTask.environmentId,
@@ -417,7 +435,8 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
         const thread = item.item.thread;
         const scopeKey = scopedProjectKey(thread.environmentId, thread.projectId);
         return (
-          <ThreadListV2Row
+          <MatterTimelineRow
+            matter={item.matter}
             onNewThreadOnBranch={props.onNewThreadOnBranch}
             thread={thread}
             variant={item.item.variant}

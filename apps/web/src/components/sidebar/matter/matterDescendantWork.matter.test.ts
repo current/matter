@@ -12,7 +12,7 @@ import {
   workingNativeSubagentKeys,
   type MatterThreadItem,
 } from "./matterSidebar.logic";
-import { buildTimelineSections } from "./matterTimelineFeed.logic";
+import { buildTimelineSections } from "@t3tools/client-runtime/matter/timeline-feed";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
 const NOW_MS = Date.parse(NOW_ISO);

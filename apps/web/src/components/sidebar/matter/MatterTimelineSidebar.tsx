@@ -60,7 +60,7 @@ import {
   type MatterTimelineNeedsKind,
   type MatterTimelineRowState,
   type MatterTimelineSection,
-} from "./matterTimelineFeed.logic";
+} from "@t3tools/client-runtime/matter/timeline-feed";
 import type { MatterPullRequestState, MatterThreadItem } from "./matterSidebar.logic";
 import { MatterTip } from "./MatterSidebarParts";
 import {

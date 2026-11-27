@@ -10,7 +10,7 @@ import {
   timelineRowState,
   shortTimelineBranchLabel,
   visibleTimelineSubagents,
-} from "./matterTimelineFeed.logic";
+} from "@t3tools/client-runtime/matter/timeline-feed";
 import { toMatterThreadItem } from "./matterSidebar.logic";
 
 // Sections follow local calendar days, so the fixtures are built in local time. "Now" is noon on

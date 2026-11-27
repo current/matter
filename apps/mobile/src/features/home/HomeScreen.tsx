@@ -74,7 +74,6 @@ import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
   ThreadListV2PendingRow,
-  ThreadListV2Row,
   ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
@@ -84,12 +83,21 @@ import { useThreadRowProviderInstanceResolver } from "../threads/thread-provider
 import { useOpenThreadPullRequests } from "../threads/use-open-thread-pull-requests";
 import type { ThreadPrPresentation } from "../../state/thread-pr-presentation";
 import {
-  threadListV2ListItemsAreEqual,
   THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
   THREAD_LIST_V2_SETTLED_PAGE_COUNT,
-  type ThreadListV2ListItem,
 } from "../threads/threadListV2";
-import { useThreadListV2ShelfPreferences } from "../threads/use-thread-list-v2-shelf-preferences";
+import { MatterTimelineRow } from "../matter/timeline/MatterTimelineRow";
+import { MatterTimelineSectionHeader } from "../matter/timeline/MatterTimelineSectionHeader";
+import {
+  isMatterTimelineSectionListItem,
+  matterTimelineListItemsAreEqual,
+  threadListItemsOf,
+  type MatterTimelineListItem,
+} from "../matter/timeline/matterTimelineList";
+import {
+  useMatterTimelineListItems,
+  useMatterTimelineShelfPreferences,
+} from "../matter/timeline/useMatterTimeline";
 import type { HomeListFilterMenuEnvironment } from "./home-list-filter-menu";
 import {
   buildHomeProjectScopes,
@@ -285,7 +293,7 @@ export function HomeScreen(props: HomeScreenProps) {
     });
   });
   const swipeRowActivation = createSwipeRowActivation();
-  const activateVisibleRows = (rows: ReadonlyArray<ThreadListV2ListItem>) => {
+  const activateVisibleRows = (rows: ReadonlyArray<MatterTimelineListItem>) => {
     const state = listRef.current?.getState();
     if (state === undefined || !(state.end >= 0)) return;
     swipeRowActivation.activate(
@@ -396,7 +404,8 @@ export function HomeScreen(props: HomeScreenProps) {
     toggleSettledShelf,
     toggleSnoozedShelf,
     toggleWorkingShelf,
-  } = useThreadListV2ShelfPreferences();
+    matterTimeline,
+  } = useMatterTimelineShelfPreferences(props.searchQuery);
   const now = useThreadListNow(props.threads);
   const listEnvironments = useAtomValue(threadListEnvironmentsAtom);
   const {
@@ -415,7 +424,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const pendingOrder = usePendingThreadOrder();
   const {
     layout: threadListV2Layout,
-    items: threadListV2Items,
+    items: upstreamThreadListItems,
     contentOnlyThreadKeys,
     olderSettledShelf,
   } = useThreadListV2({
@@ -440,6 +449,15 @@ export function HomeScreen(props: HomeScreenProps) {
     settledShelfExpanded,
     selectedThreadKey,
   });
+  const threadListV2Items = useMatterTimelineListItems({
+    timeline: matterTimeline,
+    items: upstreamThreadListItems,
+    layout: threadListV2Layout,
+    threads: props.threads,
+    projectNameByKey: v2ProjectTitleByProjectKey,
+    now,
+    selectedThreadKey,
+  });
   // Called as `props.onSelectThread(...)`, the compiler would cache this handler on the whole
   // props object, which is new on every render of Home's parent.
   const { onSelectThread } = props;
@@ -455,13 +473,22 @@ export function HomeScreen(props: HomeScreenProps) {
     }
     onSelectThread(thread);
   };
-  useThreadJumpShortcuts(threadListV2Items, selectThread, props.onSelectPendingTask);
+  useThreadJumpShortcuts(
+    threadListItemsOf(threadListV2Items),
+    selectThread,
+    props.onSelectPendingTask,
+  );
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the list's visible range after commit to enable swipe gestures on those rows
   useEffect(() => {
     if (swipeEnabled) activateVisibleRows(threadListV2Items);
   }, [activateVisibleRows, swipeEnabled, threadListV2Items]);
 
-  const renderV2Item = ({ item }: { readonly item: ThreadListV2ListItem }) => {
+  const renderV2Item = ({ item }: { readonly item: MatterTimelineListItem }) => {
+    if (isMatterTimelineSectionListItem(item)) {
+      return (
+        <MatterTimelineSectionHeader item={item} pane={sidebarSurface ? "sidebar" : "screen"} />
+      );
+    }
     if (item.type === "v2-pending") {
       const pendingScopeKey = scopedProjectKey(
         item.pendingTask.environmentId,
@@ -529,7 +556,8 @@ export function HomeScreen(props: HomeScreenProps) {
     }
     const thread = item.item.thread;
     return (
-      <ThreadListV2Row
+      <MatterTimelineRow
+        matter={item.matter}
         pane={sidebarSurface ? "sidebar" : "screen"}
         selected={scopedThreadKey(thread.environmentId, thread.id) === selectedThreadKey}
         fullSwipeWidth={fullSwipeWidth}
@@ -598,7 +626,7 @@ export function HomeScreen(props: HomeScreenProps) {
       />
     );
   };
-  const v2KeyExtractor = (item: ThreadListV2ListItem) => item.key;
+  const v2KeyExtractor = (item: MatterTimelineListItem) => item.key;
 
   // extraData changes invalidate every visible row; put the minute clock on items to limit updates.
   const v2ExtraData = {
@@ -782,7 +810,7 @@ export function HomeScreen(props: HomeScreenProps) {
                 renderItem={renderV2Item}
                 keyExtractor={v2KeyExtractor}
                 getItemType={(item) => item.type}
-                itemsAreEqual={threadListV2ListItemsAreEqual}
+                itemsAreEqual={matterTimelineListItemsAreEqual}
                 estimatedItemSize={ESTIMATED_THREAD_LIST_V2_ROW_HEIGHT}
                 drawDistance={THREAD_LIST_V2_DRAW_DISTANCE}
                 recycleItems
