@@ -41,10 +41,10 @@ import * as ClaudeCloudRunner from "./ClaudeCloudRunner.ts";
 import * as ClaudeCloudService from "./ClaudeCloudService.ts";
 import * as ClaudeCloudSessionsApi from "./ClaudeCloudSessionsApi.ts";
 import { layerClaudeCloudRoutes } from "./claudeCloudHttp.ts";
-import type {
-  MapClaudeCloudEventsInput,
-  MapClaudeCloudEventsResult,
-} from "./claudeCloudTranscript.ts";
+import type { mapClaudeCloudEvents } from "./claudeCloudTranscript.ts";
+
+type MapClaudeCloudEventsInput = Parameters<typeof mapClaudeCloudEvents>[0];
+type MapClaudeCloudEventsResult = ReturnType<typeof mapClaudeCloudEvents>;
 
 const PROJECT = ProjectId.make("project:matter");
 const ROOT = "/repo/matter";
@@ -648,6 +648,14 @@ describe("ClaudeCloudSessionsApi", () => {
         transcriptActivity: "idle",
       }),
       "running",
+    );
+    assert.strictEqual(
+      ClaudeCloudSessionsApi.mapClaudeCloudSessionState({
+        sessionStatus: "running",
+        postTurnSummaryCategory: "completed",
+        transcriptActivity: "needs_input",
+      }),
+      "needs_input",
     );
     assert.strictEqual(
       ClaudeCloudSessionsApi.mapClaudeCloudSessionState({

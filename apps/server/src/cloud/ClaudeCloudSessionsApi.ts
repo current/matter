@@ -246,6 +246,8 @@ export function mapClaudeCloudSessionState(input: {
   readonly transcriptActivity?: ClaudeCloudTranscriptActivity | null;
 }): ClaudeCloudSessionState {
   if (input.sessionStatus === "archived") return "archived";
+  // A permission prompt keeps the session "running" in the API while it waits on the user.
+  if (input.transcriptActivity === "needs_input") return "needs_input";
   if (input.sessionStatus === "running" || input.sessionStatus === "pending") return "running";
   if (input.postTurnSummaryCategory === "need_input") return "needs_input";
   if (input.transcriptActivity !== undefined && input.transcriptActivity !== null) {
@@ -338,6 +340,15 @@ const trackedFallbackSession = (tracked: TrackedClaudeCloudSession): ClaudeCloud
 
 const eventUuid = (event: Readonly<Record<string, unknown>>): string | null =>
   nonEmpty(typeof event.uuid === "string" ? event.uuid : null);
+
+// Events the transcript never shows; dropping them at ingest keeps cached sessions small.
+const NOISE_EVENT_TYPES = new Set(["env_manager_log", "tool_progress", "rate_limit_event"]);
+const NOISE_SYSTEM_SUBTYPES = new Set(["status", "hook_started", "hook_response"]);
+const isTranscriptNoise = (event: Readonly<Record<string, unknown>>): boolean =>
+  (typeof event.type === "string" && NOISE_EVENT_TYPES.has(event.type)) ||
+  (event.type === "system" &&
+    typeof event.subtype === "string" &&
+    NOISE_SYSTEM_SUBTYPES.has(event.subtype));
 
 const sortSessionsNewestFirst = (sessions: Array<ClaudeCloudRemoteSession>) =>
   sessions.sort((a, b) => {
@@ -900,16 +911,26 @@ export const make = Effect.fn("ClaudeCloudSessionsApi.make")(function* (
 
       const seenEventUuids = new Set(existing?.seenEventUuids ?? []);
       const rawEvents = [...(existing?.rawEvents ?? [])];
+      let added = 0;
       for (const event of delta.events) {
         const uuid = eventUuid(event);
         if (uuid !== null) {
           if (seenEventUuids.has(uuid)) continue;
           seenEventUuids.add(uuid);
         }
+        if (isTranscriptNoise(event)) continue;
         rawEvents.push(event);
+        added += 1;
       }
 
-      const mappedTranscript = mapEvents({ sessionId: id, events: rawEvents });
+      const mappedTranscript =
+        existing !== undefined && added === 0
+          ? {
+              turnItems: existing.turnItems,
+              pendingRequest: existing.pendingRequest,
+              activity: existing.activity,
+            }
+          : mapEvents({ sessionId: id, events: rawEvents });
       const prevItemState = existing?.itemState ?? new Map();
       let nextRev = existing?.rev ?? 0;
       const nextItemState = new Map<string, { readonly json: string; readonly rev: number }>();
