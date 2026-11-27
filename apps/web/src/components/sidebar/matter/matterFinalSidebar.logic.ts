@@ -1,4 +1,5 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+import { compactAge, type MatterListFilter } from "@t3tools/client-runtime/matter/timeline-feed";
 import { resolveListedAncestorThreadRef } from "@t3tools/client-runtime/state/threads";
 import type {
   ProviderDriverKind,
@@ -8,24 +9,9 @@ import type {
 
 import type { MatterProjectRef, MatterThreadItem } from "./matterSidebar.logic";
 
-/** Short age such as "4m", "2h", "1d"; never "just now", so the column stays one shape. */
-export function compactAge(iso: string | null, nowMs: number): string {
-  if (iso === null) return "";
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return "";
-  const minutes = Math.max(1, Math.floor((nowMs - at) / 60_000));
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  if (days < 30) return `${Math.floor(days / 7)}w`;
-  if (days < 365) return `${Math.floor(days / 30)}mo`;
-  return `${Math.floor(days / 365)}y`;
-}
+export { compactAge, type MatterListFilter };
 
 export type MatterSortMode = "project" | "recent";
-export type MatterListFilter = "all" | "needs";
 
 /** A thread the rail lists: live, or settled/snoozed but raising a hand itself or through a child. */
 function isListed(item: MatterThreadItem, needsChildParents?: ReadonlySet<string>): boolean {

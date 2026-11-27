@@ -1,7 +1,7 @@
 import type { MatterChildItem } from "./matterFinalSidebar.logic";
 import type { MatterThreadItem } from "./matterSidebar.logic";
 
-export type MatterTimelineSort = "updated" | "created";
+export type { MatterTimelineSort } from "@t3tools/client-runtime/matter/timeline-feed";
 
 /** A subagent or delegated task that is still working or waiting on you. */
 export function isActiveSubagent(child: MatterThreadItem): boolean {

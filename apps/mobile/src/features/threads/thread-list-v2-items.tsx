@@ -40,7 +40,7 @@ import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import type { MenuAction } from "@react-native-menu/menu";
 import { useNavigation } from "@react-navigation/native";
 import { msg, T, useGT, useMessages } from "gt-react-native";
-import { memo, useCallback, useMemo, useState, type ComponentProps } from "react";
+import { memo, useCallback, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { Platform, Pressable, Text as RNText, useWindowDimensions, View } from "react-native";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 
@@ -808,6 +808,13 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   readonly searchMatch?: EnvironmentThreadSearchMatch;
   readonly searchQuery?: string;
   readonly simultaneousSwipeGesture?: ComponentProps<typeof ThreadSwipeable>["simultaneousWith"];
+  /** Matter's Timeline draws the row's content; swipe, menu and selection stay this row's. */
+  readonly matterRow?: {
+    readonly renderContent: (
+      appearance: ReturnType<typeof getThreadListV2RowAppearance>,
+    ) => ReactNode;
+    readonly accessibilityLabel: string;
+  };
 }) {
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const titleTypography = useScaledTextRole("body");
@@ -1663,7 +1670,25 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   );
 
   const rowContent = (close: () => void) =>
-    variant === "card" ? (
+    props.matterRow ? (
+      <RowPressable
+        key={`${thread.environmentId}:${thread.id}`}
+        interactionClassName={rowAppearance.interactionClassName}
+        interactionOpacity={rowAppearance.interactionOpacity}
+        accessibilityHint={swipeAccessibilityHint}
+        accessibilityLabel={props.matterRow.accessibilityLabel}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        className={rowAppearance.className}
+        onPress={() => {
+          close();
+          selectThread();
+        }}
+        style={rowAppearance.style}
+      >
+        {props.matterRow.renderContent(rowAppearance)}
+      </RowPressable>
+    ) : variant === "card" ? (
       <RowPressable
         key={`${thread.environmentId}:${thread.id}`}
         interactionClassName={rowAppearance.interactionClassName}

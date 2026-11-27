@@ -207,6 +207,10 @@
       "types": "./src/voice-input/index.ts",
       "default": "./src/voice-input/index.ts"
     },
+    "./matter/timeline-feed": {
+      "types": "./src/matter/timelineFeed.ts",
+      "default": "./src/matter/timelineFeed.ts"
+    },
     "./matter-voice-http": {
       "types": "./src/matterVoiceHttp.ts",
       "default": "./src/matterVoiceHttp.ts"
