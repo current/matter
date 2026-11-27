@@ -63,6 +63,15 @@ vi.mock("../../components/ui/AppText", () => ({
 vi.mock("../../components/ui/AppSymbol", () => ({
   SymbolView: ({ name }: { name: string }) => <span data-symbol={name} />,
 }));
+vi.mock("../../lib/matterAudioCues", () => ({
+  playMobileAudioCue: vi.fn(),
+}));
+vi.mock("../../state/atom-registry", () => ({
+  appAtomRegistry: { get: () => null },
+}));
+vi.mock("../../state/preferences", () => ({
+  mobilePreferencesAtom: {},
+}));
 vi.mock("../../components/ui/useAndroidControlSizing", () => ({
   useAndroidControlSizing: () => ({ scale: 1, smallIconSize: 16 }),
 }));

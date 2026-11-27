@@ -206,55 +206,52 @@ describe("MatterQuestionsCard", () => {
   });
 
   it("clears the 200ms single-select auto-advance timer when typing a custom answer or clicking Skip", async () => {
-    using _timers = fakeTimers();
     const onAdvance = vi.fn();
     const onDismiss = vi.fn();
     const onChangeCustomAnswer = vi.fn();
     const onToggleOption = vi.fn();
+    const card = () => (
+      <MatterQuestionsCard
+        prompt={prompt}
+        cwd={undefined}
+        threadRef={threadRef}
+        disabled={false}
+        isResponding={false}
+        answers={{}}
+        questionIndex={0}
+        onToggleOption={onToggleOption}
+        onAdvance={onAdvance}
+        onPrevious={vi.fn()}
+        onChangeCustomAnswer={onChangeCustomAnswer}
+        onDismiss={onDismiss}
+      />
+    );
+    // Vitest advances fake timers in real time while a locator action runs, so a slow click
+    // would fire the 200ms timer before the next step. Dispatch the events synchronously.
+    const press = (element: HTMLElement) => act(() => element.click());
 
     {
-      await using screen = await render(
-        <MatterQuestionsCard
-          prompt={prompt}
-          cwd={undefined}
-          threadRef={threadRef}
-          disabled={false}
-          isResponding={false}
-          answers={{}}
-          questionIndex={0}
-          onToggleOption={onToggleOption}
-          onAdvance={onAdvance}
-          onPrevious={vi.fn()}
-          onChangeCustomAnswer={onChangeCustomAnswer}
-          onDismiss={onDismiss}
-        />,
-      );
-      await screen.getByRole("button", { name: "Session cookies" }).click();
-      await screen.getByPlaceholder("Something else…").fill("Custom");
+      await using screen = await render(card());
+      using _timers = fakeTimers();
+      await press(screen.getByRole("button", { name: "Session cookies" }).element() as HTMLElement);
+      await act(() => {
+        const input = screen.getByPlaceholder("Something else…").element() as HTMLInputElement;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+          input,
+          "Custom",
+        );
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
       expect(onChangeCustomAnswer).toHaveBeenCalled();
       await act(() => vi.advanceTimersByTime(300));
       expect(onAdvance).not.toHaveBeenCalled();
     }
 
     {
-      await using screen = await render(
-        <MatterQuestionsCard
-          prompt={prompt}
-          cwd={undefined}
-          threadRef={threadRef}
-          disabled={false}
-          isResponding={false}
-          answers={{}}
-          questionIndex={0}
-          onToggleOption={onToggleOption}
-          onAdvance={onAdvance}
-          onPrevious={vi.fn()}
-          onChangeCustomAnswer={onChangeCustomAnswer}
-          onDismiss={onDismiss}
-        />,
-      );
-      await screen.getByRole("button", { name: "Session cookies" }).click();
-      await screen.getByRole("button", { name: "Skip" }).click();
+      await using screen = await render(card());
+      using _timers = fakeTimers();
+      await press(screen.getByRole("button", { name: "Session cookies" }).element() as HTMLElement);
+      await press(screen.getByRole("button", { name: "Skip" }).element() as HTMLElement);
       expect(onDismiss).toHaveBeenCalledTimes(1);
       await act(() => vi.advanceTimersByTime(300));
       expect(onAdvance).not.toHaveBeenCalled();
