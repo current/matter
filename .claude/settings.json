@@ -1,22 +1,168 @@
 {
   "deniedMcpServers": [
-    { "serverName": "aws-mcp" },
-    { "serverName": "claude.ai Claude Docs" },
-    { "serverName": "claude.ai Gmail" },
-    { "serverName": "claude.ai Google Drive" },
-    { "serverName": "claude.ai Notion" },
-    { "serverName": "codex" },
-    { "serverName": "cua" },
-    { "serverName": "cua-driver" },
-    { "serverName": "emblematic" },
-    { "serverName": "gemini" },
-    { "serverName": "linear" },
-    { "serverName": "motion" },
-    { "serverName": "notion" },
-    { "serverName": "pencil" },
-    { "serverName": "plugin:mobbin:mobbin" },
-    { "serverName": "properui" },
-    { "serverName": "screenrove" },
-    { "serverName": "vercel" }
-  ]
+    {
+      "serverName": "aws-mcp"
+    },
+    {
+      "serverName": "claude.ai Claude Docs"
+    },
+    {
+      "serverName": "claude.ai Gmail"
+    },
+    {
+      "serverName": "claude.ai Google Drive"
+    },
+    {
+      "serverName": "claude.ai Notion"
+    },
+    {
+      "serverName": "codex"
+    },
+    {
+      "serverName": "cua"
+    },
+    {
+      "serverName": "cua-driver"
+    },
+    {
+      "serverName": "emblematic"
+    },
+    {
+      "serverName": "gemini"
+    },
+    {
+      "serverName": "linear"
+    },
+    {
+      "serverName": "motion"
+    },
+    {
+      "serverName": "notion"
+    },
+    {
+      "serverName": "pencil"
+    },
+    {
+      "serverName": "plugin:mobbin:mobbin"
+    },
+    {
+      "serverName": "properui"
+    },
+    {
+      "serverName": "screenrove"
+    },
+    {
+      "serverName": "vercel"
+    }
+  ],
+  "skillOverrides": {
+    "agent-fleet": "off",
+    "ai-seo": "off",
+    "animate": "off",
+    "animation-performance": "off",
+    "anthropic-skills:built-in-browser": "off",
+    "anthropic-skills:chrome-browser": "off",
+    "anthropic-skills:computer-use": "off",
+    "anthropic-skills:deep-research": "off",
+    "anthropic-skills:docs": "off",
+    "anthropic-skills:docx": "off",
+    "anthropic-skills:google-workspace": "off",
+    "anthropic-skills:humanizer": "off",
+    "anthropic-skills:import-memory": "off",
+    "anthropic-skills:morning": "off",
+    "anthropic-skills:pdf": "off",
+    "anthropic-skills:pptx": "off",
+    "anthropic-skills:skill-creator": "off",
+    "anthropic-skills:xlsx": "off",
+    "artifact-capabilities": "off",
+    "artifact-diagramming": "off",
+    "aside-browser": "off",
+    "ask-sonner": "off",
+    "audit-ai-design-slop": "off",
+    "baseline-ui": "off",
+    "batch": "off",
+    "better-accessibility": "off",
+    "better-colors": "off",
+    "better-interface": "off",
+    "better-layout": "off",
+    "better-typography": "off",
+    "better-ui": "off",
+    "break-ui": "off",
+    "build-awwwards-quality-sites": "off",
+    "claude-api": "off",
+    "claude-approvals": "off",
+    "code-review": "off",
+    "codebase-design": "off",
+    "cua-sandboxes": "off",
+    "cua-spaces": "off",
+    "dataviz": "off",
+    "debug": "off",
+    "deep-research": "off",
+    "design": "off",
+    "design-motion-principles": "off",
+    "design-sync": "off",
+    "design-taste-frontend": "off",
+    "doctor": "off",
+    "domain-search": "off",
+    "emil-prototype": "off",
+    "fewer-permission-prompts": "off",
+    "find-skills": "off",
+    "frontend-design": "off",
+    "gui-automation": "off",
+    "healthcare-phi-compliance": "off",
+    "hipaa-compliance": "off",
+    "humanizer": "off",
+    "interface-review": "off",
+    "landing-page-design": "off",
+    "loop": "off",
+    "mobbin:best-practices": "off",
+    "mobbin:plain-writing": "off",
+    "mobbin:redesign-screen": "off",
+    "mobbin:search": "off",
+    "nextjs-seo": "off",
+    "pick-ui-library": "off",
+    "plugin-authoring": "off",
+    "prototype": "off",
+    "review-animations": "off",
+    "run": "off",
+    "run-skill-generator": "off",
+    "schedule": "off",
+    "seo": "off",
+    "signing-in-to-aws": "off",
+    "simplify": "off",
+    "slides": "off",
+    "slop-check": "off",
+    "stageshow": "off",
+    "state-machine": "off",
+    "supabase": "off",
+    "supabase-postgres-best-practices": "off",
+    "transitions-dev": "off",
+    "update-config": "off",
+    "vercel-cli": "off",
+    "vercel-composition-patterns": "off",
+    "vercel-react-best-practices": "off",
+    "vercel-react-view-transitions": "off",
+    "verify": "off",
+    "web-design-guidelines": "off",
+    "whiteboard": "off",
+    "workflow-authoring": "off",
+    "writing-guidelines": "off"
+  },
+  "enabledPlugins": {
+    "mobbin@mobbin": false,
+    "humanizer@skills-dir": false
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|mcp__t3-code__delegate_task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node matter/hooks/guard-subagents.mjs"
+          }
+        ]
+      }
+    ]
+  }
 }

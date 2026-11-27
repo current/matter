@@ -109,6 +109,11 @@
   }
 }
 
+/* "Worked for" sits in the flow like any work row, without upstream's rule under it. */
+[data-timeline-row-kind="turn-fold"] .border-b {
+  border-bottom-width: 0;
+}
+
 /* The turn fold swaps a right chevron for a down one; a click turns the new one in from the
    old angle. Keyboard focus alone (`:focus-visible`) never spins it. */
 [data-timeline-row-kind="turn-fold"] button[aria-expanded="true"]:focus:not(:focus-visible) svg {
