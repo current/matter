@@ -1,7 +1,14 @@
 import * as Schema from "effect/Schema";
 import { msg } from "gt-react";
 import { createContext } from "react";
-import { toolGroupAction } from "@t3tools/client-runtime/work-log/presentation";
+import {
+  deriveMatterAiStatusPhaseFrom,
+  MATTER_AI_STATUS_PHASE_ICONS,
+  type MatterAiStatusActivity,
+  type MatterAiStatusIcon,
+  type MatterAiStatusPhase,
+  type MatterAiStatusRow,
+} from "@t3tools/client-runtime/matter/ai-status";
 
 import type { TimelineRow } from "./components/chat/timelineRowContext";
 import { readLocalStorageValue, useLocalStorage } from "./hooks/useLocalStorage";
@@ -48,127 +55,56 @@ export function useMatterAiStatusStyle() {
   );
 }
 
-/** What the agent is doing during a live turn. */
-export type MatterAiStatusPhase =
-  | "thinking"
-  | "searching"
-  | "reading"
-  | "browsing"
-  | "editing"
-  | "running"
-  | "delegating"
-  | "working"
-  | "writing"
-  | "input"
-  | "compacting"
-  | "setup";
+export type { MatterAiStatusIcon, MatterAiStatusPhase };
 
-/** The RareUI icon a status draws; `done` only ends the Settings preview. */
-export type MatterAiStatusIcon =
-  | "thinking"
-  | "researching"
-  | "analyzing"
-  | "writing"
-  | "input"
-  | "done";
-
-export const MATTER_AI_STATUS_PHASES: Record<
-  MatterAiStatusPhase,
-  { readonly label: string; readonly icon: MatterAiStatusIcon; readonly active: boolean }
-> = {
-  thinking: { label: msg("Thinking", { $context: "AI status" }), icon: "thinking", active: true },
-  searching: {
-    label: msg("Searching", { $context: "AI status" }),
-    icon: "researching",
-    active: true,
-  },
-  reading: { label: msg("Reading", { $context: "AI status" }), icon: "researching", active: true },
-  browsing: {
-    label: msg("Browsing", { $context: "AI status" }),
-    icon: "researching",
-    active: true,
-  },
-  editing: { label: msg("Editing", { $context: "AI status" }), icon: "writing", active: true },
-  running: {
-    label: msg("Running command", { $context: "AI status" }),
-    icon: "analyzing",
-    active: true,
-  },
-  delegating: {
-    label: msg("Delegating", { $context: "AI status" }),
-    icon: "analyzing",
-    active: true,
-  },
-  working: { label: msg("Working", { $context: "AI status" }), icon: "analyzing", active: true },
-  writing: { label: msg("Writing", { $context: "AI status" }), icon: "writing", active: true },
-  input: {
-    label: msg("Needs your input", { $context: "AI status" }),
-    icon: "input",
-    active: false,
-  },
-  compacting: {
-    label: msg("Compacting", { $context: "AI status" }),
-    icon: "analyzing",
-    active: true,
-  },
-  setup: {
-    label: msg("Setting up worktree", { $context: "AI status" }),
-    icon: "analyzing",
-    active: true,
-  },
+const MATTER_AI_STATUS_LABELS: Record<MatterAiStatusPhase, string> = {
+  thinking: msg("Thinking", { $context: "AI status" }),
+  searching: msg("Searching", { $context: "AI status" }),
+  reading: msg("Reading", { $context: "AI status" }),
+  browsing: msg("Browsing", { $context: "AI status" }),
+  editing: msg("Editing", { $context: "AI status" }),
+  running: msg("Running command", { $context: "AI status" }),
+  delegating: msg("Delegating", { $context: "AI status" }),
+  working: msg("Working", { $context: "AI status" }),
+  writing: msg("Writing", { $context: "AI status" }),
+  input: msg("Needs your input", { $context: "AI status" }),
+  compacting: msg("Compacting", { $context: "AI status" }),
+  setup: msg("Setting up worktree", { $context: "AI status" }),
 };
 
-type WorkLiveRow = Extract<TimelineRow, { kind: "work-live" }>;
+export const MATTER_AI_STATUS_PHASES = Object.fromEntries(
+  Object.entries(MATTER_AI_STATUS_PHASE_ICONS).map(([phase, visual]) => [
+    phase,
+    { ...visual, label: MATTER_AI_STATUS_LABELS[phase as MatterAiStatusPhase] },
+  ]),
+) as Record<
+  MatterAiStatusPhase,
+  { readonly label: string; readonly icon: MatterAiStatusIcon; readonly active: boolean }
+>;
 
-function toolPhase(entry: WorkLiveRow["entry"]): MatterAiStatusPhase {
-  if (entry.itemType === "reasoning") return "thinking";
-  switch (toolGroupAction(entry)) {
-    case "read":
-      return "reading";
-    case "search":
-    case "code-search":
-      return "searching";
-    case "browser":
-      return "browsing";
-    case "edit":
-      return "editing";
-    case "command":
-      return "running";
-    case "thread-create":
-      return "delegating";
+function toStatusRow(row: TimelineRow): MatterAiStatusRow {
+  switch (row.kind) {
+    case "working":
+      return { kind: "working", compacting: row.compacting === true };
+    case "work-live":
+      return row.active ? { kind: "tool", entry: row.entry } : null;
+    case "thinking":
+      return { kind: "thinking", delegating: row.label !== undefined };
+    case "message":
+      return row.message.role === "assistant" && row.message.streaming
+        ? { kind: "streaming-reply" }
+        : null;
     default:
-      return "working";
+      return null;
   }
 }
 
 /** The live turn's phase, read from the rows after its working indicator. */
 export function deriveMatterAiStatusPhase(
   rows: ReadonlyArray<TimelineRow>,
-  activity: {
-    readonly awaitingUser: boolean;
-    readonly compacting: boolean;
-    readonly preparingWorktree: boolean;
-  },
+  activity: MatterAiStatusActivity,
 ): MatterAiStatusPhase {
-  if (activity.awaitingUser) return "input";
-  if (activity.preparingWorktree) return "setup";
-  if (activity.compacting) return "compacting";
-  for (let index = rows.length - 1; index >= 0; index--) {
-    const row = rows[index]!;
-    switch (row.kind) {
-      case "working":
-        return row.compacting ? "compacting" : "thinking";
-      case "work-live":
-        if (row.active) return toolPhase(row.entry);
-        break;
-      case "thinking":
-        return row.label === undefined ? "thinking" : "delegating";
-      case "message":
-        if (row.message.role === "assistant" && row.message.streaming) return "writing";
-        break;
-    }
-  }
-  return "thinking";
+  return deriveMatterAiStatusPhaseFrom(rows, toStatusRow, activity);
 }
 
 export const MatterAiStatusPhaseCtx = createContext<MatterAiStatusPhase>("thinking");

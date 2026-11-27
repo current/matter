@@ -115,6 +115,9 @@ import { useAssetUrl } from "../../state/assets";
 import { PullRequestGlyph } from "../pull-requests/pullRequestGlyphs";
 import { useOpenLinkedThread } from "./useOpenLinkedThread";
 import { startShimmerSteps } from "./work-shimmer-steps";
+import { MatterLivePulse } from "../matter/chat/MatterLivePulse.matter";
+import { MatterWorkDuration } from "../matter/chat/MatterWorkDuration.matter";
+import { MATTER_LIVE_PULSE } from "../matter/chat/matterLivePulse";
 
 const SHIMMER_WIDTH = 72;
 const SHIMMER_ICON_AND_GAP_WIDTH = 30;
@@ -250,7 +253,7 @@ function ShimmerWorkContent(props: {
       <Text
         className={cn(
           "min-w-0 shrink",
-          props.compact ? "text-xs" : "text-sm",
+          "text-xs",
           props.highlighted ? "text-foreground" : "text-foreground-muted",
           props.textClassName,
         )}
@@ -295,7 +298,8 @@ export function ShimmeringWorkContent(props: {
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- steps the native shimmer value on timers while visible and active, and stops them on cleanup
   useEffect(() => {
     progress.setValue(0);
-    if (contentWidth <= 0 || reducedMotion || !appIsActive || !screenIsFocused) return;
+    if (MATTER_LIVE_PULSE || contentWidth <= 0 || reducedMotion || !appIsActive || !screenIsFocused)
+      return;
     return startShimmerSteps(progress);
   }, [appIsActive, contentWidth, progress, reducedMotion, screenIsFocused]);
 
@@ -315,21 +319,27 @@ export function ShimmeringWorkContent(props: {
       className={cn("min-w-0 flex-1 overflow-hidden", props.className)}
       onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)}
     >
-      <ShimmerWorkContent
-        textClassName={props.textClassName}
-        compact={props.compact}
-        environmentId={props.environmentId}
-        highlighted={false}
-        icon={props.icon}
-        iconNode={props.iconNode}
-        iconSubtleColor={props.iconSubtleColor}
-        label={props.label}
-        showIcon={props.showIcon}
-        themeAppearance={props.themeAppearance}
-        toolIcon={props.toolIcon}
-        onTextLayout={(event) => setTextWidth(event.nativeEvent.lines[0]?.width ?? 0)}
-      />
-      {!reducedMotion && appIsActive && screenIsFocused && contentWidth > 0 ? (
+      <MatterLivePulse active={MATTER_LIVE_PULSE}>
+        <ShimmerWorkContent
+          textClassName={props.textClassName}
+          compact={props.compact}
+          environmentId={props.environmentId}
+          highlighted={false}
+          icon={props.icon}
+          iconNode={props.iconNode}
+          iconSubtleColor={props.iconSubtleColor}
+          label={props.label}
+          showIcon={props.showIcon}
+          themeAppearance={props.themeAppearance}
+          toolIcon={props.toolIcon}
+          onTextLayout={(event) => setTextWidth(event.nativeEvent.lines[0]?.width ?? 0)}
+        />
+      </MatterLivePulse>
+      {!MATTER_LIVE_PULSE &&
+      !reducedMotion &&
+      appIsActive &&
+      screenIsFocused &&
+      contentWidth > 0 ? (
         <NativeAnimated.View
           pointerEvents="none"
           accessible={false}
@@ -962,8 +972,8 @@ const ThreadWorkLogRow = function ThreadWorkLogRow(
             <Text
               className={
                 warning
-                  ? "min-w-0 flex-1 font-t3-medium text-sm text-warning-foreground"
-                  : "min-w-0 flex-1 font-t3-medium text-sm text-adaptive-rose-600-400"
+                  ? "min-w-0 flex-1 font-t3-medium text-xs text-warning-foreground"
+                  : "min-w-0 flex-1 font-t3-medium text-xs text-adaptive-rose-600-400"
               }
             >
               {label}
@@ -1228,6 +1238,9 @@ const ThreadWorkLogRow = function ThreadWorkLogRow(
               {mcpSignedIn ? <T>Signed in</T> : <T>Sign in</T>}
             </Text>
           ) : null}
+          {reasoning || isSystemNotice || props.copied || mcpSignInTarget !== null ? null : (
+            <MatterWorkDuration item={row.projectedItem.item} />
+          )}
           {failed && toolIcon !== undefined ? (
             <View
               className="h-4 w-4 items-center justify-center"
@@ -1461,7 +1474,7 @@ export function ThreadWorkGroupToggle(props: {
             selectable={false}
             numberOfLines={4}
             ellipsizeMode="tail"
-            className="min-w-0 flex-1 py-0.5 text-sm text-foreground-muted"
+            className="min-w-0 flex-1 py-0.5 text-xs text-foreground-muted"
           >
             {props.thought}
           </Text>

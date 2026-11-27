@@ -511,6 +511,10 @@
       "types": "./src/work-log/presentation.ts",
       "default": "./src/work-log/presentation.ts"
     },
+    "./matter/ai-status": {
+      "types": "./src/matter/aiStatus.ts",
+      "default": "./src/matter/aiStatus.ts"
+    },
     "./work-log/tool-presentation": {
       "types": "./src/work-log/toolPresentation.ts",
       "default": "./src/work-log/toolPresentation.ts"
