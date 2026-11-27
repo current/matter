@@ -38,7 +38,7 @@ describe("normalizeMatterComposerAppearance", () => {
     expect(normalizeMatterComposerAppearance("glass")).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
     expect(
       normalizeMatterComposerAppearance({
-        scrollFade: "no",
+        scrollEdge: "glow",
         material: "chrome",
         shape: 3,
         transparency: "50",
@@ -49,8 +49,19 @@ describe("normalizeMatterComposerAppearance", () => {
   });
 
   it("keeps valid fields from a partial value", () => {
-    expect(normalizeMatterComposerAppearance({ material: "glass", scrollFade: false })).toEqual(
-      appearance({ material: "glass", scrollFade: false }),
+    expect(normalizeMatterComposerAppearance({ material: "glass", scrollEdge: "frost" })).toEqual(
+      appearance({ material: "glass", scrollEdge: "frost" }),
+    );
+  });
+
+  it("carries the old scroll fade switch over", () => {
+    expect(normalizeMatterComposerAppearance({ scrollFade: false }).scrollEdge).toBe("off");
+    expect(normalizeMatterComposerAppearance({ scrollFade: true }).scrollEdge).toBe("fade");
+    expect(
+      normalizeMatterComposerAppearance({ scrollFade: false, scrollEdge: "blur" }).scrollEdge,
+    ).toBe("blur");
+    expect(normalizeMatterComposerAppearance({ scrollFade: false })).not.toHaveProperty(
+      "scrollFade",
     );
   });
 
@@ -129,9 +140,9 @@ describe("composer appearance storage", () => {
   it("merges patches into the stored appearance", () => {
     expect(readMatterComposerAppearance()).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);
     writeMatterComposerAppearance({ material: "frosted" });
-    writeMatterComposerAppearance({ transparency: 999, scrollFade: false });
+    writeMatterComposerAppearance({ transparency: 999, scrollEdge: "shadow" });
     expect(readMatterComposerAppearance()).toEqual(
-      appearance({ material: "frosted", transparency: 85, scrollFade: false }),
+      appearance({ material: "frosted", transparency: 85, scrollEdge: "shadow" }),
     );
     writeMatterComposerAppearance(DEFAULT_MATTER_COMPOSER_APPEARANCE);
     expect(readMatterComposerAppearance()).toEqual(DEFAULT_MATTER_COMPOSER_APPEARANCE);

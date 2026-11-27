@@ -5,10 +5,11 @@
    Rules are scoped `.mts .mts-*` so they outrank `.mfs button { color: inherit }`. */
 
 .mts {
-  --mts-ink: var(--sidebar-foreground);
-  --mts-nav: color-mix(in srgb, var(--sidebar-foreground) 88%, transparent);
-  --mts-secondary: var(--sidebar-muted-foreground);
-  --mts-muted: color-mix(in srgb, var(--sidebar-muted-foreground) 96%, var(--sidebar-foreground));
+  /* The contrast tokens carry Appearance's contrast boost; outside the app sidebar they fall back. */
+  --mts-ink: var(--contrast-sidebar-foreground, var(--sidebar-foreground));
+  --mts-nav: color-mix(in srgb, var(--mts-ink) 88%, transparent);
+  --mts-secondary: var(--contrast-sidebar-muted-foreground, var(--sidebar-muted-foreground));
+  --mts-muted: color-mix(in srgb, var(--mts-secondary) 96%, var(--mts-ink));
   --mts-hover: color-mix(in srgb, var(--sidebar-foreground) 4.5%, transparent);
   --mts-press: color-mix(in srgb, var(--sidebar-foreground) 9%, transparent);
   --mts-active: color-mix(in srgb, var(--sidebar-foreground) 7.5%, transparent);
@@ -18,9 +19,9 @@
   --mts-track: color-mix(in srgb, var(--sidebar-foreground) 9%, transparent);
   --mts-trunk: color-mix(in srgb, var(--sidebar-foreground) 18%, transparent);
   --mts-edge: color-mix(in srgb, var(--sidebar-foreground) 8%, transparent);
-  --mts-pr-open: #1f9a52;
-  --mts-pr-merged: #7c5ce6;
-  --mts-pr-closed: #d93a4a;
+  --mts-pr-open: #047857;
+  --mts-pr-merged: #6d48d6;
+  --mts-pr-closed: #c42536;
   --mts-needs: #d97706;
   --mts-mono: var(--font-mono, ui-monospace, "SF Mono", monospace);
   container-type: inline-size;
@@ -28,15 +29,19 @@
 
 .dark .mts {
   /* Derive tints from --mts-ink so warm/tinted custom themes (Ember, Grove) stay harmonious. */
-  --mts-ink: var(--sidebar-foreground, #f1f3f7);
+  --mts-ink: var(--contrast-sidebar-foreground, var(--sidebar-foreground, #f1f3f7));
   --mts-nav: color-mix(in srgb, var(--mts-ink) 88%, transparent);
-  --mts-secondary: var(--sidebar-muted-foreground, #98a0b0);
+  --mts-secondary: var(
+    --contrast-sidebar-muted-foreground,
+    var(--sidebar-muted-foreground, #98a0b0)
+  );
   --mts-muted: color-mix(in srgb, var(--mts-secondary) 82%, transparent);
-  --mts-hover: color-mix(in srgb, var(--mts-ink) 5%, transparent);
+  /* Hover stays well below the open row, which has no white card to set it apart in dark. */
+  --mts-hover: color-mix(in srgb, var(--mts-ink) 4%, transparent);
   --mts-press: color-mix(in srgb, var(--mts-ink) 12%, transparent);
   --mts-active: color-mix(in srgb, var(--mts-ink) 9%, transparent);
-  --mts-selected: color-mix(in srgb, var(--mts-ink) 8.5%, transparent);
-  --mts-selected-ring: color-mix(in srgb, var(--mts-ink) 7%, transparent);
+  --mts-selected: color-mix(in srgb, var(--mts-ink) 11%, transparent);
+  --mts-selected-ring: color-mix(in srgb, var(--mts-ink) 9%, transparent);
   --mts-selected-shadow: none;
   --mts-track: color-mix(in srgb, var(--mts-ink) 8%, transparent);
   --mts-trunk: color-mix(in srgb, var(--mts-ink) 16%, transparent);
@@ -77,6 +82,14 @@ html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"]) 
     transition:
       background-color 120ms ease,
       color 120ms ease;
+  }
+
+  .mts .mts-kbd {
+    transition: opacity 120ms ease;
+  }
+
+  .mts :is(.mts-scope, .mts-fold) .mts-cr {
+    transition: rotate 140ms ease;
   }
 }
 
@@ -224,7 +237,6 @@ html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"]) 
   font-weight: 450;
   font-variant-numeric: tabular-nums;
   opacity: 0;
-  transition: opacity 120ms ease;
 }
 
 .mts .mts-ni:is(:hover, :focus-visible) .mts-kbd {
@@ -249,8 +261,8 @@ html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"]) 
   gap: 2px;
   padding: 0 8px;
   border-radius: 7px;
-  color: var(--mts-secondary);
-  font-size: 11.5px;
+  color: var(--mts-nav);
+  font-size: 12.5px;
   font-weight: 500;
 }
 
@@ -274,10 +286,6 @@ html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"]) 
   width: 14px;
   height: 14px;
   margin-left: 1px;
-}
-
-.mts .mts-scope .mts-cr {
-  transition: rotate 140ms ease;
 }
 
 .mts .mts-scope[data-popup-open] .mts-cr {
@@ -364,7 +372,7 @@ html.dark[data-matter-shell-material]:not([data-matter-shell-material="solid"]) 
   scrollbar-width: none;
 }
 
-html:not([data-matter-scroll-fade="off"])
+html:not([data-matter-scroll-edge="off"])
   .mts
   .mts-list[data-scrolled-top]:not([data-scrolled-bottom]) {
   -webkit-mask-image: linear-gradient(
@@ -391,7 +399,7 @@ html:not([data-matter-scroll-fade="off"])
   );
 }
 
-html:not([data-matter-scroll-fade="off"])
+html:not([data-matter-scroll-edge="off"])
   .mts
   .mts-list[data-scrolled-bottom]:not([data-scrolled-top]) {
   -webkit-mask-image: linear-gradient(
@@ -418,7 +426,7 @@ html:not([data-matter-scroll-fade="off"])
   );
 }
 
-html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data-scrolled-bottom] {
+html:not([data-matter-scroll-edge="off"]) .mts .mts-list[data-scrolled-top][data-scrolled-bottom] {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0px,
@@ -467,9 +475,11 @@ html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data
 
 .mts .mts-fold {
   display: flex;
+  min-height: 24px;
+  flex: 1;
   align-items: center;
-  margin: -4px -8px;
-  padding: 4px 8px;
+  margin: -5px -8px;
+  padding: 5px 8px;
   border-radius: 6px;
   color: inherit;
 }
@@ -480,10 +490,6 @@ html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data
 
 .mts .mts-fold:active {
   background: var(--mts-press);
-}
-
-.mts .mts-fold .mts-cr {
-  transition: rotate 140ms ease;
 }
 
 .mts .mts-fold[aria-expanded="true"] .mts-cr {
@@ -609,7 +615,7 @@ html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data
   width: 7px;
   height: 7px;
   flex: none;
-  margin: 0 3.5px;
+  margin: 0 2px 0 4px;
   border-radius: 50%;
 }
 
@@ -638,33 +644,30 @@ html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data
   background: var(--info);
 }
 
-/* Subtle hover / focus-visible row action trigger on web and touch clients. */
+/* Row actions. With a mouse the button lays over the status column on hover or focus, so
+   nothing beside it moves; on touch it stays in the row. */
 .mts .mts-more {
   position: relative;
   z-index: 2;
   display: grid;
-  width: 0;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   flex: none;
   place-items: center;
-  margin-left: -8px;
-  overflow: hidden;
-  border-radius: 5px;
+  margin: -2.5px -4px -2.5px 0;
+  border-radius: 6px;
   color: var(--mts-secondary);
-  opacity: 0;
+  pointer-events: auto;
+}
+
+.mts .mts-sub > .mts-more {
+  order: 1;
   pointer-events: auto;
 }
 
 .mts .mts-more svg {
   width: 14px;
   height: 14px;
-}
-
-.mts .mts-row:is(:hover, :focus-within) .mts-more,
-.mts .mts-more:focus-visible {
-  width: 20px;
-  margin-left: 0;
-  opacity: 1;
 }
 
 .mts .mts-more:hover {
@@ -676,11 +679,30 @@ html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data
   background: var(--mts-press);
 }
 
-@media (hover: none) {
-  .mts .mts-more {
-    width: 24px;
-    margin-left: 0;
+@media (hover: hover) {
+  .mts :is(.mts-l1, .mts-sub) > .mts-more {
+    position: absolute;
+    top: 50%;
+    right: -4px;
+    margin: 0;
+    opacity: 0;
+    translate: 0 -50%;
+  }
+
+  .mts .mts-sub > .mts-more {
+    right: 4px;
+  }
+
+  .mts :is(.mts-row, .mts-sub):is(:hover, :focus-within) .mts-more {
     opacity: 1;
+  }
+
+  .mts
+    .mts-row:is(:hover, :focus-within)
+    .mts-l1
+    > :is(.mts-age, .mts-need, .mts-unread, .mts-fail, .mlf-st),
+  .mts .mts-sub:is(:hover, :focus-within) > .mts-sm {
+    visibility: hidden;
   }
 }
 
@@ -1080,10 +1102,10 @@ html:not([data-matter-scroll-fade="off"]) .mts .mts-list[data-scrolled-top][data
     min-height: 36px;
   }
 
-  .mts .mts-more {
-    width: 36px;
-    height: 36px;
-    margin-left: 0;
-    opacity: 1;
+  /* A 36px target behind the 24px button. */
+  .mts .mts-more::before {
+    position: absolute;
+    inset: -6px;
+    content: "";
   }
 }

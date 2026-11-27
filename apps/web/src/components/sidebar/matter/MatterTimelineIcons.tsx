@@ -120,17 +120,13 @@ export const ChevronDownGlyph = (props: IconProps) => (
   </Glyph>
 );
 
-/** Continuous fork optically aligned to FolderGlyph's x=2.5 left origin. */
+/** BranchGlyph's fork ending in a square: the checkout that lives beside the repo. */
 export const WorktreeGlyph = (props: IconProps) => (
   <Glyph {...props}>
-    <path d="M2.5 8h4.25l5.5-4.5M9.75 3.5h2.5V6M6.75 8l5.5 4.5" />
-  </Glyph>
-);
-
-export const FolderGlyph = (props: IconProps) => (
-  <Glyph {...props}>
-    <path d="M2.5 4.75a1.5 1.5 0 0 1 1.5-1.5h2.35l1.4 1.5H12a1.5 1.5 0 0 1 1.5 1.5v5.5a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5z" />
-    <path d="M2.5 6.5h11" />
+    <circle cx="4.75" cy="3.75" r="1.5" />
+    <circle cx="4.75" cy="12.25" r="1.5" />
+    <rect x="9.75" y="3" width="3" height="3" rx="0.75" />
+    <path d="M4.75 5.25v5.5M11.25 6v.25a3 3 0 0 1-3 3h-.5a3 3 0 0 0-3 1.5" />
   </Glyph>
 );
 

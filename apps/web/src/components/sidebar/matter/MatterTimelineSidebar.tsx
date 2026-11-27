@@ -6,12 +6,13 @@ import { useGT } from "gt-react";
 import { CheckIcon, FolderPlusIcon, LayersIcon, SettingsIcon } from "lucide-react";
 import {
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
 import { openCommandPalette } from "../../../commandPaletteBus";
-import { contextMenuSourceOf } from "../../../contextMenuSource";
+import { contextMenuSourceOf, openContextMenuFromKeyboard } from "../../../contextMenuSource";
 import { useLocalStorage } from "../../../hooks/useLocalStorage";
 import { shortcutLabelForCommand } from "../../../keybindings";
 import { observeResize } from "../../../lib/observeResize";
@@ -38,13 +39,11 @@ import {
   useCrewBots,
 } from "./MatterDefaultSidebarParts";
 import {
-  countNeedsYou,
   formatResetLabel,
   indexChildrenByParent,
   parentsWithNeedsChild,
   pickUsageMeters,
   subagentStatus,
-  summarizeProjects,
   type MatterChildItem,
   type MatterListFilter,
   type MatterUsageMeter,
@@ -52,10 +51,12 @@ import {
 import {
   buildTimelineSections,
   isTimelineSectionOpen,
+  timelineRaisesHand,
   timelineRowState,
   shortTimelineBranchLabel,
   visibleTimelineSubagents,
   type MatterTimelineNeedsKind,
+  type MatterTimelineRowState,
   type MatterTimelineSection,
 } from "./matterTimelineFeed.logic";
 import type { MatterPullRequestState, MatterThreadItem } from "./matterSidebar.logic";
@@ -74,7 +75,6 @@ import {
   ClockGlyph,
   CloseGlyph,
   ComposeGlyph,
-  FolderGlyph,
   GearGlyph,
   HelpGlyph,
   InboxGlyph,
@@ -108,7 +108,8 @@ const FOLDS_STORAGE_KEY = "mattr:sidebar:timeline-folds:v1";
 const METER_LIMIT = 5;
 const Folds = Schema.Record(Schema.String, Schema.Boolean);
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
-const ROW_FOCUS_STOPS = "button.mts-hit, button.mts-fold";
+const ROW_FOCUS_STOPS =
+  "button.mts-hit, button.mts-fold, button.mlf-elsewhere, button.mfs-hit, a.mfs-row";
 
 const PR_GLYPH: Record<MatterPullRequestState, typeof PullRequestOpenGlyph> = {
   open: PullRequestOpenGlyph,
@@ -197,7 +198,9 @@ function sectionLabel(section: MatterTimelineSection, nowMs: number, gt: GT): st
     case "pinned":
       return gt("Pinned");
     case "working":
-      return gt("Working", { $context: "threads whose agents are running now" });
+      return gt("Active", {
+        $context: "threads whose agents are working or waiting on background work",
+      });
     case "today":
       return gt("Today");
     case "yesterday":
@@ -217,6 +220,40 @@ function sectionLabel(section: MatterTimelineSection, nowMs: number, gt: GT): st
     }
   }
 }
+
+/** What a screen reader hears after a row's title: everything its two lines show. */
+function rowSummary(item: MatterThreadItem, state: MatterTimelineRowState, gt: GT): string {
+  const parts: string[] = [];
+  switch (state.tone) {
+    case "needs":
+      parts.push(gt("Needs you: {reason}", { reason: needsLabel(state.kind, gt) }), state.age);
+      break;
+    case "running":
+      parts.push(gt("Working for {duration}", { duration: state.elapsed }));
+      break;
+    case "background":
+      parts.push(gt("Waiting on background work for {duration}", { duration: state.elapsed }));
+      break;
+    case "failed":
+      parts.push(gt("Failed"));
+      if (state.age !== "") parts.push(state.age);
+      break;
+    case "idle":
+      if (item.unread) parts.push(gt("Unread"));
+      if (state.age !== "") parts.push(state.age);
+      break;
+  }
+  if (item.projectName !== null) parts.push(item.projectName);
+  if (item.providerName !== null) parts.push(item.providerName);
+  if (item.branch !== null) parts.push(gt("Branch {branch}", { branch: item.branch }));
+  if (item.pullRequest !== null) {
+    parts.push(gt("Pull request #{number}", { number: item.pullRequest.number }));
+  }
+  return parts.join(", ");
+}
+
+/** The accessible id for a row's summary; thread keys only hold id-safe characters. */
+const summaryId = (key: string) => `mlf-desc-${key}`;
 
 interface TimelineRowContext {
   readonly subagents: ReadonlyMap<string, ReadonlyArray<MatterChildItem>>;
@@ -262,10 +299,16 @@ function openRowContextMenu(
   openWebMenu(item, pointAnchor(event.clientX, event.clientY));
 }
 
-function TimelineProjectIcon({ project }: { project: MatterSidebarProject }) {
+function TimelineProjectIcon({
+  project,
+  onOpen,
+}: {
+  project: MatterSidebarProject;
+  onOpen: () => void;
+}) {
   return (
     <MatterTip label={project.name} side="top">
-      <span className="mlf-proj-icon" role="img" aria-label={project.name}>
+      <span className="mlf-proj-icon" onClick={onOpen}>
         <ProjectFavicon project={project.group} className="size-3.5" />
       </span>
     </MatterTip>
@@ -310,23 +353,30 @@ function TimelineRow({
       data-unread={item.unread ? "" : undefined}
       data-pinned={item.pinned ? "" : undefined}
       onContextMenu={(event) => openRowContextMenu(event, model, item, context.openWebMenu)}
+      onKeyDown={openContextMenuFromKeyboard}
     >
       <button
         type="button"
         className="mts-hit"
         aria-label={item.title}
+        aria-describedby={summaryId(item.key)}
         aria-current={active ? "page" : undefined}
         onClick={() => model.actions.openThread(item)}
       />
+      <span id={summaryId(item.key)} className="sr-only">
+        {rowSummary(item, state, gt)}
+      </span>
       <span className="mts-l1">
-        <span className="mts-pi">
+        <span className="mts-pi" aria-hidden>
           {project !== undefined ? (
-            <TimelineProjectIcon project={project} />
+            <TimelineProjectIcon project={project} onOpen={() => model.actions.openThread(item)} />
           ) : (
             <MatterProviderMark driver={item.driver} />
           )}
         </span>
-        <span className="mts-t">{item.title}</span>
+        <span className="mts-t" aria-hidden>
+          {item.title}
+        </span>
         {item.interactionMode === "goal" ? (
           <TargetGlyph className="mts-goal" role="img" aria-label={gt("Goal mode")} />
         ) : null}
@@ -337,43 +387,55 @@ function TimelineRow({
           </span>
         ) : null}
         {state.tone === "needs" ? (
-          <span className="mts-need" role="img" aria-label={gt("Needs you")} />
+          <>
+            {state.age !== "" ? (
+              <span className="mts-age" aria-hidden>
+                {state.age}
+              </span>
+            ) : null}
+            <span className="mts-need" aria-hidden />
+          </>
         ) : state.tone === "running" ? (
-          <span className="mlf-st" data-tone="running">
+          <span className="mlf-st" data-tone="running" aria-hidden>
             {state.elapsed}
-            <SpinnerGlyph className="mts-spin" role="img" aria-label={gt("Running")} />
+            <SpinnerGlyph className="mts-spin" />
           </span>
         ) : state.tone === "background" ? (
-          <span className="mlf-st" data-tone="background">
+          <span className="mlf-st" data-tone="background" aria-hidden>
             {state.elapsed}
-            <WaitingGlyph
-              className="mlf-wait"
-              role="img"
-              aria-label={gt("Waiting on background work")}
-            />
+            <WaitingGlyph className="mlf-wait" />
           </span>
         ) : state.tone === "failed" ? (
           density === "full" ? (
-            <span className="mts-fail" aria-hidden />
+            <>
+              {state.age !== "" ? (
+                <span className="mts-age" aria-hidden>
+                  {state.age}
+                </span>
+              ) : null}
+              <span className="mts-fail" aria-hidden />
+            </>
           ) : (
-            <span className="mlf-st" data-tone="failed">
+            <span className="mlf-st" data-tone="failed" aria-hidden>
               {gt("Failed")}
               <span className="mts-fail" aria-hidden />
             </span>
           )
         ) : (
           <>
-            {state.age !== "" ? <span className="mts-age">{state.age}</span> : null}
-            {item.unread ? (
-              <span className="mts-unread" role="img" aria-label={gt("Unread")} />
+            {state.age !== "" ? (
+              <span className="mts-age" aria-hidden>
+                {state.age}
+              </span>
             ) : null}
+            {item.unread ? <span className="mts-unread" aria-hidden /> : null}
           </>
         )}
         {context.showRowMenuButton ? (
           <button
             type="button"
             className="mts-more"
-            aria-label={gt("Thread actions")}
+            aria-label={gt("Actions for {title}", { title: item.title })}
             aria-haspopup="menu"
             onClick={(event) => {
               event.stopPropagation();
@@ -385,27 +447,35 @@ function TimelineRow({
         ) : null}
       </span>
       {density === "full" ? (
-        <span className="mts-l2">
-          {project !== undefined ? (
+        <span className="mts-l2" aria-hidden>
+          {project !== undefined && item.driver !== null ? (
             <span className="mts-pi mlf-l2-provider">
               <MatterProviderMark driver={item.driver} />
             </span>
-          ) : null}
-          {kind === "worktree" ? (
-            <WorktreeGlyph className="mts-mi" data-matter-workspace="worktree" />
-          ) : kind === "local" ? (
-            <FolderGlyph className="mts-mi" data-matter-workspace="local" />
           ) : null}
           {!context.projectScoped ? (
             <span className="mts-proj">{item.projectName ?? gt("No project")}</span>
           ) : null}
           {item.branch !== null ? (
-            <MatterTip label={item.branch} side="top">
-              <span className="mts-br" onClick={() => model.actions.openThread(item)}>
-                <BranchGlyph />
+            <MatterTip
+              label={
+                kind === "worktree"
+                  ? gt("Worktree · {branch}", { branch: item.branch })
+                  : item.branch
+              }
+              side="top"
+            >
+              <span
+                className="mts-br"
+                data-matter-workspace={kind}
+                onClick={() => model.actions.openThread(item)}
+              >
+                {kind === "worktree" ? <WorktreeGlyph /> : <BranchGlyph />}
                 <span>{shortTimelineBranchLabel(item.branch, item.projectName)}</span>
               </span>
             </MatterTip>
+          ) : kind === "worktree" ? (
+            <WorktreeGlyph className="mts-mi" data-matter-workspace="worktree" />
           ) : null}
           {state.tone === "needs" ? (
             <span className="mlf-st" data-tone="needs">
@@ -449,27 +519,54 @@ function TimelineSubagent({
   const gt = useGT();
   const active = item.key === model.activeThreadKey;
   const status = subagentStatus(item, model.nowMs);
+  const statusText =
+    status.tone === "needs"
+      ? gt("Needs you: {reason}", { reason: needsLabel(item.needsKind ?? "request", gt) })
+      : status.tone === "running"
+        ? gt("Working for {duration}", { duration: status.age })
+        : status.tone === "failed"
+          ? gt("Failed")
+          : gt("Done");
   return (
-    <div
+    <li
       ref={active ? (row) => context.revealActiveRow(row, item.key) : undefined}
       className="mts-sub"
       data-matter-timeline-subagent={item.key}
       data-active={active ? "" : undefined}
       onContextMenu={(event) => openRowContextMenu(event, model, item, context.openWebMenu)}
+      onKeyDown={openContextMenuFromKeyboard}
     >
       <button
         type="button"
         className="mts-hit"
         aria-label={item.title}
+        aria-describedby={summaryId(item.key)}
         aria-current={active ? "page" : undefined}
         onClick={() => model.actions.openThread(item)}
       />
+      <span id={summaryId(item.key)} className="sr-only">
+        {item.providerName === null ? statusText : `${statusText}, ${item.providerName}`}
+      </span>
       <span className="mts-conn" aria-hidden />
       <span className="mts-pi">
         <MatterProviderMark driver={item.driver} />
       </span>
       <span className="mts-st">{item.title}</span>
-      <span className="mts-sm" data-tone={status.tone}>
+      {context.showRowMenuButton ? (
+        <button
+          type="button"
+          className="mts-more"
+          aria-label={gt("Actions for {title}", { title: item.title })}
+          aria-haspopup="menu"
+          onClick={(event) => {
+            event.stopPropagation();
+            context.openWebMenu(item, event.currentTarget);
+          }}
+        >
+          <MoreGlyph />
+        </button>
+      ) : null}
+      <span className="mts-sm" data-tone={status.tone} aria-hidden>
         {status.tone === "needs" ? (
           needsLabel(item.needsKind ?? "request", gt)
         ) : status.tone === "running" ? (
@@ -483,7 +580,7 @@ function TimelineSubagent({
           gt("Done")
         )}
       </span>
-    </div>
+    </li>
   );
 }
 
@@ -508,7 +605,11 @@ function TimelineSubagents({
   });
   const rows = expanded ? active : collapsed.shown;
   return (
-    <div role="group" aria-label={gt("Subagents of {title}", { title: parent.title })}>
+    <ul
+      role="list"
+      className="mlf-subs"
+      aria-label={gt("Subagents of {title}", { title: parent.title })}
+    >
       {rows.map((child) => (
         <TimelineSubagent key={child.key} model={model} item={child} context={context} />
       ))}
@@ -516,7 +617,7 @@ function TimelineSubagents({
         <TimelineSubagent model={model} item={openFinished} context={context} />
       ) : null}
       {collapsed.hiddenCount > 0 ? (
-        <div className="mts-sub mlf-more">
+        <li className="mts-sub mlf-more">
           <button
             type="button"
             className="mts-hit"
@@ -535,9 +636,9 @@ function TimelineSubagents({
               : gt("{count} more running", { count: collapsed.hiddenCount })}
           </span>
           <ChevronGlyph className="mts-cr" />
-        </div>
+        </li>
       ) : null}
-    </div>
+    </ul>
   );
 }
 
@@ -559,6 +660,8 @@ function TimelineSection({
   const rows = open
     ? section.items
     : section.items.filter((item) => item.key === context.openRowKey);
+  const listId = `mlf-section-${section.id}`;
+  const hiddenUnread = !open && section.items.some((item) => item.unread && !rows.includes(item));
   return (
     <section aria-label={label} data-matter-timeline-section={section.id}>
       <h3 className="mts-sec mlf-sec" data-kind={section.kind}>
@@ -566,12 +669,21 @@ function TimelineSection({
           <button
             type="button"
             className="mts-fold"
-            aria-label={`${label}, ${section.items.length}`}
+            aria-label={
+              hiddenUnread
+                ? gt("{label}, {count}, has unread threads", {
+                    label,
+                    count: section.items.length,
+                  })
+                : `${label}, ${section.items.length}`
+            }
             aria-expanded={open}
+            aria-controls={rows.length > 0 ? listId : undefined}
             onClick={onToggle}
           >
             <span>{label}</span>
             <span className="mlf-count">{section.items.length}</span>
+            {hiddenUnread ? <span className="mts-unread mlf-fold-unread" aria-hidden /> : null}
             <ChevronGlyph className="mts-cr" />
           </button>
         ) : (
@@ -582,7 +694,7 @@ function TimelineSection({
         )}
       </h3>
       {rows.length > 0 ? (
-        <ul className="mts-rows mlf-rows" data-density={section.density}>
+        <ul id={listId} role="list" className="mts-rows mlf-rows" data-density={section.density}>
           {rows.map((item) => (
             <li key={item.key}>
               <TimelineRow model={model} item={item} density={section.density} context={context} />
@@ -595,10 +707,17 @@ function TimelineSection({
   );
 }
 
-function meterTip(meter: MatterUsageMeter, nowMs: number, gt: GT): string {
-  const used = gt("{percent}% used", { percent: meter.usedPercent });
+function meterTip(meter: MatterUsageMeter, nowMs: number, gt: GT, spoken = false): string {
+  const tone = usageMeterTone(meter.usedPercent);
+  const used =
+    tone === "critical"
+      ? gt("{percent}% used, at the limit", { percent: meter.usedPercent })
+      : tone === "warn"
+        ? gt("{percent}% used, close to the limit", { percent: meter.usedPercent })
+        : gt("{percent}% used", { percent: meter.usedPercent });
   const soon = formatResetLabel(meter.resetsAt, nowMs);
-  const head = `${meter.accountName} · ${compactWindowLabel(meter.windowLabel)} · ${used}`;
+  const window = spoken ? meter.windowLabel : compactWindowLabel(meter.windowLabel);
+  const head = `${meter.accountName} · ${window} · ${used}`;
   return soon === null ? head : `${head} · ${gt("Resets in {duration}", { duration: soon })}`;
 }
 
@@ -619,7 +738,7 @@ function TimelineMeters({
       className="mts-use mlf-use-row"
       role="group"
       aria-label={gt("Usage limits")}
-      style={{ gridTemplateColumns: `repeat(${meters.length}, minmax(0, 1fr))` }}
+      style={{ "--mlf-meters": Math.min(meters.length, 4) } as CSSProperties}
     >
       {meters.map((meter) => (
         <MatterTip key={meter.key} label={meterTip(meter, nowMs, gt)} side="top">
@@ -627,7 +746,7 @@ function TimelineMeters({
             type="button"
             className="mts-m"
             data-tone={usageMeterTone(meter.usedPercent)}
-            aria-label={meterTip(meter, nowMs, gt)}
+            aria-label={meterTip(meter, nowMs, gt, true)}
             onClick={onOpen}
           >
             <span className="mts-mh">
@@ -676,12 +795,15 @@ function TimelineWebContextMenu({
         {item !== null ? (
           <>
             <MatterMenuItem label={gt("Open thread")} onClick={() => run("open")} />
-            <div className="mfs-menu-sep" />
+            <MenuPrimitive.Separator className="mfs-menu-sep" />
             <MatterMenuItem
               label={item.pinned ? gt("Unpin") : gt("Pin")}
               onClick={() => run(item.pinned ? "unpin" : "pin")}
             />
-            <MatterMenuItem label={gt("Mark as unread")} onClick={() => run("mark-unread")} />
+            <MatterMenuItem
+              label={item.unread ? gt("Mark as read") : gt("Mark as unread")}
+              onClick={() => run(item.unread ? "mark-read" : "mark-unread")}
+            />
             <MatterMenuItem
               label={item.settled ? gt("Unsettle") : gt("Settle")}
               onClick={() => run(item.settled ? "unsettle" : "settle")}
@@ -693,7 +815,7 @@ function TimelineWebContextMenu({
                 onClick={() => run("project-settings")}
               />
             ) : null}
-            <div className="mfs-menu-sep" />
+            <MenuPrimitive.Separator className="mfs-menu-sep" />
             <MatterMenuItem label={gt("Archive")} onClick={() => run("archive")} />
           </>
         ) : null}
@@ -789,8 +911,17 @@ export function MatterTimelineSidebar({
     revealActiveRow,
     projectByKey: new Map(projects.map((project) => [project.key, project])),
   };
-  const needsCount = countNeedsYou(items, children) + crew.needsCount;
-  const projectSummary = summarizeProjects(items);
+  const needsRows = items.filter((item) => timelineRaisesHand(item, needsChildParents));
+  const needsCount = needsRows.length + crew.needsCount;
+  const needsByProject = new Map<string, number>();
+  for (const item of needsRows) {
+    if (item.projectKey === null) continue;
+    needsByProject.set(item.projectKey, (needsByProject.get(item.projectKey) ?? 0) + 1);
+  }
+  const needsElsewhere =
+    projectFilter === null
+      ? 0
+      : needsRows.filter((item) => item.projectKey !== projectFilter).length;
   const scopeName =
     projectFilter === null
       ? gt("All activity")
@@ -800,6 +931,7 @@ export function MatterTimelineSidebar({
     activeChild?.projectKey ??
     null;
   const newThreadHint = shortcutLabelForCommand(keybindings, "chat.new");
+  const searchHint = shortcutLabelForCommand(keybindings, "commandPalette.toggle");
   const onSettings = pathname.startsWith("/settings");
 
   const handleWebAction = (item: MatterThreadItem, action: MatterThreadMenuAction) => {
@@ -817,7 +949,7 @@ export function MatterTimelineSidebar({
           onNavigate={closeMobile}
           caret={<ChevronDownGlyph className="mfs-caret" />}
         />
-        <MatterTip label={gt("Search")}>
+        <MatterTip label={searchHint ? `${gt("Search")}  ${searchHint}` : gt("Search")}>
           <button
             type="button"
             className="mts-ib"
@@ -827,7 +959,15 @@ export function MatterTimelineSidebar({
             <SearchGlyph />
           </button>
         </MatterTip>
-        <MatterTip label={gt("Needs you")}>
+        <MatterTip
+          label={
+            filter === "needs"
+              ? gt("Show all threads")
+              : needsCount > 0
+                ? gt("Show only what needs you")
+                : gt("Nothing needs you")
+          }
+        >
           <button
             type="button"
             className="mts-ib"
@@ -930,7 +1070,7 @@ export function MatterTimelineSidebar({
                 }
               />
               {projects.map((project) => {
-                const summary = projectSummary.get(project.key);
+                const waiting = needsByProject.get(project.key) ?? 0;
                 return (
                   <MatterMenuRadioItem
                     key={project.key}
@@ -941,19 +1081,38 @@ export function MatterTimelineSidebar({
                         <span>{project.name}</span>
                       </span>
                     }
-                    hint={summary ? <em>{summary.count}</em> : null}
+                    hint={
+                      waiting > 0 ? (
+                        <span
+                          className="mlf-menu-needs"
+                          aria-label={gt("Needs you: {count}", { count: waiting })}
+                        >
+                          {waiting}
+                        </span>
+                      ) : null
+                    }
                   />
                 );
               })}
             </MenuPrimitive.RadioGroup>
-            <div className="mfs-menu-sep" />
+            <MenuPrimitive.Separator className="mfs-menu-sep" />
             <MatterMenuItem
-              icon={<FolderPlusIcon aria-hidden />}
+              icon={
+                <>
+                  <span className="mlf-menu-gap" aria-hidden />
+                  <FolderPlusIcon aria-hidden />
+                </>
+              }
               label={gt("Add project")}
               onClick={() => go(() => openCommandPalette({ open: "add-project" }))}
             />
             <MatterMenuItem
-              icon={<SettingsIcon aria-hidden />}
+              icon={
+                <>
+                  <span className="mlf-menu-gap" aria-hidden />
+                  <SettingsIcon aria-hidden />
+                </>
+              }
               label={gt("Project settings")}
               onClick={() =>
                 go(() =>
@@ -980,18 +1139,22 @@ export function MatterTimelineSidebar({
           </button>
         ) : null}
         <MenuPrimitive.Root>
-          <MenuPrimitive.Trigger
-            className="mts-so"
-            aria-label={gt("View options")}
-            data-sort={sort}
-          >
-            <SortGlyph />
-            {sort === "created" ? <span className="mts-so-lab">{gt("Created")}</span> : null}
-          </MenuPrimitive.Trigger>
+          <MatterTip label={gt("View options")}>
+            <MenuPrimitive.Trigger
+              className="mts-so"
+              aria-label={
+                sort === "created" ? gt("View options: sorted by created") : gt("View options")
+              }
+              data-sort={sort}
+            >
+              <SortGlyph />
+              {sort === "created" ? <span className="mts-so-lab">{gt("Created")}</span> : null}
+            </MenuPrimitive.Trigger>
+          </MatterTip>
           <MatterMenuPopup align="end">
             <MenuPrimitive.Group>
               <MenuPrimitive.GroupLabel className="mfs-menu-label">
-                {gt("Sort by")}
+                {gt("Sort", { $context: "heading over the ways to order the thread list" })}
               </MenuPrimitive.GroupLabel>
               <MenuPrimitive.RadioGroup
                 value={sort}
@@ -1004,24 +1167,44 @@ export function MatterTimelineSidebar({
                 />
               </MenuPrimitive.RadioGroup>
             </MenuPrimitive.Group>
-            <div className="mfs-menu-sep" />
-            <MenuPrimitive.CheckboxItem
-              className="mfs-menu-item"
-              checked={showSubagents}
-              onCheckedChange={(checked: boolean) => setShowSubagents(checked)}
-            >
-              <span className="inline-flex size-3.5 items-center justify-center">
-                <MenuPrimitive.CheckboxItemIndicator>
-                  <CheckIcon aria-hidden className="mfs-menu-check" />
-                </MenuPrimitive.CheckboxItemIndicator>
-              </span>
-              <span className="mfs-menu-text">{gt("Show active subagents")}</span>
-            </MenuPrimitive.CheckboxItem>
+            <MenuPrimitive.Separator className="mfs-menu-sep" />
+            <MenuPrimitive.Group>
+              <MenuPrimitive.GroupLabel className="mfs-menu-label">
+                {gt("Show", { $context: "heading over what the thread list includes" })}
+              </MenuPrimitive.GroupLabel>
+              <MenuPrimitive.CheckboxItem
+                className="mfs-menu-item"
+                checked={showSubagents}
+                onCheckedChange={(checked: boolean) => setShowSubagents(checked)}
+              >
+                <span className="inline-flex size-3.5 items-center justify-center">
+                  <MenuPrimitive.CheckboxItemIndicator>
+                    <CheckIcon aria-hidden className="mfs-menu-check" />
+                  </MenuPrimitive.CheckboxItemIndicator>
+                </span>
+                <span className="mfs-menu-text">{gt("Active subagents")}</span>
+              </MenuPrimitive.CheckboxItem>
+            </MenuPrimitive.Group>
           </MatterMenuPopup>
         </MenuPrimitive.Root>
       </div>
 
       <div ref={observeScrollFade} className="mts-list" onKeyDown={moveRowFocus}>
+        {needsElsewhere > 0 ? (
+          <button
+            type="button"
+            className="mlf-elsewhere"
+            aria-label={gt("Needs you in other projects: {count}. Show all activity", {
+              count: needsElsewhere,
+            })}
+            onClick={() => setProjectFilter(null)}
+          >
+            <span className="mts-need" aria-hidden />
+            <span>{gt("Needs you in other projects")}</span>
+            <span className="mlf-count">{needsElsewhere}</span>
+            <ChevronGlyph className="mts-cr" aria-hidden />
+          </button>
+        ) : null}
         {sections.map((section) => {
           const open = isTimelineSectionOpen(section, folds);
           return (
@@ -1036,9 +1219,41 @@ export function MatterTimelineSidebar({
           );
         })}
         {sections.length === 0 ? (
-          <p className="mfs-empty">
-            {filter === "needs" ? gt("Nothing needs you right now.") : gt("No threads yet.")}
-          </p>
+          <div className="mlf-empty">
+            <p className="mfs-empty">
+              {filter === "needs"
+                ? projectFilter === null
+                  ? gt("Nothing needs you right now.")
+                  : gt("Nothing in {project} needs you.", { project: scopeName })
+                : projectFilter === null
+                  ? gt("No threads yet.")
+                  : gt("No threads in {project} yet.", { project: scopeName })}
+            </p>
+            {filter === "all" ? (
+              <button
+                type="button"
+                className="mlf-empty-action"
+                onClick={() => actions.newThread(projectFilter ?? activeProjectKey)}
+              >
+                <ComposeGlyph />
+                <span>
+                  {projectFilter === null
+                    ? gt("New thread")
+                    : gt("New thread in {project}", { project: scopeName })}
+                </span>
+              </button>
+            ) : null}
+            {projectFilter !== null ? (
+              <button
+                type="button"
+                className="mlf-empty-action"
+                onClick={() => setProjectFilter(null)}
+              >
+                <LayersIcon aria-hidden />
+                <span>{gt("Show all activity")}</span>
+              </button>
+            ) : null}
+          </div>
         ) : null}
         <MatterCrew crew={crew} nowMs={nowMs} />
       </div>

@@ -5,7 +5,21 @@
 
 .mts.mlf {
   /* Amber text sits on the bare shell, so it leans toward the ink to stay readable when small. */
-  --mlf-needs-ink: color-mix(in srgb, var(--mts-needs) 80%, var(--mts-ink));
+  --mlf-needs-ink: color-mix(in srgb, var(--mts-needs) 70%, var(--mts-ink));
+  --mlf-running-ink: var(--success-foreground, var(--success));
+  --mlf-failed-ink: var(--destructive-foreground, var(--destructive));
+}
+
+.dark .mts.mlf {
+  --mlf-needs-ink: color-mix(in srgb, var(--mts-needs) 85%, var(--mts-ink));
+}
+
+.mts.mlf .mts-pill {
+  color: var(--mlf-needs-ink);
+}
+
+.mts.mlf .mts-list {
+  scroll-padding-block: 16px;
 }
 
 /* sidebar.css hides the titlebar wordmark; back and forward then start where it did. */
@@ -26,7 +40,11 @@
 /* Section headers: label, a quiet count, and a chevron that shows on hover or while folded. */
 .mts.mlf .mlf-sec {
   gap: 6px;
-  padding: 12px 16px 5px;
+  padding: 16px 16px 5px;
+}
+
+.mts.mlf .mts-list > section:first-of-type > .mlf-sec {
+  padding-top: 10px;
 }
 
 .mts.mlf .mlf-sec .mts-fold {
@@ -36,7 +54,10 @@
 .mts.mlf .mlf-count {
   font-variant-numeric: tabular-nums;
   font-weight: 450;
-  opacity: 0.72;
+}
+
+.mts.mlf .mlf-fold-unread {
+  margin-left: -1px;
 }
 
 .mts.mlf .mlf-sec[data-kind="needs"] {
@@ -50,6 +71,13 @@
 
 .mts.mlf .mlf-sec .mts-fold:is(:hover, :focus-visible, [aria-expanded="false"]) .mts-cr {
   opacity: 1;
+}
+
+/* No hover on touch, so open sections still show they fold. */
+@media (hover: none) {
+  .mts.mlf .mlf-sec .mts-cr {
+    opacity: 0.6;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -72,9 +100,11 @@
   padding: 7px 8px;
 }
 
+/* sidebar.css sets line-height 1, which clips descenders in line 2's ellipsized labels. */
 .mts.mlf .mlf-row .mts-l2 {
   height: 16px;
   margin-top: 1px;
+  line-height: 16px;
 }
 
 /* History drops to one 30px line: provider, title, pull request state, age. */
@@ -114,21 +144,23 @@
   align-items: center;
   gap: 4px;
   color: var(--mts-secondary);
-  font-size: 10.5px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+.mts.mlf .mlf-row .mts-age {
+  font-size: 11px;
+}
+
 .mts.mlf .mlf-st[data-tone="needs"] {
   color: var(--mlf-needs-ink);
-  font-size: 11px;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .mts.mlf .mlf-st[data-tone="failed"] {
-  color: var(--destructive);
-  font-size: 11px;
-  font-weight: 550;
+  color: var(--mlf-failed-ink);
+  font-weight: 500;
 }
 
 .mts.mlf .mlf-row .mts-fail {
@@ -139,11 +171,17 @@
 .mts.mlf .mts-l2 .mlf-st {
   margin-left: auto;
   padding-left: 10px;
+  font-size: 11.5px;
+  font-weight: 500;
 }
 
 .mts.mlf .mlf-row .mts-spin,
 .mts.mlf .mlf-row[data-active] .mts-spin {
-  color: var(--success);
+  color: var(--mlf-running-ink);
+}
+
+.mts.mlf .mlf-row :is(.mts-spin, .mlf-wait) {
+  margin-right: -2px;
 }
 
 .mts.mlf .mlf-row[data-active] .mlf-st[data-tone="running"] {
@@ -157,18 +195,25 @@
   flex: none;
 }
 
-/* A thread without a project has no workspace glyph; its label still starts on the text rail. */
-.mts.mlf .mlf-row .mts-l2 > .mts-proj:first-child {
+/* Without a provider mark in front, line 2 still starts on the title's text rail. */
+.mts.mlf .mlf-row .mts-l2 > :is(.mts-proj, .mts-br, .mts-mi):first-child {
   margin-left: 22px;
 }
 
+/* The branch reads as a plain label after the project; a worktree swaps its glyph. */
 .mts.mlf .mlf-row .mts-br {
   margin-left: 8px;
   padding-left: 0;
+  font-family: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0;
 }
 
-.mts.mlf .mlf-row .mts-mi + .mts-br {
-  margin-left: 0;
+/* A worktree with no branch name shows only its glyph. */
+.mts.mlf .mlf-row .mts-l2 > .mts-mi {
+  width: 12px;
+  height: 12px;
+  margin: 0 0 0 7px;
 }
 
 .mts.mlf .mlf-row .mts-pr {
@@ -187,7 +232,13 @@
 }
 
 .mts.mlf .mts-sm[data-tone="failed"] {
-  color: var(--destructive);
+  color: var(--mlf-failed-ink);
+}
+
+.mts.mlf .mlf-subs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .mts.mlf .mlf-more {
@@ -226,12 +277,7 @@
 /* Line 2 names the run beside the light on line 1: green while the agent works, quiet while it
    waits on background work it resumes from. */
 .mts.mlf .mts-l2 .mlf-st[data-tone="running"] {
-  color: var(--success);
-  font-weight: 500;
-}
-
-.mts.mlf .mts-l2 .mlf-st[data-tone="background"] {
-  font-weight: 500;
+  color: var(--mlf-running-ink);
 }
 
 .mts.mlf .mlf-row .mlf-wait {
@@ -245,19 +291,24 @@
   color: var(--mts-ink);
 }
 
-/* The project's icon leads the row; its provider moves to the start of line 2. */
+/* The project's icon leads the row and names its project on hover; its provider moves to the
+   start of line 2, quieter, since the title and project carry the row. */
 .mts.mlf .mlf-proj-icon {
   display: inline-grid;
   width: 14px;
   height: 14px;
   flex: none;
   place-items: center;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .mts.mlf .mts-l2 .mlf-l2-provider {
   width: 14px;
   height: 12px;
   margin-right: 8px;
+  filter: grayscale(1);
+  opacity: 0.8;
 }
 
 .mts.mlf .mts-l2 .mlf-l2-provider svg,
@@ -266,14 +317,34 @@
   height: 11px;
 }
 
-.mts.mlf .mts-l2 .mlf-l2-provider + .mts-mi {
-  margin-left: -2px;
+/* Every provider's tightest limit on one row, two per row when the sidebar is narrow. The
+   row's hairline is the only one above the footer. */
+.mts.mlf .mlf-use-row {
+  grid-template-columns: repeat(var(--mlf-meters, 2), minmax(0, 1fr));
+  column-gap: 12px;
+  padding: 9px 16px 8px;
 }
 
-/* Every provider's tightest limit on one row. */
-.mts.mlf .mlf-use-row {
-  column-gap: 12px;
-  padding: 9px 14px 10px;
+.mts.mlf .mlf-use-row + .mts-foot {
+  box-shadow: none;
+}
+
+@container (max-width: 230px) {
+  .mts.mlf .mlf-use-row {
+    grid-template-columns: repeat(var(--mlf-meters, 2), minmax(0, 1fr));
+    column-gap: 8px;
+  }
+
+  .mts.mlf .mlf-use-row .mts-tr {
+    display: none;
+  }
+}
+
+/* Too narrow for a useful branch name: the glyph stays, and its tooltip names the branch. */
+@container (max-width: 240px) {
+  .mts.mlf .mlf-row .mts-br > span {
+    display: none;
+  }
 }
 
 .mts.mlf .mlf-use-row .mts-mh {
@@ -282,6 +353,16 @@
 
 .mts.mlf .mlf-use-row .mts-v {
   margin-left: 0;
+  color: var(--mts-secondary);
+  font-weight: 500;
+}
+
+.mts.mlf .mlf-use-row .mts-m[data-tone="warn"] .mts-v {
+  color: var(--mlf-needs-ink);
+}
+
+.mts.mlf .mlf-use-row .mts-m[data-tone="critical"] .mts-v {
+  color: var(--mlf-failed-ink);
 }
 
 .mts.mlf .mlf-use-row .mts-tr {
@@ -316,4 +397,110 @@
 .mlf-menu-proj > span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* What a scope hides: threads that need you in other projects, and an empty scope's next steps. */
+.mts.mlf .mlf-elsewhere {
+  display: flex;
+  width: calc(100% - 16px);
+  height: 30px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 8px 0;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--mts-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-align: left;
+}
+
+.mts.mlf .mlf-elsewhere:hover {
+  color: var(--mts-ink);
+}
+
+.mts.mlf .mlf-elsewhere .mts-cr {
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+}
+
+.mts.mlf .mlf-elsewhere .mts-need {
+  margin: 0 3.5px;
+}
+
+.mts.mlf .mlf-elsewhere > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mts.mlf :is(.mlf-elsewhere, .mlf-empty-action):hover {
+  background: var(--mts-hover);
+}
+
+.mts.mlf :is(.mlf-elsewhere, .mlf-empty-action):active {
+  background: var(--mts-press);
+}
+
+.mts.mlf .mlf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 8px 0;
+}
+
+.mts.mlf .mlf-empty .mfs-empty {
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.mts.mlf .mlf-empty-action {
+  display: flex;
+  max-width: 100%;
+  height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--mts-nav);
+  font-size: 12.5px;
+  line-height: 16px;
+}
+
+.mts.mlf .mlf-empty-action svg {
+  width: 14px;
+  height: 14px;
+  color: var(--mts-secondary);
+}
+
+.mts.mlf .mlf-empty-action > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Menus render outside the sidebar, so these spell out their own colors. */
+.mlf-menu-gap {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.mlf-menu-needs {
+  flex: none;
+  padding-left: 12px;
+  color: color-mix(in srgb, #d97706 70%, var(--popover-foreground));
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .mlf-menu-needs {
+  color: color-mix(in srgb, #fbbf24 85%, var(--popover-foreground));
 }

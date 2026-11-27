@@ -18,7 +18,7 @@ import { useHandleNewThread } from "../../../hooks/useHandleNewThread";
 import { useNowMinute } from "../../../hooks/useNowMinute";
 import { useShownThreadRouteTarget } from "../../../hooks/useShownThreadRouteTarget";
 import { useSidebarProjectGroups } from "../../../hooks/useSidebarProjectGroups";
-import { useThreadActions } from "../../../hooks/useThreadActions";
+import { useAcknowledgeThreadWoke, useThreadActions } from "../../../hooks/useThreadActions";
 import { m } from "../../../i18n/messages";
 import { copyThreadReference } from "../../../lib/copyThreadReference";
 import { readLocalApi } from "../../../localApi";
@@ -50,6 +50,7 @@ export type MatterThreadMenuAction =
   | "pin"
   | "unpin"
   | "mark-unread"
+  | "mark-read"
   | "settle"
   | "unsettle"
   | "archive"
@@ -94,6 +95,7 @@ export function useMatterSidebarModel(): MatterSidebarModel {
   const { handleNewThread } = useHandleNewThread();
   const { pinThread, unpinThread, settleThread, unsettleThread, markThreadUnread, archiveThread } =
     useThreadActions();
+  const markThreadRead = useAcknowledgeThreadWoke();
 
   // The minute tick is a UTC "YYYY-MM-DDTHH:MM" stamp.
   const nowMs = Date.parse(`${nowMinute}:00Z`);
@@ -195,6 +197,9 @@ export function useMatterSidebarModel(): MatterSidebarModel {
         case "mark-unread":
           markThreadUnread(item.ref);
           return;
+        case "mark-read":
+          markThreadRead(item.ref, new Date().toISOString());
+          return;
         case "settle":
           reportFailure(await settleThread(item.ref));
           return;
@@ -232,7 +237,9 @@ export function useMatterSidebarModel(): MatterSidebarModel {
             item.pinned
               ? { id: "unpin", label: gt("Unpin"), separatorBefore: true }
               : { id: "pin", label: gt("Pin"), separatorBefore: true },
-            { id: "mark-unread", label: gt("Mark as unread") },
+            item.unread
+              ? { id: "mark-read", label: gt("Mark as read") }
+              : { id: "mark-unread", label: gt("Mark as unread") },
             item.settled
               ? { id: "unsettle", label: gt("Unsettle") }
               : { id: "settle", label: gt("Settle") },

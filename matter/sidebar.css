@@ -80,8 +80,17 @@
   -webkit-app-region: no-drag;
 }
 
+/* An outline, not a shadow, so the ring survives forced colors and selected rows' shadows. */
 .mfs :is(button, a):focus-visible {
-  box-shadow: inset 0 0 0 1.5px var(--ring);
+  outline: 1.5px solid var(--ring);
+  outline-offset: -1.5px;
+}
+
+@media (forced-colors: active) {
+  .mfs-menu-item[data-highlighted] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 .mfs svg {

@@ -463,9 +463,9 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "matter-scroll-fade",
-    title: msg("Scroll edge fade"),
+    title: msg("Scroll edge"),
     to: "/settings/appearance",
-    searchTerms: [msg("vignette gradient fade mask top edge chat scroll header")],
+    searchTerms: [msg("vignette gradient fade shadow blur frost mask top edge chat scroll header")],
   },
   {
     id: "matter-composer-material",

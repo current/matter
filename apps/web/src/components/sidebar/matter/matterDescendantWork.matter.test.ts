@@ -24,7 +24,7 @@ function item(id: string, overrides: ThreadFixtureOverrides = {}) {
       id: ThreadId.make(id),
       projectId: ProjectId.make(MATTER.key),
       title: id,
-      // Yesterday, so only running work lists it under Working.
+      // Yesterday, so only running work lists it under Active.
       latestUserMessageAt: "2026-03-09T14:00:00.000Z",
       createdAt: "2026-03-09T14:00:00.000Z",
       ...overrides,
@@ -123,7 +123,7 @@ describe("descendant work", () => {
     expect([...since.keys()]).toEqual([b.key]);
   });
 
-  it("keeps the parent in Working, in its project's running dot and in the Default list", () => {
+  it("keeps the parent in Active, in its project's running dot and in the Default list", () => {
     const child = subagentOf("Parent", "Child", { runtime: runtime("running") });
     const { items } = lift([parent], [child]);
     const sections = buildTimelineSections(items, {

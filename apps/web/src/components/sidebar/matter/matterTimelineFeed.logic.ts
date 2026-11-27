@@ -53,9 +53,28 @@ const SECTION_SHAPE: Record<
   month: { density: "compact", foldable: true, openByDefault: false },
 };
 
-function timelineAt(item: MatterThreadItem, sort: MatterTimelineSort): number {
+/** `null` for a timestamp that doesn't parse, which files under Today rather than January 1970. */
+function timelineAt(item: MatterThreadItem, sort: MatterTimelineSort): number | null {
   const at = Date.parse(sort === "created" ? item.createdAt : item.activityAt);
+  return Number.isFinite(at) ? at : null;
+}
+
+/** How long a working row has run: the column it shows, so the section sorts by it too. */
+function runningAt(item: MatterThreadItem): number {
+  const at = Date.parse(item.runningSince ?? item.activityAt);
   return Number.isFinite(at) ? at : 0;
+}
+
+/**
+ * Whether a thread waits on the user: its own request, a subagent's, or a failed run nobody has
+ * looked at yet. Opening a failed thread reads it, which drops it back to its day.
+ */
+export function timelineRaisesHand(
+  item: MatterThreadItem,
+  needsChildParents: ReadonlySet<string>,
+): boolean {
+  if (item.attention === "needs" || needsChildParents.has(item.key)) return true;
+  return item.failed && item.unread && !item.settled && !item.snoozed;
 }
 
 function startOfLocalDay(nowMs: number, daysBack = 0): number {
@@ -78,9 +97,9 @@ function monthId(monthStartMs: number): string {
 }
 
 /**
- * The feed in reading order. State leads: everything waiting on you, then pinned, then everything
- * working, whatever its age. The rest follows by local day, then by rolling week and month, then
- * by calendar month. Empty sections are left out.
+ * The feed in reading order. State leads: everything waiting on you, then pinned (which keeps its
+ * place while it runs), then everything else working, whatever its age. The rest follows by local
+ * day, then by rolling week and month, then by calendar month. Empty sections are left out.
  */
 export function buildTimelineSections(
   items: ReadonlyArray<MatterThreadItem>,
@@ -105,16 +124,16 @@ export function buildTimelineSections(
     else bucket.push(item);
   };
   for (const item of items) {
-    const raisesHand = item.attention === "needs" || needsChildParents.has(item.key);
+    const raisesHand = timelineRaisesHand(item, needsChildParents);
     if (!raisesHand && (item.settled || item.snoozed)) continue;
     if (options.projectFilter !== null && item.projectKey !== options.projectFilter) continue;
     if (options.filter === "needs" && !raisesHand) continue;
     if (raisesHand) push("needs", item);
-    else if (item.attention === "running") push("working", item);
     else if (item.pinned) push("pinned", item);
+    else if (item.attention === "running") push("working", item);
     else {
       const at = timelineAt(item, options.sort);
-      if (at >= todayStart) push("today", item);
+      if (at === null || at >= todayStart) push("today", item);
       else if (at >= yesterdayStart) push("yesterday", item);
       else if (at >= weekStart) push("week", item);
       else if (at >= days30Start) push("days30", item);
@@ -127,7 +146,9 @@ export function buildTimelineSections(
     }
   }
   const newestFirst = (left: MatterThreadItem, right: MatterThreadItem) =>
-    timelineAt(right, options.sort) - timelineAt(left, options.sort);
+    (timelineAt(right, options.sort) ?? 0) - (timelineAt(left, options.sort) ?? 0);
+  const latestStartFirst = (left: MatterThreadItem, right: MatterThreadItem) =>
+    runningAt(right) - runningAt(left);
   const sections: MatterTimelineSection[] = [];
   for (const kind of FIXED_ORDER) {
     const bucket = fixed.get(kind);
@@ -136,7 +157,7 @@ export function buildTimelineSections(
       id: kind,
       kind,
       monthStartMs: null,
-      items: bucket.toSorted(newestFirst),
+      items: bucket.toSorted(kind === "working" ? latestStartFirst : newestFirst),
       ...SECTION_SHAPE[kind],
     });
   }
@@ -164,10 +185,10 @@ export function isTimelineSectionOpen(
 export type MatterTimelineNeedsKind = MatterNeedsKind | "subagent";
 
 export type MatterTimelineRowState =
-  | { readonly tone: "needs"; readonly kind: MatterTimelineNeedsKind }
+  | { readonly tone: "needs"; readonly kind: MatterTimelineNeedsKind; readonly age: string }
   | { readonly tone: "running"; readonly elapsed: string }
   | { readonly tone: "background"; readonly elapsed: string }
-  | { readonly tone: "failed" }
+  | { readonly tone: "failed"; readonly age: string }
   | { readonly tone: "idle"; readonly age: string };
 
 /** What a row says at its right edge: what it waits on, how long it has run, or how old it is. */
@@ -179,15 +200,19 @@ export function timelineRowState(
     readonly nowMs: number;
   },
 ): MatterTimelineRowState {
-  if (item.attention === "needs") return { tone: "needs", kind: item.needsKind ?? "request" };
-  if (options.childNeedsYou) return { tone: "needs", kind: "subagent" };
+  // How long a request has waited, from the thread's last activity.
+  const waited = compactAge(item.activityAt, options.nowMs);
+  if (item.attention === "needs") {
+    return { tone: "needs", kind: item.needsKind ?? "request", age: waited };
+  }
+  if (options.childNeedsYou) return { tone: "needs", kind: "subagent", age: waited };
   if (item.attention === "running") {
     return {
       tone: item.waitsOnBackground ? "background" : "running",
       elapsed: compactAge(item.runningSince ?? item.activityAt, options.nowMs),
     };
   }
-  if (item.failed) return { tone: "failed" };
+  if (item.failed) return { tone: "failed", age: compactAge(item.activityAt, options.nowMs) };
   return {
     tone: "idle",
     age: compactAge(options.sort === "created" ? item.createdAt : item.activityAt, options.nowMs),

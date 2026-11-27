@@ -27,11 +27,15 @@ export type MatterComposerMaterial = (typeof MATTER_COMPOSER_MATERIALS)[number];
 export const MATTER_COMPOSER_SHAPES = ["shelf", "floating", "compact", "pill"] as const;
 export type MatterComposerShape = (typeof MATTER_COMPOSER_SHAPES)[number];
 
+/** How chat and pages meet the top edge as they scroll under it. Fade is upstream's mask. */
+export const MATTER_SCROLL_EDGES = ["fade", "shadow", "blur", "frost", "off"] as const;
+export type MatterScrollEdge = (typeof MATTER_SCROLL_EDGES)[number];
+
 /** `null` is the theme's own composer; `"shell"` follows the Shell color; else a `#rrggbb` seed. */
 export type MatterComposerColor = null | "shell" | string;
 
 export interface MatterComposerAppearance {
-  readonly scrollFade: boolean;
+  readonly scrollEdge: MatterScrollEdge;
   readonly material: MatterComposerMaterial;
   readonly shape: MatterComposerShape;
   readonly transparency: number;
@@ -49,7 +53,7 @@ const TINTED_BLUR = 16;
 const CARD_LIFT = 0.5;
 
 export const DEFAULT_MATTER_COMPOSER_APPEARANCE: MatterComposerAppearance = {
-  scrollFade: true,
+  scrollEdge: "fade",
   material: "solid",
   shape: "shelf",
   transparency: 40,
@@ -93,7 +97,12 @@ export function normalizeMatterComposerAppearance(value: unknown): MatterCompose
         ? normalizeShellColor(input.color)
         : null;
   return {
-    scrollFade: typeof input.scrollFade === "boolean" ? input.scrollFade : defaults.scrollFade,
+    // Older stores kept an on/off `scrollFade`; off carries over.
+    scrollEdge: oneOf(
+      MATTER_SCROLL_EDGES,
+      input.scrollEdge,
+      input.scrollFade === false ? "off" : defaults.scrollEdge,
+    ),
     material: oneOf(MATTER_COMPOSER_MATERIALS, input.material, defaults.material),
     shape: oneOf(MATTER_COMPOSER_SHAPES, input.shape, defaults.shape),
     transparency: clampStep(
@@ -171,8 +180,8 @@ export function applyMatterComposerAppearance(
   appearance: MatterComposerAppearance,
 ): void {
   const { dataset, style } = root;
-  if (appearance.scrollFade) delete dataset.matterScrollFade;
-  else dataset.matterScrollFade = "off";
+  if (appearance.scrollEdge === "fade") delete dataset.matterScrollEdge;
+  else dataset.matterScrollEdge = appearance.scrollEdge;
 
   if (appearance.material === "solid") delete dataset.matterComposerMaterial;
   else dataset.matterComposerMaterial = appearance.material;

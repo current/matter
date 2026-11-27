@@ -6,6 +6,7 @@ import type { MatterChildItem } from "./matterFinalSidebar.logic";
 import {
   buildTimelineSections,
   isTimelineSectionOpen,
+  timelineRaisesHand,
   timelineRowState,
   shortTimelineBranchLabel,
   visibleTimelineSubagents,
@@ -73,9 +74,56 @@ describe("buildTimelineSections", () => {
     );
     expect(shape(sections)).toEqual([
       ["needs", ["pinned and asks", "asks"]],
-      ["pinned", ["pinned"]],
-      ["working", ["pinned and running", "old and running"]],
+      ["pinned", ["pinned", "pinned and running"]],
+      ["working", ["old and running"]],
       ["today", ["today"]],
+    ]);
+  });
+
+  it("raises an unseen failure into Needs you until it is opened", () => {
+    const failed = (id: string, overrides: ThreadFixtureOverrides = {}) =>
+      item(id, {
+        latestRun: {
+          runId: RunId.make(`run-${id}`),
+          status: "failed",
+          requestedAt: null,
+          startedAt: local(3, 10, 10),
+          completedAt: local(3, 10, 10),
+          assistantMessageId: null,
+        },
+        runtime: { ...running.runtime, status: "failed", activeRunId: null },
+        lastVisitedAt: local(3, 10, 9),
+        ...overrides,
+      });
+    const unseen = failed("unseen");
+    const seen = failed("seen", { lastVisitedAt: local(3, 10, 11) });
+    expect(unseen).toMatchObject({ failed: true, unread: true });
+    expect(timelineRaisesHand(unseen, new Set())).toBe(true);
+    expect(timelineRaisesHand(seen, new Set())).toBe(false);
+    expect(shape(buildTimelineSections([unseen, seen], options))).toEqual([
+      ["needs", ["unseen"]],
+      ["today", ["seen"]],
+    ]);
+  });
+
+  it("sorts what is working by how long it has run and files a bad timestamp under Today", () => {
+    const startedAgo = (minutes: number) => ({
+      runtime: {
+        ...running.runtime,
+        activityStartedAt: new Date(NOW_MS - minutes * 60_000).toISOString(),
+      },
+    });
+    const sections = buildTimelineSections(
+      [
+        item("long run", { ...startedAgo(40), latestUserMessageAt: local(3, 10, 11, 2026) }),
+        item("fresh run", { ...startedAgo(3), latestUserMessageAt: local(3, 9) }),
+        { ...item("broken clock"), activityAt: "not a date" },
+      ],
+      options,
+    );
+    expect(shape(sections)).toEqual([
+      ["working", ["fresh run", "long run"]],
+      ["today", ["broken clock"]],
     ]);
   });
 
@@ -203,16 +251,18 @@ describe("timelineRowState", () => {
     expect(timelineRowState(item("a", { hasPendingApprovals: true }), stateOptions)).toEqual({
       tone: "needs",
       kind: "approval",
+      age: "1h",
     });
     expect(
       timelineRowState(item("b", { hasPendingUserInput: true }), {
         ...stateOptions,
         childNeedsYou: true,
       }),
-    ).toEqual({ tone: "needs", kind: "input" });
+    ).toEqual({ tone: "needs", kind: "input", age: "1h" });
     expect(timelineRowState(item("c", running), { ...stateOptions, childNeedsYou: true })).toEqual({
       tone: "needs",
       kind: "subagent",
+      age: "1h",
     });
   });
 

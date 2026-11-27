@@ -84,10 +84,10 @@ const mask = (element: Element) => {
 
 describe("applyMatterComposerAppearance", () => {
   it("leaves no attribute or variable behind for the defaults", () => {
-    apply({ material: "glass", shape: "pill", scrollFade: false, color: "#4b4fa8" });
+    apply({ material: "glass", shape: "pill", scrollEdge: "blur", color: "#4b4fa8" });
     apply({});
     for (const name of [
-      "matterScrollFade",
+      "matterScrollEdge",
       "matterComposerMaterial",
       "matterComposerShape",
       "matterComposerBlur",
@@ -138,9 +138,9 @@ describe("applyMatterComposerAppearance", () => {
     using _styles = shellStyles();
     const stop = startMatterComposerAppearance(root);
     try {
-      expect(root.dataset.matterScrollFade).toBeUndefined();
-      writeMatterComposerAppearance({ scrollFade: false, material: "tinted" });
-      expect(root.dataset.matterScrollFade).toBe("off");
+      expect(root.dataset.matterScrollEdge).toBeUndefined();
+      writeMatterComposerAppearance({ scrollEdge: "off", material: "tinted" });
+      expect(root.dataset.matterScrollEdge).toBe("off");
       expect(root.dataset.matterComposerMaterial).toBe("tinted");
       expect(root.dataset.matterComposerTint).toBe("shell");
     } finally {
@@ -155,9 +155,51 @@ describe("composer appearance CSS", () => {
     await using _screen = await render(<Composer contextRow />, { router: false });
     expect(mask(scroller())).toContain("linear-gradient");
     const before = scroller().getBoundingClientRect();
-    apply({ scrollFade: false });
+    apply({ scrollEdge: "off" });
     expect(mask(scroller())).toBe("none");
     expect(scroller().getBoundingClientRect()).toEqual(before);
+  });
+
+  it("lays a strip over the top edge for Shadow, Blur and Frost without moving content", async () => {
+    using _styles = shellStyles();
+    await using _screen = await render(<Composer contextRow />, { router: false });
+    const content = () => scroller().firstElementChild!.getBoundingClientRect();
+    const before = content();
+    expect(css(scroller(), "::before").content).toBe("none");
+
+    apply({ scrollEdge: "shadow" });
+    expect(mask(scroller())).toBe("none");
+    expect(css(scroller(), "::before").position).toBe("sticky");
+    expect(css(scroller(), "::before").backgroundImage).toContain("linear-gradient");
+    expect(backdrop(scroller(), "::before")).toBe("none");
+    expect(content()).toEqual(before);
+
+    apply({ scrollEdge: "blur" });
+    expect(mask(scroller())).toBe("none");
+    expect(backdrop(scroller(), "::before")).toContain("blur(6px)");
+    expect(content()).toEqual(before);
+
+    apply({ scrollEdge: "frost" });
+    expect(mask(scroller())).toBe("none");
+    expect(backdrop(scroller(), "::before")).toContain("blur(14px)");
+    expect(css(scroller(), "::before").backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(content()).toEqual(before);
+  });
+
+  it("keeps the fade on bottom-anchored scrollers", async () => {
+    using _styles = shellStyles();
+    await using _screen = await render(
+      <div className="topbar-scroll-fade flex h-20 flex-col-reverse overflow-y-auto">
+        <div className="h-60 shrink-0" />
+      </div>,
+      { router: false },
+    );
+    const reversed = document.querySelector<HTMLElement>(".flex-col-reverse")!;
+    apply({ scrollEdge: "shadow" });
+    expect(mask(reversed)).toContain("linear-gradient");
+    expect(css(reversed, "::before").content).toBe("none");
+    apply({ scrollEdge: "off" });
+    expect(mask(reversed)).toBe("none");
   });
 
   it("keeps Solid opaque with no backdrop layer", async () => {

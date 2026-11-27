@@ -7,16 +7,17 @@ import {
   DEFAULT_MATTER_COMPOSER_APPEARANCE,
   MATTER_COMPOSER_MATERIALS,
   MATTER_COMPOSER_SHAPES,
+  MATTER_SCROLL_EDGES,
   MAX_COMPOSER_BLUR,
   MAX_COMPOSER_TRANSPARENCY,
   MIN_COMPOSER_BLUR,
   MIN_COMPOSER_TRANSPARENCY,
   type MatterComposerMaterial,
   type MatterComposerShape,
+  type MatterScrollEdge,
   useMatterComposerAppearance,
 } from "../../matterComposerAppearance";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { Switch } from "../ui/switch";
 import {
   AppearanceSlider,
   ColorSwatch,
@@ -33,6 +34,14 @@ const MATERIAL_LABELS: Record<MatterComposerMaterial, string> = {
   glass: msg("Glass", { $context: "chat composer material" }),
   tinted: msg("Tinted", { $context: "chat composer material" }),
   minimal: msg("Minimal", { $context: "chat composer material" }),
+};
+
+const SCROLL_EDGE_LABELS: Record<MatterScrollEdge, string> = {
+  fade: msg("Fade", { $context: "scroll edge style" }),
+  shadow: msg("Shadow", { $context: "scroll edge style" }),
+  blur: msg("Blur", { $context: "scroll edge style" }),
+  frost: msg("Frost", { $context: "scroll edge style" }),
+  off: msg("Off", { $context: "scroll edge style" }),
 };
 
 const SHAPE_LABELS: Record<MatterComposerShape, string> = {
@@ -54,8 +63,43 @@ function isMaterial(value: unknown): value is MatterComposerMaterial {
   return MATTER_COMPOSER_MATERIALS.includes(value as MatterComposerMaterial);
 }
 
+function isScrollEdge(value: unknown): value is MatterScrollEdge {
+  return MATTER_SCROLL_EDGES.includes(value as MatterScrollEdge);
+}
+
 function isShape(value: unknown): value is MatterComposerShape {
   return MATTER_COMPOSER_SHAPES.includes(value as MatterComposerShape);
+}
+
+/** A few lines of chat parked under the top edge, so the chosen scroll edge shows at rest. */
+function ScrollEdgePreview() {
+  const gt = useGT();
+  return (
+    <div
+      aria-hidden
+      data-matter-scroll-edge-preview=""
+      className="pointer-events-none mt-3 h-28 overflow-hidden rounded-xl border border-border/60 bg-background select-none"
+    >
+      <div
+        ref={(element) => {
+          if (element) element.scrollTop = 44;
+        }}
+        className="topbar-scroll-fade h-full overflow-y-auto [scrollbar-width:none]"
+      >
+        <div className="space-y-2.5 px-6 pt-6 pb-16 text-sm leading-5 text-foreground/80">
+          <p>{gt("Reconnects now keep their queue. The change in the session store:")}</p>
+          <div className="overflow-hidden rounded-lg border border-border/60 font-mono text-xs leading-6">
+            {PREVIEW_DIFF.map((line) => (
+              <div key={line.code} className={line.className}>
+                {line.code}
+              </div>
+            ))}
+          </div>
+          <p className="text-muted-foreground">{gt("Ran the suite: 214 passed.")}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -128,24 +172,40 @@ export function MatterComposerAppearanceSettings() {
     <>
       <SettingsRow
         {...searchableSetting("matter-scroll-fade")}
-        description={gt("Soften chat and pages as they scroll under the top edge.")}
+        description={gt("How chat and pages meet the top edge as they scroll under it.")}
         devicePreference
         resetAction={
-          appearance.scrollFade !== defaults.scrollFade ? (
+          appearance.scrollEdge !== defaults.scrollEdge ? (
             <SettingResetButton
-              ariaLabel={gt("Reset scroll edge fade to default")}
-              onClick={() => update({ scrollFade: defaults.scrollFade })}
+              ariaLabel={gt("Reset scroll edge to default")}
+              onClick={() => update({ scrollEdge: defaults.scrollEdge })}
             />
           ) : null
         }
         control={
-          <Switch
-            checked={appearance.scrollFade}
-            onCheckedChange={(checked) => update({ scrollFade: Boolean(checked) })}
-            aria-label={gt("Scroll edge fade")}
-          />
+          <div className="w-full sm:w-40">
+            <Select
+              value={appearance.scrollEdge}
+              onValueChange={(value) => {
+                if (isScrollEdge(value)) update({ scrollEdge: value });
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full min-w-0" aria-label={gt("Scroll edge")}>
+                <SelectValue>{m(SCROLL_EDGE_LABELS[appearance.scrollEdge])}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem value="fade">{gt("Fade (default)")}</SelectItem>
+                <SelectItem value="shadow">{m(SCROLL_EDGE_LABELS.shadow)}</SelectItem>
+                <SelectItem value="blur">{m(SCROLL_EDGE_LABELS.blur)}</SelectItem>
+                <SelectItem value="frost">{m(SCROLL_EDGE_LABELS.frost)}</SelectItem>
+                <SelectItem value="off">{m(SCROLL_EDGE_LABELS.off)}</SelectItem>
+              </SelectPopup>
+            </Select>
+          </div>
         }
-      />
+      >
+        <ScrollEdgePreview />
+      </SettingsRow>
 
       <SettingsRow
         {...searchableSetting("matter-composer-material")}

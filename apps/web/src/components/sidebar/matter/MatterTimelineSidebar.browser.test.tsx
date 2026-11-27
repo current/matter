@@ -3,6 +3,7 @@ import {
   EnvironmentId,
   MATTER_ADDON_MANIFESTS,
   ProjectId,
+  ProviderDriverKind,
   ProviderInstanceId,
   RunId,
   ThreadId,
@@ -44,7 +45,7 @@ vi.mock(import("../../../state/environments"), async (original) => ({
 import { MatterBrandMenu } from "./MatterDefaultSidebarParts";
 import type { MatterChildItem } from "./matterFinalSidebar.logic";
 import { MatterTimelineSidebar } from "./MatterTimelineSidebar";
-import { toMatterThreadItem } from "./matterSidebar.logic";
+import { toMatterThreadItem, type MatterThreadItem } from "./matterSidebar.logic";
 import {
   MATTER_SIDEBAR_LAYOUT_STORAGE_KEY,
   MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY,
@@ -125,11 +126,14 @@ const asks = thread("Sign the build", {
   hasPendingApprovals: true,
   latestUserMessageAt: local(12, 9),
 });
-const working = thread("Port the composer", {
-  ...running,
-  branch: "t3/composer-port",
-  worktreePath: "/worktrees/matter/composer-port",
-});
+const working: MatterThreadItem = {
+  ...thread("Port the composer", {
+    ...running,
+    branch: "t3/composer-port",
+    worktreePath: "/worktrees/matter/composer-port",
+  }),
+  driver: ProviderDriverKind.make("codex"),
+};
 const waiting = thread("Replay the evals", {
   runtime: { ...running.runtime, status: "idle", activeRunId: null },
   pendingBackgroundTasks: [{ taskId: "replay", kind: "command", awaited: true }],
@@ -242,7 +246,7 @@ describe("MatterTimelineSidebar", () => {
     expect(sectionIds(screen.container)).toEqual(["needs", "working", "today", "week", "days30"]);
     await expect
       .element(
-        page.getByRole("region", { name: "Working" }).getByRole("button", {
+        page.getByRole("region", { name: "Active" }).getByRole("button", {
           name: "Port the composer",
         }),
       )
@@ -277,9 +281,7 @@ describe("MatterTimelineSidebar", () => {
     const workingRow = row(screen.container, working)!;
     expect(workingRow.getAttribute("data-density")).toBe("full");
     expect(workingRow.querySelector('[data-matter-workspace="worktree"]')).not.toBeNull();
-    expect(workingRow.querySelector(".mts-l1 .mlf-proj-icon")?.getAttribute("aria-label")).toBe(
-      "Matter",
-    );
+    expect(workingRow.querySelector(".mts-l1 .mlf-proj-icon")).not.toBeNull();
     expect(workingRow.querySelector(".mts-l2 .mlf-l2-provider")).not.toBeNull();
     expect(workingRow.querySelector(".mts-proj")?.textContent).toBe("Matter");
     expect(workingRow.querySelector(".mts-br")?.textContent).toBe("composer-port");
@@ -340,7 +342,7 @@ describe("MatterTimelineSidebar", () => {
     ];
     await using screen = await renderTimeline(model({ children }));
     await expect
-      .element(page.getByRole("group", { name: "Subagents of Port the composer" }))
+      .element(page.getByRole("list", { name: "Subagents of Port the composer" }))
       .toBeVisible();
     const shown = () =>
       [...screen.container.querySelectorAll<HTMLElement>("[data-matter-timeline-subagent]")].map(
@@ -388,7 +390,7 @@ describe("MatterTimelineSidebar", () => {
   it("sorts and toggles subagents from the view options menu", async () => {
     using _server = useServer();
     await using screen = await renderTimeline(model({ children: [subagent("Agent one")] }));
-    const options = page.getByRole("button", { name: "View options" });
+    const options = page.getByRole("button", { name: /^View options/ });
     await expect.element(options).toHaveAttribute("data-sort", "updated");
 
     await options.click();
@@ -398,7 +400,7 @@ describe("MatterTimelineSidebar", () => {
     expect(screen.container.querySelector(".mts-so-lab")?.textContent).toBe("Created");
 
     await options.click();
-    await page.getByRole("menuitemcheckbox", { name: "Show active subagents" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Active subagents" }).click();
     expect(window.localStorage.getItem(MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY)).toBe("false");
     await expect.element(page.getByRole("button", { name: "Agent one" })).not.toBeInTheDocument();
   });
@@ -412,7 +414,7 @@ describe("MatterTimelineSidebar", () => {
     (first.element() as HTMLElement).focus();
 
     await userEvent.keyboard("{ArrowDown}");
-    await expect.element(page.getByRole("button", { name: "Working, 1" })).toHaveFocus();
+    await expect.element(page.getByRole("button", { name: "Active, 1" })).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     await expect.element(page.getByRole("button", { name: "Port the composer" })).toHaveFocus();
     await userEvent.keyboard("{Enter}");
@@ -442,12 +444,12 @@ describe("MatterTimelineSidebar", () => {
     expect(sectionIds(screen.container)).toEqual(["needs"]);
   });
 
-  it("lists a thread waiting on background work under Working, marked Waiting", async () => {
+  it("lists a thread waiting on background work under Active, marked Waiting", async () => {
     using _server = useServer();
     await using screen = await renderTimeline(model({ items: [...items, waiting] }));
     await expect
       .element(
-        page.getByRole("region", { name: "Working" }).getByRole("button", {
+        page.getByRole("region", { name: "Active" }).getByRole("button", {
           name: "Replay the evals",
         }),
       )

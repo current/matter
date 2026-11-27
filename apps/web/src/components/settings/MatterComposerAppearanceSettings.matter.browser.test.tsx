@@ -51,22 +51,24 @@ async function renderSettings(settings: Partial<ClientSettings> = {}) {
 const row = (id: string) => document.querySelector(`[data-testid="${id}"]`);
 
 describe("MatterComposerAppearanceSettings", () => {
-  it("toggles the scroll edge fade and resets it", async () => {
+  it("picks a scroll edge style and resets it", async () => {
     await using _settings = await renderSettings();
-    const toggle = page.getByRole("switch", { name: "Scroll edge fade" });
-    await expect.element(toggle).toBeChecked();
+    const picker = page.getByRole("combobox", { name: "Scroll edge" });
+    await expect.element(picker).toHaveTextContent("Fade");
+    expect(page.getByRole("button", { name: "Reset scroll edge to default" }).query()).toBeNull();
+
+    await userEvent.click(picker);
+    await userEvent.click(page.getByRole("option", { name: "Frost" }));
+    await expect.element(picker).toHaveTextContent("Frost");
+    expect(readMatterComposerAppearance().scrollEdge).toBe("frost");
+    expect(root.dataset.matterScrollEdge).toBe("frost");
     expect(
-      page.getByRole("button", { name: "Reset scroll edge fade to default" }).query(),
-    ).toBeNull();
+      row("matter-scroll-fade")?.querySelector("[data-matter-scroll-edge-preview]"),
+    ).not.toBeNull();
 
-    await userEvent.click(toggle);
-    await expect.element(toggle).not.toBeChecked();
-    expect(readMatterComposerAppearance().scrollFade).toBe(false);
-    expect(root.dataset.matterScrollFade).toBe("off");
-
-    await userEvent.click(page.getByRole("button", { name: "Reset scroll edge fade to default" }));
-    await expect.element(toggle).toBeChecked();
-    expect(root.dataset.matterScrollFade).toBeUndefined();
+    await userEvent.click(page.getByRole("button", { name: "Reset scroll edge to default" }));
+    await expect.element(picker).toHaveTextContent("Fade");
+    expect(root.dataset.matterScrollEdge).toBeUndefined();
   });
 
   it("shows only the rows that apply to Solid, with a live preview", async () => {
