@@ -64,7 +64,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
     <>
       {primaryOptions.map((option) => {
         const buttonProps = {
-          "data-matter-approval-action": "",
+          "data-matter-approval-action": option.decision,
           "data-matter-approval-responding": isResponding ? "true" : undefined,
           disabled: disabled || isResponding || !canRespond,
           "aria-description": option.warning,

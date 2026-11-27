@@ -43,6 +43,15 @@
   opacity: 1;
   transform: none;
 }
+/* One quiet ink for every action; only the one under the pointer brightens. */
+[data-matter-message-buttons] button,
+[data-matter-assistant-meta] > button {
+  color: var(--muted-foreground);
+}
+[data-matter-message-buttons] button:is(:hover, :focus-visible),
+[data-matter-assistant-meta] > button:is(:hover, :focus-visible) {
+  color: var(--foreground);
+}
 
 [data-matter-user-row]:is(:hover, :focus-within)
   :is(
@@ -141,6 +150,15 @@
 .chat-markdown .chat-markdown-codeblock-header [role="toolbar"] > [aria-pressed="true"] {
   opacity: 1;
 }
+/* The table's copy button rests like the code block's toolbar. */
+.chat-markdown .chat-markdown-table-container > div:last-child > button {
+  opacity: 0.55;
+  transition: opacity 150ms var(--matter-msg-ease);
+}
+.chat-markdown .chat-markdown-table-container:is(:hover, :focus-within) > div:last-child > button,
+.chat-markdown .chat-markdown-table-container > div:last-child > button[data-popup-open] {
+  opacity: 1;
+}
 
 /* ---------- assistant meta ---------- */
 
@@ -166,7 +184,8 @@
   [data-matter-message-actions] > :not([data-matter-message-time]),
   [data-matter-message-buttons] > *,
   [data-matter-assistant-meta] > button,
-  .chat-markdown .chat-markdown-codeblock-header [role="toolbar"] > * {
+  .chat-markdown .chat-markdown-codeblock-header [role="toolbar"] > *,
+  .chat-markdown .chat-markdown-table-container > div:last-child > button {
     opacity: 1;
     transform: none;
   }

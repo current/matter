@@ -534,3 +534,18 @@
 .dark .mlf-menu-needs {
   color: color-mix(in srgb, #fbbf24 85%, var(--popover-foreground));
 }
+
+/* Snoozed and Archived are put away: their rows sit a step quieter than live ones until opened. */
+.mts.mlf
+  section:has(> .mlf-sec:is([data-kind="settled"], [data-kind="snoozed"]))
+  .mts-row:not([data-active])
+  .mts-t {
+  color: var(--mts-muted);
+}
+
+.mts.mlf
+  section:has(> .mlf-sec:is([data-kind="settled"], [data-kind="snoozed"]))
+  .mts-row:not([data-active])
+  .mts-pi {
+  opacity: 0.6;
+}

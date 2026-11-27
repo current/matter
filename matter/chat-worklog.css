@@ -46,6 +46,10 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* Rows without a chevron keep its 16px slot and the 6px gap, so durations share one column. */
+[data-matter-wl-duration]:last-child {
+  margin-inline-end: 22px;
+}
 
 /* Chevrons show on hover, focus or while open; touch has no hover, so they stay. */
 [data-matter-wl-chevron] {

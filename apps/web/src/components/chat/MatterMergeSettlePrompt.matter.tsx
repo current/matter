@@ -6,8 +6,8 @@ import { useNowMinute } from "../../hooks/useNowMinute";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useThreadActions } from "../../hooks/useThreadActions";
 import { useQuietThreadShell } from "../../state/entities";
-import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { PULL_REQUEST_STATE_PRESENTATION } from "../pullRequest/pullRequestIcons";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
@@ -18,6 +18,8 @@ import {
   resolveAutoSettleOnMerge,
   resolveMergeSettlePrompt,
 } from "./matterMergeSettlePrompt.logic";
+
+const MERGED = PULL_REQUEST_STATE_PRESENTATION.merged;
 
 let dismissalsCache: MergeSettleDismissals | null = null;
 const listeners = new Set<() => void>();
@@ -94,25 +96,23 @@ export function MatterMergeSettlePrompt(props: {
         controlAlignment="first-line"
         data-matter-merge-prompt=""
       >
-        <PullRequestGlyph.merged />
+        <MERGED.Icon className={MERGED.toneClassName} />
         <AlertTitle>{gt("Pull request #{number} merged", { number: prNumber })}</AlertTitle>
         <AlertDescription>
-          <div className="flex flex-col gap-2">
-            <p>{gt("Settle this thread? It moves to Settled in the sidebar.")}</p>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => dismissMergeSettlePrompt(threadKey, prNumber)}
-              >
-                {gt("Keep")}
-              </Button>
-              <Button size="xs" variant="default" onClick={() => void settle()}>
-                {gt("Settle")}
-              </Button>
-            </div>
-          </div>
+          {gt("Settle this thread? It moves to Settled in the sidebar.")}
         </AlertDescription>
+        <AlertAction>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => dismissMergeSettlePrompt(threadKey, prNumber)}
+          >
+            {gt("Keep")}
+          </Button>
+          <Button size="xs" variant="outline" onClick={() => void settle()}>
+            {gt("Settle")}
+          </Button>
+        </AlertAction>
       </Alert>
     </div>
   );

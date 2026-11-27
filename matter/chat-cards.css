@@ -50,6 +50,28 @@
 }
 
 :is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action]:not([data-slot="button"]) {
+  padding-inline: 8px;
+  text-decoration: none;
+}
+
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action]:not([data-slot="button"]):is(:hover, :focus-visible) {
+  background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+/* Inline Approve is a link-toned text button upstream; a quiet fill marks it as the action. */
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action="accept"]:not([data-slot="button"]) {
+  background-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
+  [data-matter-approval-action="accept"]:not([data-slot="button"]):is(:hover, :focus-visible) {
+  background-color: color-mix(in srgb, var(--foreground) 15%, transparent);
+}
+
+:is([data-v2-item-type="approval_request"], [data-matter-child-approval])
   [data-matter-approval-action]:active:not(:disabled, [aria-disabled="true"]) {
   transform: scale(0.97);
 }

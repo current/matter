@@ -301,7 +301,8 @@ export const SF_SYMBOL_FOR_LUCIDE: Readonly<Record<string, string | null>> = {
 };
 
 // Shape symbols without a ".fill" form, drawn by a filled relative instead. Open glyphs (arrows,
-// chevrons, plus, xmark, magnifyingglass) have no filled form and stay as they are.
+// chevrons, plus, xmark, magnifyingglass) have no filled form and stay as they are, as do the
+// pencils: their circle-filled relatives read as solid dots at message-action sizes.
 export const SF_FILL_FOR_SYMBOL: Readonly<Record<string, string>> = {
   at: "at.circle.fill",
   calendar: "calendar.circle.fill",
@@ -318,14 +319,11 @@ export const SF_FILL_FOR_SYMBOL: Readonly<Record<string, string>> = {
   "line.3.horizontal.decrease": "line.3.horizontal.decrease.circle.fill",
   macwindow: "rectangle.topthird.inset.filled",
   number: "number.square.fill",
-  pencil: "pencil.circle.fill",
-  "pencil.line": "pencil.circle.fill",
   power: "power.circle.fill",
   "quote.opening": "quote.bubble.fill",
   "sidebar.left": "rectangle.leftthird.inset.filled",
   "sidebar.right": "rectangle.rightthird.inset.filled",
   "square.3.layers.3d": "square.stack.3d.up.fill",
-  "square.and.pencil": "square.and.pencil.circle.fill",
   timer: "timer.circle.fill",
   "waveform.path.ecg": "waveform.path.ecg.rectangle.fill",
 };
