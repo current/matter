@@ -219,6 +219,10 @@
       "types": "./src/matter/interactionMode.ts",
       "default": "./src/matter/interactionMode.ts"
     },
+    "./matter/message-reply": {
+      "types": "./src/matter/messageReply.ts",
+      "default": "./src/matter/messageReply.ts"
+    },
     "./t3ToolSummary": {
       "types": "./src/t3ToolSummary.ts",
       "default": "./src/t3ToolSummary.ts"

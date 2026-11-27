@@ -23,6 +23,10 @@ import {
   MATTER_MESSAGE_TIME_CLASS,
   MATTER_USER_BUBBLE_BODY_CLASS,
 } from "../matter/chat/matterChatLook";
+import { MatterReplyButton } from "../matter/replies/MatterReplyButton.matter";
+import { MatterReplyHighlight } from "../matter/replies/MatterReplyHighlight.matter";
+import { MatterSentReplyHeader } from "../matter/replies/MatterSentReplyHeader.matter";
+import { matterReplyBubbleText } from "../matter/replies/matterReplies";
 import {
   ThreadMarkdownVideo,
   ThreadMediaRetainContext,
@@ -2418,6 +2422,7 @@ function renderFeedEntry(
           className={cn("items-end", props.userMessageGrouping.groupedWithNext ? "mb-1" : "mb-2")}
           {...(enterAnimated ? { entering: FadeInDown.duration(220) } : {})}
         >
+          <MatterReplyHighlight messageId={message.id} />
           {presentation.attribution === "t3code" ? (
             <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted opacity-60">
               {m(msg("Sent by T3 Code"))}
@@ -2471,6 +2476,7 @@ function renderFeedEntry(
               })}
             </View>
           ) : null}
+          <MatterSentReplyHeader text={presentation.text} context={message.context} />
           {hasBubble ? (
             <View
               className="min-w-0 rounded-[20px]"
@@ -2589,7 +2595,7 @@ function renderFeedEntry(
                         bubbleColor={userBubbleColor}
                       >
                         <UserMessageContent
-                          text={renderedText}
+                          text={matterReplyBubbleText(renderedText, message.context)}
                           environmentId={props.environmentId}
                           context={message.context}
                           markdownStyles={styles}
@@ -2662,6 +2668,19 @@ function renderFeedEntry(
                   <SymbolView name="pencil" size={14} tintColor={iconSubtleColor} />
                 </Pressable>
               ) : null}
+              <MatterReplyButton
+                enabled={
+                  props.onCiteAssistantText !== undefined &&
+                  !(entry.pendingMessage && !entry.acknowledged)
+                }
+                role="user"
+                environmentId={props.environmentId}
+                threadId={props.threadId}
+                messageId={message.id}
+                itemId={message.projectedItem?.sourceItemId}
+                text={presentation.text}
+                tintColor={iconSubtleColor}
+              />
               {presentation.text.trim().length > 0 ? (
                 <UserMessageCopyButton
                   text={presentation.text}
@@ -2699,6 +2718,7 @@ function renderFeedEntry(
         )}
         {...(enterAnimated ? { entering: FadeIn.duration(220) } : {})}
       >
+        <MatterReplyHighlight messageId={message.id} />
         {renderedText.trim().length > 0 ? (
           <MarkdownImageAvailableWidthContext value={props.markdownContentWidth}>
             <AssistantMarkdownContent
@@ -2740,6 +2760,18 @@ function renderFeedEntry(
                 sourceTitle={props.threadTitle}
               />
             ) : null}
+            <MatterReplyButton
+              enabled={props.onCiteAssistantText !== undefined}
+              role="assistant"
+              environmentId={props.environmentId}
+              threadId={props.threadId}
+              messageId={message.id}
+              itemId={message.projectedItem?.sourceItemId}
+              text={renderedText}
+              tintColor={iconSubtleColor}
+              buttonSize={props.replyActionSize.button}
+              iconSize={props.replyActionSize.icon}
+            />
             <Text className={MATTER_MESSAGE_TIME_CLASS}>{timestampLabel}</Text>
           </View>
         ) : null}

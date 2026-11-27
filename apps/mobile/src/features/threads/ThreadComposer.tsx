@@ -78,6 +78,7 @@ import { MatterComposerModeControl } from "../matter/composer/MatterComposerMode
 import { MatterComposerSendButton } from "../matter/composer/MatterComposerSendButton.matter";
 import { MatterComposerShelf } from "../matter/composer/MatterComposerShelf.matter";
 import { MatterComposerUnderTray } from "../matter/composer/MatterComposerUnderTray.matter";
+import { MatterComposerReplyBar } from "../matter/replies/MatterComposerReplyBar.matter";
 import {
   deriveMatterMobileInteractionMode,
   shouldShowMatterMobileUnderTray,
@@ -878,6 +879,10 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         ) : null}
 
         <MatterComposerShelf underTray={underTray}>
+          <MatterComposerReplyBar
+            draftKey={composerDraftKey}
+            onFocusComposer={() => inputRef.current?.focus()}
+          />
           <ComposerDictationError
             error={voiceInput.state.phase === "error" ? voiceInput.state.error : null}
             onDismiss={voiceInput.cancel}

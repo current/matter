@@ -74,6 +74,7 @@ const reactTests = [
   "src/features/matter-voice/MatterVoiceModeScreen.test.tsx",
   "src/features/matter/cards/MatterQuestionsCard.matter.test.tsx",
   "src/features/matter/cards/MatterPlanOverviewCard.matter.test.tsx",
+  "src/features/matter/replies/MatterComposerReplyBar.matter.test.tsx",
   "src/features/voice-input/useVoiceInputController.test.tsx",
 ];
 

@@ -1,6 +1,6 @@
 import type { LegendListRef } from "@legendapp/list/react";
+import { stripReplyMarkdownToPlainText } from "@t3tools/client-runtime/matter/message-reply";
 import {
-  type ComposerContextRecord,
   type EnvironmentId,
   type MessageId,
   type ResponseContextRecord,
@@ -8,118 +8,22 @@ import {
   type ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
-import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
-import {
-  collectComposerContextReferences,
-  replaceComposerContextReferences,
-} from "@t3tools/shared/composerContextReferences";
 import { useEffect, useEffectEvent, useRef } from "react";
 
 import { captureAssistantMessageOpening } from "~/lib/assistantTextSelection";
-import { isResponseContextRecord, responseContextRecord } from "~/lib/composerContextRecords";
+import { responseContextRecord } from "~/lib/composerContextRecords";
 import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
 
-export type MatterReplyRole = "user" | "assistant";
+export {
+  extractLeadingReplyReference,
+  extractReplyExcerpt,
+  MATTER_REPLY_EXCERPT_MAX_CHARS,
+  resolveReplyRole,
+  type ExtractedLeadingReply,
+  type MatterReplyRole,
+} from "@t3tools/client-runtime/matter/message-reply";
 
-export const MATTER_REPLY_EXCERPT_MAX_CHARS = 180;
 const MATTER_REPLY_HIGHLIGHT_DURATION_MS = 1_600;
-
-function stripMarkdownToPlainText(input: string): string {
-  // Replace inline composer context references first: drop nested reply refs, keep other labels.
-  let text = replaceComposerContextReferences(input, (reference) =>
-    reference.kind === "response" ? "" : reference.label,
-  );
-  // Replace serialized assistant citation markdown links with their quoted plain text.
-  text = assistantCitationsToPlainText(text);
-  // Strip fenced code block markers while preserving inner code lines.
-  text = text.replace(/```[^\n]*\n?([\s\S]*?)```/g, " $1 ");
-  text = text.replace(/~~~[^\n]*\n?([\s\S]*?)~~~/g, " $1 ");
-  // Unwrap inline code spans.
-  text = text.replace(/`+([^`]+)`+/g, "$1");
-  // Markdown images -> alt text; markdown links -> link text.
-  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
-  text = text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-  // Reference-style links [text][ref] -> text.
-  text = text.replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1");
-  // Line-level block syntax: headings, blockquotes, horizontal rules, task/bullet/ordered lists.
-  text = text
-    .split(/\r?\n/)
-    .map((line) => {
-      const trimmed = line.trim();
-      if (/^[-*_]{3,}$/.test(trimmed)) return "";
-      return line
-        .replace(/^\s{0,3}#{1,6}\s+/, "")
-        .replace(/^\s*(?:>\s*)+/, "")
-        .replace(/^\s*(?:[-*+]|\d+\.)\s+(?:\[[ xX]\]\s+)?/, "");
-    })
-    .join(" ");
-  // Emphasis / strikethrough delimiters.
-  text = text
-    .replace(/(\*\*|__|~~)(.*?)\1/g, "$2")
-    .replace(/(^|[\s([{"'])\*([^*\n]+)\*(?=$|[\s.,!?;:)\]}"'])/g, "$1$2")
-    .replace(/(^|[\s([{"'])_([^_\n]+)_(?=$|[\s.,!?;:)\]}"'])/g, "$1$2");
-  // Collapse whitespace into single spaces.
-  return text.replace(/\s+/g, " ").trim();
-}
-
-/**
- * Extracts a crisp, single-line plain-text excerpt from markdown or plain message text,
- * capped cleanly without splitting UTF-16 surrogate pairs.
- */
-export function extractReplyExcerpt(
-  rawText: string,
-  maxChars: number = MATTER_REPLY_EXCERPT_MAX_CHARS,
-): string {
-  const plain = stripMarkdownToPlainText(rawText);
-  if (plain.length === 0) return "";
-  if (maxChars <= 0) return "";
-  if (plain.length <= maxChars) return plain;
-  let end = Math.max(1, maxChars - 1);
-  // Avoid splitting a UTF-16 surrogate pair.
-  const previous = plain.charCodeAt(end - 1);
-  const next = plain.charCodeAt(end);
-  if (previous >= 0xd800 && previous <= 0xdbff && next >= 0xdc00 && next <= 0xdfff) {
-    end -= 1;
-  }
-  const sliced = plain.slice(0, end).replace(/[\s,;:–—-]+$/u, "");
-  return `${sliced || plain.slice(0, end)}…`;
-}
-
-export function resolveReplyRole(record: ResponseContextRecord): MatterReplyRole {
-  return record.role === "user" ? "user" : "assistant";
-}
-
-export interface ExtractedLeadingReply {
-  readonly record: ResponseContextRecord;
-  readonly bodyText: string;
-}
-
-/**
- * When a user message starts with a reply reference followed by message body text,
- * splits them so the timeline can render a sleek reply reference header above the bubble.
- * Reply-only messages (empty body) stay in-bubble so the bubble is never blank.
- */
-export function extractLeadingReplyReference(
-  text: string,
-  recordsById: ReadonlyMap<string, ComposerContextRecord>,
-): ExtractedLeadingReply | null {
-  const trimmedStart = text.trimStart();
-  const leadingOffset = text.length - trimmedStart.length;
-  const firstReference = collectComposerContextReferences(trimmedStart)[0];
-  if (!firstReference || firstReference.start !== 0 || firstReference.kind !== "response") {
-    return null;
-  }
-  const candidate = recordsById.get(firstReference.contextId);
-  if (!candidate || !isResponseContextRecord(candidate)) {
-    return null;
-  }
-  const remainder = text.slice(leadingOffset + firstReference.end).replace(/^[ \t]+/, "");
-  const bodyText = remainder.replace(/^\r?\n/, "");
-  if (bodyText.trim().length === 0) {
-    return null;
-  }
-  return { record: candidate, bodyText };
-}
 
 /**
  * Builds a `ResponseContextRecord` targeting a user message in the current thread.
@@ -133,7 +37,7 @@ export function buildUserMessageReplyRecord(input: {
   readonly rawText: string;
   readonly sourceElement?: HTMLElement | null;
 }): ResponseContextRecord | null {
-  const cleanedFallback = stripMarkdownToPlainText(input.rawText);
+  const cleanedFallback = stripReplyMarkdownToPlainText(input.rawText);
   const opening = captureAssistantMessageOpening(
     input.sourceElement ?? null,
     cleanedFallback || input.rawText,

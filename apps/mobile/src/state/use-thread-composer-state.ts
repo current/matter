@@ -111,6 +111,7 @@ import {
   deriveMatterMobileInteractionMode,
   resolveMatterMobileModeSend,
 } from "../features/matter/composer/matterComposerLogic";
+import { takeMatterReplyForSend } from "../features/matter/replies/matterReplies";
 import { isClearComposerCommand, parseSideChatCommand } from "@t3tools/shared/composerTrigger";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
 import {
@@ -954,9 +955,8 @@ export function useThreadComposerState(input: {
       threadId: selectedThreadShell.id,
       messageId,
       commandId: CommandId.make(metadata.commandId),
-      text: sendText,
+      ...takeMatterReplyForSend(threadKey, { text: sendText, context: draft.context }),
       attachments,
-      context: draft.context,
       modelSelection,
       runtimeMode: draft.runtimeMode ?? thread.runtimeMode,
       interactionMode: sendInteractionMode,
