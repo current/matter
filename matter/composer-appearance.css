@@ -346,10 +346,12 @@ html[data-matter-composer-material="glass"][data-matter-composer-shape="floating
 :root[data-matter-composer-tint] [data-matter-whisper-pill-row] {
   --mw-bg: var(--mca-tint);
   --mw-line: color-mix(in oklab, var(--mca-tint), #000000 11%);
+  --mw-card-line: color-mix(in oklab, var(--mca-tint), #000000 9%);
 }
 
 :root.dark[data-matter-composer-tint] [data-matter-whisper-pill-row] {
   --mw-line: color-mix(in oklab, var(--mca-tint), #ffffff 10%);
+  --mw-card-line: color-mix(in oklab, var(--mca-tint), #ffffff 7%);
 }
 
 html[data-matter-composer-shape="compact"] [data-matter-whisper-pill-row] {

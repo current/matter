@@ -180,6 +180,20 @@ export function stackMatterWhisperAvatars(
   return shown.map((row, index) => ({ row, zIndex: shown.length - index }));
 }
 
+/** The pill's avatars name who is working, not how many: one per agent kind. */
+export function uniqueMatterWhisperAgents(
+  rows: ReadonlyArray<MatterWhisperRow>,
+  agentOf: (row: MatterWhisperRow) => string,
+): ReadonlyArray<MatterWhisperRow> {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const agent = agentOf(row);
+    if (seen.has(agent)) return false;
+    seen.add(agent);
+    return true;
+  });
+}
+
 export function isMatterWhisperActive(input: {
   readonly rowCount: number;
   readonly serverCount: number;

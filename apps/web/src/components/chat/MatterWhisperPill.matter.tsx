@@ -37,6 +37,7 @@ import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { AgentElapsed } from "./AgentElapsed";
 import { ThreadAutomationsPanel } from "./ThreadAutomationsPanel";
+import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { ThreadRelationshipIcon } from "./ThreadRelationshipIcon";
 import { ThreadRelationshipsPanel } from "./ThreadRelationshipsControl";
 import { ThreadServersPanel } from "./ThreadServersPanel";
@@ -51,6 +52,7 @@ import {
   openMatterLineagePopover,
   setMatterLineageView,
   stackMatterWhisperAvatars,
+  uniqueMatterWhisperAgents,
   useMatterLineagePopover,
 } from "./matterThreadRibbon.logic";
 
@@ -478,7 +480,6 @@ export function MatterWhisperPill(props: LineageThreadProps) {
   const runningAutomations = automations.running;
   const providersByEnvironment = useEnvironmentProviders();
   const providers = providersByEnvironment.get(props.environmentId);
-  const providerEntries = deriveProviderInstanceEntries(providers ?? []);
   const popover = useMatterLineagePopover();
   const { rows } = model;
   const active = isMatterWhisperActive({
@@ -495,7 +496,15 @@ export function MatterWhisperPill(props: LineageThreadProps) {
     return null;
   }
   const oldest = oldestMatterWhisperStart(rows);
-  const avatars = stackMatterWhisperAvatars(rows);
+  const avatars = stackMatterWhisperAvatars(
+    uniqueMatterWhisperAgents(rows, (row) =>
+      row.kind === "subagent"
+        ? (row.driver ??
+          providers?.find((entry) => entry.instanceId === row.providerInstanceId)?.driver ??
+          "agent")
+        : "command",
+    ),
+  );
   const [firstServer] = servers;
   const label =
     rows.length > 0
@@ -533,16 +542,19 @@ export function MatterWhisperPill(props: LineageThreadProps) {
                   const provider = providers?.find(
                     (entry) => entry.instanceId === row.providerInstanceId,
                   );
+                  const driver = row.kind === "subagent" ? (row.driver ?? provider?.driver) : null;
                   return (
                     <span key={row.key} data-matter-whisper-avatar style={{ zIndex }}>
-                      {row.kind === "subagent" ? (
-                        <ThreadRelationshipIcon
-                          driver={row.driver ?? provider?.driver}
-                          provider={provider}
-                          providerEntries={providerEntries}
-                          fallbackIcon={BotIcon}
-                          status={row.status}
+                      {driver ? (
+                        <ProviderInstanceIcon
+                          driverKind={driver}
+                          displayName={provider?.displayName ?? driver}
+                          acpRegistryIconUrl={provider?.iconUrl}
+                          showBadge={false}
+                          size="compact"
                         />
+                      ) : row.kind === "subagent" ? (
+                        <BotIcon />
                       ) : (
                         <TerminalIcon />
                       )}

@@ -15,6 +15,7 @@ import {
   resolveMatterRibbonDensity,
   setMatterLineageView,
   stackMatterWhisperAvatars,
+  uniqueMatterWhisperAgents,
   toggleMatterLineagePopover,
 } from "./matterThreadRibbon.logic";
 
@@ -152,6 +153,12 @@ describe("pill summary", () => {
   it("stacks at most three avatars, earlier ones drawn on top", () => {
     const avatars = stackMatterWhisperAvatars(rows);
     expect(avatars.map(({ zIndex }) => zIndex)).toEqual([3, 2, 1]);
+  });
+
+  it("keeps the first row of each agent for the avatars", () => {
+    const agents = ["claude", "codex", "claude", "command"];
+    const unique = uniqueMatterWhisperAgents(rows, (row) => agents[rows.indexOf(row)]!);
+    expect(unique).toEqual([rows[0], rows[1], rows[3]]);
   });
 
   it("is idle with nothing running", () => {

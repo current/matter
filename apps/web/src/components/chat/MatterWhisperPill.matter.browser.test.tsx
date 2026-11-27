@@ -107,9 +107,14 @@ describe("MatterWhisperPill", () => {
     expect(screen.container.querySelector("[data-matter-whisper-pill-row]")).toBeNull();
   });
 
-  it("shows stacked avatars, the running count and the oldest timer as a 28px pill", async () => {
+  it("shows one avatar per agent, the running count and the oldest timer as a 28px pill", async () => {
     using _styles = withStyles();
-    state.subagents = [agent("a", 2), agent("b", 18), agent("c", 26), agent("d", 29)];
+    state.subagents = [
+      agent("a", 2),
+      agent("b", 18),
+      { ...agent("c", 26), driver: "codex", providerInstanceId: "codex" },
+      agent("d", 29),
+    ];
     await using screen = await render(
       <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
@@ -121,7 +126,32 @@ describe("MatterWhisperPill", () => {
     expect(getComputedStyle(element).borderRadius).toBe("10px");
     expect(getComputedStyle(element).fontStyle).toBe("normal");
     const avatars = screen.container.querySelectorAll<HTMLElement>("[data-matter-whisper-avatar]");
-    expect(Array.from(avatars, (avatar) => avatar.style.zIndex)).toEqual(["3", "2", "1"]);
+    expect(Array.from(avatars, (avatar) => avatar.style.zIndex)).toEqual(["2", "1"]);
+  });
+
+  it("takes the composer's outer edge: the card's alone, the shelf's under an under-tray", async () => {
+    using _styles = withStyles();
+    document.documentElement.classList.add("dark");
+    state.subagents = [agent("a", 2)];
+    const edge = () =>
+      getComputedStyle(document.querySelector<HTMLElement>("[data-matter-whisper-pill]")!)
+        .borderTopColor;
+    for (const contextRow of [false, true]) {
+      await using _screen = await render(
+        <div>
+          <MatterWhisperPill
+            environmentId={ENVIRONMENT}
+            threadId={THREAD}
+            backgroundWork={idleWork}
+          />
+          <div>
+            <div data-matter-composer="" data-context-row={contextRow || undefined} />
+          </div>
+        </div>,
+      );
+      await expect.element(page.getByRole("button", { name: "Lineage: 1 running" })).toBeVisible();
+      expect(edge()).toBe(contextRow ? "rgba(255, 255, 255, 0.09)" : "rgba(255, 255, 255, 0.05)");
+    }
   });
 
   it("opens the frosted Lineage popover with rows, Stop and Stop all", async () => {
@@ -227,7 +257,7 @@ describe("MatterWhisperPill", () => {
     expect(document.querySelector("[data-matter-lineage-popup='pill']")).toBeNull();
   });
 
-  it("shows multi-instance provider badges in both the collapsed avatars and expanded Lineage rows", async () => {
+  it("shows bare agent logos in the pill and multi-instance badges in the Lineage rows", async () => {
     using _styles = withStyles();
     state.providers = [
       {
@@ -256,8 +286,9 @@ describe("MatterWhisperPill", () => {
       <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
     const pill = screen.container.querySelector<HTMLElement>("[data-matter-whisper-pill]")!;
-    expect(pill.textContent).toContain("CL");
-    expect(pill.textContent).toContain("CA");
+    expect(pill.textContent).not.toContain("CL");
+    expect(pill.textContent).not.toContain("CA");
+    expect(pill.querySelectorAll("[data-matter-whisper-avatar]")).toHaveLength(1);
 
     await page.getByRole("button", { name: "Lineage: 2 running" }).click();
     await expect.element(page.getByText("Lineage · 2 running")).toBeVisible();

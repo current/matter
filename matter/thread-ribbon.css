@@ -34,6 +34,7 @@
    Appearance → Composer restyles it too (composer-appearance.css). */
 [data-matter-whisper-pill-row] {
   --mw-line: rgb(0 0 0 / 7.5%);
+  --mw-card-line: rgb(0 0 0 / 7.5%);
   --mw-shadow: 0 1px 2px rgb(20 22 30 / 5%);
   --mw-radius: 10px;
 }
@@ -41,12 +42,23 @@
 .dark [data-matter-whisper-pill-row] {
   --mw-bg: #1c1c1c;
   --mw-line: rgb(255 255 255 / 9%);
+  --mw-card-line: rgb(255 255 255 / 5%);
   --mw-shadow: none;
 }
 
 html[data-theme-id] :is([data-matter-whisper-pill-row], [data-matter-frosted]) {
   --mw-bg: var(--app-theme-surface-raised, var(--card));
   --mw-line: var(--app-theme-toolbar-border, var(--border));
+  --mw-card-line: var(--app-theme-toolbar-border, var(--border));
+}
+
+/* The pill's edge copies the composer's outer edge: the shelf's hairline while the under-tray
+   shows, the card's own fainter one when the card stands alone (no under-tray, or Floating). */
+[data-matter-whisper-pill-row]:has(~ * > [data-matter-composer]:not([data-context-row]))
+  [data-matter-whisper-pill]:not(:hover, [data-popup-open]),
+html[data-matter-composer-shape="floating"]
+  [data-matter-whisper-pill]:not(:hover, [data-popup-open]) {
+  --mw-edge: var(--mw-card-line);
 }
 
 :is([data-matter-ribbon], [data-matter-whisper-pill-row], [data-matter-frosted]),
@@ -251,9 +263,9 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
   --mw-edge: var(--mw-line);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   height: 28px;
-  padding-inline: 6px 10px;
+  padding-inline: 7px 9px;
   border: 1px solid var(--mw-edge);
   border-radius: var(--mw-radius);
   background-color: var(--mw-fill);
@@ -279,29 +291,24 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
   outline-offset: 1px;
 }
 
+/* One plain logo per agent kind (no instance badge, no status dot): the label already says they run. */
 [data-matter-whisper-avatars] {
   display: inline-flex;
   align-items: center;
-  padding-inline-start: 2px;
+  gap: 3px;
 }
 
 [data-matter-whisper-avatar] {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background-color: var(--mw-bg);
-  box-shadow: 0 0 0 1.5px var(--mw-bg);
+  width: 16px;
+  height: 16px;
+  color: var(--mr-muted);
 }
 
-[data-matter-whisper-avatar] + [data-matter-whisper-avatar] {
-  margin-inline-start: -5px;
-}
-
-[data-matter-whisper-avatar] svg {
+[data-matter-whisper-avatar] svg,
+[data-matter-whisper-avatar] img {
   width: 14px;
   height: 14px;
 }
@@ -319,12 +326,13 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
 }
 
 [data-matter-whisper-label] {
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 [data-matter-whisper-timer] {
   color: var(--mr-muted);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -344,6 +352,7 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
 [data-matter-whisper-chevron] {
   width: 12px;
   height: 12px;
+  margin-inline-start: -1px;
   color: var(--mr-muted);
   transition: rotate 160ms var(--mr-ease);
 }
