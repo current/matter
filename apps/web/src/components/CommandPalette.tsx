@@ -93,6 +93,7 @@ import {
 } from "lucide-react";
 import { setVoiceModeOpen, toggleVoiceAssistantHandsFree } from "../island/voiceAssistantStore";
 import { openClaudeCloudDialog } from "../addons/claudeCloudApi";
+import { useClaudeCloudPaletteItem } from "./cloud/useClaudeCloudPaletteItem";
 import { useIsAddonEnabled } from "../addons/useAddonRegistry";
 import { openThreadFind } from "./chat/threadFindStore";
 import { dispatchPreviewAction } from "./preview/previewActionBus";
@@ -520,6 +521,7 @@ function OpenCommandPaletteDialog(props: {
   const desktopLocalBootstraps = useDesktopLocalBootstraps();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const claudeCloudEnabled = useIsAddonEnabled("claude-cloud");
+  const claudeCloudSessionsItem = useClaudeCloudPaletteItem(claudeCloudEnabled);
   const settingsSearchItems = useCommandPaletteSettingsItems(deferredQuery.trim().length > 0);
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread } =
     useHandleNewThread();
@@ -1894,6 +1896,7 @@ function OpenCommandPaletteDialog(props: {
         openClaudeCloudDialog({ mode: "teleport", projectId: cloudProjectId });
       },
     });
+    if (claudeCloudSessionsItem) actionItems.push(claudeCloudSessionsItem);
   }
 
   actionItems.push({
