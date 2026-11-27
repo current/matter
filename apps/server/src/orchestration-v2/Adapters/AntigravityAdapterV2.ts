@@ -36,6 +36,7 @@ import {
   antigravitySubagentLaunches,
   describeAntigravitySubagentLaunches,
   readAntigravityChildrenAtWork,
+  readAntigravityExecutedModel,
   readAntigravityPendingReply,
   readAntigravitySubagentTranscript,
 } from "../../provider/acp/AntigravityChildWork.ts";
@@ -191,6 +192,7 @@ export function makeAntigravityAcpAdapterFlavor(
                   hasT3Mcp,
                   hasDeviceTools: hasT3Mcp && input.hasDeviceTools === true,
                   includeMcpFallback: !httpMcpConnected,
+                  toolExposure: "deferred-proxy",
                 }),
               ]
                 .filter((part) => part.trim().length > 0)
@@ -265,9 +267,8 @@ export function makeAntigravityAcpAdapterFlavor(
     supportsNativeGoals: options.supportsNativeGoals ?? Effect.succeed(false),
     // Agents that advertise HTTP MCP skip the stdio bridge process; others keep stdio.
     mcpOverHttp: true,
-    deferMcpTools: true,
-    // agy rereads tools/list on list_changed, which the bridge relays from tool_search.
-    deferStdioMcpTools: true,
+    // Antigravity freezes its toolbox per turn, so optional T3 tools run through `tool_call`.
+    deferMcpTools: "proxy",
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     sessionCarriesSystemInstructions: antigravityAppendsSystemPrompt,
     ...(options.unsetOptionDefaults === undefined
@@ -402,6 +403,8 @@ export function makeAntigravityAcpAdapterFlavor(
               profileDirectory,
               sessionId,
             }),
+          executedModel: (sessionId: string) =>
+            readAntigravityExecutedModel({ profileDirectory, sessionId }),
         }),
   };
 }

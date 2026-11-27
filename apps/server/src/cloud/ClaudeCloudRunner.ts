@@ -82,7 +82,13 @@ const ANSI_PATTERN = new RegExp(
   "g",
 );
 
-export const stripAnsi = (text: string): string => text.replace(ANSI_PATTERN, "");
+// Claude's TUI moves the cursor (CSI n G / n C) instead of printing spaces between words.
+const CURSOR_JUMP_PATTERN = /\u001b\[[0-9]*[CG]/g;
+
+export const stripAnsi = (text: string): string =>
+  text.replace(CURSOR_JUMP_PATTERN, " ").replace(ANSI_PATTERN, "");
+
+const ANSWER_DELAY_MS = 500;
 
 const appendCapped = (buffer: string, chunk: string) => {
   const next = buffer + chunk;
@@ -152,7 +158,11 @@ const make = Effect.gen(function* () {
           input.answers?.forEach((answer, index) => {
             if (answered.has(index) || !answer.when.test(seen.output)) return;
             answered.add(index);
-            child.write(answer.send);
+            // Keys sent as the first frame paints are dropped before the TUI reads input.
+            // @effect-diagnostics-next-line globalTimers:off -- runs inside the PTY data callback.
+            setTimeout(() => {
+              if (!settled) child.write(answer.send);
+            }, ANSWER_DELAY_MS);
           });
         });
         const stopExit = child.onExit((event) =>
