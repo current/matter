@@ -1098,7 +1098,10 @@ function ClassicSidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
   } | null>(null);
   const snoozingThreadKeysRef = useRef(new Set<string>());
   const removeFromSelection = useThreadSelectionStore((s) => s.removeFromSelection);
-  const openAddProjectCommandPalette = () => openCommandPalette({ open: "add-project" });
+  const openAddProjectCommandPalette = () => {
+    if (isMobile) setOpenMobile(false);
+    openCommandPalette({ open: "add-project" });
+  };
   const routeThreadRef = resolveActiveThreadRouteRef(
     routeTarget,
     routeDraftThread,
@@ -2426,7 +2429,7 @@ function ClassicSidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
               : []),
             {
               id: "settle",
-              label: gt("Settle ({count})", { count }),
+              label: gt("Settle ({count})", { count: settlingThreads.length }),
               disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads, true),
             },
             ...(canSnoozeSelection
@@ -2821,6 +2824,7 @@ function ClassicSidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
               });
             return;
           case "new-thread-on-branch": {
+            if (isMobile) setOpenMobile(false);
             const result = await settlePromise(() =>
               handleNewThread(scopeProjectRef(thread.environmentId, thread.projectId), {
                 branch: thread.branch,
