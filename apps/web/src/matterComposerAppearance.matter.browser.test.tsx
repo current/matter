@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import shellCss from "../../../matter/shell.css?inline";
 import { render } from "../test/render";
 import { ComposerSurface } from "./components/chat/ComposerSurface";
+import { MatterScrollEdgeBlur } from "./components/MatterScrollEdgeBlur";
 import {
   adaptComposerTint,
   applyMatterComposerAppearance,
@@ -48,6 +49,7 @@ function Composer({
       <div className="topbar-scroll-fade h-20 overflow-y-auto" data-testid="scroller">
         <div className="h-60" />
       </div>
+      <MatterScrollEdgeBlur />
       <ComposerSurface.Shell data-matter-composer="" contextRow={contextRow}>
         <ComposerSurface.Host>
           {attachedBanner ? <div data-composer-banner-surface="attached">banner</div> : null}
@@ -160,7 +162,7 @@ describe("composer appearance CSS", () => {
     expect(scroller().getBoundingClientRect()).toEqual(before);
   });
 
-  it("lays a strip over the top edge for Shadow, Blur and Frost without moving content", async () => {
+  it("lays its edge over the scroller for Shadow, Blur and Frost without moving content", async () => {
     using _styles = shellStyles();
     await using _screen = await render(<Composer contextRow />, { router: false });
     const content = () => scroller().firstElementChild!.getBoundingClientRect();
@@ -176,7 +178,11 @@ describe("composer appearance CSS", () => {
 
     apply({ scrollEdge: "blur" });
     expect(mask(scroller())).toBe("none");
-    expect(backdrop(scroller(), "::before")).toContain("blur(4px)");
+    expect(css(scroller(), "::before").content).toBe("none");
+    expect(css(document.querySelector("[data-matter-edge-blur]")!).display).toBe("block");
+    expect(
+      [...document.querySelectorAll("[data-matter-edge-blur] > i")].map((layer) => backdrop(layer)),
+    ).toEqual(["blur(0.5px)", "blur(1px)", "blur(2px)", "blur(4px)"]);
     expect(content()).toEqual(before);
 
     apply({ scrollEdge: "frost" });
@@ -184,6 +190,19 @@ describe("composer appearance CSS", () => {
     expect(backdrop(scroller(), "::before")).toContain("blur(14px)");
     expect(css(scroller(), "::before").backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
     expect(content()).toEqual(before);
+  });
+
+  it("keeps the fade under Blur where no progressive blur follows the scroller", async () => {
+    using _styles = shellStyles();
+    await using _screen = await render(
+      <div className="topbar-scroll-fade h-20 overflow-y-auto" data-testid="scroller">
+        <div className="h-60" />
+      </div>,
+      { router: false },
+    );
+    apply({ scrollEdge: "blur" });
+    expect(mask(scroller())).toContain("linear-gradient");
+    expect(css(scroller(), "::before").content).toBe("none");
   });
 
   it("keeps the fade on bottom-anchored scrollers", async () => {

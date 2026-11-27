@@ -18,6 +18,7 @@ import {
   useMatterComposerAppearance,
 } from "../../matterComposerAppearance";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { MatterScrollEdgeBlur } from "../MatterScrollEdgeBlur";
 import {
   AppearanceSlider,
   ColorSwatch,
@@ -78,7 +79,7 @@ function ScrollEdgePreview() {
     <div
       aria-hidden
       data-matter-scroll-edge-preview=""
-      className="pointer-events-none mt-3 h-28 overflow-hidden rounded-xl border border-border/60 bg-background select-none"
+      className="pointer-events-none relative mt-3 h-28 overflow-hidden rounded-xl border border-border/60 bg-background select-none"
     >
       <div
         ref={(element) => {
@@ -98,6 +99,7 @@ function ScrollEdgePreview() {
           <p className="text-muted-foreground">{gt("Ran the suite: 214 passed.")}</p>
         </div>
       </div>
+      <MatterScrollEdgeBlur />
     </div>
   );
 }

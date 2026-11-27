@@ -10,21 +10,39 @@
 @import "./thread-ribbon.css";
 
 /* Settings → Appearance → Scroll edge (matterComposerAppearance.ts). Fade is upstream's mask; the
-   others drop it. Shadow, Blur and Frost lay a sticky strip over the scroller's top edge whose net
-   height is zero, so nothing moves. A scroll-driven opacity shows it only once content passes under
-   the edge, and nothing runs at rest. Reversed (bottom-anchored) scrollers keep the fade: their
-   scroll origin sits at the bottom, so the strip can't find the top. */
+   others drop it. Shadow and Frost lay a sticky strip over the scroller's top edge whose net height
+   is zero, so nothing moves. A scroll-driven opacity shows it only once content passes under the
+   edge, and nothing runs at rest. Reversed (bottom-anchored) scrollers keep the fade: their scroll
+   origin sits at the bottom, so the strip can't find the top. Blur needs several layers, so it only
+   replaces the fade where a MatterScrollEdgeBlur follows the scroller. */
+/* Upstream's fade eases in from fully clear, so the top few pixels read as an empty band and text
+   seems to vanish before the edge. This curve rises fast, so lines dim right up to the edge. */
+.topbar-scroll-fade {
+  --matter-fade-curve: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 6%),
+    rgb(0 0 0 / 32%) 12%,
+    rgb(0 0 0 / 60%) 30%,
+    rgb(0 0 0 / 82%) 52%,
+    rgb(0 0 0 / 95%) 76%,
+    black
+  );
+  -webkit-mask-image:
+    var(--matter-fade-curve), linear-gradient(black, black), linear-gradient(black, black);
+  mask-image:
+    var(--matter-fade-curve), linear-gradient(black, black), linear-gradient(black, black);
+}
+
 html[data-matter-scroll-edge="off"] .topbar-scroll-fade,
-html[data-matter-scroll-edge] .topbar-scroll-fade:not(.flex-col-reverse) {
+html:is([data-matter-scroll-edge="shadow"], [data-matter-scroll-edge="frost"])
+  .topbar-scroll-fade:not(.flex-col-reverse),
+html[data-matter-scroll-edge="blur"]
+  .topbar-scroll-fade:not(.flex-col-reverse):has(~ [data-matter-edge-blur]) {
   -webkit-mask-image: none;
   mask-image: none;
 }
 
-html:is(
-    [data-matter-scroll-edge="shadow"],
-    [data-matter-scroll-edge="blur"],
-    [data-matter-scroll-edge="frost"]
-  )
+html:is([data-matter-scroll-edge="shadow"], [data-matter-scroll-edge="frost"])
   .topbar-scroll-fade:not(.flex-col-reverse)::before {
   --matter-scroll-edge-height: 2rem;
   content: "";
@@ -39,11 +57,7 @@ html:is(
 }
 
 @supports (animation-timeline: scroll()) {
-  html:is(
-      [data-matter-scroll-edge="shadow"],
-      [data-matter-scroll-edge="blur"],
-      [data-matter-scroll-edge="frost"]
-    )
+  html:is([data-matter-scroll-edge="shadow"], [data-matter-scroll-edge="frost"])
     .topbar-scroll-fade:not(.flex-col-reverse)::before {
     opacity: 0;
     animation: matter-scroll-edge-in linear both;
@@ -82,31 +96,92 @@ html.dark[data-matter-scroll-edge="shadow"] .topbar-scroll-fade:not(.flex-col-re
   );
 }
 
-/* One layer standing in for a progressive blur: a soft blur eases in over the whole strip on an
-   eased mask, and a light veil of the page color hides the crossfade between sharp and blurred
-   text, so lines dissolve into the edge instead of snapping to a smudge. */
-html[data-matter-scroll-edge="blur"] .topbar-scroll-fade:not(.flex-col-reverse)::before {
-  --matter-scroll-edge-height: 3rem;
+/* A progressive blur (MatterScrollEdgeBlur) laid over the scroller from its parent, about as deep
+   as Fade. Four full-height layers each show one overlapping band, from 0.5px at the bottom to 4px
+   at the top, so neighbouring bands blend similar blurs instead of sharp and smeared text. A veil
+   on Fade's curve dims lines right up to the edge. Opacity must stay on the layers: on their
+   container it would cut them off from the content behind. */
+[data-matter-edge-blur] {
+  display: none;
+}
+
+html[data-matter-scroll-edge="blur"]
+  .topbar-scroll-fade:not(.flex-col-reverse)
+  ~ [data-matter-edge-blur] {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 20;
+  display: block;
+  height: calc(var(--workspace-titlebar-scroll-fade-height) + 0.5rem);
+  pointer-events: none;
+}
+
+[data-matter-edge-blur] > i,
+[data-matter-edge-blur]::after {
+  position: absolute;
+  inset: 0;
+}
+
+[data-matter-edge-blur] > i {
+  -webkit-backdrop-filter: blur(var(--matter-edge-blur));
+  backdrop-filter: blur(var(--matter-edge-blur));
+  -webkit-mask-image: var(--matter-edge-band);
+  mask-image: var(--matter-edge-band);
+}
+
+[data-matter-edge-blur] > i:nth-child(1) {
+  --matter-edge-blur: 0.5px;
+  --matter-edge-band: linear-gradient(to top, transparent, black 20%, black 40%, transparent 60%);
+}
+[data-matter-edge-blur] > i:nth-child(2) {
+  --matter-edge-blur: 1px;
+  --matter-edge-band: linear-gradient(
+    to top,
+    transparent 20%,
+    black 40%,
+    black 60%,
+    transparent 80%
+  );
+}
+[data-matter-edge-blur] > i:nth-child(3) {
+  --matter-edge-blur: 2px;
+  --matter-edge-band: linear-gradient(to top, transparent 40%, black 60%, black 80%, transparent);
+}
+[data-matter-edge-blur] > i:nth-child(4) {
+  --matter-edge-blur: 4px;
+  --matter-edge-band: linear-gradient(to top, transparent 60%, black 80%);
+}
+
+[data-matter-edge-blur]::after {
+  content: "";
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--background) 58%, transparent),
-    color-mix(in srgb, var(--background) 24%, transparent) 45%,
+    color-mix(in srgb, var(--background) 80%, transparent),
+    color-mix(in srgb, var(--background) 58%, transparent) 12%,
+    color-mix(in srgb, var(--background) 34%, transparent) 30%,
+    color-mix(in srgb, var(--background) 16%, transparent) 52%,
+    color-mix(in srgb, var(--background) 4%, transparent) 76%,
     transparent
   );
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-  --matter-scroll-edge-ease: linear-gradient(
-    to bottom,
-    black,
-    rgb(0 0 0 / 86%) 18%,
-    rgb(0 0 0 / 62%) 38%,
-    rgb(0 0 0 / 34%) 58%,
-    rgb(0 0 0 / 12%) 78%,
-    rgb(0 0 0 / 3%) 91%,
-    transparent
-  );
-  -webkit-mask-image: var(--matter-scroll-edge-ease);
-  mask-image: var(--matter-scroll-edge-ease);
+}
+
+@supports (animation-timeline: scroll()) {
+  html[data-matter-scroll-edge="blur"] :has(> [data-matter-edge-blur]) {
+    timeline-scope: --matter-scroll-edge;
+  }
+
+  html[data-matter-scroll-edge="blur"]
+    .topbar-scroll-fade:not(.flex-col-reverse):has(~ [data-matter-edge-blur]) {
+    scroll-timeline: --matter-scroll-edge block;
+  }
+
+  [data-matter-edge-blur] > i,
+  [data-matter-edge-blur]::after {
+    opacity: 0;
+    animation: matter-scroll-edge-in linear both;
+    animation-timeline: --matter-scroll-edge;
+    animation-range: 0 var(--workspace-titlebar-scroll-fade-height);
+  }
 }
 
 /* A frosted glass band in the page's own color, like a macOS toolbar over scrolled content. */
