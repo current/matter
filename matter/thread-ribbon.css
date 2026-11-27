@@ -336,9 +336,11 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
   font-variant-numeric: tabular-nums;
 }
 
+/* A globe for running servers, with a count from two up; the ports live in the popover. */
 [data-matter-whisper-server] {
   display: inline-flex;
   align-items: center;
+  gap: 3px;
   height: 18px;
   padding-inline: 6px;
   border-radius: 999px;
@@ -347,6 +349,18 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
   font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+[data-matter-whisper-server] svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+
+[data-matter-whisper-server]:not(:has(> [data-matter-whisper-server-count])) {
+  width: 18px;
+  justify-content: center;
+  padding-inline: 0;
 }
 
 [data-matter-whisper-chevron] {

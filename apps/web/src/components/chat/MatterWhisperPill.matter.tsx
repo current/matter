@@ -14,6 +14,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
+  GlobeIcon,
   HistoryIcon,
   MessagesSquareIcon,
   TerminalIcon,
@@ -396,7 +397,7 @@ export function MatterLineagePopoverContent(
         />
         {props.serverCount > 0 ? (
           <LineageFooterLink
-            icon={<TerminalIcon aria-hidden />}
+            icon={<GlobeIcon aria-hidden />}
             label={<T context="running dev servers">Servers</T>}
             count={props.serverCount}
             onClick={() => setMatterLineageView("servers")}
@@ -505,7 +506,6 @@ export function MatterWhisperPill(props: LineageThreadProps) {
         : "command",
     ),
   );
-  const [firstServer] = servers;
   const label =
     rows.length > 0
       ? gt("{count} running", { count: rows.length })
@@ -569,10 +569,17 @@ export function MatterWhisperPill(props: LineageThreadProps) {
                 <WhisperRowTimer startedAtMs={oldest} />
               </span>
             ) : null}
-            {firstServer ? (
+            {servers.length > 0 ? (
               <span data-matter-whisper-server>
-                :{firstServer.port}
-                {servers.length > 1 ? ` +${servers.length - 1}` : ""}
+                <GlobeIcon aria-hidden />
+                {servers.length > 1 ? (
+                  <span data-matter-whisper-server-count>{servers.length}</span>
+                ) : null}
+                <span className="sr-only">
+                  {gt("Servers on ports {ports}", {
+                    ports: servers.map((server) => server.port).join(", "),
+                  })}
+                </span>
               </span>
             ) : null}
             <ChevronUpIcon aria-hidden data-matter-whisper-chevron />

@@ -216,16 +216,33 @@ describe("MatterWhisperPill", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a running dev server's port, in dark mode too", async () => {
+  it("marks running dev servers with a globe and keeps their ports for screen readers, in dark mode too", async () => {
     using _styles = withStyles();
     document.documentElement.classList.add("dark");
     state.servers = [{ pid: 1, port: 5173, terminal: null, processName: "node" }];
     await using screen = await render(
       <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
     );
-    await expect.element(screen.getByText(":5173")).toBeVisible();
+    await expect.element(screen.getByText("Servers on ports 5173")).toBeInTheDocument();
+    const chip = screen.container.querySelector<HTMLElement>("[data-matter-whisper-server]")!;
+    expect(chip.querySelector("svg")).not.toBeNull();
+    expect(chip.querySelector("[data-matter-whisper-server-count]")).toBeNull();
     const pill = screen.container.querySelector<HTMLElement>("[data-matter-whisper-pill]")!;
     expect(getComputedStyle(pill).backgroundColor).toBe("rgb(28, 28, 28)");
+  });
+
+  it("counts servers on the globe once more than one runs", async () => {
+    using _styles = withStyles();
+    state.servers = [
+      { pid: 1, port: 5173, terminal: null, processName: "node" },
+      { pid: 2, port: 5799, terminal: null, processName: "node" },
+    ];
+    await using screen = await render(
+      <MatterWhisperPill environmentId={ENVIRONMENT} threadId={THREAD} backgroundWork={idleWork} />,
+    );
+    await expect.element(screen.getByText("Servers on ports 5173, 5799")).toBeInTheDocument();
+    const count = screen.container.querySelector("[data-matter-whisper-server-count]");
+    expect(count?.textContent).toBe("2");
   });
 
   it("clears popover state when transitioning from active to idle so future runs stay closed", async () => {

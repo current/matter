@@ -4316,6 +4316,7 @@
   "45ff94430871a42a": "{count, plural, one {{count} server} other {{count} servers}}",
   "638841ed31c5041c": "{count, plural, one {{count} automation} other {{count} automations}} running",
   "0cee7400239abb12": "Lineage: {label}",
+  "aa6ce725e42ea9ab": "Servers on ports {ports}",
   "0bc72950072ee1aa": [
     "на ",
     {
