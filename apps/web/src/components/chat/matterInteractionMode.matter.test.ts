@@ -5,19 +5,21 @@ import { DraftId, useComposerDraftStore } from "../../composerDraftStore";
 import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "../../proposedPlan";
 import { searchSlashCommandItems } from "./composerSlashCommandSearch";
 import {
-  clearPersistedComposerInteractionMode,
-  deriveMatterComposerInteractionMode,
   isGoalClearCommand,
   latestProposedPlan,
-  matterInteractionModeSlashItems,
   nextInteractionMode,
+  prependKeepingGoalCommand,
   providerHasNativeGoals,
   resolveComposerInteractionMode,
   resolveInteractionModeSend,
-  prependKeepingGoalCommand,
   resolveMatterModeSend,
   threadHasNativeGoal,
   withNativeGoalCommand,
+} from "@t3tools/client-runtime/matter/interaction-mode";
+import {
+  clearPersistedComposerInteractionMode,
+  deriveMatterComposerInteractionMode,
+  matterInteractionModeSlashItems,
 } from "./matterInteractionMode.matter";
 import { resolveMultipleModelTargets } from "./chatViewSend";
 import type { ProviderInstanceEntry } from "../../providerInstances";

@@ -5793,5 +5793,21 @@
   "3d3c2c16506e66bf": "Writing",
   "f1a84f6361ceb78e": "Needs your input",
   "eebeab436756c4a4": "Compacting",
-  "d4d6459ff291c0be": "Setting up worktree"
+  "d4d6459ff291c0be": "Setting up worktree",
+  "2dbbaa767bbf24a1": "Interaktionsläge: {label}",
+  "53628149fa258575": "Mode",
+  "b557a9b90dd7b99d": "Lämna läget {label}",
+  "d0ef8003cb23e7b6": "Behörigheter: {mode}",
+  "4aa91c06e3cc23d3": "Behörigheter",
+  "2d68cb39ed6b45ca": "Planera först: undersök och föreslå en plan innan något ändras",
+  "088a7afa42adcd8d": "Arbeta självständigt tills uppgiften är verifierat klar",
+  "1e2664b52d580a91": "Sätt ett mål och arbeta självständigt tills det är verifierat uppnått",
+  "b5724101371222fc": "Tillbaka till vanlig interaktiv kodning",
+  "f1f3c589d0c0fd77": "Standard",
+  "59ee8cd68fb1cc58": "Vanlig interaktiv kodning",
+  "89a52e8bfb1e817b": "Planera",
+  "42c4a91e4a91f914": "Undersök, ställ frågor och föreslå en steg-för-steg-plan innan något ändras",
+  "40fed90b1e2c6e6f": "Mål",
+  "51cc9f52e73c8f47": "Självständigt genomförande från början till slut tills det är verifierat klart",
+  "4d1326fad2b65d90": "Local"
 }

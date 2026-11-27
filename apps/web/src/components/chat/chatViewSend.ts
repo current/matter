@@ -38,7 +38,10 @@ import { ATTACHMENT_ONLY_BOOTSTRAP_PROMPT } from "@t3tools/shared/composerContex
 import { createModelSelection } from "@t3tools/shared/model";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { getComposerPromptInjectionState, getComposerProviderState } from "./composerProviderState";
-import { nativeGoalCommand, providerHasNativeGoals } from "./matterInteractionMode.matter";
+import {
+  nativeGoalCommand,
+  providerHasNativeGoals,
+} from "@t3tools/client-runtime/matter/interaction-mode";
 import {
   formatOutgoingPrompt,
   getAntigravitySendBlockReason,

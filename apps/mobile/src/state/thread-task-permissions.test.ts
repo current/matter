@@ -13,6 +13,7 @@ import {
   type ModelSelection,
   type OrchestrationMessageContext,
   type OrchestrationV2ThreadProjection,
+  type ProviderInteractionMode,
   type RuntimeMode,
   type ServerConfig,
 } from "@t3tools/contracts";
@@ -39,6 +40,7 @@ const state = vi.hoisted(() => ({
     context: undefined as OrchestrationMessageContext | undefined,
     modelSelection: undefined as ModelSelection | undefined,
     runtimeMode: undefined as RuntimeMode | undefined,
+    interactionMode: undefined as ProviderInteractionMode | undefined,
   },
   serverConfig: null as ServerConfig | null,
   projection: null as OrchestrationV2ThreadProjection | null,
@@ -261,6 +263,7 @@ beforeEach(() => {
     context: undefined,
     modelSelection: undefined,
     runtimeMode: undefined,
+    interactionMode: undefined,
   };
   state.freshPending = false;
   state.questionDrafts = {};
@@ -802,5 +805,72 @@ describe("mobile handoff preview and submission", () => {
       }),
     );
     expect(state.clearDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles Plan/Goal slash prefixes and native-first Goal sends & exits", async () => {
+    state.grantedEnvironments.add("secondary");
+    state.serverConfig = {
+      ...state.serverConfig,
+      providers: [
+        {
+          instanceId: ProviderInstanceId.make("codex"),
+          driver: "codex",
+          installed: true,
+          enabled: true,
+          status: "ready",
+          auth: { status: "authenticated" },
+          checkedAt: "2026-09-05T00:00:00.000Z",
+          models: [],
+          slashCommands: [],
+          skills: [],
+          version: null,
+        },
+      ],
+    } as unknown as ServerConfig;
+
+    // Standalone `/plan` switches mode without enqueueing a turn.
+    state.draft = { ...state.draft, text: "/plan", attachments: [], interactionMode: undefined };
+    expect(await useThreadComposerState(NO_SIDE_CHATS).onSendMessage()).toBeNull();
+    expect(state.updateSettings).toHaveBeenLastCalledWith("secondary:thread", {
+      interactionMode: "plan",
+    });
+    expect(state.enqueue).not.toHaveBeenCalled();
+    expect(state.clearDraft).toHaveBeenCalledOnce();
+
+    // First Goal prompt on a native-goal provider prefixes `/goal ` and sends `interactionMode: "goal"`.
+    vi.clearAllMocks();
+    state.draft = {
+      ...state.draft,
+      text: "ship the shelf",
+      attachments: [],
+      interactionMode: "goal",
+    };
+    expect(await useThreadComposerState(NO_SIDE_CHATS).onSendMessage()).toBe("message");
+    expect(state.enqueue).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        text: "/goal ship the shelf",
+        interactionMode: "goal",
+      }),
+    );
+
+    // Leaving a running native goal sends `/goal clear` with the target mode.
+    vi.clearAllMocks();
+    state.thread = {
+      ...state.thread,
+      interactionMode: "goal",
+      goal: { objective: "ship the shelf", status: "active" },
+    } as typeof state.thread;
+    state.draft = { ...state.draft, text: "", attachments: [], interactionMode: undefined };
+    useThreadComposerState(NO_SIDE_CHATS).setInteractionMode("default");
+    expect(state.updateSettings).toHaveBeenLastCalledWith("secondary:thread", {
+      interactionMode: "default",
+    });
+    expect(state.enqueue).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        text: "/goal clear",
+        interactionMode: "default",
+        restoreToDraft: false,
+      }),
+    );
   });
 });

@@ -5787,5 +5787,21 @@
   "3d3c2c16506e66bf": "Writing",
   "f1a84f6361ceb78e": "Needs your input",
   "eebeab436756c4a4": "Compacting",
-  "d4d6459ff291c0be": "Setting up worktree"
+  "d4d6459ff291c0be": "Setting up worktree",
+  "2dbbaa767bbf24a1": "Mode d’interaction : {label}",
+  "53628149fa258575": "Mode",
+  "b557a9b90dd7b99d": "Quitter le mode {label}",
+  "d0ef8003cb23e7b6": "Autorisations : {mode}",
+  "4aa91c06e3cc23d3": "Autorisations",
+  "2d68cb39ed6b45ca": "Planifier d’abord : rechercher et proposer un plan avant de modifier",
+  "088a7afa42adcd8d": "Travailler en autonomie jusqu’à ce que la tâche soit vérifiée comme terminée",
+  "1e2664b52d580a91": "Définir un objectif et travailler en autonomie jusqu’à vérification de son atteinte",
+  "b5724101371222fc": "Revenir au codage interactif normal",
+  "f1f3c589d0c0fd77": "Par défaut",
+  "59ee8cd68fb1cc58": "Codage interactif normal",
+  "89a52e8bfb1e817b": "Plan",
+  "42c4a91e4a91f914": "Rechercher, poser des questions et proposer un plan étape par étape avant de modifier",
+  "40fed90b1e2c6e6f": "Objectif",
+  "51cc9f52e73c8f47": "Exécution autonome de bout en bout jusqu’à vérification de l’achèvement",
+  "4d1326fad2b65d90": "Local"
 }

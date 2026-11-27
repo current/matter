@@ -90,6 +90,7 @@ import {
   type ComposerDraft,
   getComposerDraftSnapshot,
   mergeComposerDraftContent,
+  releaseComposerDraftInteractionMode,
   replaceComposerDraftAttachments,
   removeDeliveredCloudQueuedMessage,
   undoComposerDraftMerge,
@@ -1051,6 +1052,10 @@ export function createThreadOutboxDelivery(): {
       deliveredSequence(deliveryResult),
     );
     if (outcome !== "removed") return yield* retryDelivery;
+    releaseComposerDraftInteractionMode(
+      scopedThreadKey(queuedMessage.environmentId, queuedMessage.threadId),
+      sendSettings.interactionMode,
+    );
     acknowledgedExistingThreadMessageIds.delete(persistedMessage.messageId);
   });
 

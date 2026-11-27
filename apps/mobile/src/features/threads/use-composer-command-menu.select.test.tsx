@@ -96,3 +96,44 @@ it("/ ranks a skill whose name matches exactly above skills that only mention it
   expect(menu?.items[0]?.id).toBe("skill:review");
   act(() => root.unmount());
 });
+
+it("/plan and /goal switch interaction mode and keep `/goal ` on native goal providers", async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const onChangeDraftMessage = vi.fn();
+  const onSelectInteractionMode = vi.fn();
+  let menu: ReturnType<typeof useComposerCommandMenu> | undefined;
+  function Probe(props: { readonly draftMessage: string; readonly nativeGoalProvider: boolean }) {
+    menu = useComposerCommandMenu({
+      draftMessage: props.draftMessage,
+      ownerKey: "draft",
+      environmentId: null,
+      projectCwd: null,
+      selectedProviderStatus: null,
+      hasThread: true,
+      hasCompactableConversation: false,
+      offersInteractionModes: true,
+      nativeGoalProvider: props.nativeGoalProvider,
+      onChangeDraftMessage,
+      onOpenModelPicker: vi.fn(),
+      onSelectInteractionMode,
+    });
+    return null;
+  }
+
+  const root = createRoot(document.createElement("div"));
+  await act(async () => root.render(<Probe draftMessage="/pl" nativeGoalProvider={false} />));
+  const plan = menu?.items.find((item) => item.id === "cmd:plan");
+  if (!plan) throw new Error("Expected /plan in the slash menu");
+  await act(async () => menu?.onSelect(plan));
+  expect(onChangeDraftMessage).toHaveBeenLastCalledWith("");
+  expect(onSelectInteractionMode).toHaveBeenLastCalledWith("plan");
+
+  await act(async () => root.render(<Probe draftMessage="/go" nativeGoalProvider />));
+  await act(async () => menu?.onSelectionChange({ start: 3, end: 3 }));
+  const goal = menu?.items.find((item) => item.id === "cmd:goal");
+  if (!goal) throw new Error("Expected /goal in the slash menu");
+  await act(async () => menu?.onSelect(goal));
+  expect(onChangeDraftMessage).toHaveBeenLastCalledWith("/goal ");
+  expect(onSelectInteractionMode).toHaveBeenLastCalledWith("goal");
+  act(() => root.unmount());
+});

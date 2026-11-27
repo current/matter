@@ -18,7 +18,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HiddenThreadContext } from "./backgroundThread";
 import { ComposerControl } from "./ComposerControl";
 import { useComposerMenuProps } from "./composerEventScope";
-import { MATTER_INTERACTION_MODES } from "./matterInteractionMode.matter";
+import { MATTER_INTERACTION_MODES } from "@t3tools/client-runtime/matter/interaction-mode";
 import { useComposerMenuState } from "./useComposerMenuState";
 
 const MODE_COPY = {

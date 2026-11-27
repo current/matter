@@ -1633,6 +1633,25 @@ export function releaseComposerDraftModelSelection(
   });
 }
 
+/** Lets the thread's interaction mode show again once the server accepted this pick. */
+export function releaseComposerDraftInteractionMode(
+  draftKey: string,
+  persisted: ProviderInteractionMode,
+): void {
+  updateComposerDrafts((current) => {
+    const existing = current[draftKey];
+    if (
+      !existing ||
+      existing.interactionMode === undefined ||
+      existing.interactionMode !== persisted
+    ) {
+      return current;
+    }
+    const { interactionMode: _interactionMode, ...draft } = existing;
+    return withComposerDraft(current, draftKey, draft);
+  });
+}
+
 export function setFreshSessionPending(draftKey: string, pending: boolean): void {
   if ((getComposerDraftSnapshot(draftKey).freshContext === true) === pending) return;
   updateComposerDraftSettings(draftKey, { freshContext: pending ? true : undefined });
@@ -1714,6 +1733,7 @@ export function clearComposerDraftContentState(
   options?: {
     readonly clearModelSelection?: boolean;
     readonly clearWorkspaceSelection?: boolean;
+    readonly clearInteractionMode?: boolean;
   },
 ): Record<string, ComposerDraft> {
   const existing = current[draftKey];
@@ -1725,6 +1745,7 @@ export function clearComposerDraftContentState(
     context: _context,
     modelSelection,
     workspaceSelection,
+    interactionMode,
     project: _project,
     ...retained
   } = existing;
@@ -1734,6 +1755,7 @@ export function clearComposerDraftContentState(
     ...(options?.clearWorkspaceSelection || workspaceSelection === undefined
       ? {}
       : { workspaceSelection }),
+    ...(options?.clearInteractionMode || interactionMode === undefined ? {} : { interactionMode }),
     text: "",
     attachments: [],
   };
@@ -1977,6 +1999,7 @@ export function clearComposerDraftContent(
   options?: {
     readonly clearModelSelection?: boolean;
     readonly clearWorkspaceSelection?: boolean;
+    readonly clearInteractionMode?: boolean;
     // Defer sweeping during enqueue; rollback can briefly remove ownership before restoring attachments.
     readonly deferAttachmentCleanup?: boolean;
   },

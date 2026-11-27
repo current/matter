@@ -5774,5 +5774,21 @@
   "3d3c2c16506e66bf": "Writing",
   "f1a84f6361ceb78e": "Needs your input",
   "eebeab436756c4a4": "Compacting",
-  "d4d6459ff291c0be": "Setting up worktree"
+  "d4d6459ff291c0be": "Setting up worktree",
+  "2dbbaa767bbf24a1": "交互模式：{label}",
+  "53628149fa258575": "Mode",
+  "b557a9b90dd7b99d": "退出{label}模式",
+  "d0ef8003cb23e7b6": "权限：{mode}",
+  "4aa91c06e3cc23d3": "权限",
+  "2d68cb39ed6b45ca": "先计划：在编辑前调研并提出计划",
+  "088a7afa42adcd8d": "自主工作，直到任务被验证完成",
+  "1e2664b52d580a91": "设定目标并自主工作，直到验证完成",
+  "b5724101371222fc": "返回常规交互式编码",
+  "f1f3c589d0c0fd77": "默认",
+  "59ee8cd68fb1cc58": "常规交互式编码",
+  "89a52e8bfb1e817b": "计划",
+  "42c4a91e4a91f914": "在编辑前先调研、提问并提出分步计划",
+  "40fed90b1e2c6e6f": "目标",
+  "51cc9f52e73c8f47": "自主端到端执行，直到验证完成",
+  "4d1326fad2b65d90": "Local"
 }

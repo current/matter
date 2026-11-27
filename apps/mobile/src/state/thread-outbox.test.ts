@@ -389,6 +389,17 @@ describe("thread outbox", () => {
         providers,
       ).interactionMode,
     ).toBe("plan");
+    expect(
+      resolveQueuedThreadSettings(
+        { ...message, interactionMode: "goal" },
+        {
+          modelSelection: antigravity,
+          runtimeMode: "approval-required",
+          interactionMode: "default",
+        },
+        providers,
+      ).interactionMode,
+    ).toBe("goal");
   });
 
   // regression: #29729 Cursor runs its own Fast default when the turn carries no fastMode

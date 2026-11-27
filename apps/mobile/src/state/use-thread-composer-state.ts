@@ -36,6 +36,7 @@ import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   type EnvironmentId,
   type ModelSelection,
+  type ProviderInteractionMode,
   type RuntimeMode,
   type ScopedThreadRef,
   type ThreadId,
@@ -102,9 +103,14 @@ import {
   scheduleUnusedComposerAttachmentCleanup,
   setComposerDraftText,
   setFreshSessionPending,
+  updateComposerDraftSettings,
   useComposerDraft,
   useComposerDraftSettings,
 } from "./use-composer-drafts";
+import {
+  deriveMatterMobileInteractionMode,
+  resolveMatterMobileModeSend,
+} from "../features/matter/composer/matterComposerLogic";
 import { isClearComposerCommand, parseSideChatCommand } from "@t3tools/shared/composerTrigger";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
 import {
@@ -358,8 +364,16 @@ export function useThreadComposerState(input: {
     serverConfig?.providers ?? [],
   );
   const runtimeMode = threadDraftSettings.runtimeMode ?? selectedThread?.runtimeMode ?? null;
-  // Plan mode is not offered to users; every send runs in build mode.
-  const interactionMode = selectedThread ? DEFAULT_PROVIDER_INTERACTION_MODE : null;
+  const selectedProviderForMode =
+    serverConfig?.providers.find((entry) => entry.instanceId === modelSelection?.instanceId) ??
+    null;
+  const interactionModeState = deriveMatterMobileInteractionMode({
+    draftInteractionMode: threadDraftSettings.interactionMode,
+    thread: selectedThread ?? undefined,
+    isServerThread: selectedThread !== null && selectedThreadCreation === null,
+    provider: selectedProviderForMode,
+  });
+  const interactionMode = selectedThread ? interactionModeState.mode : null;
   const canSwitchThreadProvider = threadAllowsProviderSwitch({
     thread: selectedThreadShell,
     projection: selectedThreadProjection?.projection,
@@ -792,13 +806,40 @@ export function useThreadComposerState(input: {
       return null;
     }
 
+    const provider = serverConfig?.providers.find(
+      (entry) => entry.instanceId === modelSelection.instanceId,
+    );
+    const modeSend = resolveMatterMobileModeSend({
+      prompt: text,
+      bypass: beforeDispatch !== undefined,
+      editingQueuedMessage: false,
+      modeState: deriveMatterMobileInteractionMode({
+        draftInteractionMode: draft.interactionMode,
+        thread,
+        isServerThread: selectedThreadCreation === null,
+        provider: provider ?? null,
+      }),
+      attachmentCount: attachments.length,
+      contextCount: draft.context?.records.length ?? 0,
+    });
+    const canClearNativeGoalNow =
+      selectedThreadCreation === null &&
+      selectedEnvironmentRuntime?.connectionState === "connected" &&
+      readEnvironmentScope(thread.environmentId, AuthOrchestrationOperateScope);
+    if (modeSend.kind === "switch") {
+      updateComposerDraftSettings(threadKey, { interactionMode: modeSend.nextMode });
+      if (modeSend.clearNativeGoal && canClearNativeGoalNow) {
+        void onSendCommand("/goal clear", modeSend.nextMode);
+      }
+      clearComposerDraftContent(threadKey);
+      return null;
+    }
     if (modelUnavailable) {
       alertModelUnavailable();
       return null;
     }
-    const provider = serverConfig?.providers.find(
-      (entry) => entry.instanceId === modelSelection.instanceId,
-    );
+    const sendText = modeSend.text;
+    const sendInteractionMode = modeSend.interactionMode;
     const feedbackCommand =
       attachments.length === 0 && provider?.driver === "codex"
         ? parseCodexFeedbackCommand(text)
@@ -900,6 +941,12 @@ export function useThreadComposerState(input: {
       appAtomRegistry.get(fullHistoryThreadKeysAtom)[threadKey] !== true &&
       resumeCompactionTokens(modelSelection, text, metadata.createdAt) !== null;
     const messageId = MessageId.make(metadata.messageId);
+    if (modeSend.switchTo !== null) {
+      updateComposerDraftSettings(threadKey, { interactionMode: modeSend.switchTo });
+      if (modeSend.clearNativeGoalBeforeSend && canClearNativeGoalNow) {
+        await onSendCommand("/goal clear", modeSend.switchTo);
+      }
+    }
     onWillEnqueue?.();
     clearThreadComposerError(threadKey);
     const enqueuePromise = enqueueThreadOutboxMessage({
@@ -907,12 +954,12 @@ export function useThreadComposerState(input: {
       threadId: selectedThreadShell.id,
       messageId,
       commandId: CommandId.make(metadata.commandId),
-      text,
+      text: sendText,
       attachments,
       context: draft.context,
       modelSelection,
       runtimeMode: draft.runtimeMode ?? thread.runtimeMode,
-      interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+      interactionMode: sendInteractionMode,
       ...(compactBeforeSend
         ? { compactBeforeSend, dispatchMode: "queue" as const }
         : followUpDispatchMode === null
@@ -979,7 +1026,10 @@ export function useThreadComposerState(input: {
   })();
 
   /** Queues a standalone text command such as `/goal clear` and leaves the composer draft alone. */
-  const onSendCommand = async (text: string) => {
+  const onSendCommand = async (
+    text: string,
+    interactionModeOverride: ProviderInteractionMode = DEFAULT_PROVIDER_INTERACTION_MODE,
+  ) => {
     if (
       !selectedThreadShell ||
       selectedThreadCreation !== null ||
@@ -1016,10 +1066,30 @@ export function useThreadComposerState(input: {
       attachments: [],
       modelSelection,
       runtimeMode: thread.runtimeMode,
-      interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+      interactionMode: interactionModeOverride,
       createdAt: metadata.createdAt,
     });
     return messageId;
+  };
+
+  const setInteractionMode = (next: ProviderInteractionMode) => {
+    if (
+      !selectedThreadShell ||
+      selectedThreadKey === null ||
+      next === interactionModeState.mode ||
+      (selectedEnvironmentRuntime?.connectionState === "connected" &&
+        !readEnvironmentScope(selectedThreadShell.environmentId, AuthOrchestrationOperateScope))
+    ) {
+      return;
+    }
+    updateComposerDraftSettings(selectedThreadKey, { interactionMode: next });
+    if (
+      interactionModeState.clearsNativeGoalOnExit &&
+      selectedThreadCreation === null &&
+      selectedEnvironmentRuntime?.connectionState === "connected"
+    ) {
+      void onSendCommand("/goal clear", next);
+    }
   };
 
   const onChangeDraftMessage = (value: string) => {
@@ -1086,6 +1156,7 @@ export function useThreadComposerState(input: {
     canSwitchThreadProvider,
     runtimeMode,
     interactionMode,
+    setInteractionMode,
     activeThreadBusy,
     interruptibleRunId,
     onChangeDraftMessage,

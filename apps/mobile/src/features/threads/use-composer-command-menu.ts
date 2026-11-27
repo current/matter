@@ -3,10 +3,12 @@ import * as Dialog from "../../components/ui/Dialog";
 import type {
   EnvironmentId,
   ProjectId,
+  ProviderInteractionMode,
   ServerProvider,
   ThreadId,
   ThreadPullRequestLink,
 } from "@t3tools/contracts";
+import { matterMobileInteractionModeSlashItems } from "../matter/composer/matterComposerLogic";
 import {
   type ComposerEnvironmentCandidate,
   matchComposerEnvironmentItems,
@@ -115,6 +117,8 @@ export function buildComposerSlashCommandItems(
     /** T3's `/clear` replaces the provider's, which would clear a session T3 still treats as live. */
     readonly offersFreshSession?: boolean;
     readonly offersSideChat?: boolean;
+    readonly offersInteractionModes?: boolean;
+    readonly nativeGoalProvider?: boolean;
     readonly selectedProviderStatus: Pick<ServerProvider, "driver" | "slashCommands"> | null;
   },
   resolve: MessageResolver = m,
@@ -135,6 +139,11 @@ export function buildComposerSlashCommandItems(
   // Providers expand commands only at the start of a message. T3 commands
   // change local state and do not have this restriction, except `/clear`.
   if (!input.atMessageStart) return items;
+  if (input.offersInteractionModes) {
+    items.push(
+      ...matterMobileInteractionModeSlashItems(query, input.nativeGoalProvider === true, resolve),
+    );
+  }
   if (input.offersSideChat) {
     for (const [command, description] of [
       ["side", resolve(msg("Ask a side question in a new side chat"))],
@@ -162,6 +171,9 @@ export function buildComposerSlashCommandItems(
   for (const command of input.selectedProviderStatus?.slashCommands ?? []) {
     if (!command.name.toLowerCase().includes(query)) continue;
     if (command.name === "clear" && input.offersFreshSession) continue;
+    if (command.name === "goal" && input.offersInteractionModes && input.nativeGoalProvider) {
+      continue;
+    }
     if (command.name === "compact" && !input.hasCompactableConversation) continue;
     if (command.name === USAGE_LIMITS_COMMAND.name && input.offersUsageLimits && !input.hasThread) {
       continue;
@@ -272,6 +284,9 @@ export function useComposerCommandMenu({
   modelProviders,
   onFreshSession,
   offersSideChat = false,
+  offersInteractionModes = false,
+  nativeGoalProvider = false,
+  onSelectInteractionMode,
 }: {
   readonly draftMessage: string;
   readonly ownerKey: string | null;
@@ -299,6 +314,9 @@ export function useComposerCommandMenu({
   /** Arms a fresh session for the next message; absent where `/clear` is unavailable. */
   readonly onFreshSession?: () => void;
   readonly offersSideChat?: boolean;
+  readonly offersInteractionModes?: boolean;
+  readonly nativeGoalProvider?: boolean;
+  readonly onSelectInteractionMode?: (mode: ProviderInteractionMode) => void;
 }) {
   const gt = useGT();
   const messages = useMessages();
@@ -408,6 +426,8 @@ export function useComposerCommandMenu({
           offersUsageLimits,
           offersFreshSession: onFreshSession !== undefined,
           offersSideChat,
+          offersInteractionModes,
+          nativeGoalProvider,
           selectedProviderStatus: selectedProviderStatus
             ? {
                 ...selectedProviderStatus,
@@ -678,6 +698,23 @@ export function useComposerCommandMenu({
     }
     if (item.type === "slash-command" && item.command === "clear" && onFreshSession) {
       clearTriggerThen(onFreshSession);
+      return;
+    }
+    if (
+      item.type === "slash-command" &&
+      (item.command === "plan" || item.command === "goal" || item.command === "default") &&
+      onSelectInteractionMode
+    ) {
+      const keepsGoalCommand = item.command === "goal" && nativeGoalProvider;
+      const replaced = replaceTextRange(
+        draftMessage,
+        trigger.rangeStart,
+        trigger.rangeEnd,
+        keepsGoalCommand ? "/goal " : "",
+      );
+      setSelection({ start: replaced.cursor, end: replaced.cursor });
+      onChangeDraftMessage(replaced.text);
+      onSelectInteractionMode(item.command);
       return;
     }
     if (

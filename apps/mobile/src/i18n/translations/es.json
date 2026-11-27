@@ -5787,5 +5787,21 @@
   "3d3c2c16506e66bf": "Writing",
   "f1a84f6361ceb78e": "Needs your input",
   "eebeab436756c4a4": "Compacting",
-  "d4d6459ff291c0be": "Setting up worktree"
+  "d4d6459ff291c0be": "Setting up worktree",
+  "2dbbaa767bbf24a1": "Modo de interacción: {label}",
+  "53628149fa258575": "Mode",
+  "b557a9b90dd7b99d": "Salir del modo {label}",
+  "d0ef8003cb23e7b6": "Permisos: {mode}",
+  "4aa91c06e3cc23d3": "Permisos",
+  "2d68cb39ed6b45ca": "Primero planificar: investiga y propone un plan antes de editar",
+  "088a7afa42adcd8d": "Trabajar de forma autónoma hasta verificar que la tarea está completa",
+  "1e2664b52d580a91": "Fijar un objetivo y trabajar de forma autónoma hasta verificar que se cumple",
+  "b5724101371222fc": "Volver a la programación interactiva normal",
+  "f1f3c589d0c0fd77": "Predeterminado",
+  "59ee8cd68fb1cc58": "Programación interactiva normal",
+  "89a52e8bfb1e817b": "Planificar",
+  "42c4a91e4a91f914": "Investiga, haz preguntas y propone un plan paso a paso antes de editar",
+  "40fed90b1e2c6e6f": "Objetivo",
+  "51cc9f52e73c8f47": "Ejecución autónoma de principio a fin hasta verificar que está completa",
+  "4d1326fad2b65d90": "Local"
 }
