@@ -30,7 +30,7 @@ const SETTLED: ReadonlySet<ClaudeCloudSessionState | null | undefined> = new Set
 ]);
 
 /** Sessions an agent or user started from a chat, not brought back, whose end isn't reported yet. */
-export const watchedSessions = (
+const watchedSessions = (
   sessions: ReadonlyArray<TrackedClaudeCloudSession>,
   now: number,
 ): ReadonlyArray<TrackedClaudeCloudSession> =>
@@ -75,7 +75,7 @@ const failedText = (remote: ClaudeCloudRemoteSession) =>
   ].join("\n");
 
 /** What to tell the source thread about a session's latest state, if anything. */
-export const claudeCloudReport = (input: {
+const claudeCloudReport = (input: {
   readonly session: TrackedClaudeCloudSession;
   readonly remote: ClaudeCloudRemoteSession;
   readonly seenRunning: boolean;

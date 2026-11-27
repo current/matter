@@ -4337,6 +4337,8 @@
   "34b5ccf452e1dc18": "Use the classic details card",
   "a06eb47a82969918": "Субагент",
   "3e96cf915b1d079b": "Stop {title}",
+  "9fb30dbeae76b935": "{title}, cloud run, needs input",
+  "3acf475328d56252": "{title}, cloud run",
   "ba2cf3dd6de0d1a6": "Не удалось остановить субагента",
   "bc5f7c6821578b8f": "Предыдущие агенты",
   "dc28386e0a961d4d": "Боковые чаты",
@@ -4358,6 +4360,8 @@
     }
   ],
   "25da730aa6ca43c3": "Stop",
+  "74b2c584cc69b5c9": "Needs input",
+  "d0f54c94bc193a89": "Cloud",
   "a3db5fd6c4b955ec": "Back",
   "a33df1497c9fa65b": [
     "Lineage · ",
@@ -5856,6 +5860,15 @@
   "21d0ab2cb7685f9c": "Не сейчас",
   "fb4516dffeebe159": "Готово",
   "a4461ecfdea68985": "В вашем аккаунте пока нет других опубликованных окружений. Опубликуйте окружение с другого устройства, и оно появится здесь.",
+  "aa34e64ede248096": "Ran in cloud, from {title}",
+  "96ea6b508e827db2": [
+    "Ran in cloud for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "45fb5ac2c21df202": "Проверка текущей установки",
   "0afc8b32e04965cf": "Ожидание установщика",
   "08e68823178c1e89": "Загрузка клиента relay",
@@ -13807,6 +13820,8 @@
   "d3b196a6b0c4c7c9": "Claude Cloud sessions",
   "ca9617cd3b34471c": "Show {count} more cloud sessions",
   "51a6253a30722d04": "{count} more",
+  "c7440a0bc42a782f": "Needs input",
+  "b24b57bdf1b68b1b": "{title}, cloud run, working for {duration}",
   "29a9beca8f378a2e": "Hide subagents of {title}",
   "32910347d718b7cf": "Show {count} subagents of {title}",
   "e8e7b6206aa41761": "Subagents of {title}",

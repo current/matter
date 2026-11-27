@@ -188,3 +188,9 @@ export const SpinnerGlyph = (props: IconProps) => (
     <path d="M8 2.5A5.5 5.5 0 0 1 13.5 8" strokeWidth={1.65} />
   </Glyph>
 );
+
+export const CloudGlyph = (props: IconProps) => (
+  <Glyph {...props}>
+    <path d="M4.6 12.75h6.9a2.75 2.75 0 0 0 .35-5.48 4 4 0 0 0-7.6.9 2.3 2.3 0 0 0 .35 4.58z" />
+  </Glyph>
+);

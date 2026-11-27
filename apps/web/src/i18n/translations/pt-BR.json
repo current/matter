@@ -4338,6 +4338,8 @@
   "34b5ccf452e1dc18": "Use the classic details card",
   "a06eb47a82969918": "Subagente",
   "3e96cf915b1d079b": "Stop {title}",
+  "9fb30dbeae76b935": "{title}, cloud run, needs input",
+  "3acf475328d56252": "{title}, cloud run",
   "ba2cf3dd6de0d1a6": "Não foi possível parar o subagente",
   "bc5f7c6821578b8f": "Agentes anteriores",
   "dc28386e0a961d4d": "Chats paralelos",
@@ -4359,6 +4361,8 @@
     }
   ],
   "25da730aa6ca43c3": "Stop",
+  "74b2c584cc69b5c9": "Needs input",
+  "d0f54c94bc193a89": "Cloud",
   "a3db5fd6c4b955ec": "Back",
   "a33df1497c9fa65b": [
     "Lineage · ",
@@ -5857,6 +5861,15 @@
   "21d0ab2cb7685f9c": "Agora não",
   "fb4516dffeebe159": "Concluído",
   "a4461ecfdea68985": "Nenhum outro ambiente foi publicado na sua conta ainda. Publique um a partir de outro dispositivo e ele aparecerá aqui.",
+  "aa34e64ede248096": "Ran in cloud, from {title}",
+  "96ea6b508e827db2": [
+    "Ran in cloud for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "45fb5ac2c21df202": "Verificando a instalação atual",
   "0afc8b32e04965cf": "Aguardando o instalador",
   "08e68823178c1e89": "Baixando o cliente do relay",
@@ -13808,6 +13821,8 @@
   "d3b196a6b0c4c7c9": "Claude Cloud sessions",
   "ca9617cd3b34471c": "Show {count} more cloud sessions",
   "51a6253a30722d04": "{count} more",
+  "c7440a0bc42a782f": "Needs input",
+  "b24b57bdf1b68b1b": "{title}, cloud run, working for {duration}",
   "29a9beca8f378a2e": "Hide subagents of {title}",
   "32910347d718b7cf": "Show {count} subagents of {title}",
   "e8e7b6206aa41761": "Subagents of {title}",

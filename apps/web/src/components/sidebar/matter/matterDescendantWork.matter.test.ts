@@ -12,6 +12,11 @@ import {
   workingNativeSubagentKeys,
   type MatterThreadItem,
 } from "./matterSidebar.logic";
+import {
+  deriveMatterCloudRuns,
+  matterCloudRunWork,
+  type MatterCloudRunSession,
+} from "@t3tools/client-runtime/matter/cloud-runs";
 import { buildTimelineSections } from "@t3tools/client-runtime/matter/timeline-feed";
 
 const NOW_ISO = "2026-03-10T15:00:00.000Z";
@@ -66,6 +71,25 @@ const lift = (
   return { items: withDescendantWork(items, since), children: withDescendantWork(children, since) };
 };
 
+const cloudSession = (
+  id: string,
+  state: MatterCloudRunSession["state"],
+  createdAt: string,
+): MatterCloudRunSession => ({
+  id: id as MatterCloudRunSession["id"],
+  title: id,
+  state,
+  instanceId: ProviderInstanceId.make("claudeAgent"),
+  needsAction: null,
+  createdAt,
+  updatedAt: createdAt,
+  tracked: {
+    sourceThreadId: ThreadId.make("Parent"),
+    teleportedThreadId: null,
+    lastMessageAt: null,
+  },
+});
+
 describe("descendant work", () => {
   const parent = item("Parent", { runtime: runtime("idle") });
 
@@ -114,6 +138,43 @@ describe("descendant work", () => {
     const child = subagentOf("Parent", "Child", { runtime: runtime("running") });
     const [lifted] = lift([asking], [child]).items;
     expect(lifted).toMatchObject({ attention: "needs", needsKind: "approval" });
+  });
+
+  it("shows an idle chat as running while a cloud run it started runs", () => {
+    const work = matterCloudRunWork(
+      deriveMatterCloudRuns([
+        cloudSession("cse_build", "running", "2026-03-10T14:50:00.000Z"),
+        cloudSession("cse_ask", "needs_input", "2026-03-10T14:30:00.000Z"),
+      ]),
+      () => parent.key,
+    );
+    const since = workingDescendantSince([parent], work);
+    const [lifted] = withDescendantWork([parent], since);
+    expect(lifted).toMatchObject({
+      attention: "running",
+      runningSince: "2026-03-10T14:50:00.000Z",
+    });
+  });
+
+  it("lifts the subagent that launched a cloud run and the thread above it", () => {
+    const child = subagentOf("Parent", "Child", { runtime: runtime("completed") });
+    const since = workingDescendantSince(
+      [parent, child],
+      [{ parentKey: child.key, since: "2026-03-10T14:50:00.000Z" }],
+    );
+    expect(withDescendantWork([parent, child], since).map((entry) => entry.attention)).toEqual([
+      "running",
+      "running",
+    ]);
+  });
+
+  it("drops a chat back to its own state once its cloud run finishes", () => {
+    const work = matterCloudRunWork(
+      deriveMatterCloudRuns([cloudSession("cse_done", "idle", "2026-03-10T14:50:00.000Z")]),
+      () => parent.key,
+    );
+    const [lifted] = withDescendantWork([parent], workingDescendantSince([parent], work));
+    expect(lifted).toBe(parent);
   });
 
   it("stops at a lineage cycle", () => {

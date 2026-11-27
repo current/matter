@@ -58,6 +58,7 @@ const MATTER: MatterSidebarProject = {
     workspaceRoot: "/repo/matter",
     faviconPath: null,
     projectIcon: { kind: "monogram", text: "m", color: "blue" },
+    memberProjectRefs: [{ environmentId, projectId: ProjectId.make("Matter") }],
   } as unknown as SidebarProjectSnapshot,
 };
 
@@ -114,6 +115,7 @@ function model(children: ReadonlyArray<MatterChildItem>): MatterSidebarModel {
   return {
     items: withDescendantWork([parent], since),
     children: withDescendantWork(children, since),
+    cloudRuns: new Map(),
     projects: [MATTER],
     activeThreadKey: null,
     nowMs: Date.parse(NOW_ISO),

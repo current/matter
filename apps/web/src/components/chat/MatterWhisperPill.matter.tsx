@@ -6,7 +6,12 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { useNavigate } from "@tanstack/react-router";
+import {
+  matterCloudRunNudgeKey,
+  matterCloudRunsForThread,
+  type MatterCloudRun,
+} from "@t3tools/client-runtime/matter/cloud-runs";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { T, useGT, useMessages, Var } from "gt-react";
 import {
   BotIcon,
@@ -14,6 +19,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
+  CloudIcon,
   GlobeIcon,
   HistoryIcon,
   MessagesSquareIcon,
@@ -24,8 +30,12 @@ import { useLayoutEffect, useState, type ReactNode } from "react";
 import { openSideThread } from "../../lib/sideChatPane";
 import { useThreadDiscoveredPorts } from "../../portDiscoveryState";
 import { deriveProviderInstanceEntries, type ProviderInstanceEntry } from "../../providerInstances";
-import { useQuietThreadProjection, useThreadRelationshipShells } from "../../state/entities";
-import { useEnvironmentProviders } from "../../state/environments";
+import {
+  useQuietThreadProjection,
+  useQuietThreadShell,
+  useThreadRelationshipShells,
+} from "../../state/entities";
+import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../../state/environments";
 import { useEnvironmentQuery } from "../../state/query";
 import { useEnvironmentScope } from "../../state/session";
 import { serverEnvironment } from "../../state/server";
@@ -33,6 +43,7 @@ import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { useSideThreadTrigger } from "../../hooks/useSideThreadTrigger";
+import { useMatterCloudRunNudge, useMatterCloudRuns } from "../cloud/useMatterCloudRuns.matter";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -87,10 +98,18 @@ export function useMatterLineageModel(props: LineageThreadProps) {
     (thread) =>
       thread.lineage.sideChat === true && thread.lineage.parentThreadId === props.threadId,
   ).length;
+  // Cloud sessions live on the primary environment's server, so only its chats start them.
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const allCloudRuns = useMatterCloudRuns();
+  const cloudRuns =
+    primaryEnvironmentId === props.environmentId
+      ? matterCloudRunsForThread(allCloudRuns, props.threadId)
+      : [];
   return {
     ref,
     threadKey: scopedThreadKey(ref),
     rows,
+    cloudRuns,
     previousCount: countMatterPreviousAgents(subagents),
     sideChatCount,
   };
@@ -226,6 +245,43 @@ function LineageRow(props: {
   );
 }
 
+/** A Claude Cloud run this chat started: opens its session page; only claude.ai can stop it. */
+function CloudRunLineageRow({ run }: { readonly run: MatterCloudRun }) {
+  const gt = useGT();
+  const needsInput = run.state === "needs_input";
+  return (
+    <li data-matter-lineage-row data-kind="cloud" data-state={run.state}>
+      <Link
+        to="/cloud/$sessionId"
+        params={{ sessionId: run.id }}
+        search={{ instanceId: run.instanceId }}
+        data-matter-lineage-row-open
+        aria-label={
+          needsInput
+            ? gt("{title}, cloud run, needs input", { title: run.title })
+            : gt("{title}, cloud run", { title: run.title })
+        }
+        onClick={() => closeMatterLineagePopover()}
+      >
+        <CloudIcon aria-hidden data-matter-lineage-row-glyph />
+        <span data-matter-lineage-row-title>{run.title}</span>
+        {needsInput ? (
+          <span data-matter-lineage-row-meta data-tone="needs">
+            <T context="a cloud run waits for the user">Needs input</T>
+          </span>
+        ) : (
+          <span data-matter-lineage-row-meta>
+            <T context="where a run executes: on a Claude Cloud VM">Cloud</T>
+          </span>
+        )}
+        <span data-matter-lineage-row-time>
+          <WhisperRowTimer startedAtMs={Date.parse(run.startedAt)} />
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 function LineageFooterLink(props: {
   readonly icon: ReactNode;
   readonly label: ReactNode;
@@ -264,7 +320,8 @@ export function MatterLineagePopoverContent(
   const interruptTurn = useAtomCommand(threadEnvironment.interruptTurn);
   const canInterrupt = useEnvironmentScope(props.environmentId, AuthOrchestrationOperateScope);
   const [stoppingKeys, setStoppingKeys] = useState<ReadonlySet<string>>(new Set());
-  const { rows, previousCount, sideChatCount } = props.model;
+  const { rows, cloudRuns, previousCount, sideChatCount } = props.model;
+  const runningCount = rows.length + cloudRuns.length;
   const stopRow = async (row: MatterWhisperRow) => {
     if (row.stopTarget === null || stoppingKeys.has(row.key)) return;
     setStoppingKeys((current) => new Set(current).add(row.key));
@@ -337,9 +394,9 @@ export function MatterLineagePopoverContent(
     <div data-matter-lineage data-view="main">
       <div data-matter-lineage-header>
         <span data-matter-lineage-title>
-          {rows.length > 0 ? (
+          {runningCount > 0 ? (
             <T>
-              Lineage · <Var>{rows.length}</Var> running
+              Lineage · <Var>{runningCount}</Var> running
             </T>
           ) : (
             <T context="heading of the subagents popover">Lineage</T>
@@ -361,8 +418,11 @@ export function MatterLineagePopoverContent(
           </button>
         ) : null}
       </div>
-      {rows.length > 0 ? (
+      {runningCount > 0 ? (
         <ul data-matter-lineage-rows aria-label={gt("Running agents")}>
+          {cloudRuns.map((run) => (
+            <CloudRunLineageRow key={run.id} run={run} />
+          ))}
           {rows.map((row) => (
             <LineageRow
               key={row.key}
@@ -482,9 +542,12 @@ export function MatterWhisperPill(props: LineageThreadProps) {
   const providersByEnvironment = useEnvironmentProviders();
   const providers = providersByEnvironment.get(props.environmentId);
   const popover = useMatterLineagePopover();
-  const { rows } = model;
+  const { rows, cloudRuns } = model;
+  const latestRun = useQuietThreadShell(model.ref)?.latestRun ?? null;
+  useMatterCloudRunNudge(model.threadKey, matterCloudRunNudgeKey(latestRun));
+  const runningCount = rows.length + cloudRuns.length;
   const active = isMatterWhisperActive({
-    rowCount: rows.length,
+    rowCount: runningCount,
     serverCount: servers.length,
     runningAutomationCount: runningAutomations,
   });
@@ -496,7 +559,13 @@ export function MatterWhisperPill(props: LineageThreadProps) {
   if (!active && !open) {
     return null;
   }
-  const oldest = oldestMatterWhisperStart(rows);
+  const oldest = [
+    oldestMatterWhisperStart(rows),
+    ...cloudRuns.map((run) => Date.parse(run.startedAt)),
+  ]
+    .filter((start): start is number => start !== null && Number.isFinite(start))
+    .reduce<number | null>((min, start) => (min === null || start < min ? start : min), null);
+  const cloudNeedsInput = cloudRuns.some((run) => run.state === "needs_input");
   const avatars = stackMatterWhisperAvatars(
     uniqueMatterWhisperAgents(rows, (row) =>
       row.kind === "subagent"
@@ -507,8 +576,8 @@ export function MatterWhisperPill(props: LineageThreadProps) {
     ),
   );
   const label =
-    rows.length > 0
-      ? gt("{count} running", { count: rows.length })
+    runningCount > 0
+      ? gt("{count} running", { count: runningCount })
       : servers.length > 0
         ? gt("{count, plural, one {{count} server} other {{count} servers}}", {
             count: servers.length,
@@ -536,7 +605,7 @@ export function MatterWhisperPill(props: LineageThreadProps) {
               />
             }
           >
-            {avatars.length > 0 ? (
+            {avatars.length > 0 || cloudRuns.length > 0 ? (
               <span data-matter-whisper-avatars aria-hidden>
                 {avatars.map(({ row, zIndex }) => {
                   const provider = providers?.find(
@@ -561,6 +630,16 @@ export function MatterWhisperPill(props: LineageThreadProps) {
                     </span>
                   );
                 })}
+                {cloudRuns.length > 0 ? (
+                  <span
+                    data-matter-whisper-avatar
+                    data-cloud=""
+                    data-needs={cloudNeedsInput || undefined}
+                    style={{ zIndex: 0 }}
+                  >
+                    <CloudIcon />
+                  </span>
+                ) : null}
               </span>
             ) : null}
             <span data-matter-whisper-label>{label}</span>

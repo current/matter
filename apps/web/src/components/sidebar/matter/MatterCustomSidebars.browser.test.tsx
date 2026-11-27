@@ -13,6 +13,7 @@ import {
   type BotIdentity,
   type BotProviderDescriptor,
 } from "@t3tools/contracts";
+import type { MatterCloudRun } from "@t3tools/client-runtime/matter/cloud-runs";
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
@@ -130,6 +131,17 @@ const subagent = (
   ancestorKey: `${environmentId}:${ancestor}`,
 });
 
+const cloudRun = (id: string, title: string, state: MatterCloudRun["state"]): MatterCloudRun => ({
+  id,
+  title,
+  state,
+  sourceThreadId: ThreadId.make("Muse provider matrix"),
+  instanceId: "claudeAgent",
+  needsAction: null,
+  startedAt: "2026-03-10T14:50:00.000Z",
+  updatedAt: NOW_ISO,
+});
+
 const children = [
   subagent("Audit adapters", { runtime: runtime("running") }),
   subagent("Write matrix doc"),
@@ -139,6 +151,7 @@ function model(overrides: Partial<MatterSidebarModel> = {}): MatterSidebarModel 
   return {
     items,
     children,
+    cloudRuns: new Map(),
     projects: [MATTER, LILT],
     activeThreadKey: items[1]!.key,
     nowMs: Date.parse(NOW_ISO),
@@ -294,6 +307,49 @@ describe("MatterDefaultSidebar", () => {
     await expect.element(tree).not.toBeInTheDocument();
     await page.getByRole("button", { name: "Show 2 subagents of Muse provider matrix" }).click();
     await expect.element(tree).toBeVisible();
+  });
+
+  it("nests a chat's live cloud runs above its subagents and opens their session pages", async () => {
+    using _server = useServer(false);
+    const parent = items[3]!;
+    const current = model({
+      cloudRuns: new Map([
+        [
+          parent.key,
+          [
+            cloudRun("cse_ask", "Answer the schema question", "needs_input"),
+            cloudRun("cse_build", "Full test suite", "running"),
+          ],
+        ],
+      ]),
+    });
+    await using screen = await render(
+      <SidebarProvider>
+        <MatterDefaultSidebar model={current} />
+      </SidebarProvider>,
+    );
+    await expect
+      .element(page.getByRole("list", { name: "Subagents of Muse provider matrix" }))
+      .toBeVisible();
+    const rows = [
+      ...screen.container.querySelectorAll(
+        'ul[aria-label="Subagents of Muse provider matrix"] > li',
+      ),
+    ];
+    expect(rows.map((row) => row.querySelector(".mfs-t")?.textContent)).toEqual([
+      "Answer the schema question",
+      "Full test suite",
+      "Audit adapters",
+      "Write matrix doc",
+    ]);
+    expect(rows[0]!.querySelector(".mfs-st")?.textContent).toBe("Needs input");
+    expect(rows[1]!.querySelector(".mfs-st")?.getAttribute("data-tone")).toBe("running");
+    await expect
+      .element(page.getByRole("link", { name: "Full test suite, cloud run, working for 10m" }))
+      .toHaveAttribute("href", "/cloud/cse_build?instanceId=claudeAgent");
+    await expect
+      .element(page.getByRole("button", { name: "Hide subagents of Muse provider matrix" }))
+      .toBeVisible();
   });
 
   it("draws the subagent tree without overlapping strokes", async () => {

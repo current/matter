@@ -719,3 +719,25 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
   color: var(--mr-text);
   font-weight: 500;
 }
+
+/* Claude Cloud runs this chat started: a cloud glyph, and amber while one waits on the user. */
+[data-matter-lineage-row-meta][data-tone="needs"] {
+  color: var(--warning);
+  font-weight: 500;
+}
+
+[data-matter-whisper-avatar][data-cloud] {
+  position: relative;
+}
+
+[data-matter-whisper-avatar][data-needs]::after {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--mw-bg);
+  border-radius: 50%;
+  background: var(--warning);
+  content: "";
+}
