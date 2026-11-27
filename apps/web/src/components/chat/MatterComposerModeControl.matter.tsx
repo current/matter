@@ -1,7 +1,7 @@
 import type { ProviderInteractionMode } from "@t3tools/contracts";
 import { msg, T, useGT, useMessages } from "gt-react";
 import { Code2Icon, ListChecksIcon, TargetIcon, XIcon } from "lucide-react";
-import { use } from "react";
+import { use, useState } from "react";
 
 import {
   Menu,
@@ -59,6 +59,10 @@ export function MatterComposerModeControl(props: {
   const composerMenuProps = useComposerMenuProps();
   const [open, setOpen] = useComposerMenuState(use(HiddenThreadContext));
   const { mode, onModeChange, onClear, disabled = false } = props;
+  const [modeState, setModeState] = useState({ mode, changed: false });
+  if (modeState.mode !== mode) {
+    setModeState({ mode, changed: true });
+  }
   const current = MODE_COPY[mode];
   const CurrentIcon = current.icon;
   const label = messages(current.label);
@@ -95,12 +99,27 @@ export function MatterComposerModeControl(props: {
               />
             }
           >
-            <CurrentIcon
-              aria-hidden="true"
-              data-composer-control-icon=""
-              className={cn("size-4", active && "text-current")}
-            />
-            {active ? <span data-matter-mode-label="">{label}</span> : null}
+            <span
+              key={`icon:${modeState.mode}`}
+              data-matter-mode-icon=""
+              data-matter-mode-changed={modeState.changed ? "" : undefined}
+              className="inline-flex shrink-0 items-center"
+            >
+              <CurrentIcon
+                aria-hidden="true"
+                data-composer-control-icon=""
+                className={cn("size-4", active && "text-current")}
+              />
+            </span>
+            {active ? (
+              <span
+                key={`label:${modeState.mode}`}
+                data-matter-mode-label=""
+                data-matter-mode-changed={modeState.changed ? "" : undefined}
+              >
+                {label}
+              </span>
+            ) : null}
           </TooltipTrigger>
           <TooltipPopup side="top">
             {tooltip} · {MATTER_MODE_SHORTCUT_LABEL}
@@ -123,7 +142,7 @@ export function MatterComposerModeControl(props: {
                   const OptionIcon = copy.icon;
                   return (
                     <MenuRadioItem key={option} value={option} closeOnClick>
-                      <span className="flex w-full items-start gap-2.5 py-0.5">
+                      <span className="flex w-full items-start gap-2">
                         <OptionIcon aria-hidden="true" className="mt-0.5 size-4" />
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span>{messages(copy.label)}</span>
@@ -138,7 +157,10 @@ export function MatterComposerModeControl(props: {
                 })}
               </MenuRadioGroup>
             </MenuGroup>
-            <div className="px-2 pt-1.5 pb-1 text-muted-foreground text-xs">
+            <div
+              data-matter-mode-menu-hint=""
+              className="px-2 pt-1.5 pb-1 text-muted-foreground text-xs"
+            >
               <T>
                 <kbd className="font-sans">⇧Tab</kbd> cycles modes
               </T>

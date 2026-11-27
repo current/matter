@@ -44,6 +44,7 @@ export function TimelineSystemDivider(props: {
 
   return (
     <div
+      data-matter-system-divider=""
       className={cn(
         "flex min-w-0 items-center gap-2 py-2 text-2xs text-muted-foreground",
         props.tone === "danger" && "text-destructive",
@@ -55,6 +56,7 @@ export function TimelineSystemDivider(props: {
           render={
             <button
               type="button"
+              data-matter-system-divider-pill=""
               aria-label={props.actionLabel}
               onClick={props.onAction}
               className={cn(

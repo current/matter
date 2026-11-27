@@ -15,6 +15,7 @@ import { CircleAlertIcon, XIcon } from "lucide-react";
 import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
 import { ExpandableText } from "../settings/ExpandableText";
+import { useMatterDismissFade } from "./matterDismissFade.matter";
 
 export function copyAdminRequest() {
   void writeTextToClipboard(CHATGPT_WORKSPACE_ADMIN_REQUEST, {
@@ -91,12 +92,17 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   onDismiss?: () => void;
 }) {
   const gt = useGT();
+  const { dismissing, triggerDismiss } = useMatterDismissFade(onDismiss, 160, error);
   if (!error) return null;
   const workspaceLimit = errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE;
   const chatGptLimit = workspaceLimit || errorCode === CHATGPT_USAGE_LIMIT_CODE;
   const variant = errorClass === "usage_limit" || chatGptLimit ? "warning" : "error";
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[min(48rem,calc(100%-2rem))] pt-3">
+    <div
+      data-matter-error-banner=""
+      data-matter-banner-dismissing={dismissing ? "true" : undefined}
+      className="pointer-events-auto mx-auto w-fit max-w-[min(48rem,calc(100%-2rem))] pt-3"
+    >
       <Alert variant={variant} surface="glass" controlAlignment="first-line" data-variant={variant}>
         {chatGptLimit ? (
           <OpenAI className="size-4 text-foreground!" aria-hidden="true" />
@@ -134,8 +140,9 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
               <Button
                 variant="ghost"
                 size="icon-xs"
+                data-matter-banner-dismiss=""
                 aria-label={gt("Dismiss error")}
-                onClick={onDismiss}
+                onClick={triggerDismiss}
               >
                 <XIcon />
               </Button>

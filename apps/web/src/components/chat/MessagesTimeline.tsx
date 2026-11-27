@@ -1793,6 +1793,11 @@ function ContextCompactionTimelineRow({
   row: Extract<TimelineRow, { kind: "context-compaction" }>;
 }) {
   const gt = useGT();
+  const compactionState = row.active ? "active" : row.failed ? "failed" : "done";
+  const [stateTrack, setStateTrack] = useState({ state: compactionState, changed: false });
+  if (stateTrack.state !== compactionState) {
+    setStateTrack({ state: compactionState, changed: true });
+  }
   const label =
     row.title && row.compacted
       ? row.tokenCounts
@@ -1834,6 +1839,7 @@ function ContextCompactionTimelineRow({
   return (
     <div
       role="separator"
+      data-matter-compaction-divider=""
       aria-label={row.failure ? `${label}: ${row.failure}` : label}
       className={cn(
         "mx-auto flex w-full max-w-(--chat-content-max-width) items-center gap-3 py-1 text-xs",
@@ -1842,6 +1848,9 @@ function ContextCompactionTimelineRow({
     >
       <span className={cn("h-px flex-1", row.failed ? "bg-destructive/30" : "bg-border/70")} />
       <span
+        key={stateTrack.state}
+        data-matter-compaction-text=""
+        data-matter-compaction-changed={stateTrack.changed ? "" : undefined}
         ref={row.active ? observeVisibleAnimation : undefined}
         className="relative min-w-0 overflow-hidden"
       >

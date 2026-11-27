@@ -28,10 +28,11 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
   const { approval } = entry;
   return (
     <section
+      data-matter-child-approval=""
       aria-label={gt("Approval from {title}", { title: entry.title })}
-      className="rounded-lg border border-border bg-background p-3 text-xs"
+      className="rounded-lg border border-border bg-background p-2.5 text-xs"
     >
-      <p className="mb-2 font-medium">
+      <p className="mb-1 font-medium">
         <T>
           Approval needed from <Var>{entry.title}</Var>
         </T>
@@ -44,19 +45,19 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
       ) : (
         <ApprovalText text={approval.detail || approval.requestKind} />
       )}
-      {approval.appName ? <p className="mt-2 text-muted-foreground">{approval.appName}</p> : null}
+      {approval.appName ? <p className="mt-1 text-muted-foreground">{approval.appName}</p> : null}
       {approval.responseCapability !== "live" ? (
-        <p className="mt-2 text-warning">
+        <p className="mt-1 text-warning">
           <T>Provider process is gone. Interrupt or restart the child thread to respond.</T>
         </p>
       ) : null}
-      {approval.reason ? <p className="mt-2 text-muted-foreground">{approval.reason}</p> : null}
+      {approval.reason ? <p className="mt-1 text-muted-foreground">{approval.reason}</p> : null}
       {approval.fullAccessOverride ? (
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-1 text-muted-foreground">
           {fullAccessOverrideExplanation(approval.fullAccessOverride, messages)}
         </p>
       ) : null}
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-1 flex flex-wrap gap-2">
         <ComposerPendingApprovalActions
           presentation="inline"
           requestId={approval.requestId}
