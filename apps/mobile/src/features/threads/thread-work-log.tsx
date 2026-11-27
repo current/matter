@@ -1473,7 +1473,7 @@ export function ThreadWorkGroupToggle(props: {
           </WorkLogIconSlot>
           <Text
             selectable={false}
-            numberOfLines={4}
+            numberOfLines={1}
             ellipsizeMode="tail"
             className="min-w-0 flex-1 py-0.5 text-xs text-foreground-muted"
           >

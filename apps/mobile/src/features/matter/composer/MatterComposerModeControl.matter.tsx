@@ -11,13 +11,13 @@ import { MATTER_INTERACTION_MODE_COPY } from "./matterComposerLogic";
 
 const MODE_ICON: Record<ProviderInteractionMode, AppSymbolName> = {
   default: "chevron.left.forwardslash.chevron.right",
-  plan: "list.number",
+  plan: "checklist",
   goal: "target",
 };
 
 const MODE_MENU_IMAGE: Record<ProviderInteractionMode, string> = {
   default: "chevron.left.forwardslash.chevron.right",
-  plan: "list.number",
+  plan: "checklist",
   goal: "target",
 };
 

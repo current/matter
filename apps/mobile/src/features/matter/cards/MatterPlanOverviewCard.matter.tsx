@@ -182,14 +182,14 @@ export function MatterPlanOverviewCard(props: MatterPlanOverviewCardProps) {
       <View className="flex-row items-center gap-2.5">
         <View className="h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-adaptive-emerald-500-a12-a16">
           <SymbolView
-            name="list.number"
+            name="checklist"
             size={14}
             tintColorClassName="accent-adaptive-emerald-600-400"
             type="monochrome"
           />
         </View>
         <Text className="font-t3-medium text-sm text-foreground">{gt("Plan Overview")}</Text>
-        <View className="ml-auto flex-row items-center gap-0.5">
+        <View className="-mr-2 ml-auto flex-row items-center gap-0.5">
           <CopyTextButton
             accessibilityLabel={gt("Copy plan")}
             text={contents}
@@ -200,7 +200,8 @@ export function MatterPlanOverviewCard(props: MatterPlanOverviewCardProps) {
             accessibilityRole="button"
             accessibilityLabel={gt("Open full plan")}
             onPress={() => setSheetOpen(true)}
-            className="h-11 w-11 items-center justify-center rounded-lg active:opacity-70"
+            hitSlop={4}
+            className="h-9 w-9 items-center justify-center rounded-lg active:opacity-70"
           >
             <SymbolView
               name="arrow.up.left.and.arrow.down.right"

@@ -20,8 +20,8 @@ import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanima
 
 import { SymbolView } from "../../../components/ui/AppSymbol";
 import { AppText as Text, AppTextInput as TextInput } from "../../../components/ui/AppText";
-import { ControlPill } from "../../../components/ui/ControlPill";
 import { cn } from "../../../lib/cn";
+import { MatterComposerSendButton } from "../composer/MatterComposerSendButton.matter";
 import { resolveMarkdownLinkPresentation } from "../../../lib/markdownLinks";
 import { SelectableMarkdownText } from "../../../native/SelectableMarkdownText";
 import { useOpenPullRequest } from "../../../native/useOpenPullRequest";
@@ -312,11 +312,10 @@ export function MatterQuestionsCard(props: PendingUserInputCardProps) {
   };
 
   const stopButton = props.onStopThread ? (
-    <ControlPill
+    <MatterComposerSendButton
       accessibilityLabel={gt("Stop", { $context: "verb, stops the thread" })}
       icon="stop.fill"
-      variant="danger"
-      className="h-9 w-9"
+      variant="stop"
       disabled={!props.canOperateThread}
       onPress={props.onStopThread}
     />
@@ -481,7 +480,7 @@ export function MatterQuestionsCard(props: PendingUserInputCardProps) {
                     disabled={responseDisabled}
                     onPress={() => handleSelectOption(optionValue)}
                     className={cn(
-                      "min-h-11 w-full flex-row items-center gap-2.5 rounded-[12px] border px-2.5 py-2.5 active:opacity-80",
+                      "min-h-11 w-full flex-row items-start gap-2.5 rounded-[12px] border px-2.5 py-2.5 active:opacity-80",
                       selected ? "border-foreground/30 bg-grouped-card" : "border-border bg-subtle",
                       responseDisabled && "opacity-55",
                     )}

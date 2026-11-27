@@ -391,6 +391,8 @@ export interface ThreadFeedProps {
   readonly toolCallVisibility?: ToolCallVisibility;
   readonly worktreeSetup?: WorktreeSetupCardProps | null;
   readonly preparingWorktree?: boolean;
+  /** A question or approval waits on the user, so the live status says so. */
+  readonly awaitingUser?: boolean;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
   readonly dispatchingMessageId: MessageId | null;
   readonly onEditPendingMessage: ((message: QueuedThreadMessage) => void) | null;
@@ -2051,7 +2053,7 @@ function renderFeedEntry(
 
   if (entry.type === "pending-fold") {
     return (
-      <View className="mb-1 flex-row items-center px-2">
+      <View className="mb-1 flex-row items-center px-1">
         <View
           className="min-h-11 min-w-0 flex-1 flex-row items-center"
           style={{
@@ -2072,7 +2074,7 @@ function renderFeedEntry(
 
   if (entry.type === "run-fold") {
     return (
-      <View className="mb-1 flex-row items-center px-2">
+      <View className="mb-1 flex-row items-center px-1">
         {entry.workingSince ? (
           <MatterAiStatusWorkingRow
             environmentId={props.environmentId}
@@ -3902,7 +3904,10 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       setupAnchorIndex:
         props.worktreeSetup || props.preparingWorktree ? setupAnchorIndex : undefined,
     }),
-    { preparingWorktree: props.preparingWorktree === true },
+    {
+      preparingWorktree: props.preparingWorktree === true,
+      awaitingUser: props.awaitingUser === true,
+    },
   );
   const groupedFeed = matterAiStatus.rows;
   const { contentInsetEndAdjustment } = props;

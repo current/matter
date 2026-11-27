@@ -96,19 +96,24 @@ function isPlainThinking(row: ThreadFeedRow): boolean {
  */
 export function matterAiStatusFeed<Row extends ThreadFeedRow>(
   rows: ReadonlyArray<Row>,
-  activity: { readonly preparingWorktree: boolean },
+  activity: { readonly preparingWorktree: boolean; readonly awaitingUser?: boolean },
 ): { readonly rows: ReadonlyArray<Row>; readonly status: MatterAiStatusFeedState } {
   const workingIndex = rows.findLastIndex(
     (row) => row.type === "run-fold" && row.workingSince !== undefined,
   );
   if (workingIndex < 0) return { rows, status: IDLE_MATTER_AI_STATUS };
   const phase = deriveMatterAiStatusPhaseFrom(rows, toStatusRow, {
-    awaitingUser: false,
+    awaitingUser: activity.awaitingUser === true,
     compacting: false,
     preparingWorktree: activity.preparingWorktree,
   });
   const thinkingIndex = rows.findLastIndex((row) => row.type === "thinking");
-  if (thinkingIndex < 0 || activity.preparingWorktree || phase === "compacting") {
+  if (
+    thinkingIndex < 0 ||
+    activity.preparingWorktree ||
+    phase === "compacting" ||
+    phase === "input"
+  ) {
     return { rows, status: { phase, workingRowShowsStatus: true } };
   }
   if (thinkingIndex === workingIndex + 1 && isPlainThinking(rows[thinkingIndex]!)) {

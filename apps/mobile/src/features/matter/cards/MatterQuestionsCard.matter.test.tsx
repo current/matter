@@ -69,7 +69,9 @@ vi.mock("../../../components/ui/AppText", () => ({
     />
   ),
 }));
-vi.mock("../../../components/ui/ControlPill", () => ({ ControlPill: () => null }));
+vi.mock("../composer/MatterComposerSendButton.matter", () => ({
+  MatterComposerSendButton: () => null,
+}));
 vi.mock("../../files/FileMarkdownPreview", () => ({
   useMarkdownPreviewStyles: () => ({ nativeTextStyle: {} }),
 }));

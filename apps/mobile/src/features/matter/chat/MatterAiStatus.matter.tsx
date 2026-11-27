@@ -1,5 +1,8 @@
 import { toServerClock } from "@t3tools/client-runtime/clock";
-import { MATTER_AI_STATUS_PHASE_HOLD_MS } from "@t3tools/client-runtime/matter/ai-status";
+import {
+  MATTER_AI_STATUS_PHASE_HOLD_MS,
+  type MatterAiStatusPhase,
+} from "@t3tools/client-runtime/matter/ai-status";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
 import { useGT, useMessages } from "gt-react-native";
@@ -46,8 +49,8 @@ function useHeldValue<T>(value: T, holdMs: number): T {
 
 /**
  * The live turn's Working row as Matter's AI status: what the agent is doing, held 700 ms so tool
- * beats don't flicker, and the elapsed time. Falls back to upstream's row (`children`) when a
- * lower thinking row owns the status.
+ * beats don't flicker, and the elapsed time. While a lower thinking row owns the status it just
+ * says Working; upstream's row (`children`) stays only for worktree setup.
  */
 export function MatterAiStatusWorkingRow(props: {
   readonly environmentId: EnvironmentId;
@@ -59,13 +62,14 @@ export function MatterAiStatusWorkingRow(props: {
   readonly children: ReactNode;
 }) {
   const status = use(MatterAiStatusContext);
-  if (!status.workingRowShowsStatus || props.keepUpstream) return props.children;
+  if (props.keepUpstream) return props.children;
   return (
     <MatterAiStatusRow
       environmentId={props.environmentId}
       startedAt={props.startedAt}
       rowSizing={props.rowSizing}
       iconColor={props.iconColor}
+      phase={status.workingRowShowsStatus ? undefined : "working"}
     />
   );
 }
@@ -75,10 +79,13 @@ function MatterAiStatusRow(props: {
   readonly startedAt: string;
   readonly rowSizing: ReturnType<typeof deriveThreadWorkLogSizing>;
   readonly iconColor: ColorValue;
+  /** Pins the label while a lower thinking row owns the live status. */
+  readonly phase?: MatterAiStatusPhase | undefined;
 }) {
   const gt = useGT();
   const messages = useMessages();
-  const phase = useHeldValue(use(MatterAiStatusContext).phase, MATTER_AI_STATUS_PHASE_HOLD_MS);
+  const contextPhase = use(MatterAiStatusContext).phase;
+  const phase = useHeldValue(props.phase ?? contextPhase, MATTER_AI_STATUS_PHASE_HOLD_MS);
   const visual = matterAiStatusVisual(phase);
   const label = messages(MATTER_AI_STATUS_LABELS[phase]);
   const nowMs = toServerClock(props.environmentId, useVisibleSecondClock(true));

@@ -1628,6 +1628,9 @@ function ThreadDetailBody(
                   pendingHandoff={props.pendingHandoff}
                   statusLines={statusLines}
                   worktreeSetup={props.worktreeSetup}
+                  awaitingUser={
+                    props.activePendingApproval !== null || props.activePendingUserInput !== null
+                  }
                   preparingWorktree={
                     props.creationState?.kind === "preparing" &&
                     props.creationState.preparingWorktree &&

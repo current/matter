@@ -70,6 +70,14 @@ describe("matterAiStatusFeed", () => {
     );
   });
 
+  it("says it needs input while a question or approval waits, even under a labeled row", () => {
+    const result = matterAiStatusFeed([working, delegating], {
+      preparingWorktree: false,
+      awaitingUser: true,
+    });
+    expect(result.status).toEqual({ phase: "input", workingRowShowsStatus: true });
+  });
+
   it("shows worktree setup ahead of the rows", () => {
     const result = matterAiStatusFeed([working, thinking], { preparingWorktree: true });
     expect(result.status).toEqual({ phase: "setup", workingRowShowsStatus: true });
