@@ -261,6 +261,17 @@ describe("ClaudeCloudSessionView", () => {
     ).toBe("needs_input");
   });
 
+  it("lets a plain reply answer a turn that ended on a question", async () => {
+    using _server = useCloudServer({
+      session: session({ state: "needs_input", needsAction: "Check the settings page." }),
+    });
+    await using _screen = await renderView();
+    await expect
+      .element(page.getByRole("textbox", { name: "Reply to Claude Cloud" }))
+      .toBeEnabled();
+    await expect.element(page.getByText("Answer on claude.ai")).not.toBeInTheDocument();
+  });
+
   it("disables the composer for an archived session", async () => {
     using _server = useCloudServer({ session: session({ state: "archived" }) });
     await using _screen = await renderView();

@@ -6,6 +6,7 @@ import { useGT } from "gt-react";
 import { useRef, type ReactNode } from "react";
 
 import { useIncrementalTimelineEntries } from "~/hooks/useIncrementalTimelineEntries";
+import { useClientSettings } from "~/hooks/useSettings";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { SideThreadsOpenContext } from "~/hooks/useSideThreadTrigger";
 import { useTheme } from "~/hooks/useTheme";
@@ -53,6 +54,7 @@ export function ClaudeCloudTimeline(props: {
   const threadKey = `claude-cloud-${sessionId}`;
   const listRef = useRef<LegendListRef | null>(null);
   const { resolvedTheme } = useTheme();
+  const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
   const turnItemSource = cloudTurnItemSource(sessionId);
   const entries = useIncrementalTimelineEntries(threadKey, {
     visibleTurnItems: props.rows,
@@ -103,7 +105,7 @@ export function ClaudeCloudTimeline(props: {
             activeThreadEnvironmentId={NO_ENVIRONMENT_ID}
             markdownCwd={undefined}
             resolvedTheme={resolvedTheme}
-            timestampFormat="locale"
+            timestampFormat={timestampFormat}
             workspaceRoot={undefined}
             anchorMessageId={null}
             onAnchorReady={ignore}

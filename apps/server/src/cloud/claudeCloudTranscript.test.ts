@@ -122,12 +122,23 @@ describe("mapClaudeCloudEvents", () => {
     expect(reply).toMatchObject({ text: "There are two files.", streaming: false });
     for (const item of mapped.turnItems) {
       expect(item.threadId).toBe(`claude-cloud:${SESSION}`);
-      expect(item.runId).toBeNull();
+      expect(item.runId).toBe(`claude-cloud:${SESSION}:run:0`);
       expect(item.nativeItemRef).toBeNull();
     }
     expect(mapped.turnItems.map((item) => item.ordinal)).toEqual([0, 1, 2, 3]);
     expect(mapped.activity).toBe("idle");
     expect(mapped.pendingRequest).toBeNull();
+  });
+
+  it("leaves the open turn runless so the timeline shows it as the live response", () => {
+    const events = [
+      ...basicTurn(),
+      { type: "user", uuid: "u-next", message: { role: "user", content: "And now?" } },
+    ];
+    const mapped = mapClaudeCloudEvents({ sessionId: SESSION, events });
+    const next = mapped.turnItems.at(-1);
+    expect(next).toMatchObject({ type: "user_message", text: "And now?", runId: null });
+    expect(mapped.turnItems.slice(0, -1).every((item) => item.runId !== null)).toBe(true);
   });
 
   it("decodes every item with the turn item schema", () => {

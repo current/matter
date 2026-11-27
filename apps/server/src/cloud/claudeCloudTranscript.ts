@@ -11,6 +11,7 @@ import {
   PlanId,
   ProviderDriverKind,
   ProviderInstanceId,
+  RunId,
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
@@ -49,7 +50,7 @@ type Item = OrchestrationV2TurnItem;
 interface ItemBase {
   readonly id: TurnItemId;
   readonly threadId: ThreadId;
-  readonly runId: null;
+  readonly runId: RunId | null;
   readonly nodeId: null;
   readonly providerThreadId: null;
   readonly providerTurnId: null;
@@ -583,10 +584,14 @@ export function mapClaudeCloudEvents(input: {
   const itemId = (suffix: string) => TurnItemId.make(`${threadId}:${suffix}`);
   const items: Array<Item> = [];
   const indexById = new Map<string, number>();
+  // Turns are counted by result events; each item belongs to the turn it first appeared in.
+  const turnOfItem = new Map<string, number>();
+  let turnNumber = 0;
   const put = (draft: ItemDraft) => {
     const existing = indexById.get(draft.id);
     if (existing === undefined) {
       indexById.set(draft.id, items.length);
+      turnOfItem.set(draft.id, turnNumber);
       items.push({ ...draft, ordinal: items.length } as Item);
     } else {
       items[existing] = { ...draft, ordinal: items[existing]!.ordinal } as Item;
@@ -869,6 +874,7 @@ export function mapClaudeCloudEvents(input: {
           message: "Stopped",
         });
       }
+      turnNumber += 1;
       turnKey = uuid;
       continue;
     }
@@ -1037,5 +1043,13 @@ export function mapClaudeCloudEvents(input: {
             ? "idle"
             : null;
 
-  return { turnItems: items, pendingRequest: pending, activity };
+  // Finished turns get a run id so the timeline folds them like native runs; the open turn stays
+  // runless, which the timeline treats as the live response.
+  const turnItems = items.map((item) => {
+    const turn = turnOfItem.get(item.id);
+    return turn === undefined || turn >= turnNumber
+      ? item
+      : { ...item, runId: RunId.make(`${threadId}:run:${turn}`) };
+  });
+  return { turnItems, pendingRequest: pending, activity };
 }

@@ -22,7 +22,9 @@ function CloudSessionRoute() {
   const { instanceId } = Route.useSearch();
   // A disabled add-on's route renders a pointer to Settings and loads nothing.
   if (!useIsAddonEnabled(CLAUDE_CLOUD_ADDON_ID)) return <CloudDisabled />;
-  return <ClaudeCloudSessionView sessionId={sessionId} instanceId={instanceId ?? null} />;
+  return (
+    <ClaudeCloudSessionView key={sessionId} sessionId={sessionId} instanceId={instanceId ?? null} />
+  );
 }
 
 function CloudDisabled() {

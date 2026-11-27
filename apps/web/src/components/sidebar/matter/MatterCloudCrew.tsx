@@ -12,7 +12,7 @@ import {
   retainClaudeCloudSessions,
   useClaudeCloudSessionsState,
 } from "../../cloud/claudeCloudStore";
-import { isCloudSessionActive, rankCloudSessions } from "../../cloud/claudeCloudTranscript.logic";
+import { rankCloudSessions } from "../../cloud/claudeCloudTranscript.logic";
 import { ClaudeAI } from "../../Icons";
 import { compactAge } from "./matterFinalSidebar.logic";
 
@@ -21,9 +21,9 @@ const PREVIEW_LIMIT = 4;
 const DOT_COLOR: Readonly<Record<ClaudeCloudRemoteSession["state"], string>> = {
   running: "var(--mfs-success)",
   needs_input: "var(--mfs-warning)",
-  idle: "var(--mfs-muted-50)",
+  idle: "transparent",
   failed: "var(--mfs-pr-closed)",
-  archived: "var(--mfs-muted-50)",
+  archived: "transparent",
 };
 
 /** Every cloud session on the user's claude.ai accounts, while the add-on is on. */
@@ -49,7 +49,8 @@ export function MatterCloudCrew({
   const gt = useGT();
   const [showAll, setShowAll] = useState(false);
   const ranked = rankCloudSessions(sessions);
-  const live = ranked.filter((session) => isCloudSessionActive(session.state)).length;
+  const waiting = ranked.filter((session) => session.state === "needs_input").length;
+  const live = ranked.filter((session) => session.state === "running").length;
   const visible = showAll ? ranked : ranked.slice(0, PREVIEW_LIMIT);
   const hidden = ranked.length - visible.length;
   return (
@@ -65,7 +66,11 @@ export function MatterCloudCrew({
           <ClaudeAI aria-hidden />
         </span>
         <span className="mfs-t">{gt("Claude Cloud")}</span>
-        {live > 0 ? (
+        {waiting > 0 ? (
+          <span className="mfs-a" data-tone="needs">
+            {gt("{count} waiting", { count: waiting })}
+          </span>
+        ) : live > 0 ? (
           <span className="mfs-a" data-tone="running">
             {gt("{count} live", { count: live })}
           </span>

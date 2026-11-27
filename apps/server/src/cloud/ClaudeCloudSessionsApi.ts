@@ -366,11 +366,60 @@ interface CachedCredentials extends ParsedCredentials {
   readonly organizationUuid: string | null;
 }
 
+// The API can store an event moments after later ones, so a cursor at the newest event skips it.
+// Each refresh re-reads this much history and slots late events in by time.
+const EVENT_OVERLAP_MS = 60_000;
+
+const eventTimeMs = (event: Readonly<Record<string, unknown>>): number | null => {
+  const ms = typeof event.created_at === "string" ? Date.parse(event.created_at) : Number.NaN;
+  return Number.isFinite(ms) ? ms : null;
+};
+
+interface EventMark {
+  readonly id: string;
+  readonly at: number;
+}
+
+/** The newest event at least the overlap older than the newest one; refreshes read after it. */
+const overlapCursor = (marks: ReadonlyArray<EventMark>): string | null => {
+  const newest = marks.at(-1);
+  if (newest === undefined) return null;
+  for (let index = marks.length - 1; index >= 0; index -= 1) {
+    if (marks[index]!.at <= newest.at - EVENT_OVERLAP_MS) return marks[index]!.id;
+  }
+  return null;
+};
+
+/** Keeps the cursor mark and everything after it. */
+const trimMarks = (marks: ReadonlyArray<EventMark>): ReadonlyArray<EventMark> => {
+  const cursor = overlapCursor(marks);
+  if (cursor === null) return marks;
+  const index = marks.findIndex((mark) => mark.id === cursor);
+  return marks.slice(index);
+};
+
+const insertByTime = (
+  events: Array<Record<string, unknown>>,
+  event: Record<string, unknown>,
+): void => {
+  const at = eventTimeMs(event);
+  let index = events.length;
+  if (at !== null) {
+    while (index > 0) {
+      const previous = eventTimeMs(events[index - 1]!);
+      if (previous === null || previous <= at) break;
+      index -= 1;
+    }
+  }
+  events.splice(index, 0, event);
+};
+
 interface TranscriptCacheEntry {
   readonly sessionId: string;
   readonly instanceId: ProviderInstanceId;
   readonly lastFetchedAt: number;
-  readonly lastEventId: string | null;
+  /** Fetched events with times, trimmed to the overlap window plus its cursor. */
+  readonly eventMarks: ReadonlyArray<EventMark>;
   readonly rawEvents: ReadonlyArray<Record<string, unknown>>;
   readonly seenEventUuids: ReadonlySet<string>;
   readonly session: ClaudeCloudRemoteSession;
@@ -888,6 +937,7 @@ export const make = Effect.fn("ClaudeCloudSessionsApi.make")(function* (
       const effectiveInstanceId = requestedInstanceId ?? existing?.instanceId;
       const { candidates, tracked } = yield* resolveAccountCandidates(id, effectiveInstanceId);
 
+      const afterId = existing === undefined ? null : overlapCursor(existing.eventMarks);
       let account: ClaudeCloudService.ClaudeCloudAccountLaunch;
       let rawSession: RemoteSessionApi;
       let delta: ClaudeCloudSessionsApiEventsPage;
@@ -895,10 +945,7 @@ export const make = Effect.fn("ClaudeCloudSessionsApi.make")(function* (
       if (candidates.length === 1) {
         account = candidates[0]!;
         [rawSession, delta] = yield* Effect.all(
-          [
-            fetchRawSession(account, id),
-            fetchEventsAfterForAccount(account, id, existing?.lastEventId ?? null),
-          ],
+          [fetchRawSession(account, id), fetchEventsAfterForAccount(account, id, afterId)],
           { concurrency: "unbounded" },
         );
         yield* rememberSessionInstance(id, account.instanceId);
@@ -906,22 +953,26 @@ export const make = Effect.fn("ClaudeCloudSessionsApi.make")(function* (
         const resolved = yield* resolveSessionWithRaw(id, effectiveInstanceId);
         account = resolved.account;
         rawSession = resolved.raw;
-        delta = yield* fetchEventsAfterForAccount(account, id, existing?.lastEventId ?? null);
+        delta = yield* fetchEventsAfterForAccount(account, id, afterId);
       }
 
       const seenEventUuids = new Set(existing?.seenEventUuids ?? []);
       const rawEvents = [...(existing?.rawEvents ?? [])];
+      const eventMarks = [...(existing?.eventMarks ?? [])];
       let added = 0;
       for (const event of delta.events) {
         const uuid = eventUuid(event);
         if (uuid !== null) {
           if (seenEventUuids.has(uuid)) continue;
           seenEventUuids.add(uuid);
+          const at = eventTimeMs(event);
+          if (at !== null) eventMarks.push({ id: uuid, at });
         }
         if (isTranscriptNoise(event)) continue;
-        rawEvents.push(event);
+        insertByTime(rawEvents, event);
         added += 1;
       }
+      eventMarks.sort((a, b) => a.at - b.at);
 
       const mappedTranscript =
         existing !== undefined && added === 0
@@ -963,7 +1014,7 @@ export const make = Effect.fn("ClaudeCloudSessionsApi.make")(function* (
         sessionId: id,
         instanceId: account.instanceId,
         lastFetchedAt: yield* Clock.currentTimeMillis,
-        lastEventId: delta.lastId ?? existing?.lastEventId ?? null,
+        eventMarks: trimMarks(eventMarks),
         rawEvents,
         seenEventUuids,
         session,

@@ -14,12 +14,23 @@ import { T, useGT, useMessages } from "gt-react";
 import {
   CircleAlertIcon,
   CloudDownloadIcon,
+  CloudIcon,
   EllipsisIcon,
   ExternalLinkIcon,
+  FolderIcon,
+  GitBranchIcon,
   LinkIcon,
   MessageCircleQuestionIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  type Dispatch,
+  type FormEvent,
+  type KeyboardEvent,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   interruptClaudeCloudSession,
@@ -36,6 +47,7 @@ import { buildThreadRouteParams } from "../../threadRoutes";
 import { ComposerBanner } from "../chat/ComposerBanner";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "../chat/ComposerBannerStack";
 import { ComposerSurface } from "../chat/ComposerSurface";
+import { ClaudeAI } from "../Icons";
 import { MatterProviderMark } from "../sidebar/matter/MatterDefaultSidebarParts";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -101,6 +113,9 @@ export function ClaudeCloudSessionView({
   const transcript = useClaudeCloudTranscript(sessionId);
   const session = transcript.session ?? listed ?? null;
   const instanceId = session?.instanceId ?? instanceIdParam;
+  const [echoes, setEchoes] = useState<ReadonlyArray<CloudEcho>>([]);
+  // A sent message the transcript hasn't shown yet is about to start a turn.
+  const sending = pendingCloudEchoes(echoes, transcript.rows).length > 0;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- follows the session's transcript and the account's session list on the server while the page is open
   useEffect(() => {
@@ -128,7 +143,7 @@ export function ClaudeCloudSessionView({
             <h1 className="min-w-0">
               <WorkspaceBreadcrumbText>{session?.title || sessionId}</WorkspaceBreadcrumbText>
             </h1>
-            {session ? <CloudSessionMeta session={session} /> : null}
+            {session ? <CloudSessionMeta session={session} sending={sending} /> : null}
           </WorkspaceBreadcrumbItem>
         </WorkspaceBreadcrumb>
         {config !== null ? (
@@ -157,6 +172,8 @@ export function ClaudeCloudSessionView({
             sessionId={sessionId}
             session={session}
             instanceId={instanceId}
+            echoes={echoes}
+            setEchoes={setEchoes}
           />
         )}
       </div>
@@ -175,41 +192,50 @@ function CloudLoading() {
   );
 }
 
-function CloudSessionMeta({ session }: { session: ClaudeCloudRemoteSession }) {
-  const m = useMessages();
+/** The account's display name and the model's catalog name, falling back to the raw ids. */
+function useCloudSessionLabels(session: ClaudeCloudRemoteSession | null) {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const providers = useEnvironmentProviders();
-  const account =
-    (primaryEnvironmentId === null ? undefined : providers.get(primaryEnvironmentId))?.find(
-      (provider) => provider.instanceId === session.instanceId,
-    )?.displayName ?? session.instanceId;
-  const source = cloudSessionSource(session);
-  const details = [source, session.model, account].filter((part): part is string => Boolean(part));
+  const provider = (
+    primaryEnvironmentId === null ? undefined : providers.get(primaryEnvironmentId)
+  )?.find((candidate) => candidate.instanceId === session?.instanceId);
+  const slug = session?.model ?? null;
+  const known = provider?.models.find(
+    (candidate) => candidate.slug === slug || (slug !== null && candidate.aliases?.includes(slug)),
+  );
+  const model = slug === null ? null : (known?.name ?? slug);
+  // The composer shows the model beside Claude's mark, as the native picker does ("Opus 5.5").
+  const shortModel =
+    slug === null ? null : (known?.shortName ?? model?.replace(/^Claude\s+/i, "") ?? slug);
+  return { account: provider?.displayName ?? session?.instanceId ?? null, model, shortModel };
+}
+
+function CloudSessionMeta({
+  session,
+  sending,
+}: {
+  session: ClaudeCloudRemoteSession;
+  sending: boolean;
+}) {
+  const m = useMessages();
+  const { account, model } = useCloudSessionLabels(session);
+  const state = sending && session.state === "idle" ? "running" : session.state;
+  // Repository, branch and model already sit in the composer, so the header keeps only the state.
+  const details = [cloudSessionSource(session), session.branch, model, account].filter(
+    (part): part is string => Boolean(part),
+  );
+  const badge = (
+    <Badge variant={CLAUDE_CLOUD_STATE_BADGE[state]} data-claude-cloud-header-state={state}>
+      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
+      {m(CLAUDE_CLOUD_STATE_LABELS[state])}
+    </Badge>
+  );
+  if (details.length === 0) return badge;
   return (
-    <span
-      className="flex min-w-0 items-center gap-2"
-      data-claude-cloud-header-state={session.state}
-    >
-      <Badge variant={CLAUDE_CLOUD_STATE_BADGE[session.state]}>
-        <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
-        {m(CLAUDE_CLOUD_STATE_LABELS[session.state])}
-      </Badge>
-      {details.length > 0 ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span
-                className="hidden min-w-0 truncate text-xs font-normal text-muted-foreground sm:inline"
-                data-claude-cloud-header-source=""
-              />
-            }
-          >
-            {details.join(" · ")}
-          </TooltipTrigger>
-          <TooltipPopup>{details.join(" · ")}</TooltipPopup>
-        </Tooltip>
-      ) : null}
-    </span>
+    <Tooltip>
+      <TooltipTrigger render={<span className="flex shrink-0" />}>{badge}</TooltipTrigger>
+      <TooltipPopup>{details.join(" · ")}</TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -275,7 +301,7 @@ function CloudSessionActions({
     <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
       <Button
         size="xs"
-        variant="ghost-muted"
+        variant="outline"
         disabled={teleporting}
         data-claude-cloud-teleport=""
         onClick={() => void pullToWorktree()}
@@ -289,7 +315,7 @@ function CloudSessionActions({
       </Button>
       <Button
         size="xs"
-        variant="ghost-muted"
+        variant="outline"
         render={<a href={url} target="_blank" rel="noreferrer noopener" />}
       >
         <ExternalLinkIcon aria-hidden="true" />
@@ -297,7 +323,7 @@ function CloudSessionActions({
       </Button>
       <Menu>
         <MenuTrigger
-          render={<Button size="icon-xs" variant="ghost-muted" aria-label={gt("More actions")} />}
+          render={<Button size="icon-xs" variant="outline" aria-label={gt("More actions")} />}
         >
           <EllipsisIcon aria-hidden="true" />
         </MenuTrigger>
@@ -317,25 +343,29 @@ function CloudSessionBody({
   sessionId,
   session,
   instanceId,
+  echoes,
+  setEchoes,
 }: {
   config: MatterApiConfig;
   sessionId: string;
   session: ClaudeCloudRemoteSession | null;
   instanceId: string | null;
+  echoes: ReadonlyArray<CloudEcho>;
+  setEchoes: Dispatch<SetStateAction<ReadonlyArray<CloudEcho>>>;
 }) {
   const gt = useGT();
   const transcript = useClaudeCloudTranscript(sessionId);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
-  const [echoes, setEchoes] = useState<ReadonlyArray<CloudEcho>>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
 
   const state = session?.state ?? null;
-  const isWorking = state === "running";
   const archived = state === "archived";
   const waiting = pendingCloudEchoes(echoes, transcript.rows);
+  // A sent message the transcript hasn't shown yet is about to start a turn.
+  const isWorking = state === "running" || waiting.length > 0;
   const optimisticMessages = waiting.length === 0 ? NO_MESSAGES : waiting.map(cloudEchoMessage);
   const lastUserAt = transcript.rows.findLast((row) => row.item.type === "user_message")?.item
     .startedAt;
@@ -387,7 +417,8 @@ function CloudSessionBody({
 
   const notices: Array<ComposerBannerStackItem> = [];
   const request = transcript.pendingRequest;
-  if (request !== null || state === "needs_input") {
+  // A turn that ended on a question needs only a reply; only open prompts block the session.
+  if (request !== null) {
     notices.push(
       pendingNotice({
         request,
@@ -492,19 +523,19 @@ function pendingNotice({
   url,
   gt,
 }: {
-  request: ClaudeCloudPendingRequest | null;
+  request: ClaudeCloudPendingRequest;
   needsAction: string | null;
   url: string;
   gt: ReturnType<typeof useGT>;
 }): ComposerBannerStackItem {
   const title =
-    request?.title ||
-    (request?.kind === "permission"
+    request.title ||
+    (request.kind === "permission"
       ? gt("Claude is waiting for your permission")
-      : request?.kind === "plan"
+      : request.kind === "plan"
         ? gt("Claude is waiting for you to review its plan")
         : gt("Claude is waiting for your answer"));
-  const detail = [request?.detail, needsAction].filter(
+  const detail = [request.detail, needsAction].filter(
     (part, index, parts): part is string =>
       typeof part === "string" && part.trim() !== "" && parts.indexOf(part) === index,
   );
@@ -513,7 +544,7 @@ function pendingNotice({
     variant: "warning",
     icon: <MessageCircleQuestionIcon />,
     title,
-    description: request?.title ? gt("Claude is waiting for you") : undefined,
+    description: request.title ? gt("Claude is waiting for you") : undefined,
     children: (
       <ComposerBanner.Body
         className="flex flex-col gap-1 pt-0.5 pb-1.5 pe-2 text-xs whitespace-pre-wrap text-muted-foreground"
@@ -571,6 +602,7 @@ function CloudComposer({
   const disabled = disabledReason !== null;
   const replaceSendWithStop = showStop && !hasContent;
   const source = session ? cloudSessionSource(session) : null;
+  const modelLabel = useCloudSessionLabels(session).shortModel;
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
@@ -622,14 +654,16 @@ function CloudComposer({
                     data-chat-composer-footer="true"
                     className="flex min-w-0 flex-nowrap items-center justify-end gap-2 px-2 pb-2"
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-1 text-xs text-muted-foreground">
-                      {session?.model ? (
-                        <span className="min-w-0 truncate px-1.5" data-claude-cloud-model="">
-                          {session.model}
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      {modelLabel ? (
+                        <span
+                          className="flex min-w-0 items-center gap-1.5 px-1.5 text-sm text-foreground/90"
+                          data-claude-cloud-model=""
+                        >
+                          <ClaudeAI aria-hidden className="size-3.5 shrink-0" />
+                          <span className="truncate">{modelLabel}</span>
                         </span>
                       ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
                       {showStop ? (
                         <CloudStopButton
                           stopping={stopping}
@@ -677,15 +711,23 @@ function CloudComposer({
           </ComposerSurface.Host>
           {source !== null ? (
             <ComposerSurface.ContextStrip>
-              <span className="flex min-w-0 items-center gap-1.5 ps-1.5">
-                <span className="min-w-0 truncate font-medium text-foreground/80">
-                  {session?.repository ?? source}
+              <span className="flex min-w-0 items-center gap-3 ps-1.5">
+                <span className="flex min-w-0 items-center gap-1.5 font-medium text-foreground/80">
+                  <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-70" />
+                  <span className="truncate">{session?.repository ?? source}</span>
                 </span>
-                <span className="shrink-0">{gt("Cloud")}</span>
+                <span className="flex shrink-0 items-center gap-1 text-info-foreground">
+                  <CloudIcon aria-hidden="true" className="size-3.5" />
+                  {gt("Cloud")}
+                </span>
               </span>
               {session?.branch ? (
-                <span className="ms-auto min-w-0 truncate pe-1.5" data-claude-cloud-branch="">
-                  {session.branch}
+                <span
+                  className="ms-auto flex min-w-0 items-center gap-1.5 pe-1.5"
+                  data-claude-cloud-branch=""
+                >
+                  <GitBranchIcon aria-hidden="true" className="size-3.5 shrink-0 opacity-70" />
+                  <span className="truncate">{session.branch}</span>
                 </span>
               ) : null}
             </ComposerSurface.ContextStrip>

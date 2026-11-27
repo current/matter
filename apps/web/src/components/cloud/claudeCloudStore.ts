@@ -157,12 +157,6 @@ function patchListedSession(session: ClaudeCloudRemoteSession) {
   emit();
 }
 
-export function dropListedClaudeCloudSession(sessionId: string): void {
-  if (list.sessions === null) return;
-  list = { ...list, sessions: list.sessions.filter((session) => session.id !== sessionId) };
-  emit();
-}
-
 // ── Transcripts ────────────────────────────────────────────────────────────────────────────
 
 export interface ClaudeCloudTranscriptState {

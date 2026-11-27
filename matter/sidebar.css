@@ -795,6 +795,8 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
 .mfs-av[data-cloud] svg {
   width: 11px;
   height: 11px;
+  /* The Claude mark ships its own brand fill, which vanishes on the brand tile. */
+  fill: currentColor;
 }
 
 .mfs-need {

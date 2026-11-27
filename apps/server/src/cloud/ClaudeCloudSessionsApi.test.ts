@@ -713,8 +713,14 @@ describe("ClaudeCloudSessionsApi", () => {
         yield* enableAddon;
         const api = yield* ClaudeCloudSessionsApi.ClaudeCloudSessionsApi;
         const sessionId = "session_01TRANSCRIPT1";
-        let phase = 1;
         let eventCalls = 0;
+
+        const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString();
+        const log: Array<Record<string, unknown>> = [
+          { uuid: "ev-1", created_at: at(0), itemId: "item-1", text: "Hello" },
+          { uuid: "ev-2", created_at: at(120), itemId: "item-2", text: "Working..." },
+        ];
+        const afterIds: Array<string | null> = [];
 
         state.httpResponder = ({ pathname, searchParams }) =>
           Effect.sync(() => {
@@ -724,45 +730,15 @@ describe("ClaudeCloudSessionsApi", () => {
             if (pathname === `/v1/sessions/${sessionId}/events`) {
               eventCalls += 1;
               const afterId = searchParams.get("after_id");
-              if (phase === 1) {
-                if (!afterId) {
-                  return {
-                    status: 200,
-                    body: {
-                      data: [{ uuid: "ev-1", itemId: "item-1", text: "Hello" }],
-                      has_more: true,
-                      last_id: "ev-1",
-                    },
-                  };
-                }
-                if (afterId === "ev-1") {
-                  return {
-                    status: 200,
-                    body: {
-                      data: [{ uuid: "ev-2", itemId: "item-2", text: "Working..." }],
-                      has_more: false,
-                      last_id: "ev-2",
-                    },
-                  };
-                }
-              }
-              if (phase === 2 && afterId === "ev-2") {
-                return { status: 200, body: { data: [], has_more: false, last_id: "ev-2" } };
-              }
-              if (phase === 3 && afterId === "ev-2") {
-                return {
-                  status: 200,
-                  body: {
-                    data: [
-                      { uuid: "ev-3", itemId: "item-2", text: "Done!" },
-                      { uuid: "ev-4", itemId: "item-3", text: "Summary", activity: "failed" },
-                    ],
-                    has_more: false,
-                    last_id: "ev-4",
-                  },
-                };
-              }
-              return { status: 200, body: { data: [], has_more: false, last_id: afterId } };
+              afterIds.push(afterId);
+              const start = afterId ? log.findIndex((event) => event.uuid === afterId) + 1 : 0;
+              // The first page holds one event, so the initial load pages.
+              const data = afterId ? log.slice(start) : log.slice(0, 1);
+              const hasMore = start + data.length < log.length;
+              return {
+                status: 200,
+                body: { data, has_more: hasMore, last_id: data.at(-1)?.uuid ?? afterId },
+              };
             }
             return { status: 404, body: {} };
           });
@@ -785,8 +761,8 @@ describe("ClaudeCloudSessionsApi", () => {
         assert.deepStrictEqual(throttled.turnItems, []);
         assert.strictEqual(eventCalls, 2);
 
-        // After 1s with no new events, delta is empty and rev stays 2.
-        phase = 2;
+        // After 1s with no new events, delta is empty and rev stays 2. Refreshes re-read the
+        // last minute after ev-1, so an event stored late is still picked up.
         yield* TestClock.adjust("1 second");
         const unchanged = yield* api.getTranscript({
           sessionId,
@@ -797,9 +773,19 @@ describe("ClaudeCloudSessionsApi", () => {
         assert.strictEqual(unchanged.rev, 2);
         assert.deepStrictEqual(unchanged.turnItems, []);
         assert.strictEqual(eventCalls, 3);
+        assert.strictEqual(afterIds.at(-1), "ev-1");
 
         // After 1s with item-2 updated and item-3 added, only changed/new items return in delta.
-        phase = 3;
+        log.push(
+          { uuid: "ev-3", created_at: at(121), itemId: "item-2", text: "Done!" },
+          {
+            uuid: "ev-4",
+            created_at: at(122),
+            itemId: "item-3",
+            text: "Summary",
+            activity: "failed",
+          },
+        );
         yield* TestClock.adjust("1 second");
         const delta = yield* api.getTranscript({
           sessionId,
@@ -871,14 +857,16 @@ describe("ClaudeCloudSessionsApi", () => {
         if (!match) return Effect.succeed({ status: 404, body: {} });
         const sessionId = match[1]!;
         if (match[2] === "/events") {
-          seenEventAfterIds.push({ sessionId, afterId: searchParams.get("after_id") });
+          const afterId = searchParams.get("after_id");
+          seenEventAfterIds.push({ sessionId, afterId });
+          const events = [
+            { uuid: `ev-old-${sessionId}`, created_at: "2026-01-01T00:00:00.000Z" },
+            { uuid: `ev-${sessionId}`, created_at: "2026-01-01T00:02:00.000Z" },
+          ];
+          const data = afterId ? events.slice(1) : events;
           return Effect.succeed({
             status: 200,
-            body: {
-              data: [{ uuid: `ev-${sessionId}` }],
-              has_more: false,
-              last_id: `ev-${sessionId}`,
-            },
+            body: { data, has_more: false, last_id: `ev-${sessionId}` },
           });
         }
         return Effect.succeed({ status: 200, body: makeRemoteSessionApi({ id: sessionId }) });
@@ -900,7 +888,7 @@ describe("ClaudeCloudSessionsApi", () => {
       assert.strictEqual(session1Calls.length, 2);
       assert.isNull(session1Calls[1]?.afterId);
 
-      // Session 3 is still cached, so its refetch passes after_id=ev-session_01LRU00000003.
+      // Session 3 is still cached, so its refetch reads after its overlap cursor.
       yield* api.getTranscript({
         sessionId: "session_01LRU00000003",
         instanceId: DEFAULT_INSTANCE,
@@ -909,9 +897,61 @@ describe("ClaudeCloudSessionsApi", () => {
         (c) => c.sessionId === "session_01LRU00000003",
       );
       assert.strictEqual(session3Calls.length, 2);
-      assert.strictEqual(session3Calls[1]?.afterId, "ev-session_01LRU00000003");
+      assert.strictEqual(session3Calls[1]?.afterId, "ev-old-session_01LRU00000003");
     }).pipe(Effect.scoped, Effect.provide(makeLayerWithServices("/tmp/matter-test-home"))),
   );
+
+  it.effect("picks up an event the API stores after later ones and slots it in by time", () => {
+    const orderMapper = ({
+      sessionId,
+      events,
+    }: MapClaudeCloudEventsInput): MapClaudeCloudEventsResult => ({
+      turnItems: events.map((raw, index) => {
+        const event = raw as Record<string, unknown>;
+        return makeTurnItem(sessionId, String(event.uuid), index, String(event.uuid));
+      }),
+      pendingRequest: null,
+      activity: null,
+    });
+    return Effect.gen(function* () {
+      yield* enableAddon;
+      const api = yield* ClaudeCloudSessionsApi.ClaudeCloudSessionsApi;
+      const sessionId = "session_01LATEEVENT1";
+      const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString();
+      const log: Array<Record<string, unknown>> = [
+        { uuid: "ev-old", created_at: at(0) },
+        { uuid: "ev-result", created_at: at(300) },
+        { uuid: "ev-tool", created_at: at(302) },
+      ];
+      const afterIds: Array<string | null> = [];
+      state.httpResponder = ({ pathname, searchParams }) =>
+        Effect.sync(() => {
+          if (pathname === `/v1/sessions/${sessionId}/events`) {
+            const afterId = searchParams.get("after_id");
+            afterIds.push(afterId);
+            const start = afterId ? log.findIndex((event) => event.uuid === afterId) + 1 : 0;
+            const data = log.slice(start);
+            return { status: 200, body: { data, has_more: false, last_id: data.at(-1)?.uuid } };
+          }
+          return { status: 200, body: makeRemoteSessionApi({ id: sessionId }) };
+        });
+
+      yield* api.getTranscript({ sessionId, instanceId: DEFAULT_INSTANCE });
+      // The follow-up prompt lands in storage after the tool event that it precedes.
+      log.splice(2, 0, { uuid: "ev-prompt", created_at: at(301) });
+      yield* TestClock.adjust("1 second");
+      const next = yield* api.getTranscript({ sessionId, instanceId: DEFAULT_INSTANCE });
+
+      assert.strictEqual(afterIds.at(-1), "ev-old");
+      assert.deepStrictEqual(
+        next.turnItems.map((item) => item.id),
+        ["ev-old", "ev-result", "ev-prompt", "ev-tool"],
+      );
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(makeLayerWithServices("/tmp/matter-test-home", { mapEvents: orderMapper })),
+    );
+  });
 
   it.effect(
     "enforces auth scopes, addon enablement, interrupt_unsupported, and untracked followup routing on HTTP routes",
