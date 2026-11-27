@@ -38,6 +38,8 @@ const PROJECT = ProjectId.make("project:matter");
 const CLOUD_ID = "cse_01ABCDEFGH1234";
 const LOCAL_SESSION = "0d6c7a0e-1b2c-4d5e-8f90-123456789abc";
 const IMPORTED_THREAD = ThreadId.make(`import:claude-alt:${LOCAL_SESSION}`);
+const CHAT_THREAD = ThreadId.make("thread:chat");
+const CHAT_WORKTREE = "/repo/worktrees/chat";
 
 interface Call {
   readonly kind: "exec" | "pty";
@@ -189,7 +191,13 @@ const makeDependencies = (
         Effect.succeed(
           threadId === IMPORTED_THREAD
             ? ({ id: threadId } as unknown as OrchestrationV2ThreadShell)
-            : null,
+            : threadId === CHAT_THREAD
+              ? ({
+                  id: threadId,
+                  projectId: PROJECT,
+                  worktreePath: CHAT_WORKTREE,
+                } as unknown as OrchestrationV2ThreadShell)
+              : null,
         ),
       dispatch: (command) =>
         Effect.sync(() => {
@@ -393,6 +401,33 @@ describe("ClaudeCloudService", () => {
       );
       assert.isTrue(yield* restarted.forgetSession(`https://claude.ai/code/${CLOUD_ID}`));
       assert.deepStrictEqual(yield* restarted.listSessions(), []);
+    }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
+  );
+
+  it.effect("launches from a chat's own worktree and remembers the chat to report back to", () =>
+    Effect.gen(function* () {
+      yield* configure(true, { defaultInstanceId: "claude-alt" });
+      const cloud = yield* ClaudeCloudService.make;
+      const result = yield* cloud.launchSession({
+        prompt: "Run the e2e suite",
+        threadId: CHAT_THREAD,
+        createdBy: "user",
+      });
+      assert.strictEqual(scenario.calls.find((call) => call.kind === "pty")?.cwd, CHAT_WORKTREE);
+      assert.strictEqual(result.session.projectId, PROJECT);
+      assert.strictEqual(result.session.sourceThreadId, CHAT_THREAD);
+
+      yield* cloud.recordReportedState(CLOUD_ID, "idle");
+      assert.strictEqual((yield* cloud.listSessions())[0]?.reportedState, "idle");
+
+      const missing = yield* failureOf(
+        cloud.launchSession({
+          prompt: "Run the e2e suite",
+          threadId: ThreadId.make("thread:gone"),
+          createdBy: "user",
+        }),
+      );
+      assert.strictEqual(missing.code, "invalid_request");
     }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
   );
 

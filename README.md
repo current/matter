@@ -62,7 +62,7 @@ every optional integration is **off by default** in settings → add-ons. disabl
 | ----------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `grok bot`        | loopback CDP (`:9222`)      | chat with local Grok Bot teammates in the sidebar with character silhouettes                                                                                                                |
 | `devin bot`       | loopback CDP (`:9223`)      | v3 messages and "needs you" inbox tickets surfaced as pending requests                                                                                                                      |
-| `claude cloud`    | `claude` CLI + sessions API | every claude.ai cloud session as a live thread: watch it work, reply, pull it into a local worktree. agents move heavy builds and test suites to the cloud on their own, more so on battery |
+| `claude cloud`    | `claude` CLI + sessions API | every claude.ai cloud session as a live thread: watch it work, reply, pull it into a local worktree. agents move heavy builds and test suites to the cloud on their own, more so on battery, and the chat hears back when the run is done |
 | `voice assistant` | local server + notch / web  | hands-free summaries, agent steering, workspace Q&A, and in-thread voice mode                                                                                                               |
 
 ### fork extras
