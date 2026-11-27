@@ -2560,7 +2560,7 @@ export const PACK_ICON_NAMES: Readonly<Record<string, ReadonlyArray<string | nul
     "reply",
     "reply",
     "arrow-back-up",
-    "mail-reply-01",
+    "reply",
   ],
   RotateCcw: [
     "arrow-counter-clockwise",
