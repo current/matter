@@ -126,6 +126,11 @@ const makeRemoteSessionApi = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const pad2 = (value: number) => String(value).padStart(2, "0");
+/** An event time `seconds` into 2026-01-01 (under an hour). */
+const at = (seconds: number) =>
+  `2026-01-01T00:${pad2(Math.floor(seconds / 60))}:${pad2(seconds % 60)}.000Z`;
+
 const makeTurnItem = (
   sessionId: string,
   itemId: string,
@@ -715,7 +720,6 @@ describe("ClaudeCloudSessionsApi", () => {
         const sessionId = "session_01TRANSCRIPT1";
         let eventCalls = 0;
 
-        const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString();
         const log: Array<Record<string, unknown>> = [
           { uuid: "ev-1", created_at: at(0), itemId: "item-1", text: "Hello" },
           { uuid: "ev-2", created_at: at(120), itemId: "item-2", text: "Working..." },
@@ -917,7 +921,7 @@ describe("ClaudeCloudSessionsApi", () => {
       yield* enableAddon;
       const api = yield* ClaudeCloudSessionsApi.ClaudeCloudSessionsApi;
       const sessionId = "session_01LATEEVENT1";
-      const at = (seconds: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString();
+
       const log: Array<Record<string, unknown>> = [
         { uuid: "ev-old", created_at: at(0) },
         { uuid: "ev-result", created_at: at(300) },
