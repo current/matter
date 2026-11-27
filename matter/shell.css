@@ -82,12 +82,31 @@ html.dark[data-matter-scroll-edge="shadow"] .topbar-scroll-fade:not(.flex-col-re
   );
 }
 
-/* One masked layer: full blur at the edge easing to sharp text at the strip's foot. */
+/* One layer standing in for a progressive blur: a soft blur eases in over the whole strip on an
+   eased mask, and a light veil of the page color hides the crossfade between sharp and blurred
+   text, so lines dissolve into the edge instead of snapping to a smudge. */
 html[data-matter-scroll-edge="blur"] .topbar-scroll-fade:not(.flex-col-reverse)::before {
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent);
-  mask-image: linear-gradient(to bottom, black 30%, transparent);
+  --matter-scroll-edge-height: 3rem;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--background) 58%, transparent),
+    color-mix(in srgb, var(--background) 24%, transparent) 45%,
+    transparent
+  );
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  --matter-scroll-edge-ease: linear-gradient(
+    to bottom,
+    black,
+    rgb(0 0 0 / 86%) 18%,
+    rgb(0 0 0 / 62%) 38%,
+    rgb(0 0 0 / 34%) 58%,
+    rgb(0 0 0 / 12%) 78%,
+    rgb(0 0 0 / 3%) 91%,
+    transparent
+  );
+  -webkit-mask-image: var(--matter-scroll-edge-ease);
+  mask-image: var(--matter-scroll-edge-ease);
 }
 
 /* A frosted glass band in the page's own color, like a macOS toolbar over scrolled content. */

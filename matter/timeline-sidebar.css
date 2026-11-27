@@ -697,11 +697,12 @@ html:not([data-matter-scroll-edge="off"]) .mts .mts-list[data-scrolled-top][data
     opacity: 1;
   }
 
+  /* Only where the button exists: desktop opens the native menu and renders none. */
   .mts
     .mts-row:is(:hover, :focus-within)
-    .mts-l1
+    .mts-l1:has(> .mts-more)
     > :is(.mts-age, .mts-need, .mts-unread, .mts-fail, .mlf-st),
-  .mts .mts-sub:is(:hover, :focus-within) > .mts-sm {
+  .mts .mts-sub:is(:hover, :focus-within):has(> .mts-more) > .mts-sm {
     visibility: hidden;
   }
 }

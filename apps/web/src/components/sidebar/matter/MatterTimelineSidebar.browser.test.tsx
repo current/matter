@@ -36,6 +36,13 @@ vi.mock(import("../../../commandPaletteBus"), async (original) => ({
   openCommandPalette,
 }));
 
+// Desktop opens rows' menus natively; a non-null local API with a desktop bridge says so.
+const localApi = vi.hoisted(() => ({ current: null as object | null }));
+vi.mock(import("../../../localApi"), async (original) => ({
+  ...(await original()),
+  readLocalApi: (() => localApi.current) as never,
+}));
+
 vi.mock(import("../../../state/environments"), async (original) => ({
   ...(await original()),
   usePrimaryEnvironmentId: () => EnvironmentId.make("local"),
@@ -272,6 +279,33 @@ describe("MatterTimelineSidebar", () => {
     expect(workingRow.querySelector(".mts-spin")).not.toBeNull();
     expect(workingRow.querySelector(".mts-l2 .mlf-st")?.textContent).toBe("Working");
     expect(row(screen.container, today)!.querySelector(".mts-age")?.textContent).toBe("3h");
+  });
+
+  it("swaps a row's status for its actions on hover only where the actions button exists", async () => {
+    using _server = useServer();
+    // Desktop width, where the sidebar isn't the mobile sheet that always shows the button.
+    await page.viewport(1280, 900);
+    const ageVisibility = (container: HTMLElement) =>
+      getComputedStyle(row(container, today)!.querySelector(".mts-age")!).visibility;
+    {
+      await using screen = await renderTimeline();
+      await userEvent.hover(page.getByRole("button", { name: "Sidebar pass" }));
+      await expect
+        .element(page.getByRole("button", { name: "Actions for Sidebar pass" }))
+        .toBeVisible();
+      expect(ageVisibility(screen.container)).toBe("hidden");
+    }
+    localApi.current = {};
+    window.desktopBridge = {} as NonNullable<typeof window.desktopBridge>;
+    try {
+      await using screen = await renderTimeline();
+      await userEvent.hover(page.getByRole("button", { name: "Sidebar pass" }));
+      expect(screen.container.querySelector(".mts-more")).toBeNull();
+      expect(ageVisibility(screen.container)).toBe("visible");
+    } finally {
+      localApi.current = null;
+      delete window.desktopBridge;
+    }
   });
 
   it("keeps recent rows on two lines and history on one", async () => {

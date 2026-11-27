@@ -176,7 +176,7 @@ describe("composer appearance CSS", () => {
 
     apply({ scrollEdge: "blur" });
     expect(mask(scroller())).toBe("none");
-    expect(backdrop(scroller(), "::before")).toContain("blur(6px)");
+    expect(backdrop(scroller(), "::before")).toContain("blur(4px)");
     expect(content()).toEqual(before);
 
     apply({ scrollEdge: "frost" });
