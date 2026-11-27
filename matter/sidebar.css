@@ -726,6 +726,11 @@ button.mfs-lab[aria-expanded="false"] .mfs-fold {
   font-weight: 500;
 }
 
+.mfs-sub[data-unread]:not([data-active]) {
+  color: var(--mfs-fg);
+  font-weight: 500;
+}
+
 .mfs-sub[data-done] .mfs-t {
   color: var(--mfs-muted);
 }

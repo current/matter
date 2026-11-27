@@ -1,10 +1,6 @@
 /* oxlint-disable shadcn/no-unknown-classes -- the `mfs-*` classes come from the fork stylesheet matter/sidebar.css, which loads outside Tailwind. */
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import type {
-  BotIdentity,
-  ProviderDriverKind,
-  TrackedClaudeCloudSession,
-} from "@t3tools/contracts";
+import type { BotIdentity, ProviderDriverKind } from "@t3tools/contracts";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useGT, useMessages } from "gt-react";
 import {
@@ -14,9 +10,8 @@ import {
   RadioIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
-import { fetchClaudeCloudStatus, openClaudeCloudDialog } from "../../../addons/claudeCloudApi";
 import { useMatterApiConfig } from "../../../addons/matterApi";
 import { useEnabledBotProviderAddons, useIsAddonEnabled } from "../../../addons/useAddonRegistry";
 import { setVoiceModeOpen } from "../../../island/voiceAssistantStore";
@@ -30,7 +25,6 @@ import { BotAvatar } from "../../bots/BotAvatarRenderer";
 import { BOT_ACTIVITY_LABELS } from "../../bots/botActivity";
 import { retainBotsSync, useBotsState } from "../../bots/botsStore";
 import { ProviderInstanceIcon, providerTextColor } from "../../chat/ProviderInstanceIcon";
-import { ClaudeAI } from "../../Icons";
 import {
   getDesktopUpdateDownloadedVersion,
   resolveDesktopUpdateButtonAction,
@@ -57,6 +51,7 @@ import {
   pickUsageMeters,
   type MatterUsageMeter,
 } from "./matterFinalSidebar.logic";
+import { MatterCloudCrew, useClaudeCloudCrewSessions } from "./MatterCloudCrew";
 import { MatterTip } from "./MatterSidebarParts";
 import {
   useMatterSidebarLayout,
@@ -283,32 +278,6 @@ export function useCrewBots() {
   return { bots: [...needs, ...rest], needsCount: needs.length, pending: state.pending };
 }
 
-const CLOUD_REFRESH_MS = 60_000;
-
-/** Claude Cloud sessions Matter tracks, while the add-on is on. */
-function useClaudeCloudSessions(enabled: boolean): ReadonlyArray<TrackedClaudeCloudSession> | null {
-  const config = useMatterApiConfig();
-  const [sessions, setSessions] = useState<ReadonlyArray<TrackedClaudeCloudSession> | null>(null);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- polls the server's Claude Cloud session list while the add-on is on
-  useEffect(() => {
-    if (!enabled || config === null) return;
-    const controller = new AbortController();
-    const load = () => {
-      fetchClaudeCloudStatus(config, { signal: controller.signal }).then(
-        (status) => setSessions(status.enabled ? status.sessions : null),
-        () => undefined,
-      );
-    };
-    load();
-    const timer = window.setInterval(load, CLOUD_REFRESH_MS);
-    return () => {
-      controller.abort();
-      window.clearInterval(timer);
-    };
-  }, [enabled, config]);
-  return enabled ? sessions : null;
-}
-
 function botActivityAt(bot: BotIdentity): string | null {
   const value = bot.metadata["lastActivityAt"];
   return typeof value === "string" ? value : null;
@@ -374,12 +343,8 @@ export function MatterCrew({
 }) {
   const gt = useGT();
   const cloudEnabled = useIsAddonEnabled("claude-cloud");
-  const sessions = useClaudeCloudSessions(cloudEnabled);
-  if (crew.bots.length === 0 && sessions === null) return null;
-  const live = sessions?.filter((session) => session.teleportedThreadId === null) ?? [];
-  const latest = live.toSorted((left, right) =>
-    (right.lastMessageAt ?? right.createdAt).localeCompare(left.lastMessageAt ?? left.createdAt),
-  )[0];
+  const cloud = useClaudeCloudCrewSessions(cloudEnabled);
+  if (crew.bots.length === 0 && cloud === null) return null;
   return (
     <section className="mfs-crew" aria-label={gt("Crew")}>
       <h3 className="mfs-lab">{gt("Crew")}</h3>
@@ -392,29 +357,7 @@ export function MatterCrew({
             nowMs={nowMs}
           />
         ))}
-        {sessions !== null ? (
-          <li>
-            <div className="mfs-row">
-              <button
-                type="button"
-                className="mfs-hit"
-                aria-label={gt("Claude Cloud, {count} live", { count: live.length })}
-                onClick={() =>
-                  openClaudeCloudDialog(
-                    latest
-                      ? { mode: "followup", sessionId: latest.id, projectId: latest.projectId }
-                      : { mode: "launch" },
-                  )
-                }
-              />
-              <span className="mfs-av" data-cloud="">
-                <ClaudeAI aria-hidden />
-              </span>
-              <span className="mfs-t">{gt("Claude Cloud")}</span>
-              <span className="mfs-a">{gt("{count} live", { count: live.length })}</span>
-            </div>
-          </li>
-        ) : null}
+        {cloud !== null ? <MatterCloudCrew sessions={cloud.sessions ?? []} nowMs={nowMs} /> : null}
       </ul>
     </section>
   );
