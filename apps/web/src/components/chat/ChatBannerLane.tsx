@@ -11,6 +11,7 @@ import {
   ProviderStatusBanner,
 } from "./ProviderStatusBanner";
 import { dismissThreadErrorBannerForSession, ThreadErrorBanner } from "./ThreadErrorBanner";
+import { MatterMergeSettlePrompt } from "./MatterMergeSettlePrompt.matter";
 
 /**
  * The banners pinned above the timeline. The dismiss handlers are built here from plain
@@ -59,6 +60,7 @@ export function ChatBannerLane(props: {
           setThreadErrorBannerDismissTick((tick) => tick + 1);
         }}
       />
+      <MatterMergeSettlePrompt environmentId={props.environmentId} threadId={threadId} />
     </div>
   );
 }
