@@ -10,6 +10,7 @@ import {
   type ClaudeCloudLaunchRequest,
   type ClaudeCloudLaunchResult,
   type ClaudeCloudRepositoryState,
+  type ClaudeCloudSessionState,
   type ClaudeCloudSettingsPatch,
   type ClaudeCloudStatus,
   type ClaudeCloudTeleportResult,
@@ -240,6 +241,11 @@ export class ClaudeCloudService extends Context.Service<
       projectId?: ProjectId,
     ) => Effect.Effect<ReadonlyArray<TrackedClaudeCloudSession>, ClaudeCloudError>;
     readonly forgetSession: (sessionId: string) => Effect.Effect<boolean, ClaudeCloudError>;
+    /** Records what the source thread was last told about a session. */
+    readonly recordReportedState: (
+      sessionId: string,
+      state: ClaudeCloudSessionState | null,
+    ) => Effect.Effect<void, ClaudeCloudError>;
     readonly listClaudeAccounts: (options?: {
       readonly refresh?: boolean;
     }) => Effect.Effect<ReadonlyArray<ClaudeCloudAccountLaunch>, ClaudeCloudError>;
@@ -619,7 +625,10 @@ export const make = Effect.gen(function* () {
       ),
     );
 
-  const resolveCwd = (input: { readonly projectId?: ProjectId; readonly cwd?: string }) =>
+  const resolveCwd = (input: {
+    readonly projectId?: ProjectId | undefined;
+    readonly cwd?: string | undefined;
+  }) =>
     input.cwd !== undefined
       ? Effect.succeed<string | null>(input.cwd)
       : input.projectId !== undefined
@@ -787,6 +796,31 @@ export const make = Effect.gen(function* () {
     } satisfies ClaudeCloudEligibility;
   });
 
+  /** A user launching from a chat starts from that chat's checkout and reports back to it. */
+  const launchSource = Effect.fn("ClaudeCloudService.launchSource")(function* (
+    input: ClaudeCloudLaunchInput,
+  ) {
+    const plain = {
+      projectId: input.projectId,
+      cwd: input.cwd,
+      sourceThreadId: input.sourceThreadId,
+    };
+    if (input.threadId === undefined || input.sourceThreadId !== undefined) return plain;
+    const shell = yield* threads
+      .getThreadShell(input.threadId)
+      .pipe(Effect.orElseSucceed(() => null));
+    if (shell === null) {
+      return yield* fail("invalid_request", `Thread "${input.threadId}" was not found.`);
+    }
+    const projectId = input.projectId ?? shell.projectId;
+    const ownCheckout = projectId === shell.projectId && shell.worktreePath !== null;
+    return {
+      projectId,
+      cwd: input.cwd ?? (ownCheckout ? shell.worktreePath : null) ?? undefined,
+      sourceThreadId: shell.id,
+    };
+  });
+
   const launchSession = Effect.fn("ClaudeCloudService.launchSession")(function* (
     input: ClaudeCloudLaunchInput,
   ) {
@@ -811,6 +845,7 @@ export const make = Effect.gen(function* () {
         );
       }
     }
+    const source = yield* launchSource(input);
     const { instance, account } = yield* resolveInstance(input.instanceId, settings);
     yield* requireReadyAccount(account);
     if (input.createdBy === "agent" && input.userApproved !== true) {
@@ -822,7 +857,7 @@ export const make = Effect.gen(function* () {
         );
       }
     }
-    const cwd = yield* resolveCwd(input);
+    const cwd = yield* resolveCwd(source);
     if (cwd === null) {
       return yield* fail(
         "invalid_request",
@@ -900,11 +935,11 @@ export const make = Effect.gen(function* () {
       title,
       promptPreview: preview(input.prompt),
       instanceId: instance.instanceId,
-      projectId: input.projectId ?? null,
+      projectId: source.projectId ?? null,
       cwd,
       branch: repository.branch,
       createdBy: input.createdBy,
-      sourceThreadId: input.sourceThreadId ?? null,
+      sourceThreadId: source.sourceThreadId ?? null,
       reason: input.reason?.trim() || null,
       createdAt: yield* nowIso,
       lastMessageAt: null,
@@ -969,6 +1004,8 @@ export const make = Effect.gen(function* () {
       yield* patchSession(id, {
         lastMessageAt: yield* nowIso,
         lastReplyPreview: reply === null ? tracked.lastReplyPreview : preview(reply),
+        // A follow-up starts a new run, so its end is reported again.
+        reportedState: null,
       });
     }
     return { sessionId: id, reply } satisfies ClaudeCloudFollowUpResult;
@@ -1100,6 +1137,9 @@ export const make = Effect.gen(function* () {
     return true;
   });
 
+  const recordReportedState = (sessionId: string, state: ClaudeCloudSessionState | null) =>
+    patchSession(sessionId, { reportedState: state }).pipe(Effect.asVoid);
+
   const listClaudeAccounts = Effect.fn("ClaudeCloudService.listClaudeAccounts")(
     function* (options?: { readonly refresh?: boolean }) {
       yield* requireEnabled;
@@ -1161,6 +1201,7 @@ export const make = Effect.gen(function* () {
     teleportToWorktree,
     listSessions,
     forgetSession,
+    recordReportedState,
     listClaudeAccounts,
   });
 });

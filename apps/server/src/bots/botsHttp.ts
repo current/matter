@@ -24,6 +24,7 @@ import { HttpRouter } from "effect/http";
 import * as ClaudeCloudRunner from "../cloud/ClaudeCloudRunner.ts";
 import * as ClaudeCloudService from "../cloud/ClaudeCloudService.ts";
 import * as ClaudeCloudSessionsApi from "../cloud/ClaudeCloudSessionsApi.ts";
+import * as ClaudeCloudWatcher from "../cloud/ClaudeCloudWatcher.ts";
 import { layerClaudeCloudRoutes } from "../cloud/claudeCloudHttp.ts";
 import { eventStreamResponse } from "../eventStreamResponse.ts";
 import * as AddonConfigService from "./AddonConfigService.ts";
@@ -330,6 +331,7 @@ export const layerMatterAddonsAndBots = Layer.mergeAll(
   layerBotsRoutes,
   layerRegisteredBotProviders,
   layerClaudeCloudRoutes,
+  ClaudeCloudWatcher.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(

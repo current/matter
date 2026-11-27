@@ -180,6 +180,19 @@ export type ClaudeCloudAccountStatus = typeof ClaudeCloudAccountStatus.Type;
 export const ClaudeCloudCreatedBy = Schema.Literals(["user", "agent"]);
 export type ClaudeCloudCreatedBy = typeof ClaudeCloudCreatedBy.Type;
 
+/**
+ * Where a cloud session stands. Read from Claude's sessions API (`session_status`, the post-turn
+ * summary and the newest transcript events), never guessed from what Matter sent.
+ */
+export const ClaudeCloudSessionState = Schema.Literals([
+  "running",
+  "idle",
+  "needs_input",
+  "failed",
+  "archived",
+]);
+export type ClaudeCloudSessionState = typeof ClaudeCloudSessionState.Type;
+
 /** What Matter remembers about a cloud session. Public ids, links and titles only. */
 export const TrackedClaudeCloudSession = Schema.Struct({
   id: ClaudeCloudSessionId,
@@ -199,6 +212,8 @@ export const TrackedClaudeCloudSession = Schema.Struct({
   lastReplyPreview: Schema.NullOr(Schema.String),
   teleportedThreadId: Schema.NullOr(ThreadId),
   teleportedWorktreePath: Schema.NullOr(Schema.String),
+  /** The last state Matter told the source thread about; cleared when the session runs again. */
+  reportedState: Schema.optionalKey(Schema.NullOr(ClaudeCloudSessionState)),
 });
 export type TrackedClaudeCloudSession = typeof TrackedClaudeCloudSession.Type;
 
@@ -282,6 +297,8 @@ export const ClaudeCloudLaunchRequest = Schema.Struct({
   projectId: Schema.optionalKey(ProjectId),
   /** Push the current branch first when it has unpushed commits. */
   pushFirst: Schema.optionalKey(Schema.Boolean),
+  /** Launch from this chat's checkout; Matter reports back to it when the run ends. */
+  threadId: Schema.optionalKey(ThreadId),
 });
 export type ClaudeCloudLaunchRequest = typeof ClaudeCloudLaunchRequest.Type;
 
@@ -323,19 +340,6 @@ export const ClaudeCloudTeleportResult = Schema.Struct({
   threadId: Schema.NullOr(ThreadId),
 });
 export type ClaudeCloudTeleportResult = typeof ClaudeCloudTeleportResult.Type;
-
-/**
- * Where a cloud session stands. Read from Claude's sessions API (`session_status`, the post-turn
- * summary and the newest transcript events), never guessed from what Matter sent.
- */
-export const ClaudeCloudSessionState = Schema.Literals([
-  "running",
-  "idle",
-  "needs_input",
-  "failed",
-  "archived",
-]);
-export type ClaudeCloudSessionState = typeof ClaudeCloudSessionState.Type;
 
 /**
  * A cloud session as the claude.ai account sees it, including ones started in the Claude app or

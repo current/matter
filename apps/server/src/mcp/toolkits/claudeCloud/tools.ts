@@ -66,7 +66,7 @@ const StatusTool = Tool.make("claude_cloud_status", {
 const LaunchTool = Tool.make("claude_cloud_launch", {
   ...shared,
   description:
-    "Start a Claude Cloud session on this thread's pushed branch with `prompt` as its task. Runs on the user's claude.ai plan while this machine is free. `pushFirst` pushes unpushed commits; uncommitted changes never reach it. Follow the user's delegation rules and say why in `reason`.",
+    "Start a Claude Cloud session on this thread's pushed branch with `prompt` as its task. Runs on the user's claude.ai plan while this machine is free. `pushFirst` pushes unpushed commits; uncommitted changes never reach it. Follow the user's delegation rules and say why in `reason`. Matter messages this thread when the session finishes or needs input, so don't poll it.",
   parameters: Schema.Struct({
     prompt: Prompt,
     title: Schema.optionalKey(TrimmedNonEmptyString.check(Schema.isMaxLength(200))),
