@@ -77,7 +77,7 @@ every optional integration is **off by default** in settings → add-ons. disabl
 - **composer predictions** — after each turn, the empty composer offers your likely next message in your own voice, for every provider; tab or → fills it in.
 - **stalled turn flags** — flags running turns with no agent activity for 10 minutes.
 - **multi-project delegation** — delegate tasks across local projects from one thread.
-- **matter on iOS** — the phone app carries the desktop look: the timeline thread list, the tighter chat with live ai status, the shelf composer with plan and goal modes, and the questions and plan overview cards.
+- **matter on iOS** — the phone app carries the desktop look: the timeline thread list, the tighter chat with live ai status, the shelf composer with plan and goal modes, the questions and plan overview cards, the whisper pill, replies, predictions, the archive-on-merge prompt and streaming text.
 - **phone pairing & iOS sideloading** — Tailscale HTTPS pairing links serve Matter's bundled web UI and installable PWA directly; free Apple ID iOS builds work out of the box via `T3CODE_IOS_PERSONAL_TEAM=1`.
 - **automatic upstream nightly merges** — CI merges the newest upstream nightly tag into every macOS arm64 prerelease and re-signs with the fork's certificate.
 - **`matter.json` project config** — reads `matter.json` first and falls back to upstream's `t3.json`.

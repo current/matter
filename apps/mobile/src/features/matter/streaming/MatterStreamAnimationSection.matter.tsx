@@ -152,10 +152,10 @@ export function MatterStreamAnimationSection() {
             accessibilityRole="button"
             accessibilityLabel={gt("Replay preview")}
             hitSlop={8}
-            className="size-7 items-center justify-center rounded-full bg-subtle"
+            className="mt-0.5 size-8 items-center justify-center rounded-full bg-subtle"
             onPress={() => setReplay((count) => count + 1)}
           >
-            <SymbolView name="arrow.clockwise" size={13} tintColorClassName="accent-icon-subtle" />
+            <SymbolView name="arrow.clockwise" size={15} tintColorClassName="accent-icon-muted" />
           </Pressable>
         </View>
         {MATTER_NATIVE_STREAM_ANIMATION_IDS.map((id) => (
