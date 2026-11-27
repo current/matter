@@ -252,7 +252,9 @@ export function MatterComposerAppearanceSettings() {
 
       <SettingsRow
         {...searchableSetting("matter-composer-shape")}
-        description={gt("The composer's shape, from the default shelf to a soft pill.")}
+        description={gt(
+          "The composer's shape, from the default shelf to a soft pill. Shelf keeps branch and worktree controls under every chat.",
+        )}
         devicePreference
         resetAction={
           appearance.shape !== defaults.shape ? (

@@ -57,6 +57,7 @@ describe("shouldShowMatterComposerContextStrip", () => {
     persistInActiveThreads: true,
     isGitRepo: true,
     showEnvironmentIndicator: false,
+    shelfStyle: false,
   };
 
   it("shows the under-tray in both new-chat drafts and active threads for real projects by default", () => {
@@ -82,6 +83,14 @@ describe("shouldShowMatterComposerContextStrip", () => {
         persistInActiveThreads: false,
       }),
     ).toBe(true);
+  });
+
+  it("keeps the under-tray in active threads under the Shelf style, which is drawn around it", () => {
+    const off = { ...base, isDraftHeroState: false, persistInActiveThreads: false };
+    expect(shouldShowMatterComposerContextStrip({ ...off, shelfStyle: true })).toBe(true);
+    expect(
+      shouldShowMatterComposerContextStrip({ ...off, shelfStyle: true, hasActiveProject: false }),
+    ).toBe(false);
   });
 
   it("keeps the strip for scratch drafts and collapses it cleanly without a real active project", () => {

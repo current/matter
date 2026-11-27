@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 
+import { useMatterComposerAppearance } from "../../matterComposerAppearance";
 import { shouldShowComposerContextStrip } from "../BranchToolbar.logic";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -69,14 +70,26 @@ export function shouldShowMatterComposerContextStrip(input: {
   readonly persistInActiveThreads: boolean;
   readonly isGitRepo: boolean;
   readonly showEnvironmentIndicator: boolean;
+  /** The Shelf style is drawn around the under-tray, so it keeps the tray in every chat. */
+  readonly shelfStyle: boolean;
 }): boolean {
+  const persist = input.persistInActiveThreads || input.shelfStyle;
   return shouldShowComposerContextStrip({
-    isDraftHeroState:
-      input.isDraftHeroState || (!input.isScratchProject && input.persistInActiveThreads),
-    persistInActiveThreads: input.persistInActiveThreads,
+    isDraftHeroState: input.isDraftHeroState || (!input.isScratchProject && persist),
+    persistInActiveThreads: persist,
     hasActiveProject: !input.embedded && input.hasActiveProject && !input.showProviderSubagentBar,
     isGitRepo: input.isGitRepo,
     showEnvironmentIndicator: input.showEnvironmentIndicator,
+  });
+}
+
+export function useMatterComposerContextStrip(
+  input: Omit<Parameters<typeof shouldShowMatterComposerContextStrip>[0], "shelfStyle">,
+): boolean {
+  const [appearance] = useMatterComposerAppearance();
+  return shouldShowMatterComposerContextStrip({
+    ...input,
+    shelfStyle: appearance.shape === "shelf",
   });
 }
 

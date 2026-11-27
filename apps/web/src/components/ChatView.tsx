@@ -355,7 +355,7 @@ import {
   resolveLocalCheckoutBranchMismatch,
   shouldShowEnvironmentIndicator,
 } from "./BranchToolbar.logic";
-import { shouldShowMatterComposerContextStrip } from "./chat/MatterComposerParts.matter";
+import { useMatterComposerContextStrip } from "./chat/MatterComposerParts.matter";
 import {
   getProviderStatusDismissalKey,
   shouldShowProviderStatusBanner,
@@ -1936,7 +1936,7 @@ export default function ChatView(props: ChatViewProps) {
           providerSubagentModels,
           reportedModelSelection,
         );
-  const showComposerContextStrip = shouldShowMatterComposerContextStrip({
+  const showComposerContextStrip = useMatterComposerContextStrip({
     embedded,
     hasActiveProject: activeProject !== null,
     isScratchProject: activeProjectIsScratch,
