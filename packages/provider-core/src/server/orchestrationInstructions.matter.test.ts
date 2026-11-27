@@ -80,4 +80,38 @@ describe("Matter interaction mode instructions", () => {
     assert.equal(acpEffectiveInteractionMode("goal"), "default");
     assert.equal(acpEffectiveInteractionMode("plan"), "plan");
   });
+
+  it("delivers the deferred-proxy note in the system prompt and in a mid-session delta once", () => {
+    const proxy = {
+      interactionMode: "default",
+      hasT3Mcp: true,
+      hasDeviceTools: false,
+      includeMcpFallback: false,
+      toolExposure: "deferred-proxy",
+    } as const;
+    const plain = { ...proxy, toolExposure: undefined };
+    assert.include(buildT3AcpInstructions(proxy), "tool_call({ name, arguments })");
+    assert.notInclude(buildT3AcpInstructions(plain), "tool_call(");
+
+    assert.equal(
+      t3AcpPromptWithInstructions({ prompt: "Hi.", state: proxy, systemPromptState: proxy }),
+      "Hi.",
+    );
+    const gained = t3AcpPromptWithInstructions({
+      prompt: "Hi.",
+      state: proxy,
+      systemPromptState: plain,
+    });
+    assert.include(gained, "tool_call({ name, arguments })");
+    assert.notInclude(gained, "## T3 Code orchestration");
+    assert.equal(
+      t3AcpPromptWithInstructions({
+        prompt: "Again.",
+        state: proxy,
+        previousState: proxy,
+        systemPromptState: plain,
+      }),
+      "Again.",
+    );
+  });
 });
