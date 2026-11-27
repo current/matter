@@ -5013,6 +5013,7 @@
   "c6e000ea79ae6a2b": "{status, select, inProgress {スレッド「{title}」を読み取っています} completed {スレッド「{title}」を読み取りました} failed {スレッド「{title}」を読み取れませんでした} declined {スレッド「{title}」の読み取りは拒否されました} stopped {スレッド「{title}」の読み取りを中止しました} other {スレッド「{title}」を読み取っています}}",
   "93435595c79fd659": "使用量の上限に達しました。{resetTime} 以降に再試行してください。",
   "5a2d803b3ea43f18": "使用量の上限に達しました。",
+  "4c36ab712143ad31": "{duration}考えました",
   "1afc4f46bc0675aa": "{label}、ツール呼び出しに失敗しました",
   "e05d1bee2862c2be": "ツール呼び出しに失敗しました",
   "ce591b4de647ecda": "{title} を開く",

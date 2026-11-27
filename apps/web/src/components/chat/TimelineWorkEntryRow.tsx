@@ -83,6 +83,9 @@ import {
   thoughtPreviewMarkdown,
 } from "./TimelineWorkEntryRow.logic";
 import { rebrandTimelineServerText } from "./matterRebrandTimelineText";
+import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
+import { workEntryDurationMs } from "./matterWorkDuration.matter";
+import { useMatterDisclosure } from "./matterWorklog.matter";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
   const rawThreadId = threadReadTargetId(entry);
@@ -310,6 +313,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const [expanded, setExpanded] = useState(
     () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
   );
+  const disclosure = useMatterDisclosure(expanded);
   const noticeMessage =
     workEntry.structuredPayload?.type === "system_notice"
       ? workEntry.structuredPayload.message
@@ -439,6 +443,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? undefined
       : (workEntry.toolIcon ?? workEntry.toolSource?.icon);
   const isReasoning = workEntry.itemType === "reasoning";
+  const durationMs = workEntryDurationMs(workEntry);
+  const duration = durationMs === null ? null : formatDuration(durationMs, m);
+  const thoughtLabel = duration ? gt("Thought for {duration}", { duration }) : gt("Thought");
+  const thoughtSummary =
+    isReasoning && workEntry.toolLifecycleStatus !== "inProgress"
+      ? workEntry.detail?.trim()
+      : undefined;
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
@@ -446,7 +457,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
         ? gt("Thinking")
-        : gt("Thought")
+        : thoughtLabel
       : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot, m));
   const previewText =
     workEntry.itemType === "notification" ||
@@ -507,7 +518,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       viewedImage,
     );
   const expandedBody =
-    expanded && !isReasoning
+    disclosure.present && !isReasoning
       ? plainOutput !== undefined
         ? plainOutput
         : buildToolCallExpandedBody(
@@ -580,6 +591,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   return (
     <WorkLogRow
       data-work-entry-id={workEntry.id}
+      data-matter-disclosure={disclosure.phase ?? undefined}
       data-v2-item-type={workEntry.projectedItem?.item.type}
       data-v2-item-visibility={workEntry.projectedItem?.visibility}
       onClick={canExpandProjectedItem ? toggleExpanded : undefined}
@@ -593,7 +605,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           <ToolActivityIconView
             icon={entryToolIcon}
             fallbackName={entryIconName}
-            className="block size-4 shrink-0 stroke-2"
+            className="block size-3.5 shrink-0 stroke-2"
             muted
           />
         </span>
@@ -609,7 +621,23 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                 headingClass,
               )}
             >
-              {isReasoning && !expanded ? (
+              {isReasoning && !expanded && thoughtSummary !== undefined ? (
+                <>
+                  <span data-matter-wl-verb>{thoughtLabel}</span>
+                  {thoughtSummary ? (
+                    <span data-matter-wl-target>
+                      {" · "}
+                      <ChatMarkdown
+                        inline
+                        text={sliceThoughtPreviewSource(thoughtSummary)}
+                        cwd={ctx.markdownCwd}
+                        parseRawHtml={false}
+                        extensions={thoughtPreviewMarkdown(thoughtLabel)}
+                      />
+                    </span>
+                  ) : null}
+                </>
+              ) : isReasoning && !expanded ? (
                 <ChatMarkdown
                   inline
                   text={sliceThoughtPreviewSource(workEntry.detail ?? previewText)}
@@ -659,6 +687,9 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
               timestampFormat={timestampFormat}
             />
           ) : null}
+          {duration && !isReasoning && noticeMessage === null ? (
+            <span data-matter-wl-duration>{duration}</span>
+          ) : null}
           {createdThread ? (
             <button
               type="button"
@@ -695,7 +726,11 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
           ) : null}
           {canExpandProjectedItem ? (
-            <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
+            <span
+              className="flex size-4 shrink-0 items-center justify-center"
+              aria-hidden
+              data-matter-wl-chevron
+            >
               <ChevronRightIcon
                 className={cn(
                   "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
@@ -707,7 +742,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         </>
       }
     >
-      {expanded && viewedImage && threadRef ? (
+      {disclosure.present && viewedImage && threadRef ? (
         <WorkLogDetails kind="media">
           <ChatMarkdownAssetImage
             environmentId={threadRef.environmentId}
@@ -720,11 +755,11 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           />
         </WorkLogDetails>
       ) : null}
-      {expanded && workEntry.questionAnswer ? (
+      {disclosure.present && workEntry.questionAnswer ? (
         <QuestionAnswerHistory answer={workEntry.questionAnswer} />
       ) : null}
-      {expanded && isReasoning ? <ReasoningTraceContent entries={[workEntry]} /> : null}
-      {expanded &&
+      {disclosure.present && isReasoning ? <ReasoningTraceContent entries={[workEntry]} /> : null}
+      {disclosure.present &&
       !isReasoning &&
       !workEntry.questionAnswer &&
       canExpandProjectedItem &&

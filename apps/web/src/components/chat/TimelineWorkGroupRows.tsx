@@ -42,7 +42,7 @@ import {
   type TimelineRow,
 } from "./timelineRowContext";
 import { ProviderStartingIcon } from "./ProviderStartingIcon";
-import { TimelineRowTimestamp, ActivityShimmerOverlay } from "./TimelineRowParts";
+import { TimelineRowTimestamp } from "./TimelineRowParts";
 import {
   failedToolIconClassName,
   toolIconAcceptsTint,
@@ -63,6 +63,12 @@ import {
   workEntryIconName,
 } from "./TimelineWorkEntryRow.logic";
 import { formatWorkingTimerNow } from "./TimelineWorkGroupRows.logic";
+import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
+import {
+  noteWorkGroupToggle,
+  useWorkGroupCascade,
+  workGroupCascadeStyle,
+} from "./matterWorklog.matter";
 
 export const WorkGroupSection = memo(function WorkGroupSection({
   anchorKey,
@@ -224,6 +230,7 @@ function ExpandedWorkGroupEntries({
   }
 
   const viewedImages = useWorkGroupViewedImages(groupedEntries);
+  const cascade = useWorkGroupCascade();
   const groupView = {
     state: viewState,
     viewedImages,
@@ -285,8 +292,13 @@ function ExpandedWorkGroupEntries({
     return observeResize(content ? [element, content] : element, updateScrollFades);
   }, [updateScrollFades]);
 
-  const renderEntry = ({ item }: { item: TimelineWorkEntry }) => (
-    <SimpleWorkEntryRow key={item.id} workEntry={item} workspaceRoot={workspaceRoot} />
+  const renderEntry = ({ item, index }: { item: TimelineWorkEntry; index: number }) => (
+    <div
+      data-matter-cascade={cascade || undefined}
+      style={cascade ? workGroupCascadeStyle(index) : undefined}
+    >
+      <SimpleWorkEntryRow key={item.id} workEntry={item} workspaceRoot={workspaceRoot} />
+    </div>
   );
 
   const updateExpandedContentHeight = () => {
@@ -371,9 +383,9 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
         <span
           ref={shimmer ? observeVisibleAnimation : undefined}
           className="relative shrink-0 overflow-hidden whitespace-nowrap"
+          data-matter-pulse={shimmer || undefined}
         >
           {label}
-          {shimmer ? <ActivityShimmerOverlay>{label}</ActivityShimmerOverlay> : null}
         </span>
         {backgroundWorktreeSetup ? (
           <BackgroundWorktreeSetupChip snapshot={backgroundWorktreeSetup} />
@@ -473,7 +485,6 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
         )
       }
       active={live}
-      shimmer={live}
     />
   );
   const { groupId } = row;
@@ -483,7 +494,10 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
       type="button"
       className="group/live-work flex min-h-6 w-full max-w-full cursor-pointer items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
       aria-expanded={row.expanded === true}
-      onClick={() => ctx.onToggleWorkGroup(groupId, row.id)}
+      onClick={() => {
+        noteWorkGroupToggle(row.expanded === true);
+        ctx.onToggleWorkGroup(groupId, row.id);
+      }}
     >
       {activity}
     </button>
@@ -497,7 +511,6 @@ function LiveActivityRow({
   toolIcon,
   failed = false,
   active = false,
-  shimmer = false,
 }: {
   label: ReactNode;
   iconName?: WorkEntryIconName;
@@ -506,10 +519,8 @@ function LiveActivityRow({
   toolIcon?: ToolActivityIcon | undefined;
   failed?: boolean;
   active?: boolean;
-  shimmer?: boolean;
 }) {
   const animated = active && !failed;
-  const showShimmer = animated && shimmer;
   return (
     <div
       ref={animated ? observeVisibleAnimation : undefined}
@@ -522,19 +533,8 @@ function LiveActivityRow({
         toolIcon={toolIcon}
         failed={failed}
         announceFailure={failed}
-        active={animated && !shimmer}
+        active={animated}
       />
-      {showShimmer ? (
-        <ActivityShimmerOverlay>
-          <LiveActivityContent
-            label={label}
-            iconName={iconName}
-            iconNode={iconNode}
-            toolIcon={toolIcon}
-            highlighted
-          />
-        </ActivityShimmerOverlay>
-      ) : null}
     </div>
   );
 }
@@ -547,7 +547,6 @@ function LiveActivityContent({
   failed = false,
   announceFailure = false,
   active = false,
-  highlighted = false,
 }: {
   label: ReactNode;
   iconName: WorkEntryIconName | undefined;
@@ -556,7 +555,6 @@ function LiveActivityContent({
   failed?: boolean;
   announceFailure?: boolean;
   active?: boolean;
-  highlighted?: boolean;
 }) {
   const gt = useGT();
   const showTrailingFailureMark =
@@ -569,36 +567,26 @@ function LiveActivityContent({
           <span
             className={cn(
               "flex size-4 items-center justify-center",
-              failed
-                ? failedToolIconClassName
-                : highlighted
-                  ? "text-foreground"
-                  : "text-icon-muted",
+              failed ? failedToolIconClassName : "text-icon-muted",
             )}
             role={announceFailure ? "img" : undefined}
             aria-label={announceFailure ? gt("Tool call failed") : undefined}
           >
             {iconNode ? (
-              <span className={cn("flex", !highlighted && "opacity-70")}>{iconNode}</span>
+              <span className="flex opacity-70">{iconNode}</span>
             ) : (
               <ToolActivityIconView
                 icon={toolIcon}
                 fallbackName={iconName}
-                className="block size-4 shrink-0 stroke-2"
-                muted={!highlighted}
+                className="block size-3.5 shrink-0 stroke-2"
+                muted
               />
             )}
           </span>
         ) : null
       }
       label={
-        <span
-          className={cn(
-            "block truncate",
-            highlighted && "text-foreground",
-            active && "live-tool-shine",
-          )}
-        >
+        <span className="block truncate" data-matter-pulse={active || undefined}>
           {label}
         </span>
       }
@@ -650,7 +638,10 @@ export function LiveWorkEntryTimelineRow({
           : undefined
       }
       aria-expanded={row.expanded}
-      onClick={() => ctx.onToggleWorkGroup(row.groupId, row.id)}
+      onClick={() => {
+        noteWorkGroupToggle(row.expanded);
+        ctx.onToggleWorkGroup(row.groupId, row.id);
+      }}
     >
       {thoughtLine ? (
         <WorkLogRow
@@ -659,7 +650,7 @@ export function LiveWorkEntryTimelineRow({
               <ToolActivityIconView
                 icon={undefined}
                 fallbackName="brain"
-                className="block size-4 shrink-0 stroke-2"
+                className="block size-3.5 shrink-0 stroke-2"
                 muted
               />
             </span>
@@ -723,8 +714,10 @@ export function WorkGroupToggleTimelineRow({
   row: Extract<TimelineRow, { kind: "work-toggle" }>;
 }) {
   const ctx = use(TimelineRowCtx);
+  const m = useMessages();
   return (
     <WorkGroupHeader
+      duration={row.durationMs === undefined ? null : formatDuration(row.durationMs, m)}
       label={row.summary}
       iconName={row.toolSurface ?? toolGroupSummaryIconName(row.summaryKind)}
       toolIcon={row.toolIcon}
@@ -732,12 +725,16 @@ export function WorkGroupToggleTimelineRow({
       expanded={row.expanded}
       createdAt={row.createdAt}
       timestampFormat={ctx.timestampFormat}
-      onToggle={() => ctx.onToggleWorkGroup(row.groupId, row.id)}
+      onToggle={() => {
+        noteWorkGroupToggle(row.expanded);
+        ctx.onToggleWorkGroup(row.groupId, row.id);
+      }}
     />
   );
 }
 
 function WorkGroupHeader(props: {
+  duration: string | null;
   label: string;
   iconName: WorkEntryIconName;
   toolIcon?: ToolActivityIcon | undefined;
@@ -750,6 +747,7 @@ function WorkGroupHeader(props: {
   const gt = useGT();
   return (
     <WorkLogButton
+      data-matter-wl-group
       aria-label={
         props.failed ? gt("{label}, tool call failed", { label: props.label }) : props.label
       }
@@ -759,13 +757,19 @@ function WorkGroupHeader(props: {
         <ToolActivityIconView
           icon={props.toolIcon}
           fallbackName={props.iconName}
-          className="size-4 shrink-0 stroke-2 text-icon-muted"
+          className="size-3.5 shrink-0 stroke-2 text-icon-muted"
           muted
         />
       }
       label={<span className="block truncate">{props.label}</span>}
       trailing={
-        <TimelineRowTimestamp createdAt={props.createdAt} timestampFormat={props.timestampFormat} />
+        <>
+          <TimelineRowTimestamp
+            createdAt={props.createdAt}
+            timestampFormat={props.timestampFormat}
+          />
+          {props.duration ? <span data-matter-wl-duration>{props.duration}</span> : null}
+        </>
       }
     />
   );

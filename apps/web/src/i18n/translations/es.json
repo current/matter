@@ -5023,6 +5023,7 @@
   "c6e000ea79ae6a2b": "{status, select, inProgress {Leyendo el hilo “{title}”} completed {Leyó el hilo “{title}”} failed {No se pudo leer el hilo “{title}”} declined {Se rechazó leer el hilo “{title}”} stopped {Se dejó de leer el hilo “{title}”} other {Leyendo el hilo “{title}”}}",
   "93435595c79fd659": "Se alcanzó el límite de uso. Vuelve a intentarlo después de {resetTime}.",
   "5a2d803b3ea43f18": "Se alcanzó el límite de uso.",
+  "4c36ab712143ad31": "Pensó durante {duration}",
   "1afc4f46bc0675aa": "{label}, falló la llamada a herramienta",
   "e05d1bee2862c2be": "Falló la llamada a herramienta",
   "ce591b4de647ecda": "Abrir {title}",

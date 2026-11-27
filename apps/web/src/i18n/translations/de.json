@@ -5026,6 +5026,7 @@
   "c6e000ea79ae6a2b": "{status, select, inProgress {Thread „{title}“ wird gelesen} completed {Thread „{title}“ gelesen} failed {Thread „{title}“ konnte nicht gelesen werden} declined {Lesen von Thread „{title}“ abgelehnt} stopped {Lesen von Thread „{title}“ abgebrochen} other {Thread „{title}“ wird gelesen}}",
   "93435595c79fd659": "Nutzungslimit erreicht. Versuche es nach {resetTime} erneut.",
   "5a2d803b3ea43f18": "Nutzungslimit erreicht.",
+  "4c36ab712143ad31": "{duration} nachgedacht",
   "1afc4f46bc0675aa": "{label}, Tool-Aufruf fehlgeschlagen",
   "e05d1bee2862c2be": "Tool-Aufruf fehlgeschlagen",
   "ce591b4de647ecda": "{title} öffnen",

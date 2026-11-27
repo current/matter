@@ -5024,6 +5024,7 @@
   "c6e000ea79ae6a2b": "{status, select, inProgress {Lecture du fil « {title} »} completed {Fil « {title} » lu} failed {Impossible de lire le fil « {title} »} declined {Refus de lire le fil « {title} »} stopped {Arrêt de la lecture du fil « {title} »} other {Lecture du fil « {title} »}}",
   "93435595c79fd659": "Limite d’utilisation atteinte. Réessayez après {resetTime}.",
   "5a2d803b3ea43f18": "Limite d’utilisation atteinte.",
+  "4c36ab712143ad31": "A réfléchi pendant {duration}",
   "1afc4f46bc0675aa": "{label}, échec de l’appel d’outil",
   "e05d1bee2862c2be": "Échec de l’appel d’outil",
   "ce591b4de647ecda": "Ouvrir {title}",

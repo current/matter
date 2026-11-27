@@ -1,0 +1,203 @@
+/* Matter "Tighter" work log: thinking, tool calls, work groups, the turn fold and subagent rows.
+   One 13px line on a 20px grid, quieter trailing meta, chevrons that show on hover, and
+   disclosures that open in 180 ms and close in 120 ms. Only transform, opacity and a small blur
+   move, nothing loops while idle, and reduced motion lands everything at once. The motion
+   hooks live in apps/web/src/components/chat/matterWorklog.matter.ts. */
+
+:root {
+  --matter-wl-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --matter-wl-ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* ---------- rows ---------- */
+
+:is(
+    [data-timeline-row-kind="work"],
+    [data-timeline-row-kind="work-live"],
+    [data-timeline-row-kind="work-toggle"],
+    [data-timeline-row-kind="thinking"],
+    [data-timeline-row-kind="working"],
+    [data-native-child-work-timeline]
+  )
+  .text-sm {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* The hover timestamp sits straight in the row's line. */
+:is([data-work-entry-id], [data-matter-wl-group]) > :first-child > .text-xs {
+  font-size: 11px;
+}
+
+[data-matter-wl-verb] {
+  font-weight: 500;
+}
+[data-matter-wl-target] {
+  color: color-mix(in srgb, currentColor 76%, transparent);
+}
+
+[data-matter-wl-duration] {
+  flex: none;
+  min-width: 32px;
+  text-align: end;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Chevrons show on hover, focus or while open; touch has no hover, so they stay. */
+[data-matter-wl-chevron] {
+  opacity: 0;
+  transition: opacity 120ms var(--matter-wl-ease);
+}
+[data-matter-wl-chevron] svg {
+  transition-duration: 160ms;
+  transition-timing-function: var(--matter-wl-ease);
+}
+:is(:hover, :focus-visible, [aria-expanded="true"]) > [data-matter-wl-chevron],
+:is(:hover, :focus-visible, [aria-expanded="true"]) > * > [data-matter-wl-chevron] {
+  opacity: 1;
+}
+@media (hover: none) {
+  [data-matter-wl-chevron] {
+    opacity: 1;
+  }
+}
+
+[data-native-child-work-timeline] pre.p-2 {
+  padding: 8px 12px;
+}
+
+/* ---------- disclosures ---------- */
+
+/* On the row: everything after its line is the details. */
+[data-matter-disclosure="opening"] > :not(:first-child) {
+  animation: matter-wl-open 180ms var(--matter-wl-ease) backwards;
+}
+[data-matter-disclosure="closing"] > :not(:first-child) {
+  pointer-events: none;
+  animation: matter-wl-close 120ms var(--matter-wl-ease-in) forwards;
+}
+@keyframes matter-wl-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes matter-wl-close {
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+/* A work group the user just opened: its first rows land 24 ms apart. */
+[data-matter-cascade] {
+  animation: matter-wl-cascade 160ms var(--matter-wl-ease) var(--matter-cascade-delay, 0ms)
+    backwards;
+}
+@keyframes matter-wl-cascade {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+/* The turn fold swaps a right chevron for a down one; a click turns the new one in from the
+   old angle. Keyboard focus alone (`:focus-visible`) never spins it. */
+[data-timeline-row-kind="turn-fold"] button[aria-expanded="true"]:focus:not(:focus-visible) svg {
+  animation: matter-wl-turn-down 160ms var(--matter-wl-ease);
+}
+[data-timeline-row-kind="turn-fold"] button[aria-expanded="false"]:focus:not(:focus-visible) svg {
+  animation: matter-wl-turn-right 160ms var(--matter-wl-ease);
+}
+@keyframes matter-wl-turn-down {
+  from {
+    transform: rotate(-90deg);
+  }
+}
+@keyframes matter-wl-turn-right {
+  from {
+    transform: rotate(90deg);
+  }
+}
+
+/* ---------- live rows: a stepped opacity pulse, not a repainting shimmer ---------- */
+
+[data-matter-pulse] {
+  animation: matter-wl-pulse 2s steps(6) infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+}
+@keyframes matter-wl-pulse {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  50%,
+  90% {
+    opacity: 0.58;
+  }
+}
+
+/* ---------- subagents ---------- */
+
+[data-subagent-group] > button {
+  gap: 8px;
+  padding-block: 4px;
+}
+[data-subagent-group] > :not(button) > div {
+  border-radius: 8px;
+}
+[data-v2-item-type="subagent"]:not([data-work-entry-id]) {
+  min-height: 40px;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+[data-v2-item-type="subagent"]:not([data-work-entry-id]) > .flex-1 > :first-child {
+  line-height: 18px;
+}
+[data-v2-item-type="subagent"]:not([data-work-entry-id]) .text-2xs {
+  line-height: 14px;
+}
+[data-v2-item-type="subagent"]:not([data-work-entry-id]) > .text-xs {
+  font-size: 11px;
+}
+/* A panel the user just opened (its trigger holds pointer focus) fades in with staggered rows;
+   one that remounts open while scrolling stays still. */
+[data-subagent-group]:has(> button[aria-expanded="true"]:focus:not(:focus-visible))
+  > :not(button)
+  > div {
+  animation: matter-wl-open 160ms var(--matter-wl-ease) backwards;
+}
+[data-subagent-group]:has(> button[aria-expanded="true"]:focus:not(:focus-visible))
+  [data-v2-item-type="subagent"]:not([data-work-entry-id]) {
+  animation: matter-wl-cascade 160ms var(--matter-wl-ease) 30ms backwards;
+}
+[data-subagent-group]:has(> button[aria-expanded="true"]:focus:not(:focus-visible))
+  [data-v2-item-type="subagent"]:not([data-work-entry-id]):nth-child(2) {
+  animation-delay: 58ms;
+}
+[data-subagent-group]:has(> button[aria-expanded="true"]:focus:not(:focus-visible))
+  [data-v2-item-type="subagent"]:not([data-work-entry-id]):nth-child(3) {
+  animation-delay: 86ms;
+}
+[data-subagent-group]:has(> button[aria-expanded="true"]:focus:not(:focus-visible))
+  [data-v2-item-type="subagent"]:not([data-work-entry-id]):nth-child(n + 4) {
+  animation-delay: 114ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-matter-disclosure] > *,
+  [data-matter-cascade],
+  [data-matter-pulse],
+  [data-subagent-group] *,
+  [data-timeline-row-kind="turn-fold"] svg {
+    animation: none !important;
+  }
+  [data-matter-wl-chevron] {
+    transition: none;
+  }
+}
