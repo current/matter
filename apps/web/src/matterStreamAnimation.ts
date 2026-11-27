@@ -9,7 +9,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { STREAM_CARET_CLASS } from "./components/chat/matterStreamHast";
+import { STREAM_CARET_CLASS, STREAM_WORD_CLASS } from "./components/chat/matterStreamHast";
 
 import {
   readLocalStorageValue,
@@ -26,6 +26,9 @@ export const MatterStreamAnimation = Schema.Literals([
   "rise",
   "typewriter",
   "rareui",
+  "ink",
+  "line",
+  "phrase",
 ]);
 export type MatterStreamAnimation = typeof MatterStreamAnimation.Type;
 export type MatterAnimatedStream = Exclude<MatterStreamAnimation, "instant">;
@@ -76,6 +79,27 @@ export const MATTER_STREAM_ANIMATIONS: ReadonlyArray<{
     id: "rareui",
     name: msg("RareUI", { $context: "streaming text animation; a component library name" }),
     description: msg("Words land in uneven bursts and sharpen from a blur", {
+      $context: "streaming text animation",
+    }),
+  },
+  {
+    id: "ink",
+    name: msg("Ink", { $context: "streaming text animation" }),
+    description: msg("Each word develops quickly from a fine blur", {
+      $context: "streaming text animation",
+    }),
+  },
+  {
+    id: "line",
+    name: msg("Line settle", { $context: "streaming text animation" }),
+    description: msg("The line being written sits light and settles once it is done", {
+      $context: "streaming text animation",
+    }),
+  },
+  {
+    id: "phrase",
+    name: msg("Phrase", { $context: "streaming text animation" }),
+    description: msg("A whole phrase lands at once, so nothing moves while you read", {
       $context: "streaming text animation",
     }),
   },
@@ -326,6 +350,123 @@ export function useBurstPacedText(text: string, pacing: boolean): string {
   return length >= text.length ? text : text.slice(0, length);
 }
 
+// Phrase: words are held until their clause ends (or six words pile up), then the clause lands
+// in one render, so its words mount and fade together. A backlog drains within PHRASE_DRAIN_MS.
+const PHRASE_MAX_WORDS = 6;
+const PHRASE_MS_PER_WORD = 46;
+const PHRASE_DRAIN_MS = 500;
+const PHRASE_DRAIN_PHRASES = 4;
+/** A clause the model leaves open (a pause, a tool call) shows after this long without text. */
+const PHRASE_HOLD_MS = 350;
+
+export interface PhraseBreak {
+  /** Where the phrase ends in the text. */
+  readonly end: number;
+  readonly words: number;
+}
+
+export interface PhrasePace {
+  /** Whole phrases shown so far. */
+  readonly phrases: number;
+  /** Milliseconds until the next phrase may land; at or below zero, it lands now. */
+  readonly wait: number;
+}
+
+/** The finished phrases of streaming `text`: each ends at clause punctuation, a line break or its sixth word. */
+export function phraseBreaks(text: string): PhraseBreak[] {
+  const breaks: PhraseBreak[] = [];
+  let words = 0;
+  for (const end of wholeWordEnds(text)) {
+    words++;
+    const tail = text[end - 1] ?? "";
+    if (
+      words >= PHRASE_MAX_WORDS ||
+      SENTENCE_END.test(tail) ||
+      CLAUSE_END.test(tail) ||
+      text[end] === "\n"
+    ) {
+      breaks.push({ end, words });
+      words = 0;
+    }
+  }
+  return breaks;
+}
+
+/** The pace after `elapsedMs`: phrases land while the wait has run out, never past `breaks`. */
+export function advancePhrasePacer(
+  pace: PhrasePace,
+  breaks: ReadonlyArray<PhraseBreak>,
+  elapsedMs: number,
+): PhrasePace {
+  let phrases = Math.min(pace.phrases, breaks.length);
+  let wait = Math.max(pace.wait - Math.max(0, elapsedMs), -BURST_MAX_DEBT_MS);
+  while (wait <= 0 && phrases < breaks.length) {
+    const backlog = breaks.length - phrases;
+    const natural = breaks[phrases]!.words * PHRASE_MS_PER_WORD;
+    const drain = (PHRASE_DRAIN_MS * Math.min(1, PHRASE_DRAIN_PHRASES / backlog)) / backlog;
+    phrases++;
+    wait += Math.min(natural, drain);
+  }
+  return { phrases, wait };
+}
+
+/**
+ * The prefix of `text` Phrase shows: whole phrases released on animation frames, plus a held
+ * clause once no text has arrived for a moment. Returns the full text the moment pacing stops.
+ */
+export function usePhrasePacedText(text: string, pacing: boolean): string {
+  // Starts at whatever already arrived, so opening a running thread doesn't replay it.
+  const [shown, setShown] = useState<number>(() =>
+    pacing ? (wholeWordEnds(text).at(-1) ?? 0) : text.length,
+  );
+  const [wasPacing, setWasPacing] = useState(pacing);
+  if (pacing !== wasPacing) {
+    setWasPacing(pacing);
+    setShown(pacing ? (wholeWordEnds(text).at(-1) ?? 0) : text.length);
+  }
+  const pacer = useRef<{ pace: PhrasePace; at: number } | null>(null);
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- paces against animation frames and a hold timer, external clocks; both stop once caught up.
+  useEffect(() => {
+    if (!pacing) {
+      pacer.current = null;
+      return;
+    }
+    const breaks = phraseBreaks(text);
+    let state = pacer.current ?? {
+      pace: { phrases: breaks.length, wait: 0 },
+      at: performance.now(),
+    };
+    pacer.current = state;
+    let frame = 0;
+    let hold: ReturnType<typeof setTimeout> | undefined;
+    // Shown text never shrinks: a held clause that was flushed stays up while its phrase completes.
+    const showUpTo = (end: number) => setShown((current) => Math.max(current, end));
+    const tick = (now: number) => {
+      state = { pace: advancePhrasePacer(state.pace, breaks, now - state.at), at: now };
+      pacer.current = state;
+      showUpTo(breaks[state.pace.phrases - 1]?.end ?? 0);
+      if (state.pace.phrases < breaks.length) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      const lastWord = wholeWordEnds(text).at(-1) ?? 0;
+      if (lastWord > (breaks.at(-1)?.end ?? 0)) {
+        hold = setTimeout(() => showUpTo(lastWord), PHRASE_HOLD_MS);
+      }
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(hold);
+    };
+  }, [pacing, text]);
+
+  if (!pacing) return text;
+  const length = Math.min(shown, text.length);
+  return length >= text.length ? text : text.slice(0, length);
+}
+
 /** What ChatMarkdown renders for a message: the (paced) text and its animation, if any. */
 export function useMatterStreamingText(
   text: string,
@@ -334,7 +475,47 @@ export function useMatterStreamingText(
   const animation = useEffectiveMatterStreamAnimation(streaming);
   const paced = usePacedText(text, animation === "typewriter");
   const burst = useBurstPacedText(paced, animation === "rareui");
-  return { text: burst, animation };
+  const phrased = usePhrasePacedText(burst, animation === "phrase");
+  return { text: phrased, animation };
+}
+
+const STREAM_LINE_SETTLED_CLASS = "matter-sw-settled";
+
+/**
+ * Line settle: the line being written sits light, and every word on a line a later word has
+ * wrapped below settles. Reads only the unsettled words' boxes.
+ * The words present when it first runs settle without a transition, so opening a thread
+ * mid-reply doesn't fade its text in again.
+ */
+export function useMatterLineSettle(rootRef: RefObject<HTMLElement | null>, active: boolean): void {
+  const settledOnce = useRef(false);
+  // Runs after every render: the owner re-renders as text arrives, and only unsettled words are read.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads where words wrapped in the DOM after each update, which React can't know
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!active || root === null) {
+      settledOnce.current = false;
+      return;
+    }
+    const live = root.querySelectorAll<HTMLElement>(
+      `span.${STREAM_WORD_CLASS}:not(.${STREAM_LINE_SETTLED_CLASS})`,
+    );
+    const last = live[live.length - 1];
+    if (last === undefined) return;
+    const lastTop = last.getBoundingClientRect().top;
+    for (const word of live) {
+      if (word.getBoundingClientRect().top < lastTop - 1) {
+        word.classList.add(STREAM_LINE_SETTLED_CLASS);
+      }
+    }
+    if (settledOnce.current) return;
+    settledOnce.current = true;
+    for (const word of live) {
+      for (const transition of word.getAnimations()) {
+        if (transition instanceof CSSTransition) transition.finish();
+      }
+    }
+  });
 }
 
 /**

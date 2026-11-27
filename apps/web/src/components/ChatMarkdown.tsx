@@ -213,6 +213,7 @@ import {
   type MatterAnimatedStream,
   useMatterStreamingText,
   useSettledOpeningStreamText,
+  useMatterLineSettle,
 } from "../matterStreamAnimation";
 import { MarkdownMermaidCodeBlock } from "./chat/MarkdownMermaidCodeBlock";
 import { MarkdownTable } from "./chat/MarkdownTable";
@@ -2121,6 +2122,7 @@ function ChatMarkdown({
   const { componentState, handleCopy, markdownRef, localMediaPreview, closeLocalMediaPreview } =
     useChatMarkdownState({ text, inline, ...props }, streamingBlocks);
   useSettledOpeningStreamText(markdownRef, props.isStreaming === true && !inline);
+  useMatterLineSettle(markdownRef, stream.animation === "line");
   const Root = inline ? "span" : "div";
   const bindMarkdownRef = (node: HTMLElement | null) => {
     markdownRef.current = node;

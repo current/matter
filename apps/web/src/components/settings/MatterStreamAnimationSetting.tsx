@@ -1,6 +1,6 @@
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { CheckIcon, RotateCcwIcon } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useGT, useMessages } from "gt-react";
 import * as Schema from "effect/Schema";
 
@@ -10,7 +10,9 @@ import {
   MATTER_STREAM_ANIMATIONS,
   MatterStreamAnimation,
   useBurstPacedText,
+  useMatterLineSettle,
   usePacedText,
+  usePhrasePacedText,
   useMatterStreamAnimationSetting,
   wholeWordEnds,
 } from "../../matterStreamAnimation";
@@ -87,9 +89,12 @@ function StreamPreview({
   }, [sample, reducedMotion]);
 
   const paced = usePacedText(sample.slice(0, arrived), streaming && animation === "typewriter");
-  const visible = useBurstPacedText(paced, streaming && animation === "rareui");
-  // RareUI's bursts can trail the sample, so its turn ends once they have caught up.
-  const caughtUp = animation !== "rareui" || visible.length >= (wholeWordEnds(sample).at(-1) ?? 0);
+  const burst = useBurstPacedText(paced, streaming && animation === "rareui");
+  const visible = usePhrasePacedText(burst, streaming && animation === "phrase");
+  // RareUI's bursts and Phrase's clauses can trail the sample, so the turn ends once they catch up.
+  const caughtUp =
+    (animation !== "rareui" && animation !== "phrase") ||
+    visible.length >= (wholeWordEnds(sample).at(-1) ?? 0);
   const turnEnding = streaming && arrivalsDone && caughtUp;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the sample turn ends on a timer, a moment after its last words, as a provider's does.
@@ -102,13 +107,19 @@ function StreamPreview({
   // Like the chat: word spans only while streaming, then the same text renders plain.
   const live = streaming && animation !== "instant";
   const caret = live && (animation === "blur" || animation === "typewriter");
+  const liveRef = useRef<HTMLParagraphElement>(null);
+  useMatterLineSettle(liveRef, live && animation === "line");
 
   return (
     <div className="chat-markdown grid min-w-0 text-sm leading-relaxed text-foreground">
       <p aria-hidden className="invisible col-start-1 row-start-1 m-0">
         {renderTokens(sample, false)}
       </p>
-      <p className="col-start-1 row-start-1 m-0" data-matter-stream={live ? animation : undefined}>
+      <p
+        ref={liveRef}
+        className="col-start-1 row-start-1 m-0"
+        data-matter-stream={live ? animation : undefined}
+      >
         {renderTokens(visible, live)}
         {caret ? <span aria-hidden className={STREAM_CARET_CLASS} /> : null}
       </p>

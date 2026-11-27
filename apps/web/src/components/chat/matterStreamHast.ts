@@ -45,19 +45,25 @@ const CARET_HOSTS = new Set([
 const CARET_CONTAINERS = new Set([...CARET_HOSTS, "ul", "ol", "blockquote", "div"]);
 
 const TOKEN_PATTERN = /\s+|\S+/g;
+const SPACELESS_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
 const wordSegmenter =
   typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
     ? new Intl.Segmenter(undefined, { granularity: "word" })
     : null;
 
-/** Splits text into alternating word segments and runs of space, including space-less scripts (CJK). */
+/**
+ * Splits text into alternating words and runs of space. Only space-less scripts (CJK) split
+ * inside a token: elsewhere a word keeps its punctuation ("mid-turn", "reconnect(),"), so an
+ * inline-block word never wraps before a hyphen or comma.
+ */
 export function splitStreamWords(value: string): string[] {
   const chunks = value.match(TOKEN_PATTERN);
   if (!chunks) return [];
   if (!wordSegmenter) return chunks;
   const out: string[] = [];
   for (const chunk of chunks) {
-    if (isSpace(chunk)) {
+    if (isSpace(chunk) || !SPACELESS_SCRIPT.test(chunk)) {
       out.push(chunk);
       continue;
     }
