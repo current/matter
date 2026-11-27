@@ -3,26 +3,31 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { afterEach, assert, beforeEach, describe, it } from "@effect/vitest";
 import {
   CLAUDE_CLOUD_ADDON_ID,
+  type HostPowerSnapshot,
   type OrchestrationV2ServerCommand,
   type OrchestrationV2ThreadShell,
   type Project,
   ProjectId,
   ProviderInstanceId,
+  type ServerProvider,
   ThreadId,
 } from "@t3tools/contracts";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
+import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AddonConfigService from "../bots/AddonConfigService.ts";
 import * as ServerConfig from "../config.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as AgentSessionImporter from "../project/AgentSessionImporter.ts";
 import * as ProjectService from "../project/ProjectService.ts";
+import { ProviderRegistry } from "../provider/ProviderRegistry.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ClaudeCloudRunner from "./ClaudeCloudRunner.ts";
 import * as ClaudeCloudService from "./ClaudeCloudService.ts";
@@ -141,52 +146,101 @@ const layerRunner = Layer.succeed(ClaudeCloudRunner.ClaudeCloudRunner, {
     }),
 });
 
-const layerDependencies = Layer.mergeAll(
-  layerRunner,
-  ServerSettings.layerTest({
-    providerInstances: {
-      [ProviderInstanceId.make("claude-alt")]: {
-        driver: "claudeAgent",
-        displayName: "Claude Alt",
-        config: { homePath: "/Users/test/.claude-alt" },
+const makeDependencies = (
+  settings: { readonly fallbackExcludedInstanceIds?: Array<string> } = {},
+) =>
+  Layer.mergeAll(
+    layerRunner,
+    ServerSettings.layerTest({
+      providerInstances: {
+        [ProviderInstanceId.make("claude-alt")]: {
+          driver: "claudeAgent",
+          displayName: "Claude Alt",
+          config: { homePath: "/Users/test/.claude-alt" },
+        },
       },
-    },
-  }),
-  Layer.mock(ProjectService.ProjectService)({
-    getById: (projectId) =>
-      Effect.succeed(
-        projectId === PROJECT
-          ? Option.some({ id: PROJECT, workspaceRoot: ROOT } as unknown as Project)
-          : Option.none(),
-      ),
-  }),
-  Layer.mock(GitWorkflowService.GitWorkflowService)({
-    createWorktree: (input) =>
-      Effect.succeed({
-        worktree: { path: WORKTREE, refName: input.newRefName ?? input.refName },
-      }),
-  }),
-  Layer.mock(AgentSessionImporter.AgentSessionImporter)({
-    importRecentAgentThreads: () => Effect.succeed({ importedCount: 1, skippedCount: 0 }),
-  }),
-  Layer.mock(ThreadManagementService.ThreadManagementService)({
-    getThreadShell: (threadId) =>
-      Effect.succeed(
-        threadId === IMPORTED_THREAD
-          ? ({ id: threadId } as unknown as OrchestrationV2ThreadShell)
-          : null,
-      ),
-    dispatch: (command) =>
-      Effect.sync(() => {
-        scenario.dispatched.push(command);
-        return {} as never;
-      }),
-  }),
-).pipe(
-  Layer.provideMerge(AddonConfigService.layer),
-  Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-claude-cloud-" })),
-  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
-);
+      ...(settings.fallbackExcludedInstanceIds === undefined
+        ? {}
+        : {
+            fallbackExcludedInstanceIds: settings.fallbackExcludedInstanceIds.map((id) =>
+              ProviderInstanceId.make(id),
+            ),
+          }),
+    }),
+    Layer.mock(ProjectService.ProjectService)({
+      getById: (projectId) =>
+        Effect.succeed(
+          projectId === PROJECT
+            ? Option.some({ id: PROJECT, workspaceRoot: ROOT } as unknown as Project)
+            : Option.none(),
+        ),
+    }),
+    Layer.mock(GitWorkflowService.GitWorkflowService)({
+      createWorktree: (input) =>
+        Effect.succeed({
+          worktree: { path: WORKTREE, refName: input.newRefName ?? input.refName },
+        }),
+    }),
+    Layer.mock(AgentSessionImporter.AgentSessionImporter)({
+      importRecentAgentThreads: () => Effect.succeed({ importedCount: 1, skippedCount: 0 }),
+    }),
+    Layer.mock(ThreadManagementService.ThreadManagementService)({
+      getThreadShell: (threadId) =>
+        Effect.succeed(
+          threadId === IMPORTED_THREAD
+            ? ({ id: threadId } as unknown as OrchestrationV2ThreadShell)
+            : null,
+        ),
+      dispatch: (command) =>
+        Effect.sync(() => {
+          scenario.dispatched.push(command);
+          return {} as never;
+        }),
+    }),
+  ).pipe(
+    Layer.provideMerge(AddonConfigService.layer),
+    Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-claude-cloud-" })),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+  );
+
+const layerDependencies = makeDependencies();
+
+const onPower = (patch: Partial<HostPowerSnapshot>) =>
+  Layer.mock(BackgroundPolicy.BackgroundPolicy)({
+    snapshot: Effect.succeed({
+      leases: [],
+      activeForegroundLeaseCount: 0,
+      activeScopeKeys: [],
+      shouldRunOpportunisticWork: true,
+      updatedAt: DateTime.makeUnsafe(0),
+      hostPower: {
+        source: "electron-main",
+        idle: "false",
+        idleSeconds: 0,
+        locked: "false",
+        suspended: false,
+        onBattery: "false",
+        lowPowerMode: "unknown",
+        thermalState: "nominal",
+        stale: false,
+        updatedAt: DateTime.makeUnsafe(0),
+        ...patch,
+      },
+    }),
+  });
+
+const withWeeklyUsage = (usedPercent: number) =>
+  Layer.mock(ProviderRegistry)({
+    getProviders: Effect.succeed([
+      {
+        instanceId: ProviderInstanceId.make("claude-alt"),
+        usageLimits: {
+          checkedAt: "2026-11-27T00:00:00.000Z",
+          windows: [{ id: "weekly", kind: "weekly", label: "Weekly", usedPercent }],
+        },
+      } as unknown as ServerProvider,
+    ]),
+  });
 
 const configure = (enabled: boolean, config: Record<string, unknown> = {}) =>
   Effect.gen(function* () {
@@ -505,6 +559,102 @@ describe("ClaudeCloudService", () => {
       assert.strictEqual(missing.code, "not_found");
       assert.include(missing.message, WORKTREE);
     }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
+  );
+});
+
+describe("ClaudeCloudService offload policy", () => {
+  it.effect("advises the cloud on battery and returns the advice with status", () =>
+    Effect.gen(function* () {
+      yield* configure(true, { offloadPolicy: "balanced" });
+      const cloud = yield* ClaudeCloudService.make;
+      const status = yield* cloud.getStatus({ refresh: true, projectId: PROJECT });
+      assert.deepStrictEqual(status.advice, {
+        level: "prefer_cloud",
+        reasons: ["On battery power"],
+      });
+
+      yield* cloud.updateSettings({ offloadPolicy: "off" });
+      assert.strictEqual((yield* cloud.getStatus()).advice?.level, "unavailable");
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(onPower({ onBattery: "true" }), withWeeklyUsage(10), layerDependencies),
+      ),
+    ),
+  );
+
+  it.effect("keeps agent launches local near the usage limit unless the user agrees", () =>
+    Effect.gen(function* () {
+      yield* configure(true, { offloadPolicy: "cloud_first" });
+      const cloud = yield* ClaudeCloudService.make;
+      const status = yield* cloud.getStatus({ refresh: true });
+      assert.deepStrictEqual(status.advice, {
+        level: "prefer_local",
+        reasons: ["Claude weekly limit 95% used"],
+      });
+      const launch = (input: Partial<ClaudeCloudService.ClaudeCloudLaunchInput>) =>
+        cloud.launchSession({
+          prompt: "Run the full e2e suite",
+          projectId: PROJECT,
+          createdBy: "agent",
+          ...input,
+        });
+      const refused = yield* failureOf(launch({}));
+      assert.strictEqual(refused.code, "usage_limit");
+      assert.include(refused.message, "Claude weekly limit 95% used");
+      assert.strictEqual((yield* launch({ userApproved: true })).session.createdBy, "agent");
+      assert.strictEqual((yield* launch({ createdBy: "user" })).session.createdBy, "user");
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        Layer.mergeAll(onPower({ onBattery: "true" }), withWeeklyUsage(95), layerDependencies),
+      ),
+    ),
+  );
+
+  it.effect("writes the policy and the older mode together so either client reads the same", () =>
+    Effect.gen(function* () {
+      yield* configure(true);
+      const cloud = yield* ClaudeCloudService.make;
+      assert.deepInclude(yield* cloud.updateSettings({ offloadPolicy: "battery_saver" }), {
+        offloadPolicy: "battery_saver",
+        agentDelegationMode: "auto",
+      });
+      // An older client re-saving the same mode keeps the finer policy.
+      assert.strictEqual(
+        (yield* cloud.updateSettings({ agentDelegationMode: "auto" })).offloadPolicy,
+        "battery_saver",
+      );
+      assert.deepInclude(yield* cloud.updateSettings({ agentDelegationMode: "ask" }), {
+        offloadPolicy: "ask",
+        agentDelegationMode: "ask",
+      });
+    }).pipe(Effect.scoped, Effect.provide(layerDependencies)),
+  );
+
+  it.effect("never picks an excluded account on its own, but uses it when chosen", () =>
+    Effect.gen(function* () {
+      yield* configure(true);
+      const launch = Effect.gen(function* () {
+        const cloud = yield* ClaudeCloudService.make;
+        return yield* cloud.launchSession({
+          prompt: "Run the suite",
+          projectId: PROJECT,
+          createdBy: "agent",
+        });
+      }).pipe(Effect.scoped);
+      const refused = yield* failureOf(launch);
+      assert.strictEqual(refused.code, "account_not_ready");
+      assert.include(refused.message, "kept out of automatic picks");
+      assert.deepStrictEqual(claudeCalls(), []);
+
+      yield* configure(true, { defaultInstanceId: "claude-alt" });
+      assert.strictEqual((yield* launch).session.instanceId, "claude-alt");
+    }).pipe(
+      Effect.provide(
+        makeDependencies({ fallbackExcludedInstanceIds: ["claude-alt", "claudeAgent"] }),
+      ),
+    ),
   );
 });
 

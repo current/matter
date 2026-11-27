@@ -12,7 +12,8 @@ const toFailure = (error: ClaudeCloudService.ClaudeCloudError) =>
     code:
       error.code === "addon_disabled" ||
       error.code === "delegation_off" ||
-      error.code === "approval_required"
+      error.code === "approval_required" ||
+      error.code === "usage_limit"
         ? "capability_denied"
         : error.code === "cli_failed" ||
             error.code === "launch_timeout" ||
@@ -72,10 +73,15 @@ export const layer = McpToolAccess.toLayer(ClaudeCloudToolkit, {
   claude_cloud_status: McpToolAccess.reads(({ projectId, refresh }) =>
     Effect.gen(function* () {
       const cloud = yield* ClaudeCloudService.ClaudeCloudService;
+      const caller = yield* callerWorkspace.pipe(
+        Effect.orElseSucceed(() => ({ projectId: undefined, cwd: undefined, threadId: undefined })),
+      );
+      const target = projectId ?? caller.projectId;
       const status = yield* cloud
         .getStatus({
           ...(refresh === undefined ? {} : { refresh }),
-          ...(projectId === undefined ? {} : { projectId }),
+          ...(target === undefined ? {} : { projectId: target }),
+          ...(target === caller.projectId && caller.cwd !== undefined ? { cwd: caller.cwd } : {}),
         })
         .pipe(Effect.mapError(toFailure));
       if (!status.enabled) {
@@ -86,6 +92,8 @@ export const layer = McpToolAccess.toLayer(ClaudeCloudToolkit, {
         });
       }
       return {
+        advice: status.advice ?? { level: "unavailable", reasons: [] },
+        offloadPolicy: status.settings.offloadPolicy,
         agentDelegationMode: status.settings.agentDelegationMode,
         delegationRules: status.settings.delegationRules,
         accounts: status.accounts,

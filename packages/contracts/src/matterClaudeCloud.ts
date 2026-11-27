@@ -18,6 +18,32 @@ export const ClaudeCloudDelegationMode = Schema.Literals(["off", "ask", "auto"])
 export type ClaudeCloudDelegationMode = typeof ClaudeCloudDelegationMode.Type;
 
 const CLAUDE_CLOUD_DEFAULT_DELEGATION_MODE: ClaudeCloudDelegationMode = "auto";
+
+/**
+ * When agents should move heavy work to a cloud VM. `ask` and `balanced` weigh the same; `ask`
+ * also needs the user's consent. "Under pressure" is battery, Low Power Mode or thermal load.
+ */
+export const ClaudeCloudOffloadPolicy = Schema.Literals([
+  "off",
+  "ask",
+  "balanced",
+  "battery_saver",
+  "cloud_first",
+]);
+export type ClaudeCloudOffloadPolicy = typeof ClaudeCloudOffloadPolicy.Type;
+
+export function claudeCloudDelegationModeForPolicy(
+  policy: ClaudeCloudOffloadPolicy,
+): ClaudeCloudDelegationMode {
+  return policy === "off" ? "off" : policy === "ask" ? "ask" : "auto";
+}
+
+/** Config written before offload policies keeps its meaning: `auto` becomes Balanced. */
+export function claudeCloudPolicyForDelegationMode(
+  mode: ClaudeCloudDelegationMode,
+): ClaudeCloudOffloadPolicy {
+  return mode === "auto" ? "balanced" : mode;
+}
 export const CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH = 2_000;
 export const CLAUDE_CLOUD_PROMPT_MAX_LENGTH = 20_000;
 
@@ -25,6 +51,8 @@ export const CLAUDE_CLOUD_PROMPT_MAX_LENGTH = 20_000;
 export const ClaudeCloudAddonSettings = Schema.Struct({
   /** Claude instance whose claude.ai login runs cloud sessions; null picks the first ready one. */
   defaultInstanceId: Schema.NullOr(ProviderInstanceId),
+  offloadPolicy: ClaudeCloudOffloadPolicy,
+  /** Derived from `offloadPolicy`; kept so older clients and stored config still read. */
   agentDelegationMode: ClaudeCloudDelegationMode,
   /** Free-form rules from the user that agents follow before offloading. */
   delegationRules: Schema.String.check(
@@ -37,6 +65,7 @@ export type ClaudeCloudAddonSettings = typeof ClaudeCloudAddonSettings.Type;
 
 export const CLAUDE_CLOUD_DEFAULT_SETTINGS: ClaudeCloudAddonSettings = {
   defaultInstanceId: null,
+  offloadPolicy: claudeCloudPolicyForDelegationMode(CLAUDE_CLOUD_DEFAULT_DELEGATION_MODE),
   agentDelegationMode: CLAUDE_CLOUD_DEFAULT_DELEGATION_MODE,
   delegationRules: "",
   autoPushBeforeLaunch: false,
@@ -44,6 +73,7 @@ export const CLAUDE_CLOUD_DEFAULT_SETTINGS: ClaudeCloudAddonSettings = {
 
 export const ClaudeCloudSettingsPatch = Schema.Struct({
   defaultInstanceId: Schema.optionalKey(Schema.NullOr(ProviderInstanceId)),
+  offloadPolicy: Schema.optionalKey(ClaudeCloudOffloadPolicy),
   agentDelegationMode: Schema.optionalKey(ClaudeCloudDelegationMode),
   delegationRules: Schema.optionalKey(
     Schema.String.check(Schema.isMaxLength(CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH)),
@@ -53,22 +83,30 @@ export const ClaudeCloudSettingsPatch = Schema.Struct({
 export type ClaudeCloudSettingsPatch = typeof ClaudeCloudSettingsPatch.Type;
 
 const DELEGATION_MODES: ReadonlyArray<string> = ClaudeCloudDelegationMode.literals;
+const OFFLOAD_POLICIES: ReadonlyArray<string> = ClaudeCloudOffloadPolicy.literals;
 const INSTANCE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 
 /** Reads settings from stored add-on config, keeping defaults for anything missing or invalid. */
 export function claudeCloudSettingsFromConfig(config: AddonConfig): ClaudeCloudAddonSettings {
   const instance = config.defaultInstanceId;
   const mode = config.agentDelegationMode;
+  const storedPolicy = config.offloadPolicy;
   const rules = config.delegationRules;
+  const offloadPolicy =
+    typeof storedPolicy === "string" && OFFLOAD_POLICIES.includes(storedPolicy)
+      ? (storedPolicy as ClaudeCloudOffloadPolicy)
+      : claudeCloudPolicyForDelegationMode(
+          typeof mode === "string" && DELEGATION_MODES.includes(mode)
+            ? (mode as ClaudeCloudDelegationMode)
+            : CLAUDE_CLOUD_DEFAULT_DELEGATION_MODE,
+        );
   return {
     defaultInstanceId:
       typeof instance === "string" && INSTANCE_ID_PATTERN.test(instance)
         ? ProviderInstanceId.make(instance)
         : null,
-    agentDelegationMode:
-      typeof mode === "string" && DELEGATION_MODES.includes(mode)
-        ? (mode as ClaudeCloudDelegationMode)
-        : CLAUDE_CLOUD_DEFAULT_DELEGATION_MODE,
+    offloadPolicy,
+    agentDelegationMode: claudeCloudDelegationModeForPolicy(offloadPolicy),
     delegationRules:
       typeof rules === "string" ? rules.slice(0, CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH) : "",
     autoPushBeforeLaunch: config.autoPushBeforeLaunch === true,
@@ -97,19 +135,21 @@ export function parseClaudeCloudSessionRef(input: string): string | null {
 }
 
 /**
- * The note agents see while the add-on is on and delegation is not off. Empty otherwise, so the
- * add-on costs no context when unused.
+ * The note agents see while the add-on is on and offload is not off. Empty otherwise, so the
+ * add-on costs no context when unused. Sessions read it once at start, so live conditions
+ * (battery, heat, usage) reach agents through `claude_cloud_status`'s `advice`, not this text.
  */
 export function claudeCloudAgentInstructions(settings: ClaudeCloudAddonSettings): string {
-  if (settings.agentDelegationMode === "off") return "";
+  if (settings.offloadPolicy === "off") return "";
   const consent =
-    settings.agentDelegationMode === "ask"
-      ? "Ask the user first and pass `userApproved: true` only after they agree."
-      : "You may offload without asking when it clearly helps.";
+    settings.offloadPolicy === "ask"
+      ? "Ask the user before offloading and pass `userApproved: true` only after they agree."
+      : "You may offload without asking.";
   const rules = settings.delegationRules.trim().replaceAll(/\s+/g, " ");
   return [
     "<claude_cloud>",
-    `Heavy work (long test suites, big builds or refactors) can run on Claude Cloud: \`claude_cloud_launch\` starts a cloud session on the pushed branch, \`claude_cloud_send\` messages it, \`claude_cloud_teleport\` pulls it into a local worktree thread. ${consent}`,
+    "Claude Cloud runs work on a cloud VM so this machine keeps its battery and stays cool: `claude_cloud_launch` starts a session from the pushed branch (commit first; uncommitted edits stay here), `claude_cloud_send` messages it, `claude_cloud_teleport` pulls it into a local worktree thread.",
+    `Before a long build, a full test suite, a Docker run or a broad refactor, call \`claude_cloud_status\` and follow \`advice.level\`: prefer_cloud, offload that work; cloud_ok, offload only jobs that take ten minutes or more; prefer_local or unavailable, run it here. Keep work local when it needs this machine: local databases or services, simulators, macOS or iOS builds, local secrets, or a dev server the user is watching. ${consent}`,
     ...(rules === "" ? [] : [`The user's delegation rules: ${rules}`]),
     "</claude_cloud>",
   ].join("\n");
@@ -168,9 +208,26 @@ export const ClaudeCloudInstance = Schema.Struct({
 });
 export type ClaudeCloudInstance = typeof ClaudeCloudInstance.Type;
 
+export const ClaudeCloudOffloadLevel = Schema.Literals([
+  "prefer_cloud",
+  "cloud_ok",
+  "prefer_local",
+  "unavailable",
+]);
+export type ClaudeCloudOffloadLevel = typeof ClaudeCloudOffloadLevel.Type;
+
+/** Whether heavy work should go to the cloud right now, and the plain reasons why. */
+export const ClaudeCloudOffloadAdvice = Schema.Struct({
+  level: ClaudeCloudOffloadLevel,
+  reasons: Schema.Array(Schema.String),
+});
+export type ClaudeCloudOffloadAdvice = typeof ClaudeCloudOffloadAdvice.Type;
+
 export const ClaudeCloudStatus = Schema.Struct({
   enabled: Schema.Boolean,
   settings: ClaudeCloudAddonSettings,
+  /** Absent while the add-on is off, and from servers older than offload policies. */
+  advice: Schema.optionalKey(ClaudeCloudOffloadAdvice),
   /** Claude instances that could run cloud sessions, from settings alone. */
   instances: Schema.Array(ClaudeCloudInstance),
   /** Last readiness check per Claude instance; empty until one runs. */
@@ -373,5 +430,7 @@ export const ClaudeCloudErrorCode = Schema.Literals([
   /** The sessions API refused or could not be reached; sends through the CLI may still work. */
   "api_unavailable",
   "interrupt_unsupported",
+  /** The account is close to its usage limit, so agent launches wait for the user. */
+  "usage_limit",
 ]);
 export type ClaudeCloudErrorCode = typeof ClaudeCloudErrorCode.Type;

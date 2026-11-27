@@ -13,6 +13,7 @@ import {
   type ClaudeCloudSettingsPatch,
   type ClaudeCloudStatus,
   type ClaudeCloudTeleportResult,
+  type ClaudeCloudOffloadAdvice,
   ClaudeSettings,
   CommandId,
   GitRefName,
@@ -22,6 +23,8 @@ import {
   ThreadId,
   TrackedClaudeCloudSession,
   claudeCloudAgentInstructions,
+  claudeCloudDelegationModeForPolicy,
+  claudeCloudPolicyForDelegationMode,
   claudeCloudSessionUrl,
   claudeCloudSettingsFromConfig,
   parseClaudeCloudSessionRef,
@@ -43,6 +46,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
+import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AddonConfigService from "../bots/AddonConfigService.ts";
 import * as ServerConfig from "../config.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
@@ -55,8 +59,10 @@ import {
   resolveClaudeHomePath,
 } from "../provider/Drivers/ClaudeHome.ts";
 import { deriveProviderInstanceConfigMap } from "../provider/ProviderInstanceRegistryHydration.ts";
+import { ProviderRegistry } from "../provider/ProviderRegistry.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ClaudeCloudRunner from "./ClaudeCloudRunner.ts";
+import { claudeCloudOffloadAdvice, usageLimitReasons } from "./claudeCloudOffloadPolicy.ts";
 
 export const CLAUDE_CLOUD_SESSIONS_FILENAME = "claude-cloud-sessions.json";
 
@@ -205,6 +211,8 @@ export class ClaudeCloudService extends Context.Service<
     readonly getStatus: (options?: {
       readonly refresh?: boolean;
       readonly projectId?: ProjectId;
+      /** The checkout to judge readiness by, such as a worktree thread's; else the project root. */
+      readonly cwd?: string;
     }) => Effect.Effect<ClaudeCloudStatus, ClaudeCloudError>;
     readonly updateSettings: (
       patch: ClaudeCloudSettingsPatch,
@@ -252,6 +260,9 @@ export const make = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
   const home = yield* HostProcess.HomeDirectory;
   const services = yield* Effect.context<FileSystem.FileSystem | Path.Path>();
+  // Optional so test and HTTP-only layers build without them; advice then sees no pressure or usage.
+  const backgroundPolicy = yield* Effect.serviceOption(BackgroundPolicy.BackgroundPolicy);
+  const providerRegistry = yield* Effect.serviceOption(ProviderRegistry);
   const sessionsPath = path.join(serverConfig.stateDir, CLAUDE_CLOUD_SESSIONS_FILENAME);
 
   const writeLock = yield* Semaphore.make(1);
@@ -491,26 +502,51 @@ export const make = Effect.gen(function* () {
     return status;
   });
 
+  // Accounts the user keeps out of switched or delegated work are never picked automatically.
+  const excludedInstanceIds = serverSettings.getSettings.pipe(
+    Effect.map(
+      (settings) =>
+        new Set<string>([
+          ...settings.fallbackExcludedInstanceIds,
+          ...(settings.mattrMultiProviderDelegation
+            ? settings.mattrDelegationExcludedInstanceIds
+            : []),
+        ]),
+    ),
+    Effect.orElseSucceed(() => new Set<string>()),
+  );
+
+  const pickableInstances = Effect.gen(function* () {
+    const excluded = yield* excludedInstanceIds;
+    return (yield* claudeInstances).filter((instance) => !excluded.has(instance.instanceId));
+  });
+
   const resolveInstance = Effect.fn("ClaudeCloudService.resolveInstance")(function* (
     requested: ProviderInstanceId | undefined,
     settings: ClaudeCloudAddonSettings,
   ) {
-    const instances = yield* claudeInstances;
     const wanted = requested ?? settings.defaultInstanceId;
     if (wanted !== null && wanted !== undefined) {
-      const instance = instances.find((entry) => entry.instanceId === wanted);
+      const instance = (yield* claudeInstances).find((entry) => entry.instanceId === wanted);
       if (instance === undefined) {
         return yield* fail("invalid_request", `No Claude instance named "${wanted}".`);
       }
       return { instance, account: yield* accountStatus(instance, false) };
     }
+    const instances = yield* pickableInstances;
     for (const instance of instances) {
       const account = yield* accountStatus(instance, false);
       if (account.ready) return { instance, account };
     }
     const first = instances[0];
-    if (first === undefined)
-      return yield* fail("account_not_ready", "No Claude instance is set up.");
+    if (first === undefined) {
+      return yield* fail(
+        "account_not_ready",
+        (yield* claudeInstances).length > 0
+          ? "Every Claude account is kept out of automatic picks. Choose one under Account for cloud sessions in Settings → Add-ons."
+          : "No Claude instance is set up.",
+      );
+    }
     return { instance: first, account: yield* accountStatus(first, false) };
   });
 
@@ -590,9 +626,61 @@ export const make = Effect.gen(function* () {
         ? projectRoot(input.projectId)
         : Effect.succeed<string | null>(null);
 
+  const usageWindowsFor = (instanceId: ProviderInstanceId) =>
+    Option.match(providerRegistry, {
+      onNone: () => Effect.succeed([]),
+      onSome: (registry) =>
+        registry.getProviders.pipe(
+          Effect.map(
+            (providers) =>
+              providers.find((provider) => provider.instanceId === instanceId)?.usageLimits
+                ?.windows ?? [],
+          ),
+        ),
+    });
+
+  const adviceFor = Effect.fn("ClaudeCloudService.adviceFor")(function* (input: {
+    readonly settings: ClaudeCloudAddonSettings;
+    readonly instanceId: ProviderInstanceId | null;
+    readonly account: ClaudeCloudAccountStatus | null;
+    readonly blockers: ReadonlyArray<ClaudeCloudBlocker>;
+  }) {
+    return claudeCloudOffloadAdvice({
+      policy: input.settings.offloadPolicy,
+      hostPower: Option.isSome(backgroundPolicy)
+        ? (yield* backgroundPolicy.value.snapshot).hostPower
+        : null,
+      usageWindows: input.instanceId === null ? [] : yield* usageWindowsFor(input.instanceId),
+      account: input.account,
+      blockers: input.blockers,
+    }) satisfies ClaudeCloudOffloadAdvice;
+  });
+
+  /** The account a launch would use, from cached checks only, so status never runs the CLI. */
+  const likelyInstance = Effect.fn("ClaudeCloudService.likelyInstance")(function* (
+    settings: ClaudeCloudAddonSettings,
+  ) {
+    const cache = yield* Ref.get(accountCache);
+    const candidates =
+      settings.defaultInstanceId === null
+        ? yield* pickableInstances
+        : (yield* claudeInstances).filter(
+            (instance) => instance.instanceId === settings.defaultInstanceId,
+          );
+    const ready = candidates.find((instance) => cache.get(instance.instanceId)?.status.ready);
+    const instance = ready ?? candidates[0];
+    return instance === undefined
+      ? { instanceId: null, account: null }
+      : {
+          instanceId: instance.instanceId,
+          account: cache.get(instance.instanceId)?.status ?? null,
+        };
+  });
+
   const getStatus = Effect.fn("ClaudeCloudService.getStatus")(function* (options?: {
     readonly refresh?: boolean;
     readonly projectId?: ProjectId;
+    readonly cwd?: string;
   }) {
     const enabled = yield* addons.isEnabled(CLAUDE_CLOUD_ADDON_ID);
     const settings = yield* readSettings;
@@ -613,9 +701,28 @@ export const make = Effect.gen(function* () {
           })
         : [...(yield* Ref.get(accountCache)).values()].map((entry) => entry.status);
     const sessions = yield* listSessions(options?.projectId);
+    const likely = yield* likelyInstance(settings);
+    const cwd =
+      options?.cwd ??
+      (options?.projectId === undefined
+        ? null
+        : yield* projectRoot(options.projectId).pipe(Effect.orElseSucceed(() => null)));
+    const advice = yield* adviceFor({
+      settings,
+      instanceId: likely.instanceId,
+      account:
+        accounts.find((account) => account.instanceId === likely.instanceId) ?? likely.account,
+      blockers:
+        cwd === null
+          ? likely.instanceId === null
+            ? ["account_not_ready"]
+            : []
+          : blockersFor(yield* repositoryState(cwd)),
+    });
     return {
       enabled,
       settings,
+      advice,
       instances: instances.map(({ instanceId, displayName }) => ({ instanceId, displayName })),
       accounts,
       sessions,
@@ -625,15 +732,25 @@ export const make = Effect.gen(function* () {
   const updateSettings = Effect.fn("ClaudeCloudService.updateSettings")(function* (
     patch: ClaudeCloudSettingsPatch,
   ) {
-    yield* requireEnabled;
+    const current = yield* requireEnabled;
+    // Both keys are written together so older clients that only know the mode stay in step.
+    const offloadPolicy =
+      patch.offloadPolicy ??
+      (patch.agentDelegationMode === undefined ||
+      claudeCloudDelegationModeForPolicy(current.offloadPolicy) === patch.agentDelegationMode
+        ? undefined
+        : claudeCloudPolicyForDelegationMode(patch.agentDelegationMode));
     const config = yield* addons
       .updateConfig(CLAUDE_CLOUD_ADDON_ID, {
         ...(patch.defaultInstanceId === undefined
           ? {}
           : { defaultInstanceId: patch.defaultInstanceId }),
-        ...(patch.agentDelegationMode === undefined
+        ...(offloadPolicy === undefined
           ? {}
-          : { agentDelegationMode: patch.agentDelegationMode }),
+          : {
+              offloadPolicy,
+              agentDelegationMode: claudeCloudDelegationModeForPolicy(offloadPolicy),
+            }),
         ...(patch.delegationRules === undefined ? {} : { delegationRules: patch.delegationRules }),
         ...(patch.autoPushBeforeLaunch === undefined
           ? {}
@@ -696,6 +813,15 @@ export const make = Effect.gen(function* () {
     }
     const { instance, account } = yield* resolveInstance(input.instanceId, settings);
     yield* requireReadyAccount(account);
+    if (input.createdBy === "agent" && input.userApproved !== true) {
+      const limits = usageLimitReasons(yield* usageWindowsFor(instance.instanceId));
+      if (limits.length > 0) {
+        return yield* fail(
+          "usage_limit",
+          `${limits.join("; ")}. Run the work locally, or ask the user and call again with userApproved: true.`,
+        );
+      }
+    }
     const cwd = yield* resolveCwd(input);
     if (cwd === null) {
       return yield* fail(

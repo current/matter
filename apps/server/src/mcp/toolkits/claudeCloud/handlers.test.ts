@@ -31,10 +31,13 @@ const statusWith = (
 ): ClaudeCloudStatus => ({
   enabled,
   settings: { ...CLAUDE_CLOUD_DEFAULT_SETTINGS, ...settings },
+  advice: { level: "prefer_cloud", reasons: ["On battery power"] },
   instances: [],
   accounts: [],
   sessions: [],
 });
+
+const statusRequests: Array<unknown> = [];
 
 const run = (
   status: ClaudeCloudStatus,
@@ -62,7 +65,11 @@ const run = (
         getThreadShell: (id) => Effect.succeed({ ...liveThreadShell(id), worktreePath: WORKTREE }),
       }),
       Layer.mock(ClaudeCloudService.ClaudeCloudService)({
-        getStatus: () => Effect.succeed(status),
+        getStatus: (options) =>
+          Effect.sync(() => {
+            statusRequests.push(options);
+            return status;
+          }),
         launchSession: (input) =>
           Effect.sync(() => {
             launches.push(input);
@@ -190,8 +197,20 @@ it.effect("launches as the calling agent from its own worktree and project", () 
           reason: "e2e takes 20 minutes locally",
         });
 
-        const status = (yield* call("claude_cloud_status", {})) as { delegationRules: string };
+        statusRequests.length = 0;
+        const status = (yield* call("claude_cloud_status", {})) as {
+          delegationRules: string;
+          advice: unknown;
+        };
         assert.strictEqual(status.delegationRules, "Only e2e suites.");
+        assert.deepStrictEqual(status.advice, {
+          level: "prefer_cloud",
+          reasons: ["On battery power"],
+        });
+        // Readiness is judged by the calling thread's own checkout.
+        assert.deepStrictEqual(statusRequests, [
+          { projectId: ProjectId.make("project:mcp-test"), cwd: WORKTREE },
+        ]);
         assert.deepStrictEqual(
           yield* call("claude_cloud_send", { sessionId: CLOUD_ID, prompt: "ok?" }),
           {

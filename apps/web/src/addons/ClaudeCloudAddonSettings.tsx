@@ -1,12 +1,16 @@
 import type {
   ClaudeCloudAccountStatus,
   ClaudeCloudAddonSettings as ClaudeCloudSettingsValue,
-  ClaudeCloudDelegationMode,
+  ClaudeCloudOffloadAdvice,
+  ClaudeCloudOffloadPolicy,
   ClaudeCloudSettingsPatch,
   ClaudeCloudStatus,
   TrackedClaudeCloudSession,
 } from "@t3tools/contracts";
-import { CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH } from "@t3tools/contracts";
+import {
+  CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH,
+  ClaudeCloudOffloadPolicy as OffloadPolicySchema,
+} from "@t3tools/contracts";
 import { T, useGT, Var } from "gt-react";
 import { ExternalLinkIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -32,12 +36,19 @@ import {
 import { useMatterApiConfig } from "./matterApi";
 
 const AUTOMATIC_ACCOUNT = "__automatic__";
+const OFFLOAD_POLICY_ORDER: ReadonlyArray<ClaudeCloudOffloadPolicy> = [
+  "balanced",
+  "battery_saver",
+  "cloud_first",
+  "ask",
+  "off",
+];
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * Claude Cloud's card in Settings → Add-ons: account readiness, which account runs cloud
- * sessions, how agents may delegate, the user's rules for them, and the tracked sessions.
+ * sessions, when agents offload heavy work, the user's rules for them, and the tracked sessions.
  */
 export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
   const gt = useGT();
@@ -93,6 +104,12 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
     if (result.ok) {
       const next: ClaudeCloudSettingsValue = result.value;
       setStatus((current) => (current === null ? current : { ...current, settings: next }));
+      // The advice depends on the policy, so re-read it from the server.
+      if (patch.offloadPolicy !== undefined) {
+        void settle(fetchClaudeCloudStatus(config)).then((fresh) => {
+          if (fresh.ok) setStatus(fresh.value);
+        });
+      }
       if (patch.delegationRules !== undefined) setRulesDraft(null);
     } else {
       setError(result.error);
@@ -115,10 +132,30 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
     );
   };
 
-  const modeLabels: Record<ClaudeCloudDelegationMode, string> = {
-    auto: gt("Automatic", { $context: "agents offload to Claude Cloud on their own" }),
+  const policyLabels: Record<ClaudeCloudOffloadPolicy, string> = {
+    balanced: gt("Balanced", { $context: "Claude Cloud offload policy" }),
+    battery_saver: gt("Battery saver", { $context: "Claude Cloud offload policy" }),
+    cloud_first: gt("Cloud first", { $context: "Claude Cloud offload policy" }),
     ask: gt("Ask first", { $context: "agents ask before offloading to Claude Cloud" }),
     off: gt("Manual only", { $context: "only the user launches Claude Cloud sessions" }),
+  };
+  const policyHints: Record<ClaudeCloudOffloadPolicy, string> = {
+    balanced: gt("Long jobs, plus the rest on battery"),
+    battery_saver: gt("Only on battery or when hot"),
+    cloud_first: gt("All heavy work"),
+    ask: gt("Agents ask you each time"),
+    off: gt("Only when you send it"),
+  };
+  const policyDescriptions: Record<ClaudeCloudOffloadPolicy, string> = {
+    balanced: gt(
+      "Long builds and test suites run in the cloud. Other heavy work moves there on battery or when this machine runs hot.",
+    ),
+    battery_saver: gt(
+      "Heavy work runs in the cloud on battery or when this machine runs hot, and stays here while plugged in.",
+    ),
+    cloud_first: gt("Heavy work runs in the cloud whenever it can."),
+    ask: gt("Agents ask you before moving work to the cloud."),
+    off: gt("Agents never offload. You can still send work to the cloud yourself."),
   };
   const accountLabel = (instanceId: string) =>
     status.instances.find((instance) => instance.instanceId === instanceId)?.displayName ??
@@ -161,67 +198,76 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
         )}
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">
-            <T>Account for cloud sessions</T>
-          </span>
+      <section className="flex flex-col gap-1.5" data-claude-cloud-offload="">
+        <span className="text-xs text-muted-foreground">
+          <T>Offload heavy work</T>
+        </span>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <Select
-            value={selectedAccount}
+            value={settings.offloadPolicy}
             disabled={disabled}
             onValueChange={(value) => {
-              if (typeof value !== "string") return;
-              void save({
-                defaultInstanceId:
-                  value === AUTOMATIC_ACCOUNT
-                    ? null
-                    : (value as ClaudeCloudSettingsValue["defaultInstanceId"]),
-              });
-            }}
-          >
-            <SelectTrigger size="sm" aria-label={gt("Account for cloud sessions")}>
-              <SelectValue>
-                {selectedAccount === AUTOMATIC_ACCOUNT
-                  ? gt("First ready account")
-                  : accountLabel(selectedAccount)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectPopup>
-              <SelectItem value={AUTOMATIC_ACCOUNT}>{gt("First ready account")}</SelectItem>
-              {status.instances.map((instance) => (
-                <SelectItem key={instance.instanceId} value={instance.instanceId}>
-                  {instance.displayName}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">
-            <T>Agent delegation</T>
-          </span>
-          <Select
-            value={settings.agentDelegationMode}
-            disabled={disabled}
-            onValueChange={(value) => {
-              if (value === "auto" || value === "ask" || value === "off") {
-                void save({ agentDelegationMode: value });
+              if (OffloadPolicySchema.literals.includes(value as ClaudeCloudOffloadPolicy)) {
+                void save({ offloadPolicy: value as ClaudeCloudOffloadPolicy });
               }
             }}
           >
-            <SelectTrigger size="sm" aria-label={gt("Agent delegation")}>
-              <SelectValue>{modeLabels[settings.agentDelegationMode]}</SelectValue>
+            <SelectTrigger size="sm" className="sm:w-56" aria-label={gt("Offload heavy work")}>
+              <SelectValue>{policyLabels[settings.offloadPolicy]}</SelectValue>
             </SelectTrigger>
             <SelectPopup>
-              {(["auto", "ask", "off"] as const).map((mode) => (
-                <SelectItem key={mode} value={mode}>
-                  {modeLabels[mode]}
+              {OFFLOAD_POLICY_ORDER.map((policy) => (
+                <SelectItem key={policy} value={policy}>
+                  <span className="flex flex-col py-0.5">
+                    <span>{policyLabels[policy]}</span>
+                    <span className="text-xs text-muted-foreground">{policyHints[policy]}</span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectPopup>
           </Select>
-        </label>
-      </div>
+          {status.advice === undefined || settings.offloadPolicy === "off" ? null : (
+            <OffloadAdviceLine advice={status.advice} />
+          )}
+        </div>
+        <p className="max-w-prose text-xs text-muted-foreground">
+          {policyDescriptions[settings.offloadPolicy]}
+        </p>
+      </section>
+      <label className="flex flex-col gap-1 sm:w-56">
+        <span className="text-xs text-muted-foreground">
+          <T>Account for cloud sessions</T>
+        </span>
+        <Select
+          value={selectedAccount}
+          disabled={disabled}
+          onValueChange={(value) => {
+            if (typeof value !== "string") return;
+            void save({
+              defaultInstanceId:
+                value === AUTOMATIC_ACCOUNT
+                  ? null
+                  : (value as ClaudeCloudSettingsValue["defaultInstanceId"]),
+            });
+          }}
+        >
+          <SelectTrigger size="sm" aria-label={gt("Account for cloud sessions")}>
+            <SelectValue>
+              {selectedAccount === AUTOMATIC_ACCOUNT
+                ? gt("First ready account")
+                : accountLabel(selectedAccount)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup>
+            <SelectItem value={AUTOMATIC_ACCOUNT}>{gt("First ready account")}</SelectItem>
+            {status.instances.map((instance) => (
+              <SelectItem key={instance.instanceId} value={instance.instanceId}>
+                {instance.displayName}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      </label>
 
       <div className="flex flex-col gap-1">
         <label className="flex flex-col gap-1">
@@ -232,7 +278,7 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
             size="sm"
             value={rules}
             maxLength={CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH}
-            disabled={disabled || settings.agentDelegationMode === "off"}
+            disabled={disabled || settings.offloadPolicy === "off"}
             placeholder={gt("Example: Only offload test suites that take over five minutes.")}
             onChange={(event) => setRulesDraft(event.target.value)}
           />
@@ -407,5 +453,37 @@ function AccountRow({
         </Badge>
       )}
     </li>
+  );
+}
+
+function OffloadAdviceLine({ advice }: { advice: ClaudeCloudOffloadAdvice }) {
+  const reasons = advice.reasons.join(" · ");
+  return (
+    <p
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+      data-claude-cloud-advice={advice.level}
+    >
+      <span className="text-muted-foreground">
+        <T>Right now</T>
+      </span>
+      {advice.level === "prefer_cloud" ? (
+        <Badge variant="info" size="sm">
+          <T>Prefers cloud</T>
+        </Badge>
+      ) : advice.level === "cloud_ok" ? (
+        <Badge variant="info" size="sm">
+          <T>Cloud for long jobs</T>
+        </Badge>
+      ) : advice.level === "prefer_local" ? (
+        <Badge variant="outline" size="sm">
+          <T>Stays local</T>
+        </Badge>
+      ) : (
+        <Badge variant="warning" size="sm">
+          <T>Unavailable</T>
+        </Badge>
+      )}
+      {reasons === "" ? null : <span className="text-muted-foreground">{reasons}</span>}
+    </p>
   );
 }

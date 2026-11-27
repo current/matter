@@ -2,6 +2,8 @@ import {
   CLAUDE_CLOUD_PROMPT_MAX_LENGTH,
   ClaudeCloudAccountStatus,
   ClaudeCloudDelegationMode,
+  ClaudeCloudOffloadAdvice,
+  ClaudeCloudOffloadPolicy,
   OrchestratorMcpFailure,
   ProjectId,
   ProviderInstanceId,
@@ -44,12 +46,14 @@ const SessionSummary = Schema.Struct({
 const StatusTool = Tool.make("claude_cloud_status", {
   ...shared,
   description:
-    "Claude Cloud readiness: delegation mode, the user's delegation rules, Claude accounts, and tracked cloud sessions. `refresh` rechecks account logins.",
+    "Whether heavy work should run on Claude Cloud right now (`advice.level` with reasons such as battery, heat or usage left), the user's offload policy and rules, Claude accounts, and tracked cloud sessions. Defaults to this thread's checkout. `refresh` rechecks account logins.",
   parameters: Schema.Struct({
     projectId: Schema.optionalKey(ProjectId),
     refresh: Schema.optionalKey(Schema.Boolean),
   }),
   success: Schema.Struct({
+    advice: ClaudeCloudOffloadAdvice,
+    offloadPolicy: ClaudeCloudOffloadPolicy,
     agentDelegationMode: ClaudeCloudDelegationMode,
     delegationRules: Schema.String,
     accounts: Schema.Array(ClaudeCloudAccountStatus),

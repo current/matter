@@ -53,6 +53,7 @@ const ERROR_STATUS: Record<ClaudeCloudErrorCode, number> = {
   teleport_failed: 502,
   api_unavailable: 503,
   interrupt_unsupported: 501,
+  usage_limit: 429,
 };
 
 const errorResponse = (error: ClaudeCloudService.ClaudeCloudError) =>
