@@ -264,6 +264,36 @@
   rotate: -90deg;
 }
 
+/* Show more under Settled: a compact row whose chevron sits in the project icon's column. */
+.mts.mlf .mlf-show-more {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--mts-muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+}
+
+.mts.mlf .mlf-show-more:hover {
+  background: var(--mts-hover);
+  color: var(--mts-ink);
+}
+
+.mts.mlf .mlf-show-more[aria-disabled="true"] {
+  cursor: default;
+}
+
+.mts.mlf .mlf-show-more svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
 @media (pointer: coarse) {
   .mts.mlf .mlf-row[data-density="compact"] {
     height: 40px;

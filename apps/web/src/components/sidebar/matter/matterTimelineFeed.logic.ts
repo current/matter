@@ -14,7 +14,9 @@ export type MatterTimelineSectionKind =
   | "yesterday"
   | "week"
   | "days30"
-  | "month";
+  | "month"
+  | "snoozed"
+  | "settled";
 
 export interface MatterTimelineSection {
   /** Stable across renders, so a saved fold finds its section again: the kind, or "YYYY-MM". */
@@ -39,6 +41,12 @@ const FIXED_ORDER = [
   "days30",
 ] as const satisfies ReadonlyArray<MatterTimelineSectionKind>;
 
+/** After the months: threads put away, which come back by themselves or from their row menu. */
+const TAIL_ORDER = [
+  "snoozed",
+  "settled",
+] as const satisfies ReadonlyArray<MatterTimelineSectionKind>;
+
 const SECTION_SHAPE: Record<
   MatterTimelineSectionKind,
   Pick<MatterTimelineSection, "density" | "foldable" | "openByDefault">
@@ -51,6 +59,8 @@ const SECTION_SHAPE: Record<
   week: { density: "compact", foldable: true, openByDefault: true },
   days30: { density: "compact", foldable: true, openByDefault: false },
   month: { density: "compact", foldable: true, openByDefault: false },
+  snoozed: { density: "compact", foldable: true, openByDefault: false },
+  settled: { density: "compact", foldable: true, openByDefault: false },
 };
 
 /** `null` for a timestamp that doesn't parse, which files under Today rather than January 1970. */
@@ -96,10 +106,16 @@ function monthId(monthStartMs: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function settledAtMs(item: MatterThreadItem): number {
+  const at = Date.parse(item.settledAt ?? item.activityAt);
+  return Number.isFinite(at) ? at : 0;
+}
+
 /**
  * The feed in reading order. State leads: everything waiting on you, then pinned (which keeps its
  * place while it runs), then everything else working, whatever its age. The rest follows by local
- * day, then by rolling week and month, then by calendar month. Empty sections are left out.
+ * day, then by rolling week and month, then by calendar month, and snoozed and settled threads
+ * close the list, so nothing put away vanishes. Empty sections are left out.
  */
 export function buildTimelineSections(
   items: ReadonlyArray<MatterThreadItem>,
@@ -125,10 +141,11 @@ export function buildTimelineSections(
   };
   for (const item of items) {
     const raisesHand = timelineRaisesHand(item, needsChildParents);
-    if (!raisesHand && (item.settled || item.snoozed)) continue;
     if (options.projectFilter !== null && item.projectKey !== options.projectFilter) continue;
     if (options.filter === "needs" && !raisesHand) continue;
     if (raisesHand) push("needs", item);
+    else if (item.settled) push("settled", item);
+    else if (item.snoozed) push("snoozed", item);
     else if (item.pinned) push("pinned", item);
     else if (item.attention === "running") push("working", item);
     else {
@@ -170,7 +187,31 @@ export function buildTimelineSections(
       ...SECTION_SHAPE.month,
     });
   }
+  for (const kind of TAIL_ORDER) {
+    const bucket = fixed.get(kind);
+    if (bucket === undefined) continue;
+    sections.push({
+      id: kind,
+      kind,
+      monthStartMs: null,
+      items: bucket.toSorted(
+        kind === "settled" ? (left, right) => settledAtMs(right) - settledAtMs(left) : newestFirst,
+      ),
+      ...SECTION_SHAPE[kind],
+    });
+  }
   return sections;
+}
+
+/** The Settled section before any of its rows are local, when they all wait on a page read. */
+export function emptyTimelineSettledSection(): MatterTimelineSection {
+  return {
+    id: "settled",
+    kind: "settled",
+    monthStartMs: null,
+    items: [],
+    ...SECTION_SHAPE.settled,
+  };
 }
 
 /** Whether a section shows its rows: the saved choice, else the section's own default. */

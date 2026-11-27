@@ -7,6 +7,7 @@ import { CheckIcon, FolderPlusIcon, LayersIcon, SettingsIcon } from "lucide-reac
 import {
   useState,
   type CSSProperties,
+  type ReactNode,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
@@ -50,6 +51,7 @@ import {
 } from "./matterFinalSidebar.logic";
 import {
   buildTimelineSections,
+  emptyTimelineSettledSection,
   isTimelineSectionOpen,
   timelineRaisesHand,
   timelineRowState,
@@ -102,6 +104,7 @@ import type {
   MatterSidebarProject,
   MatterThreadMenuAction,
 } from "./useMatterSidebarModel";
+import { useMatterSettledShelf } from "./useMatterSettledShelf";
 
 const ALL_ACTIVITY = "__all__";
 const FOLDS_STORAGE_KEY = "mattr:sidebar:timeline-folds:v1";
@@ -109,7 +112,7 @@ const METER_LIMIT = 5;
 const Folds = Schema.Record(Schema.String, Schema.Boolean);
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
 const ROW_FOCUS_STOPS =
-  "button.mts-hit, button.mts-fold, button.mlf-elsewhere, button.mfs-hit, a.mfs-row";
+  "button.mts-hit, button.mts-fold, button.mlf-elsewhere, button.mlf-show-more, button.mfs-hit, a.mfs-row";
 
 const PR_GLYPH: Record<MatterPullRequestState, typeof PullRequestOpenGlyph> = {
   open: PullRequestOpenGlyph,
@@ -218,6 +221,10 @@ function sectionLabel(section: MatterTimelineSection, nowMs: number, gt: GT): st
           : { month: "long", year: "numeric" },
       ).format(month);
     }
+    case "snoozed":
+      return gt("Snoozed", { $context: "sidebar section" });
+    case "settled":
+      return gt("Settled", { $context: "sidebar section" });
   }
 }
 
@@ -648,15 +655,23 @@ function TimelineSection({
   open,
   onToggle,
   context,
+  count: totalCount,
+  footer: lastRow,
 }: {
   model: MatterSidebarModel;
   section: MatterTimelineSection;
   open: boolean;
   onToggle: () => void;
   context: TimelineRowContext;
+  /** The header's count when the section holds more than its local rows. */
+  count?: number;
+  /** A last row inside the open list, such as Show more. */
+  footer?: ReactNode;
 }) {
   const gt = useGT();
   const label = sectionLabel(section, model.nowMs, gt);
+  const count = totalCount ?? section.items.length;
+  const footer = lastRow ?? null;
   const rows = open
     ? section.items
     : section.items.filter((item) => item.key === context.openRowKey);
@@ -671,29 +686,26 @@ function TimelineSection({
             className="mts-fold"
             aria-label={
               hiddenUnread
-                ? gt("{label}, {count}, has unread threads", {
-                    label,
-                    count: section.items.length,
-                  })
-                : `${label}, ${section.items.length}`
+                ? gt("{label}, {count}, has unread threads", { label, count })
+                : `${label}, ${count}`
             }
             aria-expanded={open}
-            aria-controls={rows.length > 0 ? listId : undefined}
+            aria-controls={rows.length > 0 || footer !== null ? listId : undefined}
             onClick={onToggle}
           >
             <span>{label}</span>
-            <span className="mlf-count">{section.items.length}</span>
+            <span className="mlf-count">{count}</span>
             {hiddenUnread ? <span className="mts-unread mlf-fold-unread" aria-hidden /> : null}
             <ChevronGlyph className="mts-cr" />
           </button>
         ) : (
           <>
             <span>{label}</span>
-            <span className="mlf-count">{section.items.length}</span>
+            <span className="mlf-count">{count}</span>
           </>
         )}
       </h3>
-      {rows.length > 0 ? (
+      {rows.length > 0 || (open && footer !== null) ? (
         <ul id={listId} role="list" className="mts-rows mlf-rows" data-density={section.density}>
           {rows.map((item) => (
             <li key={item.key}>
@@ -701,6 +713,7 @@ function TimelineSection({
               <TimelineSubagents model={model} parent={item} context={context} />
             </li>
           ))}
+          {open ? footer : null}
         </ul>
       ) : null}
     </section>
@@ -878,13 +891,27 @@ export function MatterTimelineSidebar({
       : null;
   const needsChildParents = parentsWithNeedsChild(indexChildrenByParent(children));
   const subagents = activeSubagentsByParent(children, showSubagents);
-  const sections = buildTimelineSections(items, {
+  const feed = buildTimelineSections(items, {
     nowMs,
     sort,
     projectFilter,
     filter,
     needsChildParents,
   });
+  const settledSection =
+    feed.find((section) => section.kind === "settled") ?? emptyTimelineSettledSection();
+  const settledOpen = isTimelineSectionOpen(settledSection, folds);
+  const settledShelf = useMatterSettledShelf({
+    items: settledSection.items,
+    projects,
+    projectFilter,
+    open: settledOpen && filter === "all",
+    activeThreadKey,
+  });
+  const sections =
+    filter === "all" && settledShelf.total > 0 && !feed.includes(settledSection)
+      ? [...feed, settledSection]
+      : feed;
   const activeChild = children.find((child) => child.key === activeThreadKey);
   const activeChildHasRow =
     activeChild !== undefined &&
@@ -1207,14 +1234,43 @@ export function MatterTimelineSidebar({
         ) : null}
         {sections.map((section) => {
           const open = isTimelineSectionOpen(section, folds);
+          const settled = section.kind === "settled";
           return (
             <TimelineSection
               key={section.id}
               model={model}
-              section={section}
+              section={settled ? { ...section, items: settledShelf.rows } : section}
               open={open}
               onToggle={() => setFolds((current) => ({ ...current, [section.id]: !open }))}
               context={rowContext}
+              {...(settled
+                ? {
+                    count: settledShelf.total,
+                    footer:
+                      settledShelf.hiddenCount > 0 ? (
+                        <li>
+                          <button
+                            type="button"
+                            className="mlf-show-more"
+                            aria-disabled={settledShelf.loading}
+                            onClick={settledShelf.showMore}
+                          >
+                            <ChevronDownGlyph aria-hidden />
+                            <span>
+                              {settledShelf.loading
+                                ? gt("Loading")
+                                : settledShelf.failed
+                                  ? gt("Could not load older threads. Retry")
+                                  : gt(
+                                      "{count, plural, one {Show {count} more} other {Show {count} more}}",
+                                      { count: settledShelf.nextCount },
+                                    )}
+                            </span>
+                          </button>
+                        </li>
+                      ) : null,
+                  }
+                : {})}
             />
           );
         })}

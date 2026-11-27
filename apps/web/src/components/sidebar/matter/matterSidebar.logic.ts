@@ -27,6 +27,8 @@ export interface MatterThreadItem {
   readonly unread: boolean;
   readonly pinned: boolean;
   readonly settled: boolean;
+  /** When it settled, for the Settled section's order. */
+  readonly settledAt?: string | null;
   readonly snoozed: boolean;
   /** Last meaningful change, for ordering and relative ages. */
   readonly activityAt: string;
@@ -119,6 +121,7 @@ export function toMatterThreadItem(
     unread,
     pinned: thread.pinnedAt != null,
     settled: thread.settledOverride === "settled",
+    settledAt: thread.settledAt,
     snoozed: effectiveSnoozed(thread, { now: nowIso }),
     activityAt: latestTimestamp([
       thread.latestRun?.completedAt ?? null,

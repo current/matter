@@ -197,21 +197,49 @@ describe("buildTimelineSections", () => {
     ).toBe(true);
   });
 
-  it("lists a settled thread only while it or a subagent waits on you", () => {
-    const settled = item("settled", { settledOverride: "settled" });
+  it("files settled threads last, newest settle first, unless they wait on you", () => {
+    const settled = item("settled", { settledOverride: "settled", settledAt: local(3, 2) });
+    const justSettled = item("just settled", {
+      settledOverride: "settled",
+      settledAt: local(3, 10, 11),
+      latestUserMessageAt: local(2, 1),
+    });
     const settledAsks = item("settled asks", {
       settledOverride: "settled",
       hasPendingApprovals: true,
     });
     const parent = item("settled parent", { settledOverride: "settled" });
+    const snoozed = item("snoozed", { snoozedUntil: local(3, 11), snoozedAt: local(3, 10, 10) });
     expect(
       shape(
-        buildTimelineSections([settled, settledAsks, parent], {
+        buildTimelineSections([settled, justSettled, settledAsks, parent, snoozed, item("live")], {
           ...options,
           needsChildParents: new Set([parent.key]),
         }),
       ),
-    ).toEqual([["needs", ["settled asks", "settled parent"]]]);
+    ).toEqual([
+      ["needs", ["settled asks", "settled parent"]],
+      ["today", ["live"]],
+      ["snoozed", ["snoozed"]],
+      ["settled", ["just settled", "settled"]],
+    ]);
+  });
+
+  it("keeps the put-away sections folded and out of the Needs you filter", () => {
+    const sections = buildTimelineSections(
+      [
+        item("settled", { settledOverride: "settled" }),
+        item("snoozed", { snoozedUntil: local(3, 11) }),
+      ],
+      options,
+    );
+    expect(sections.map((section) => isTimelineSectionOpen(section, {}))).toEqual([false, false]);
+    expect(
+      buildTimelineSections([item("settled", { settledOverride: "settled" })], {
+        ...options,
+        filter: "needs",
+      }),
+    ).toEqual([]);
   });
 
   it("narrows to a project and to the Needs you filter", () => {

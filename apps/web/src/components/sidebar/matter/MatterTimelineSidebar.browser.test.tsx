@@ -79,6 +79,7 @@ const MATTER: MatterSidebarProject = {
     workspaceRoot: "/repo/matter",
     faviconPath: null,
     projectIcon: { kind: "monogram", text: "M", color: "blue" },
+    memberProjectRefs: [{ environmentId, projectId: ProjectId.make("Matter") }],
   } as unknown as SidebarProjectSnapshot,
 };
 
@@ -476,6 +477,35 @@ describe("MatterTimelineSidebar", () => {
       .element(page.getByRole("button", { name: "Clear Needs you filter" }))
       .toBeVisible();
     expect(sectionIds(screen.container)).toEqual(["needs"]);
+  });
+
+  it("files snoozed and settled threads last, folded, and unsettles from the menu", async () => {
+    using _server = useServer();
+    const settled = thread("Merged and settled", {
+      settledOverride: "settled",
+      settledAt: local(20, 10),
+    });
+    const snoozed = thread("Back tomorrow", {
+      snoozedUntil: local(21, 9),
+      snoozedAt: local(20, 8),
+    });
+    const current = model({ items: [...items, settled, snoozed] });
+    await using screen = await renderTimeline(current);
+    const settledFold = page.getByRole("button", { name: "Settled, 1" });
+    await expect.element(settledFold).toHaveAttribute("aria-expanded", "false");
+    await expect
+      .element(page.getByRole("button", { name: "Snoozed, 1" }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(sectionIds(screen.container).slice(-2)).toEqual(["snoozed", "settled"]);
+    expect(row(screen.container, settled)).toBeNull();
+
+    await settledFold.click();
+    await expect.element(page.getByRole("button", { name: "Merged and settled" })).toBeVisible();
+    row(screen.container, settled)!.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 80, clientY: 120 }),
+    );
+    await page.getByRole("menuitem", { name: "Unsettle" }).click();
+    expect(current.actions.runThreadAction).toHaveBeenCalledWith(settled, "unsettle");
   });
 
   it("lists a thread waiting on background work under Active, marked Waiting", async () => {
