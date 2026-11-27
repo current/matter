@@ -48,10 +48,7 @@ vi.mock(import("../../state/environments"), async (original) => ({
 
 import { loadAddons, resetAddonStoreForTests } from "../../addons/addonStore";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
-import {
-  CLAUDE_CLOUD_WELCOME_DISMISSED_KEY,
-  MatterClaudeCloudWelcome,
-} from "./MatterClaudeCloudWelcome";
+import { MatterClaudeCloudWelcome } from "./MatterClaudeCloudWelcome";
 
 const environmentId = EnvironmentId.make("primary");
 
@@ -101,7 +98,6 @@ async function mount(options: {
   readonly cloudEnabled: boolean;
   readonly settingsStatus?: number;
 }) {
-  window.localStorage.removeItem(CLAUDE_CLOUD_WELCOME_DISMISSED_KEY);
   window.localStorage.removeItem("mattr:addons:v1");
   resetAddonStoreForTests();
   state.cloudEnabled = options.cloudEnabled;
@@ -112,6 +108,21 @@ async function mount(options: {
     const url = new URL(String(input));
     if (url.pathname === "/api/mattr/addons") {
       return json({ addons: addonEntries(state.cloudEnabled) });
+    }
+    if (url.pathname === "/api/mattr/claude-cloud/status") {
+      return json({
+        enabled: true,
+        settings: {
+          defaultInstanceId: null,
+          offloadPolicy: "balanced",
+          agentDelegationMode: "auto",
+          delegationRules: "",
+          autoPushBeforeLaunch: false,
+        },
+        instances: [],
+        accounts: [],
+        sessions: [],
+      });
     }
     if (url.pathname === "/api/mattr/claude-cloud/settings" && init?.method === "POST") {
       const body = JSON.parse(String(init.body)) as { offloadPolicy?: ClaudeCloudOffloadPolicy };
@@ -152,7 +163,6 @@ async function mount(options: {
     [Symbol.asyncDispose]: async () => {
       await screen[Symbol.asyncDispose]();
       vi.unstubAllGlobals();
-      window.localStorage.removeItem(CLAUDE_CLOUD_WELCOME_DISMISSED_KEY);
       window.localStorage.removeItem("mattr:addons:v1");
       resetAddonStoreForTests();
     },
@@ -170,44 +180,27 @@ describe("MatterClaudeCloudWelcome", () => {
     expect(document.querySelector("[data-claude-cloud-welcome]")).toBeNull();
   });
 
-  it("writes the chosen offload preset through the settings API and persists dismissal", async () => {
+  it("shows the saved preset and writes a new one through the settings API", async () => {
     await using ctx = await mount({ providers: [claude], cloudEnabled: true });
-    await expect.element(page.getByRole("heading", { name: "Claude Cloud" })).toBeVisible();
-    await expect.element(page.getByText("Recommended", { exact: true })).toBeVisible();
+    const trigger = page.getByRole("combobox", { name: "Offload heavy work" });
+    await expect.element(trigger).toHaveTextContent("Balanced");
+    await expect.element(trigger).toBeEnabled();
 
-    await userEvent.click(page.getByRole("button", { name: /Battery saver/ }));
+    await userEvent.click(trigger);
+    await userEvent.click(page.getByRole("option", { name: /Battery saver/ }));
     await vi.waitFor(() => expect(ctx.settingsCalls).toEqual([{ offloadPolicy: "battery_saver" }]));
-    await expect
-      .element(page.getByRole("heading", { name: "Claude Cloud" }))
-      .not.toBeInTheDocument();
-    expect(window.localStorage.getItem(CLAUDE_CLOUD_WELCOME_DISMISSED_KEY)).toBe("1");
-
-    // Remounting stays dismissed.
-    await using _remount = await render(
-      <RegistryContext.Provider value={appAtomRegistry}>
-        <MatterClaudeCloudWelcome environmentId={environmentId} />
-      </RegistryContext.Provider>,
-      { router: false },
-    );
-    expect(document.querySelector("[data-claude-cloud-welcome]")).toBeNull();
+    await expect.element(trigger).toHaveTextContent("Battery saver");
+    await expect.element(page.getByText(/stays here while plugged in/)).toBeVisible();
   });
 
-  it("dismisses without writing settings when the dismiss button is clicked", async () => {
-    await using ctx = await mount({ providers: [claude], cloudEnabled: true });
-    await userEvent.click(page.getByRole("button", { name: "Dismiss Claude Cloud setup" }));
-    await expect
-      .element(page.getByRole("heading", { name: "Claude Cloud" }))
-      .not.toBeInTheDocument();
-    expect(ctx.settingsCalls).toEqual([]);
-    expect(window.localStorage.getItem(CLAUDE_CLOUD_WELCOME_DISMISSED_KEY)).toBe("1");
-  });
-
-  it("stays open with an alert if saving fails", async () => {
+  it("puts the saved preset back with an alert if saving fails", async () => {
     await using ctx = await mount({ providers: [claude], cloudEnabled: true, settingsStatus: 500 });
-    await userEvent.click(page.getByRole("button", { name: /Cloud first/ }));
+    const trigger = page.getByRole("combobox", { name: "Offload heavy work" });
+    await expect.element(trigger).toBeEnabled();
+    await userEvent.click(trigger);
+    await userEvent.click(page.getByRole("option", { name: /Cloud first/ }));
     await expect.element(page.getByRole("alert")).toBeVisible();
-    await expect.element(page.getByRole("heading", { name: "Claude Cloud" })).toBeVisible();
+    await expect.element(trigger).toHaveTextContent("Balanced");
     expect(ctx.settingsCalls).toEqual([{ offloadPolicy: "cloud_first" }]);
-    expect(window.localStorage.getItem(CLAUDE_CLOUD_WELCOME_DISMISSED_KEY)).toBeNull();
   });
 });

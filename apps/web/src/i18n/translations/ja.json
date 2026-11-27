@@ -3612,7 +3612,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "(このページを開いたコンピューター上)"]
+      "c": [
+        " ",
+        "(このページを開いたコンピューター上)"
+      ]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3624,7 +3627,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "· 実行した人にこのアクセス権が付与されます"]
+      "c": [
+        " ",
+        "· 実行した人にこのアクセス権が付与されます"
+      ]
     }
   ],
   "c54cc9c75db9dc58": "自分で開始したばかりのサインインだけを承認してください。",
@@ -6831,11 +6837,7 @@
   "9a50b20569f2c9e7": "保存された設定を読み込めませんでした。",
   "0d22cd9e3b9d94f0": "T3 Code はこのワークスペースを確認できませんでした。",
   "573a9e6b17f4e9e3": "再読み込み",
-  "45a01c7f04babbc2": "Dismiss Claude Cloud setup",
-  "d2d0fae05fa71abe": "Offload presets",
-  "518ec0b6f67bd949": "Offload heavy work to Claude Cloud",
-  "999859d9dda7d537": "Choose when agents move long builds and test suites to a cloud VM on your Claude plan.",
-  "25f457f910ba96b7": "Recommended",
+  "7044ff3fad054880": "Agents can move long builds and test suites to a cloud VM on your Claude plan.",
   "f9cb5fdbaf05bf8f": "Subscriptions",
   "6042108823accfb5": "Multi-provider delegation",
   "d3c0e677c4a0976a": "Multi-provider delegation",

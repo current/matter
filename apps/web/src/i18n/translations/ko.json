@@ -3613,7 +3613,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "(이 페이지를 연 컴퓨터)"]
+      "c": [
+        " ",
+        "(이 페이지를 연 컴퓨터)"
+      ]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3625,7 +3628,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "· 실행하는 사람이 이 액세스 권한을 얻습니다"]
+      "c": [
+        " ",
+        "· 실행하는 사람이 이 액세스 권한을 얻습니다"
+      ]
     }
   ],
   "c54cc9c75db9dc58": "방금 시작한 로그인만 승인하세요.",
@@ -6829,11 +6835,7 @@
   "9a50b20569f2c9e7": "저장된 설정을 불러올 수 없습니다.",
   "0d22cd9e3b9d94f0": "T3 Code에서 이 작업 영역을 확인할 수 없습니다.",
   "573a9e6b17f4e9e3": "새로 고침",
-  "45a01c7f04babbc2": "Dismiss Claude Cloud setup",
-  "d2d0fae05fa71abe": "Offload presets",
-  "518ec0b6f67bd949": "Offload heavy work to Claude Cloud",
-  "999859d9dda7d537": "Choose when agents move long builds and test suites to a cloud VM on your Claude plan.",
-  "25f457f910ba96b7": "Recommended",
+  "7044ff3fad054880": "Agents can move long builds and test suites to a cloud VM on your Claude plan.",
   "f9cb5fdbaf05bf8f": "Subscriptions",
   "6042108823accfb5": "Multi-provider delegation",
   "d3c0e677c4a0976a": "Multi-provider delegation",

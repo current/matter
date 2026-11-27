@@ -3614,7 +3614,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "on the computer that opened this page"]
+      "c": [
+        " ",
+        "on the computer that opened this page"
+      ]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3626,7 +3629,10 @@
     {
       "t": "span",
       "i": 2,
-      "c": [" ", "· whoever runs it gets this access"]
+      "c": [
+        " ",
+        "· whoever runs it gets this access"
+      ]
     }
   ],
   "c54cc9c75db9dc58": "Only approve a sign-in you just started.",
@@ -6852,11 +6858,7 @@
   "9a50b20569f2c9e7": "Your saved settings could not be loaded.",
   "0d22cd9e3b9d94f0": "T3 Code could not confirm this workspace.",
   "573a9e6b17f4e9e3": "Reload",
-  "45a01c7f04babbc2": "Dismiss Claude Cloud setup",
-  "d2d0fae05fa71abe": "Offload presets",
-  "518ec0b6f67bd949": "Offload heavy work to Claude Cloud",
-  "999859d9dda7d537": "Choose when agents move long builds and test suites to a cloud VM on your Claude plan.",
-  "25f457f910ba96b7": "Recommended",
+  "7044ff3fad054880": "Agents can move long builds and test suites to a cloud VM on your Claude plan.",
   "f9cb5fdbaf05bf8f": "Subscriptions",
   "6042108823accfb5": "Multi-provider delegation",
   "d3c0e677c4a0976a": "Multi-provider delegation",
