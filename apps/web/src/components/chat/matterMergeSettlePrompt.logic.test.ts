@@ -44,6 +44,7 @@ function thread(overrides: Record<string, unknown> = {}) {
     projectId: PROJECT_ID,
     pullRequests: [pullRequest(42, "merged")],
     settledOverride: null,
+    unsettledAt: null,
     archivedAt: null,
     latestRun: null,
     ...overrides,
@@ -96,6 +97,13 @@ describe("resolveMergeSettlePrompt", () => {
     expect(resolve({ thread: thread({ latestRun: run("waiting") }) })).toBeNull();
     expect(resolve({ thread: thread({ latestRun: run("completed") }) })).toBe(42);
     expect(resolve({ thread: thread({ settledOverride: "active" }) })).toBe(42);
+  });
+
+  it("stays quiet once the thread was unsettled after the merge", () => {
+    const unsettled = (ms: number) =>
+      thread({ settledOverride: "active", unsettledAt: new Date(NOW - ms).toISOString() });
+    expect(resolve({ thread: unsettled(30 * 60 * 1000) })).toBeNull();
+    expect(resolve({ thread: unsettled(2 * HOUR) })).toBe(42);
   });
 
   it("stays quiet when the server settles merged threads itself", () => {

@@ -9,7 +9,7 @@ const MAX_DISMISSALS = 200;
 
 type PromptThread = Pick<
   EnvironmentThreadShell,
-  "projectId" | "pullRequests" | "settledOverride" | "archivedAt" | "latestRun"
+  "projectId" | "pullRequests" | "settledOverride" | "unsettledAt" | "archivedAt" | "latestRun"
 >;
 
 /** Thread key → dismissed PR number, oldest first. */
@@ -43,6 +43,9 @@ export function resolveMergeSettlePrompt(input: {
   if (!Number.isFinite(mergedMs) || input.nowMs - mergedMs > MATTER_MERGE_SETTLE_PROMPT_WINDOW_MS) {
     return null;
   }
+  // Unsettled after the merge: the user already chose to keep it.
+  const unsettledMs = Date.parse(thread.unsettledAt ?? "");
+  if (Number.isFinite(unsettledMs) && unsettledMs >= mergedMs) return null;
   // The server settles it itself when the effective setting is on.
   if (input.autoSettleOnMerge) return null;
   const dismissed = input.dismissals.some(
