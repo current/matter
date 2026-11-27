@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // PreToolUse guard for Matter's subagent & delegation rules (matter/CONTEXT.md).
-// Deterministic, 0 context tokens: blocks disallowed Codex delegation and Sonnet/Haiku coding subagents.
+// Deterministic, 0 context tokens: blocks disallowed Codex and paused Antigravity delegation, and
+// Sonnet/Haiku coding subagents.
 
 import * as NodeFS from "node:fs";
 
 const DISALLOWED_PROVIDERS = new Set(["codex", "codex-max", "codex-alt", "claude-alt-2"]);
+// Chris paused Antigravity (agy) for delegation; drop it from this set to bring it back.
+const PAUSED_PROVIDERS = new Set(["antigravity"]);
 const READ_ONLY_AGENT_TYPES = new Set(["Explore", "Plan", "statusline-setup"]);
 const CHEAP_CLAUDE_RE = /\b(sonnet|haiku)\b/i;
 
@@ -14,6 +17,7 @@ export function evaluateGuard(payload) {
 
   if (toolName === "delegate_task" || toolName.endsWith("__delegate_task")) {
     const provider = String(input?.target?.providerInstanceId ?? "").trim();
+    const driverKind = String(input?.target?.driverKind ?? "").trim();
     const model = String(input?.target?.model ?? "").trim();
     const role = String(input?.role ?? "")
       .trim()
@@ -25,7 +29,15 @@ export function evaluateGuard(payload) {
     ) {
       return {
         allow: false,
-        reason: `Matter workflow guard: "${provider}" is disallowed for delegation in Matter (matter/CONTEXT.md). Balance across claudeAgent, claude-alt (claude-opus-5-5), and antigravity (gemini-4-neon, high).`,
+        reason: `Matter workflow guard: "${provider}" is disallowed for delegation in Matter (matter/CONTEXT.md). Balance across claudeAgent and claude-alt (claude-opus-5-5).`,
+      };
+    }
+
+    const paused = [provider, driverKind].find((id) => PAUSED_PROVIDERS.has(id.toLowerCase()));
+    if (paused) {
+      return {
+        allow: false,
+        reason: `Matter workflow guard: "${paused}" is paused for delegation in Matter (matter/CONTEXT.md). Balance across claudeAgent and claude-alt (claude-opus-5-5).`,
       };
     }
 
