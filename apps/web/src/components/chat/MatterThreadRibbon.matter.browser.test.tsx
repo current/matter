@@ -14,20 +14,35 @@ import { page } from "vite-plus/test/browser";
 const state = vi.hoisted(() => ({
   pullRequests: [] as unknown[],
   subagents: [] as unknown[],
+  claudeCloudEnabled: false,
+}));
+
+vi.mock(import("../../addons/useAddonRegistry"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  useIsAddonEnabled: (id: string) => id === "claude-cloud" && state.claudeCloudEnabled,
 }));
 
 vi.mock(import("~/state/entities"), async (importOriginal) => ({
   ...(await importOriginal()),
-  useProject: ((ref: unknown) =>
+  useProject: ((ref: { projectId?: string } | null) =>
     ref === null
       ? null
-      : {
-          id: "project",
-          environmentId: "environment",
-          title: "Matter",
-          workspaceRoot: "/repo",
-          scripts: [],
-        }) as never,
+      : ref.projectId === "scratch"
+        ? {
+            id: "scratch",
+            environmentId: "environment",
+            title: "No project",
+            workspaceRoot: "/home/user/.t3/scratch",
+            isScratch: true,
+            scripts: [],
+          }
+        : {
+            id: "project",
+            environmentId: "environment",
+            title: "Matter",
+            workspaceRoot: "/repo",
+            scripts: [],
+          }) as never,
   useProjects: (() => []) as never,
   useQuietThreadShell: ((ref: unknown) =>
     ref === null
@@ -95,6 +110,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import shellCss from "../../../../../matter/shell.css?inline";
 import indexCss from "../../index.css?inline";
 import { act, render } from "../../../test/render";
+import { closeClaudeCloudDialog, useClaudeCloudDialog } from "../../addons/claudeCloudApi";
 import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
 import { PopoverCreateHandle } from "../ui/popover";
 import { createChatCanvasStore } from "./canvasStore";
@@ -154,9 +170,11 @@ function withStyles() {
     [Symbol.dispose]: () => {
       style.remove();
       closeMatterLineagePopover();
+      closeClaudeCloudDialog();
       writeMatterThreadRibbon(false);
       state.pullRequests = [];
       state.subagents = [];
+      state.claudeCloudEnabled = false;
       useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
       document.documentElement.classList.remove("dark");
     },
@@ -168,6 +186,7 @@ function Ribbon({
   paddingLeft = 0,
   controlsWidth = 0,
   rightPanelOpen = false,
+  projectId = ProjectId.make("project"),
   onToggleChanges,
   onRunProjectScript,
 }: {
@@ -175,6 +194,7 @@ function Ribbon({
   paddingLeft?: number;
   controlsWidth?: number;
   rightPanelOpen?: boolean;
+  projectId?: ProjectId;
   onToggleChanges?: () => void;
   onRunProjectScript?: (script: ProjectScript) => void;
 }) {
@@ -208,7 +228,7 @@ function Ribbon({
         <MatterThreadRibbon
           environmentId={ENVIRONMENT}
           threadId={THREAD}
-          projectId={ProjectId.make("project")}
+          projectId={projectId}
           worktreePath={null}
           isServerThread
           composerDraftTarget={{ environmentId: ENVIRONMENT, threadId: THREAD }}
@@ -510,5 +530,60 @@ describe("MatterThreadRibbon", () => {
       .toBe("0px");
     // 840 - 204 = 636px available -> full.
     await expect.poll(() => ribbon.dataset.density).toBe("full");
+  });
+
+  it("shows Send to Claude Cloud… in More only when enabled with a project, and passes projectId and threadId", async () => {
+    using _styles = withStyles();
+    function DialogObserver() {
+      return (
+        <output data-testid="dialog-observer">{JSON.stringify(useClaudeCloudDialog())}</output>
+      );
+    }
+
+    const screen = await render(
+      <>
+        <DialogObserver />
+        <Ribbon width={1000} />
+      </>,
+    );
+    try {
+      await page.getByRole("button", { name: "More thread actions" }).click();
+      await expect
+        .element(page.getByRole("menuitem", { name: "Send to Claude Cloud…" }))
+        .not.toBeInTheDocument();
+
+      state.claudeCloudEnabled = true;
+      await screen.rerender(
+        <>
+          <DialogObserver />
+          <Ribbon width={1000} projectId={ProjectId.make("scratch")} />
+        </>,
+      );
+      await expect
+        .element(page.getByRole("menuitem", { name: "Send to Claude Cloud…" }))
+        .not.toBeInTheDocument();
+
+      await screen.rerender(
+        <>
+          <DialogObserver />
+          <Ribbon width={1000} projectId={ProjectId.make("project")} />
+        </>,
+      );
+      const item = page.getByRole("menuitem", { name: "Send to Claude Cloud…" });
+      await expect.element(item).toBeVisible();
+      await item.click();
+
+      expect(
+        JSON.parse(page.getByTestId("dialog-observer").element().textContent ?? "null"),
+      ).toEqual({
+        mode: "launch",
+        projectId: ProjectId.make("project"),
+        sessionId: "",
+        threadId: THREAD,
+        instanceId: null,
+      });
+    } finally {
+      await screen[Symbol.asyncDispose]();
+    }
   });
 });

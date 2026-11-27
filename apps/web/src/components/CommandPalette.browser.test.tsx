@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../test/render";
+import { closeClaudeCloudDialog, useClaudeCloudDialog } from "../addons/claudeCloudApi";
 import { openCommandPalette } from "../commandPaletteBus";
 import { dispatchCommandPalette, useCommandPaletteStore } from "../commandPaletteStore";
 import { LAST_USED_PROJECT_STORAGE_KEY } from "../hooks/useHandleNewThread";
@@ -18,6 +19,17 @@ const entities = vi.hoisted(() => ({
   activeThread: undefined as Thread | undefined,
   delegatedUnderParent: new Set<string>() as ReadonlySet<string>,
   handleNewThread: vi.fn(async () => undefined),
+  claudeCloudEnabled: false,
+  primaryEnvironmentId: null as EnvironmentId | null,
+}));
+
+vi.mock("../addons/useAddonRegistry", async (original) => ({
+  ...(await original<typeof import("../addons/useAddonRegistry")>()),
+  useIsAddonEnabled: (id: string) => id === "claude-cloud" && entities.claudeCloudEnabled,
+}));
+vi.mock("../state/environments", async (original) => ({
+  ...(await original<typeof import("../state/environments")>()),
+  usePrimaryEnvironmentId: () => entities.primaryEnvironmentId,
 }));
 vi.mock("../state/server", async (original) => {
   const actual = await original<typeof import("../state/server")>();
@@ -60,6 +72,9 @@ function setup(state: Partial<typeof entities> = {}) {
   entities.threads = state.threads ?? [];
   entities.activeThread = state.activeThread;
   entities.delegatedUnderParent = state.delegatedUnderParent ?? new Set();
+  entities.claudeCloudEnabled = state.claudeCloudEnabled ?? false;
+  entities.primaryEnvironmentId = state.primaryEnvironmentId ?? null;
+  closeClaudeCloudDialog();
   entities.handleNewThread.mockClear();
 }
 
@@ -383,5 +398,45 @@ describe("CommandPalette open intents", () => {
 
     await userEvent.keyboard("{Escape}");
     await expect.element(palette).not.toBeInTheDocument();
+  });
+
+  it("opens Send to Claude Cloud… from the palette with projectId and threadId for an active project thread", async () => {
+    const project = makeProject("Acme");
+    const activeThread = makeThreadFixture({
+      environmentId: project.environmentId,
+      id: ThreadId.make("active-thread"),
+      projectId: project.id,
+    });
+    setup({
+      projects: [project],
+      activeThread,
+      claudeCloudEnabled: true,
+      primaryEnvironmentId: project.environmentId,
+    });
+    function DialogObserver() {
+      return (
+        <output data-testid="dialog-observer">{JSON.stringify(useClaudeCloudDialog())}</output>
+      );
+    }
+    await using _screen = await render(
+      <CommandPalette>
+        <DialogObserver />
+      </CommandPalette>,
+    );
+
+    openCommandPalette({ query: "send to cloud" });
+    const row = page.getByRole("option", { name: /Send to Claude Cloud/ });
+    await expect.element(row).toBeVisible();
+    await row.click();
+
+    expect(JSON.parse(page.getByTestId("dialog-observer").element().textContent ?? "null")).toEqual(
+      {
+        mode: "launch",
+        projectId: project.id,
+        sessionId: "",
+        threadId: activeThread.id,
+        instanceId: null,
+      },
+    );
   });
 });

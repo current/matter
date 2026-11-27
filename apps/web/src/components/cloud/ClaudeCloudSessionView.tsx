@@ -1,4 +1,3 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   ProviderDriverKind,
   ProviderInstanceId,
@@ -6,7 +5,6 @@ import {
   type ClaudeCloudPendingRequest,
   type ClaudeCloudRemoteSession,
 } from "@t3tools/contracts";
-import { useNavigate } from "@tanstack/react-router";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -36,14 +34,12 @@ import {
   interruptClaudeCloudSession,
   openClaudeCloudDialog,
   sendClaudeCloudFollowUp,
-  teleportClaudeCloudSession,
 } from "../../addons/claudeCloudApi";
 import { type MatterApiConfig, useMatterApiConfig } from "../../addons/matterApi";
 import { isElectron } from "../../env";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { randomUUID } from "../../lib/utils";
 import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../../state/environments";
-import { buildThreadRouteParams } from "../../threadRoutes";
 import { ComposerBanner } from "../chat/ComposerBanner";
 import { ComposerBannerStack, type ComposerBannerStackItem } from "../chat/ComposerBannerStack";
 import { ComposerSurface } from "../chat/ComposerSurface";
@@ -146,9 +142,7 @@ export function ClaudeCloudSessionView({
             {session ? <CloudSessionMeta session={session} sending={sending} /> : null}
           </WorkspaceBreadcrumbItem>
         </WorkspaceBreadcrumb>
-        {config !== null ? (
-          <CloudSessionActions config={config} sessionId={sessionId} session={session} />
-        ) : null}
+        {config !== null ? <CloudSessionActions sessionId={sessionId} session={session} /> : null}
       </WorkspacePageHeader>
 
       {/* Single child under WorkspacePageHeader so Matter's shell.css wraps the body in its card. */}
@@ -240,78 +234,36 @@ function CloudSessionMeta({
 }
 
 function CloudSessionActions({
-  config,
   sessionId,
   session,
 }: {
-  config: MatterApiConfig;
   sessionId: string;
   session: ClaudeCloudRemoteSession | null;
 }) {
   const gt = useGT();
-  const navigate = useNavigate();
-  const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const [teleporting, setTeleporting] = useState(false);
   const url = session?.url ?? claudeCloudSessionUrl(sessionId);
   const tracked = session?.tracked ?? null;
   const { copyToClipboard } = useCopyToClipboard({
     onCopy: () => toastManager.add({ type: "success", title: gt("Link copied") }),
   });
 
-  const pullToWorktree = async () => {
-    const projectId = tracked?.projectId ?? null;
-    if (projectId === null) {
-      openClaudeCloudDialog({ mode: "teleport", sessionId });
-      return;
-    }
-    setTeleporting(true);
-    const result = await settle(
-      teleportClaudeCloudSession(config, {
-        sessionId,
-        projectId,
-        ...(session ? { instanceId: session.instanceId } : {}),
-      }),
-    );
-    setTeleporting(false);
-    if (!result.ok) {
-      toastManager.add({
-        type: "error",
-        title: gt("Couldn't pull the session"),
-        description: result.error,
-      });
-      return;
-    }
-    if (result.value.threadId !== null && primaryEnvironmentId !== null) {
-      await navigate({
-        to: "/$environmentId/$threadId",
-        params: buildThreadRouteParams(scopeThreadRef(primaryEnvironmentId, result.value.threadId)),
-      });
-      return;
-    }
-    toastManager.add({
-      type: "success",
-      title: gt("Pulled into a local worktree"),
-      description: gt("Teleported into {path}. Its thread will appear once the session imports.", {
-        path: result.value.worktreePath,
-      }),
-    });
-  };
-
   return (
     <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
       <Button
         size="xs"
         variant="outline"
-        disabled={teleporting}
         data-claude-cloud-teleport=""
-        onClick={() => void pullToWorktree()}
+        onClick={() =>
+          openClaudeCloudDialog({
+            mode: "teleport",
+            sessionId,
+            projectId: tracked?.projectId ?? null,
+            ...(session ? { instanceId: session.instanceId } : {}),
+          })
+        }
       >
-        {teleporting ? (
-          <Spinner size="xs" aria-hidden="true" />
-        ) : (
-          <CloudDownloadIcon aria-hidden="true" />
-        )}
-        <span className="hidden md:inline">{gt("Pull to local worktree")}</span>
+        <CloudDownloadIcon aria-hidden="true" />
+        <span>{gt("Bring it back")}</span>
       </Button>
       <Button
         size="xs"

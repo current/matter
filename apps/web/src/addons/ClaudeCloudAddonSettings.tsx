@@ -11,9 +11,16 @@ import {
   CLAUDE_CLOUD_DELEGATION_RULES_MAX_LENGTH,
   ClaudeCloudOffloadPolicy as OffloadPolicySchema,
 } from "@t3tools/contracts";
-import { T, useGT, Var } from "gt-react";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { ExternalLinkIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import {
+  CLAUDE_CLOUD_OFFLOAD_POLICY_DESCRIPTIONS,
+  CLAUDE_CLOUD_OFFLOAD_POLICY_HINTS,
+  CLAUDE_CLOUD_OFFLOAD_POLICY_LABELS,
+  CLAUDE_CLOUD_OFFLOAD_POLICY_ORDER,
+} from "../components/cloud/claudeCloudCopy";
 
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -36,13 +43,6 @@ import {
 import { useMatterApiConfig } from "./matterApi";
 
 const AUTOMATIC_ACCOUNT = "__automatic__";
-const OFFLOAD_POLICY_ORDER: ReadonlyArray<ClaudeCloudOffloadPolicy> = [
-  "balanced",
-  "battery_saver",
-  "cloud_first",
-  "ask",
-  "off",
-];
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -52,6 +52,7 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
  */
 export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
   const gt = useGT();
+  const m = useMessages();
   const config = useMatterApiConfig();
   const [status, setStatus] = useState<ClaudeCloudStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -132,31 +133,6 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
     );
   };
 
-  const policyLabels: Record<ClaudeCloudOffloadPolicy, string> = {
-    balanced: gt("Balanced", { $context: "Claude Cloud offload policy" }),
-    battery_saver: gt("Battery saver", { $context: "Claude Cloud offload policy" }),
-    cloud_first: gt("Cloud first", { $context: "Claude Cloud offload policy" }),
-    ask: gt("Ask first", { $context: "agents ask before offloading to Claude Cloud" }),
-    off: gt("Manual only", { $context: "only the user launches Claude Cloud sessions" }),
-  };
-  const policyHints: Record<ClaudeCloudOffloadPolicy, string> = {
-    balanced: gt("Long jobs, plus the rest on battery"),
-    battery_saver: gt("Only on battery or when hot"),
-    cloud_first: gt("All heavy work"),
-    ask: gt("Agents ask you each time"),
-    off: gt("Only when you send it"),
-  };
-  const policyDescriptions: Record<ClaudeCloudOffloadPolicy, string> = {
-    balanced: gt(
-      "Long builds and test suites run in the cloud. Other heavy work moves there on battery or when this machine runs hot.",
-    ),
-    battery_saver: gt(
-      "Heavy work runs in the cloud on battery or when this machine runs hot, and stays here while plugged in.",
-    ),
-    cloud_first: gt("Heavy work runs in the cloud whenever it can."),
-    ask: gt("Agents ask you before moving work to the cloud."),
-    off: gt("Agents never offload. You can still send work to the cloud yourself."),
-  };
   const accountLabel = (instanceId: string) =>
     status.instances.find((instance) => instance.instanceId === instanceId)?.displayName ??
     instanceId;
@@ -213,14 +189,18 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
             }}
           >
             <SelectTrigger size="sm" className="sm:w-56" aria-label={gt("Offload heavy work")}>
-              <SelectValue>{policyLabels[settings.offloadPolicy]}</SelectValue>
+              <SelectValue>
+                {m(CLAUDE_CLOUD_OFFLOAD_POLICY_LABELS[settings.offloadPolicy])}
+              </SelectValue>
             </SelectTrigger>
             <SelectPopup>
-              {OFFLOAD_POLICY_ORDER.map((policy) => (
+              {CLAUDE_CLOUD_OFFLOAD_POLICY_ORDER.map((policy) => (
                 <SelectItem key={policy} value={policy}>
                   <span className="flex flex-col py-0.5">
-                    <span>{policyLabels[policy]}</span>
-                    <span className="text-xs text-muted-foreground">{policyHints[policy]}</span>
+                    <span>{m(CLAUDE_CLOUD_OFFLOAD_POLICY_LABELS[policy])}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {m(CLAUDE_CLOUD_OFFLOAD_POLICY_HINTS[policy])}
+                    </span>
                   </span>
                 </SelectItem>
               ))}
@@ -231,7 +211,7 @@ export function ClaudeCloudAddonSettings({ canWrite }: { canWrite: boolean }) {
           )}
         </div>
         <p className="max-w-prose text-xs text-muted-foreground">
-          {policyDescriptions[settings.offloadPolicy]}
+          {m(CLAUDE_CLOUD_OFFLOAD_POLICY_DESCRIPTIONS[settings.offloadPolicy])}
         </p>
       </section>
       <label className="flex flex-col gap-1 sm:w-56">

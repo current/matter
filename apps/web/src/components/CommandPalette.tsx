@@ -1874,16 +1874,32 @@ function OpenCommandPaletteDialog(props: {
 
   // Matter: Claude Cloud add-on; its API lives on the primary environment.
   if (claudeCloudEnabled) {
-    const cloudProjectId =
-      currentProjectEnvironmentId === primaryEnvironmentId ? currentProjectId : null;
+    const cloudProject =
+      currentProjectEnvironmentId === primaryEnvironmentId &&
+      currentProject !== undefined &&
+      !isScratchProject(currentProject, activeThreadServerConfig?.scratchWorkspaceRoot)
+        ? currentProject
+        : null;
+    const cloudProjectId = cloudProject?.id ?? null;
+    const cloudThreadId =
+      activeThread &&
+      activeThread.environmentId === primaryEnvironmentId &&
+      cloudProject !== null &&
+      activeThread.projectId === cloudProject.id
+        ? activeThread.id
+        : null;
     actionItems.push({
       kind: "action",
       value: "action:claude-cloud-launch",
-      searchTerms: ["claude", "cloud", "offload", "remote", "vm", "tests", "send"],
+      searchTerms: ["claude", "cloud", "offload", "remote", "vm", "tests", "send", "send to cloud"],
       title: gt("Send to Claude Cloud…"),
       icon: <CloudUploadIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
-        openClaudeCloudDialog({ mode: "launch", projectId: cloudProjectId });
+        openClaudeCloudDialog({
+          mode: "launch",
+          projectId: cloudProjectId,
+          ...(cloudThreadId ? { threadId: cloudThreadId } : {}),
+        });
       },
     });
     actionItems.push({
