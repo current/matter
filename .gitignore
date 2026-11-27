@@ -51,3 +51,8 @@ node_modules/
 .pnpm-store/
 
 /packages/ssh/.ssh-launcher-test-*/
+
+# Trajector writes these into every Claude Code project; ignoring them here keeps agent worktrees clean.
+.claude/settings.local.json*
+trajector-doctor-*.tar.gz
+trajector-doctor-*/
