@@ -11,7 +11,7 @@
     },
     {
       "name": "Setup Worktree",
-      "command": "node scripts/setup-worktree.ts",
+      "command": "node matter/setup-worktree.mjs",
       "icon": "configure",
       "runOnWorktreeCreate": true
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds and signs Matter like the nightly workflow, without GitHub; --install swaps it into /Applications.
 // Default: the unpacked .app, signed in place. --dmg adds CI's DMG, zip and manifest; --no-upstream skips the merge.
-// Usage: node matter/ship-local.mjs [--install] [--ref main] [--no-upstream] [--dmg] [--build-root <dir>]
+// Usage: node matter/ship-local.mjs [--install] [--ref main] [--no-upstream] [--dmg] [--no-reuse] [--build-root <dir>]
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
@@ -18,6 +18,8 @@ const { values } = NodeUtil.parseArgs({
     install: { type: "boolean", default: false },
     ref: { type: "string", default: "main" },
     upstream: { type: "boolean", default: true },
+    // --no-reuse rebuilds even when the last build had the same inputs.
+    reuse: { type: "boolean", default: true },
     dmg: { type: "boolean", default: false },
     "build-root": { type: "string" },
     // Seconds between handing off and quitting the live app, so the caller can finish first.
@@ -241,116 +243,169 @@ if (installed) {
 }
 
 const releaseDir = NodePath.join(buildRoot, "release-local");
-NodeFS.rmSync(releaseDir, { recursive: true, force: true });
+// The merged tree, dependencies, version, build config and certificate fully determine the
+// signed app, so a build of unchanged inputs (`ship-local`, then `ship-local --install`)
+// reuses the last one instead of making it again.
+const buildKey = NodeCrypto.createHash("sha256")
+  .update(
+    JSON.stringify([
+      version,
+      values.dmg,
+      installKey,
+      read("git", ["rev-parse", "HEAD^{tree}"], { cwd: buildRoot }),
+      BUILD_ENV,
+      Object.entries(process.env)
+        .filter(([key]) => /^(T3CODE_|VITE_|CSC_|APPLE_)/.test(key))
+        .sort(),
+      ...[
+        NodePath.join(buildRoot, ".env"),
+        NodePath.join(buildRoot, ".env.local"),
+        import.meta.filename,
+        NodePath.join(signingDir, "antimatter-signing.p12"),
+      ].map((file) =>
+        NodeFS.existsSync(file)
+          ? NodeCrypto.createHash("sha256").update(NodeFS.readFileSync(file)).digest("hex")
+          : null,
+      ),
+    ]),
+  )
+  .digest("hex");
+const buildStamp = NodePath.join(releaseDir, ".matter-ship-build");
 
-step(values.dmg ? "Building the macOS app, DMG and zip" : "Building the macOS app");
-mise(
-  [
-    "pnpm",
-    "run",
-    "dist:desktop:artifact",
-    "--platform",
-    "mac",
-    "--target",
-    // electron-builder spends minutes compressing a DMG and zip that a local install throws away.
-    values.dmg ? "dmg" : "dir",
-    "--arch",
-    "arm64",
-    "--build-version",
-    version,
-    "--output-dir",
-    releaseDir,
-  ],
-  { cwd: buildRoot, env: { ...process.env, ...BUILD_ENV } },
-);
-
-let builtApp;
-if (!values.dmg) {
+function findBuiltApp() {
   const appDir = NodePath.join(releaseDir, "mac-arm64");
   const appName = NodeFS.readdirSync(appDir).find((name) => name.endsWith(".app"));
   if (!appName) throw new Error(`No .app in ${appDir}`);
-  builtApp = NodePath.join(appDir, appName);
-  // electron-builder writes the updater's feed only for dmg and zip targets, so write the
-  // same file (as createBuildConfig's publish config) before signing seals Resources.
-  const [owner, repo] = BUILD_ENV.T3CODE_DESKTOP_UPDATE_REPOSITORY.split("/");
-  NodeFS.writeFileSync(
-    NodePath.join(builtApp, "Contents/Resources/app-update.yml"),
-    [
-      `owner: ${owner}`,
-      `repo: ${repo}`,
-      "provider: github",
-      "releaseType: prerelease",
-      "channel: nightly",
-      "updaterCacheDirName: t3code-updater",
-      "",
-    ].join("\n"),
-  );
+  return NodePath.join(appDir, appName);
 }
 
-step("Signing with the Matter certificate");
-const keychain = NodePath.join(NodeOS.tmpdir(), `matter-ship-${process.pid}.keychain-db`);
-const keychainPassword = NodeCrypto.randomBytes(16).toString("hex");
-const searchList = read("security", ["list-keychains", "-d", "user"])
-  .split("\n")
-  .map((line) => line.trim().replaceAll('"', ""))
-  .filter(Boolean);
-try {
-  run("security", ["create-keychain", "-p", keychainPassword, keychain]);
-  run("security", ["set-keychain-settings", "-lut", "21600", keychain]);
-  run("security", ["unlock-keychain", "-p", keychainPassword, keychain]);
-  const p12Password = NodeFS.readFileSync(
-    NodePath.join(signingDir, "p12-password.txt"),
-    "utf8",
-  ).trim();
-  run(
-    "security",
-    [
-      "import",
-      NodePath.join(signingDir, "antimatter-signing.p12"),
-      "-k",
-      keychain,
-      "-P",
-      p12Password,
-      "-T",
-      "/usr/bin/codesign",
-    ],
-    { stdio: "ignore" },
-  );
-  run(
-    "security",
-    [
-      "set-key-partition-list",
-      "-S",
-      "apple-tool:,apple:,codesign:",
-      "-s",
-      "-k",
-      keychainPassword,
-      keychain,
-    ],
-    { stdio: "ignore" },
-  );
-  // codesign finds identities only in keychains on the user search list.
-  run("security", ["list-keychains", "-d", "user", "-s", keychain, ...searchList]);
-  const identity = /\b([0-9A-F]{40})\b.*Antimatter/.exec(
-    read("security", ["find-identity", "-p", "codesigning", keychain]),
-  )?.[1];
-  if (!identity) throw new Error("The Matter signing identity did not import.");
-  run(
-    "node",
-    [
-      NodePath.join(buildRoot, "matter/sign-mac-release.mjs"),
-      ...(builtApp ? ["--app-path", builtApp] : ["--release-dir", releaseDir]),
-      "--identity",
-      identity,
-      "--keychain",
-      keychain,
-    ],
-    { cwd: buildRoot },
-  );
-} finally {
-  run("security", ["list-keychains", "-d", "user", "-s", ...searchList]);
-  NodeChildProcess.spawnSync("security", ["delete-keychain", keychain]);
+function reusableBuild() {
+  if (!values.reuse || !NodeFS.existsSync(buildStamp)) return undefined;
+  if (NodeFS.readFileSync(buildStamp, "utf8") !== buildKey) return undefined;
+  if (values.dmg) return { builtApp: undefined };
+  try {
+    const builtApp = findBuiltApp();
+    run("codesign", ["--verify", "--deep", "--strict", builtApp]);
+    return { builtApp };
+  } catch {
+    return undefined;
+  }
 }
+
+function buildAndSign() {
+  NodeFS.rmSync(releaseDir, { recursive: true, force: true });
+
+  step(values.dmg ? "Building the macOS app, DMG and zip" : "Building the macOS app");
+  mise(
+    [
+      "pnpm",
+      "run",
+      "dist:desktop:artifact",
+      "--platform",
+      "mac",
+      "--target",
+      // electron-builder spends minutes compressing a DMG and zip that a local install throws away.
+      values.dmg ? "dmg" : "dir",
+      "--arch",
+      "arm64",
+      "--build-version",
+      version,
+      "--output-dir",
+      releaseDir,
+    ],
+    { cwd: buildRoot, env: { ...process.env, ...BUILD_ENV } },
+  );
+
+  let builtApp;
+  if (!values.dmg) {
+    builtApp = findBuiltApp();
+    // electron-builder writes the updater's feed only for dmg and zip targets, so write the
+    // same file (as createBuildConfig's publish config) before signing seals Resources.
+    const [owner, repo] = BUILD_ENV.T3CODE_DESKTOP_UPDATE_REPOSITORY.split("/");
+    NodeFS.writeFileSync(
+      NodePath.join(builtApp, "Contents/Resources/app-update.yml"),
+      [
+        `owner: ${owner}`,
+        `repo: ${repo}`,
+        "provider: github",
+        "releaseType: prerelease",
+        "channel: nightly",
+        "updaterCacheDirName: t3code-updater",
+        "",
+      ].join("\n"),
+    );
+  }
+
+  step("Signing with the Matter certificate");
+  const keychain = NodePath.join(NodeOS.tmpdir(), `matter-ship-${process.pid}.keychain-db`);
+  const keychainPassword = NodeCrypto.randomBytes(16).toString("hex");
+  const searchList = read("security", ["list-keychains", "-d", "user"])
+    .split("\n")
+    .map((line) => line.trim().replaceAll('"', ""))
+    .filter(Boolean);
+  try {
+    run("security", ["create-keychain", "-p", keychainPassword, keychain]);
+    run("security", ["set-keychain-settings", "-lut", "21600", keychain]);
+    run("security", ["unlock-keychain", "-p", keychainPassword, keychain]);
+    const p12Password = NodeFS.readFileSync(
+      NodePath.join(signingDir, "p12-password.txt"),
+      "utf8",
+    ).trim();
+    run(
+      "security",
+      [
+        "import",
+        NodePath.join(signingDir, "antimatter-signing.p12"),
+        "-k",
+        keychain,
+        "-P",
+        p12Password,
+        "-T",
+        "/usr/bin/codesign",
+      ],
+      { stdio: "ignore" },
+    );
+    run(
+      "security",
+      [
+        "set-key-partition-list",
+        "-S",
+        "apple-tool:,apple:,codesign:",
+        "-s",
+        "-k",
+        keychainPassword,
+        keychain,
+      ],
+      { stdio: "ignore" },
+    );
+    // codesign finds identities only in keychains on the user search list.
+    run("security", ["list-keychains", "-d", "user", "-s", keychain, ...searchList]);
+    const identity = /\b([0-9A-F]{40})\b.*Antimatter/.exec(
+      read("security", ["find-identity", "-p", "codesigning", keychain]),
+    )?.[1];
+    if (!identity) throw new Error("The Matter signing identity did not import.");
+    run(
+      "node",
+      [
+        NodePath.join(buildRoot, "matter/sign-mac-release.mjs"),
+        ...(builtApp ? ["--app-path", builtApp] : ["--release-dir", releaseDir]),
+        "--identity",
+        identity,
+        "--keychain",
+        keychain,
+      ],
+      { cwd: buildRoot },
+    );
+  } finally {
+    run("security", ["list-keychains", "-d", "user", "-s", ...searchList]);
+    NodeChildProcess.spawnSync("security", ["delete-keychain", keychain]);
+  }
+  return builtApp;
+}
+
+const reused = reusableBuild();
+if (reused) step("Reusing the app last built and signed from these same inputs");
+const builtApp = reused ? reused.builtApp : buildAndSign();
 
 step("Checking the signed app");
 const stageDir = NodePath.join(buildRoot, "release-local-app");
@@ -373,6 +428,7 @@ const plist = (key) =>
   ]);
 if (plist("CFBundleIdentifier") !== BUNDLE_ID)
   throw new Error(`Unexpected bundle id ${plist("CFBundleIdentifier")}`);
+if (!reused) NodeFS.writeFileSync(buildStamp, buildKey);
 console.log(
   `${stagedApp}\n${plist("CFBundleName")} ${plist("CFBundleShortVersionString")}, built in ${Math.round((Date.now() - started) / 1000)}s`,
 );
