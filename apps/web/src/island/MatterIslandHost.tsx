@@ -39,7 +39,7 @@ import {
   useVoiceTranscriptionDestination,
 } from "../speech/useEnvironmentSpeechInput";
 import { useMatterApiConfig } from "../addons/matterApi";
-import { parseMatterPlanOverview } from "../components/chat/matterPlanParser.matter";
+import { parseMatterPlanOverview } from "@t3tools/client-runtime/matter/plan-parser";
 import {
   providerHasNativeGoals,
   withNativeGoalCommand,

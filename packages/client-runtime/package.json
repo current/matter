@@ -211,6 +211,10 @@
       "types": "./src/matterVoiceHttp.ts",
       "default": "./src/matterVoiceHttp.ts"
     },
+    "./matter/plan-parser": {
+      "types": "./src/matter/planParser.ts",
+      "default": "./src/matter/planParser.ts"
+    },
     "./t3ToolSummary": {
       "types": "./src/t3ToolSummary.ts",
       "default": "./src/t3ToolSummary.ts"

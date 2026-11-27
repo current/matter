@@ -37,6 +37,7 @@ import {
   type PendingUserInputDraftAnswer,
 } from "@t3tools/client-runtime/state/pending-user-input";
 import type { PendingUserInput } from "../../lib/threadActivity";
+import { MatterQuestionsCard } from "../matter/cards/MatterQuestionsCard.matter";
 
 export interface PendingUserInputCardProps {
   readonly environmentId: EnvironmentId;
@@ -122,6 +123,11 @@ function QuestionText(props: {
 }
 
 export function PendingUserInputCard(props: PendingUserInputCardProps) {
+  return <MatterQuestionsCard {...props} />;
+}
+
+// oxlint-disable-next-line no-unused-vars -- retained upstream body to minimize merge conflicts
+function UpstreamPendingUserInputCard(props: PendingUserInputCardProps) {
   const gt = useGT();
   const questionCount = props.pendingUserInput.questions.length;
   const canRespond = props.pendingUserInput.responseCapability !== "not_resumable";
