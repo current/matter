@@ -5861,5 +5861,12 @@
   "ad208e3e32c85029": "Hide all",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Tool calls in chat",
-  "8d545d54c0a9e950": "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show."
+  "8d545d54c0a9e950": "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show.",
+  "6ef512c379079a7d": "Pull request #{number} merged",
+  "f1c767e702e8fac9": "Settle this thread? It moves to Settled.",
+  "c158f71a171ef034": "Keep this thread",
+  "65ca6ca43f7d2d66": "Keep",
+  "13e6f2309e418404": "Settle",
+  "73231e6bf79dde0d": "Use suggested prompt: {prompt}",
+  "d8698799ee901b97": "Use"
 }

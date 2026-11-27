@@ -1,14 +1,16 @@
 import { DEFAULT_SERVER_SETTINGS, ProjectId, RunId } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 import {
   addMergeSettleDismissal,
   parseMergeSettleDismissals,
   resolveAutoSettleOnMerge,
   resolveMergeSettlePrompt,
-} from "./matterMergeSettlePrompt.logic";
+} from "./mergeSettlePrompt.ts";
 
 const NOW = Date.parse("2026-11-26T12:00:00.000Z");
 const HOUR = 60 * 60 * 1000;
+const isoAt = (ms: number) => DateTime.formatIso(DateTime.makeUnsafe(ms));
 const PROJECT_ID = ProjectId.make("project-1");
 const THREAD_KEY = "env:thread-1";
 
@@ -30,10 +32,9 @@ function pullRequest(
       headBranch: "feature",
       baseBranch: "main",
       isDraft: false,
-      updatedAt:
-        times.updatedAt === undefined ? new Date(NOW - HOUR).toISOString() : times.updatedAt,
-      syncedAt: new Date(NOW).toISOString(),
-      mergedAt: times.mergedAt === undefined ? new Date(NOW - HOUR).toISOString() : times.mergedAt,
+      updatedAt: times.updatedAt === undefined ? isoAt(NOW - HOUR) : times.updatedAt,
+      syncedAt: isoAt(NOW),
+      mergedAt: times.mergedAt === undefined ? isoAt(NOW - HOUR) : times.mergedAt,
     },
     stack: null,
   };
@@ -74,7 +75,7 @@ describe("resolveMergeSettlePrompt", () => {
   });
 
   it("only asks within three days of the merge", () => {
-    const at = (ms: number) => new Date(NOW - ms).toISOString();
+    const at = (ms: number) => isoAt(NOW - ms);
     const merged = (ms: number) =>
       thread({ pullRequests: [pullRequest(42, "merged", { mergedAt: at(ms) })] });
     expect(resolve({ thread: merged(71 * HOUR) })).toBe(42);
@@ -84,8 +85,8 @@ describe("resolveMergeSettlePrompt", () => {
   it("falls back to updatedAt, and stays quiet with neither time", () => {
     const fallback = (updatedAt: string | null) =>
       thread({ pullRequests: [pullRequest(42, "merged", { mergedAt: null, updatedAt })] });
-    expect(resolve({ thread: fallback(new Date(NOW - HOUR).toISOString()) })).toBe(42);
-    expect(resolve({ thread: fallback(new Date(NOW - 80 * HOUR).toISOString()) })).toBeNull();
+    expect(resolve({ thread: fallback(isoAt(NOW - HOUR)) })).toBe(42);
+    expect(resolve({ thread: fallback(isoAt(NOW - 80 * HOUR)) })).toBeNull();
     expect(resolve({ thread: fallback(null) })).toBeNull();
   });
 
@@ -101,7 +102,7 @@ describe("resolveMergeSettlePrompt", () => {
 
   it("stays quiet once the thread was unsettled after the merge", () => {
     const unsettled = (ms: number) =>
-      thread({ settledOverride: "active", unsettledAt: new Date(NOW - ms).toISOString() });
+      thread({ settledOverride: "active", unsettledAt: isoAt(NOW - ms) });
     expect(resolve({ thread: unsettled(30 * 60 * 1000) })).toBeNull();
     expect(resolve({ thread: unsettled(2 * HOUR) })).toBe(42);
   });

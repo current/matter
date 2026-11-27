@@ -79,6 +79,8 @@ import { MatterComposerSendButton } from "../matter/composer/MatterComposerSendB
 import { MatterComposerShelf } from "../matter/composer/MatterComposerShelf.matter";
 import { MatterComposerUnderTray } from "../matter/composer/MatterComposerUnderTray.matter";
 import { MatterComposerReplyBar } from "../matter/replies/MatterComposerReplyBar.matter";
+import { MatterPredictionGhost } from "../matter/predictions/MatterPredictionGhost.matter";
+import { useMatterComposerPrediction } from "../matter/predictions/useMatterComposerPrediction";
 import {
   deriveMatterMobileInteractionMode,
   shouldShowMatterMobileUnderTray,
@@ -518,6 +520,14 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     Math.min(maxEditorHeight, editorContentHeight + 2 * editorInset),
   );
   const showsCompactDictation = isVoiceInputPresented;
+  const matterPrediction = useMatterComposerPrediction({
+    props,
+    draftKey: composerDraftKey,
+    locked: isSubmissionLocked,
+    voiceInputActive: isVoiceInputPresented,
+    editorRef: inputRef,
+    onSelectionChange: composerMenu.onSelectionChange,
+  });
   const isToolbarVisible = isVoiceInputPresented;
   const hasEditingAttachments =
     (queuedEdit !== null && queuedEdit.existingAttachments.length > 0) ||
@@ -1020,7 +1030,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 }
                 insertPaste();
               }}
-              placeholder={props.placeholder}
+              placeholder={matterPrediction.text === null ? props.placeholder : ""}
               onFocus={handleFocus}
               onBlur={handleBlur}
               onSubmit={(alternate) =>
@@ -1046,6 +1056,13 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 ...bodyText,
                 color: foregroundColor,
               }}
+            />
+            <MatterPredictionGhost
+              text={matterPrediction.text}
+              editorHeight={editorHeight}
+              inset={editorInset}
+              textStyle={bodyText}
+              onAccept={matterPrediction.accept}
             />
           </View>
           <View className="relative min-h-[44px] justify-center px-2 pb-1">

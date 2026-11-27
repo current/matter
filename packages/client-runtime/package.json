@@ -215,6 +215,14 @@
       "types": "./src/matterVoiceHttp.ts",
       "default": "./src/matterVoiceHttp.ts"
     },
+    "./matter/merge-settle-prompt": {
+      "types": "./src/matter/mergeSettlePrompt.ts",
+      "default": "./src/matter/mergeSettlePrompt.ts"
+    },
+    "./matter/prompt-prediction": {
+      "types": "./src/matter/promptPrediction.ts",
+      "default": "./src/matter/promptPrediction.ts"
+    },
     "./matter/interaction-mode": {
       "types": "./src/matter/interactionMode.ts",
       "default": "./src/matter/interactionMode.ts"

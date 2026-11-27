@@ -5837,5 +5837,12 @@
   "ad208e3e32c85029": "모두 숨기기",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "채팅의 도구 호출",
-  "8d545d54c0a9e950": "에이전트가 실행하는 명령, 편집, 검색을 숨깁니다. 성공한 항목 숨기기는 실패를 남겨 둡니다. Zen은 최종 답변만 표시합니다. 승인, 질문, 오류는 항상 표시됩니다."
+  "8d545d54c0a9e950": "에이전트가 실행하는 명령, 편집, 검색을 숨깁니다. 성공한 항목 숨기기는 실패를 남겨 둡니다. Zen은 최종 답변만 표시합니다. 승인, 질문, 오류는 항상 표시됩니다.",
+  "6ef512c379079a7d": "Pull request #{number} merged",
+  "f1c767e702e8fac9": "Settle this thread? It moves to Settled.",
+  "c158f71a171ef034": "Keep this thread",
+  "65ca6ca43f7d2d66": "Keep",
+  "13e6f2309e418404": "Settle",
+  "73231e6bf79dde0d": "Use suggested prompt: {prompt}",
+  "d8698799ee901b97": "Use"
 }

@@ -55,7 +55,7 @@ vi.mock(import("../../hooks/useNowMinute"), () => ({
 
 import { render } from "../../../test/render";
 import { MatterMergeSettlePrompt } from "./MatterMergeSettlePrompt.matter";
-import { MATTER_MERGE_SETTLE_PROMPT_STORAGE_KEY } from "./matterMergeSettlePrompt.logic";
+import { MATTER_MERGE_SETTLE_PROMPT_STORAGE_KEY } from "@t3tools/client-runtime/matter/merge-settle-prompt";
 
 const environmentId = EnvironmentId.make("environment:test");
 

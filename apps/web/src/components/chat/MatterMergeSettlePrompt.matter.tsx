@@ -17,7 +17,7 @@ import {
   parseMergeSettleDismissals,
   resolveAutoSettleOnMerge,
   resolveMergeSettlePrompt,
-} from "./matterMergeSettlePrompt.logic";
+} from "@t3tools/client-runtime/matter/merge-settle-prompt";
 
 const MERGED = PULL_REQUEST_STATE_PRESENTATION.merged;
 

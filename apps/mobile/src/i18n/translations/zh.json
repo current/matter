@@ -5840,5 +5840,12 @@
   "ad208e3e32c85029": "全部隐藏",
   "3328503592789bed": "专注模式",
   "856812e7e1fc445e": "聊天中的工具调用",
-  "8d545d54c0a9e950": "隐藏智能体执行的命令、编辑和搜索。“隐藏成功的调用”仍保留失败项；“专注模式”仅显示最终回答。审批、提问和错误始终显示。"
+  "8d545d54c0a9e950": "隐藏智能体执行的命令、编辑和搜索。“隐藏成功的调用”仍保留失败项；“专注模式”仅显示最终回答。审批、提问和错误始终显示。",
+  "6ef512c379079a7d": "Pull request #{number} merged",
+  "f1c767e702e8fac9": "Settle this thread? It moves to Settled.",
+  "c158f71a171ef034": "Keep this thread",
+  "65ca6ca43f7d2d66": "Keep",
+  "13e6f2309e418404": "Settle",
+  "73231e6bf79dde0d": "Use suggested prompt: {prompt}",
+  "d8698799ee901b97": "Use"
 }
