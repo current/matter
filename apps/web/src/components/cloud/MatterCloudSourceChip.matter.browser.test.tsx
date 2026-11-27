@@ -31,6 +31,7 @@ describe("MatterCloudSourceChip", () => {
     const chip = page.getByRole("link", { name: "Started from Port the composer" });
     await expect.element(chip).toHaveAttribute("href", "/local/chat-1");
     await expect.element(page.getByText("Port the composer")).toBeVisible();
+    await expect.element(chip).toHaveTextContent("From Port the composer");
     shells.clear();
   });
 

@@ -271,7 +271,7 @@ function CloudRunLineageRow({ run }: { readonly run: MatterCloudRun }) {
           </span>
         ) : (
           <span data-matter-lineage-row-meta>
-            <T>on Claude Cloud</T>
+            <T>Running</T>
           </span>
         )}
         <span data-matter-lineage-row-time>
@@ -565,7 +565,8 @@ export function MatterWhisperPill(props: LineageThreadProps) {
   ]
     .filter((start): start is number => start !== null && Number.isFinite(start))
     .reduce<number | null>((min, start) => (min === null || start < min ? start : min), null);
-  const cloudNeedsInput = cloudRuns.some((run) => run.state === "needs_input");
+  const needsYouCount = cloudRuns.filter((run) => run.state === "needs_input").length;
+  const cloudNeedsInput = needsYouCount > 0;
   const avatars = stackMatterWhisperAvatars(
     uniqueMatterWhisperAgents(rows, (row) =>
       row.kind === "subagent"
@@ -576,15 +577,22 @@ export function MatterWhisperPill(props: LineageThreadProps) {
     ),
   );
   const label =
-    runningCount > 0
-      ? gt("{count} running", { count: runningCount })
-      : servers.length > 0
-        ? gt("{count, plural, one {{count} server} other {{count} servers}}", {
-            count: servers.length,
+    needsYouCount > 0
+      ? runningCount > needsYouCount
+        ? gt("{needs} needs you · {running} running", {
+            needs: needsYouCount,
+            running: runningCount - needsYouCount,
           })
-        : gt("{count, plural, one {{count} automation} other {{count} automations}} running", {
-            count: runningAutomations,
-          });
+        : gt("{count} needs you", { count: needsYouCount })
+      : runningCount > 0
+        ? gt("{count} running", { count: runningCount })
+        : servers.length > 0
+          ? gt("{count, plural, one {{count} server} other {{count} servers}}", {
+              count: servers.length,
+            })
+          : gt("{count, plural, one {{count} automation} other {{count} automations}} running", {
+              count: runningAutomations,
+            });
   return (
     <div data-matter-whisper-pill-row>
       <MatterLineagePopover
@@ -642,7 +650,9 @@ export function MatterWhisperPill(props: LineageThreadProps) {
                 ) : null}
               </span>
             ) : null}
-            <span data-matter-whisper-label>{label}</span>
+            <span data-matter-whisper-label data-tone={cloudNeedsInput ? "needs" : undefined}>
+              {label}
+            </span>
             {oldest !== null ? (
               <span data-matter-whisper-timer>
                 <WhisperRowTimer startedAtMs={oldest} />

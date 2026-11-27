@@ -34,12 +34,14 @@ export function MatterCloudSourceChip({
             params={buildThreadRouteParams(ref)}
             data-matter-cloud-source=""
             aria-label={gt("Started from {title}", { title })}
-            className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap text-xs text-muted-foreground hover:text-foreground"
           />
         }
       >
         <MessageSquareIcon aria-hidden className="size-3 shrink-0" />
-        <span className="max-w-56 truncate">{title}</span>
+        <T>
+          From <Var>{<span className="max-w-56 truncate">{title}</span>}</Var>
+        </T>
       </TooltipTrigger>
       <TooltipPopup>
         <T>

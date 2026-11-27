@@ -721,7 +721,8 @@ html[data-matter-ribbon-git-menu] [data-slot="menu-positioner"] > [data-slot="me
 }
 
 /* Claude Cloud runs this chat started: a cloud glyph, and amber while one waits on the user. */
-[data-matter-lineage-row-meta][data-tone="needs"] {
+[data-matter-lineage-row-meta][data-tone="needs"],
+[data-matter-whisper-label][data-tone="needs"] {
   color: var(--warning);
   font-weight: 500;
 }

@@ -247,7 +247,7 @@ describe("MatterWhisperPill", () => {
     const avatar = screen.container.querySelector<HTMLElement>("[data-matter-whisper-avatar]");
     expect(avatar?.hasAttribute("data-cloud")).toBe(true);
     expect(avatar?.hasAttribute("data-needs")).toBe(true);
-    await page.getByRole("button", { name: "Lineage: 2 running" }).click();
+    await page.getByRole("button", { name: "Lineage: 1 needs you · 1 running" }).click();
     const ask = page.getByRole("link", { name: "Schema question, cloud run, needs you" });
     await expect.element(ask).toHaveAttribute("href", "/cloud/cse_ask?instanceId=claudeAgent");
     await expect.element(page.getByText("Needs you")).toBeVisible();

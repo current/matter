@@ -4327,6 +4327,8 @@
   "cb96d2ca669800f2": "자동화",
   "aebfbdf457c8e7b9": "Back to lineage",
   "6f90cebb27e7cec8": "Running agents",
+  "0359ddf2f82451f3": "{needs} needs you · {running} running",
+  "8a9f50011cb2661a": "{count} needs you",
   "e197c4963bacc746": "{count}개 실행 중",
   "45ff94430871a42a": "{count, plural, one {{count} server} other {{count} servers}}",
   "638841ed31c5041c": "{count, plural, one {{count} automation} other {{count} automations}} running",
@@ -4342,7 +4344,7 @@
   ],
   "25da730aa6ca43c3": "Stop",
   "1b7c524fccf06537": "Needs you",
-  "e5f3b4b52c30a58f": "on Claude Cloud",
+  "622a159ad0eabdcb": "Running",
   "a3db5fd6c4b955ec": "Back",
   "a33df1497c9fa65b": [
     "Lineage · ",
