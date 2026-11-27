@@ -1,7 +1,8 @@
 import * as Schema from "effect/Schema";
 
-import { ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, ProjectId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import type { AddonConfig } from "./matterAddons.ts";
+import { OrchestrationV2TurnItem } from "./orchestrationV2.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 /**
@@ -266,6 +267,96 @@ export const ClaudeCloudTeleportResult = Schema.Struct({
 });
 export type ClaudeCloudTeleportResult = typeof ClaudeCloudTeleportResult.Type;
 
+/**
+ * Where a cloud session stands. Read from Claude's sessions API (`session_status`, the post-turn
+ * summary and the newest transcript events), never guessed from what Matter sent.
+ */
+export const ClaudeCloudSessionState = Schema.Literals([
+  "running",
+  "idle",
+  "needs_input",
+  "failed",
+  "archived",
+]);
+export type ClaudeCloudSessionState = typeof ClaudeCloudSessionState.Type;
+
+/**
+ * A cloud session as the claude.ai account sees it, including ones started in the Claude app or
+ * on claude.ai. `tracked` is Matter's own record when Matter launched or messaged it.
+ */
+export const ClaudeCloudRemoteSession = Schema.Struct({
+  id: ClaudeCloudSessionId,
+  url: Schema.String,
+  title: Schema.String,
+  /** The Claude instance whose sign-in reads and messages this session. */
+  instanceId: ProviderInstanceId,
+  state: ClaudeCloudSessionState,
+  unread: Schema.Boolean,
+  /** Where it was started, as the API reports it (`cli`, `desktop_app`, `web`, …). */
+  origin: Schema.NullOr(Schema.String),
+  /** `owner/repo` of the session's GitHub source. */
+  repository: Schema.NullOr(Schema.String),
+  branch: Schema.NullOr(Schema.String),
+  model: Schema.NullOr(Schema.String),
+  createdAt: Schema.String,
+  updatedAt: Schema.String,
+  /** One line on where the last turn left off. */
+  summary: Schema.NullOr(Schema.String),
+  /** What the session needs from the user, when it waits on them. */
+  needsAction: Schema.NullOr(Schema.String),
+  contextUsage: Schema.NullOr(
+    Schema.Struct({ usedTokens: NonNegativeInt, maxTokens: NonNegativeInt }),
+  ),
+  tracked: Schema.NullOr(TrackedClaudeCloudSession),
+});
+export type ClaudeCloudRemoteSession = typeof ClaudeCloudRemoteSession.Type;
+
+export const ClaudeCloudAccountProblemNote = Schema.Struct({
+  instanceId: ProviderInstanceId,
+  detail: Schema.String,
+});
+export type ClaudeCloudAccountProblemNote = typeof ClaudeCloudAccountProblemNote.Type;
+
+export const ClaudeCloudRemoteSessionsResponse = Schema.Struct({
+  /** Newest activity first; archived sessions only when asked for. */
+  sessions: Schema.Array(ClaudeCloudRemoteSession),
+  /** Accounts whose list could not be read. Their tracked sessions still appear. */
+  problems: Schema.Array(ClaudeCloudAccountProblemNote),
+});
+export type ClaudeCloudRemoteSessionsResponse = typeof ClaudeCloudRemoteSessionsResponse.Type;
+
+/** Something the session waits on. Answering it happens on claude.ai or in the Claude app. */
+export const ClaudeCloudPendingRequest = Schema.Struct({
+  kind: Schema.Literals(["permission", "question", "plan"]),
+  title: Schema.String,
+  detail: Schema.NullOr(Schema.String),
+});
+export type ClaudeCloudPendingRequest = typeof ClaudeCloudPendingRequest.Type;
+
+/**
+ * A session's transcript as Matter turn items, so it renders through the same timeline as a
+ * local thread. Items carry `threadId` `claude-cloud:<sessionId>` and no run, node or provider ids.
+ */
+export const ClaudeCloudTranscriptResponse = Schema.Struct({
+  session: ClaudeCloudRemoteSession,
+  /** Pass back as `sinceRev` to receive only items added or changed after it. */
+  rev: NonNegativeInt,
+  /** `turnItems` is the whole transcript (first load, or the server lost the client's rev). */
+  full: Schema.Boolean,
+  turnItems: Schema.Array(OrchestrationV2TurnItem),
+  pendingRequest: Schema.NullOr(ClaudeCloudPendingRequest),
+  canInterrupt: Schema.Boolean,
+});
+export type ClaudeCloudTranscriptResponse = typeof ClaudeCloudTranscriptResponse.Type;
+
+export const ClaudeCloudInterruptRequest = Schema.Struct({
+  sessionId: SessionRef,
+  instanceId: Schema.optionalKey(ProviderInstanceId),
+});
+export type ClaudeCloudInterruptRequest = typeof ClaudeCloudInterruptRequest.Type;
+
+export const CLAUDE_CLOUD_THREAD_ID_PREFIX = "claude-cloud:";
+
 export const ClaudeCloudErrorCode = Schema.Literals([
   "addon_disabled",
   "delegation_off",
@@ -279,5 +370,8 @@ export const ClaudeCloudErrorCode = Schema.Literals([
   "cli_failed",
   "launch_timeout",
   "teleport_failed",
+  /** The sessions API refused or could not be reached; sends through the CLI may still work. */
+  "api_unavailable",
+  "interrupt_unsupported",
 ]);
 export type ClaudeCloudErrorCode = typeof ClaudeCloudErrorCode.Type;
