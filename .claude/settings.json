@@ -1,0 +1,22 @@
+{
+  "deniedMcpServers": [
+    { "serverName": "aws-mcp" },
+    { "serverName": "claude.ai Claude Docs" },
+    { "serverName": "claude.ai Gmail" },
+    { "serverName": "claude.ai Google Drive" },
+    { "serverName": "claude.ai Notion" },
+    { "serverName": "codex" },
+    { "serverName": "cua" },
+    { "serverName": "cua-driver" },
+    { "serverName": "emblematic" },
+    { "serverName": "gemini" },
+    { "serverName": "linear" },
+    { "serverName": "motion" },
+    { "serverName": "notion" },
+    { "serverName": "pencil" },
+    { "serverName": "plugin:mobbin:mobbin" },
+    { "serverName": "properui" },
+    { "serverName": "screenrove" },
+    { "serverName": "vercel" }
+  ]
+}
