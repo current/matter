@@ -231,6 +231,7 @@ export function ComposerControlsBar(props: {
       footer={
         <ComposerPickerFooter
           leading={props.matterModeMenu}
+          hidePermissions={props.permissionsShownInStrip}
           traits={traitsInput}
           runtimeMode={compatibleRuntimeMode}
           runtimeModeOptions={compatibleRuntimeModeOptions}

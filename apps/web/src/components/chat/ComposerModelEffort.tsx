@@ -723,6 +723,8 @@ function PermissionsMenu(props: {
 export function ComposerPickerFooter(props: {
   /** Matter: the interaction mode menu. */
   leading?: ReactNode;
+  /** Matter: the composer's under-tray already shows permissions. */
+  hidePermissions?: boolean;
   traits: TraitsSelectionInput | null;
   runtimeMode: RuntimeMode;
   runtimeModeOptions: ReadonlyArray<RuntimeModeOption>;
@@ -733,11 +735,13 @@ export function ComposerPickerFooter(props: {
       {props.leading}
       {props.traits ? <SpeedControl traits={props.traits} /> : null}
       {props.traits ? <UltracodeControl traits={props.traits} /> : null}
-      <PermissionsMenu
-        runtimeMode={props.runtimeMode}
-        options={props.runtimeModeOptions}
-        onChange={props.onRuntimeModeChange}
-      />
+      {props.hidePermissions ? null : (
+        <PermissionsMenu
+          runtimeMode={props.runtimeMode}
+          options={props.runtimeModeOptions}
+          onChange={props.onRuntimeModeChange}
+        />
+      )}
     </div>
   );
 }
