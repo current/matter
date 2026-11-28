@@ -1,6 +1,6 @@
 import type { ProviderInteractionMode } from "@t3tools/contracts";
 import { msg, T, useGT, useMessages } from "gt-react";
-import { Code2Icon, ListChecksIcon, TargetIcon, XIcon } from "lucide-react";
+import { ChevronUpIcon, HammerIcon, ListChecksIcon, TargetIcon, XIcon } from "lucide-react";
 import { use, useState } from "react";
 
 import {
@@ -17,13 +17,13 @@ import { cn } from "~/lib/utils";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HiddenThreadContext } from "./backgroundThread";
 import { ComposerControl } from "./ComposerControl";
-import { useComposerMenuProps } from "./composerEventScope";
+import { composerFloatingLayerProps, useComposerMenuProps } from "./composerEventScope";
 import { MATTER_INTERACTION_MODES } from "@t3tools/client-runtime/matter/interaction-mode";
 import { useComposerMenuState } from "./useComposerMenuState";
 
 const MODE_COPY = {
   default: {
-    icon: Code2Icon,
+    icon: HammerIcon,
     label: msg("Default", { $context: "composer interaction mode" }),
     description: msg("Normal interactive coding"),
   },
@@ -41,10 +41,56 @@ const MODE_COPY = {
 
 const MATTER_MODE_SHORTCUT_LABEL = "⇧Tab";
 
+function MatterModeMenuItems(props: {
+  readonly mode: ProviderInteractionMode;
+  readonly onModeChange: (mode: ProviderInteractionMode) => void;
+}) {
+  const messages = useMessages();
+  const { mode, onModeChange } = props;
+  return (
+    <div className="w-80" data-matter-mode-menu="">
+      <MenuGroup>
+        <MenuGroupLabel>
+          <T>Mode</T>
+        </MenuGroupLabel>
+        <MenuRadioGroup
+          value={mode}
+          onValueChange={(value: ProviderInteractionMode) => {
+            if (value !== mode) onModeChange(value);
+          }}
+        >
+          {MATTER_INTERACTION_MODES.map((option) => {
+            const copy = MODE_COPY[option];
+            const OptionIcon = copy.icon;
+            return (
+              <MenuRadioItem key={option} value={option} closeOnClick>
+                <span className="flex w-full items-start gap-2">
+                  <OptionIcon aria-hidden="true" className="mt-0.5 size-4" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span>{messages(copy.label)}</span>
+                    <span className="text-muted-foreground text-xs leading-snug">
+                      {messages(copy.description)}
+                    </span>
+                  </span>
+                  <MenuRadioItemIndicator className="mt-0.5 ms-auto" />
+                </span>
+              </MenuRadioItem>
+            );
+          })}
+        </MenuRadioGroup>
+      </MenuGroup>
+      <div data-matter-mode-menu-hint="" className="px-2 pt-1.5 pb-1 text-muted-foreground text-xs">
+        <T>
+          <kbd className="font-sans">⇧Tab</kbd> cycles modes
+        </T>
+      </div>
+    </div>
+  );
+}
+
 /**
- * The composer's interaction mode: a quiet icon in Default, a tinted pill with a clear button
- * in Plan or Goal. The menu lists every mode; Shift+Tab and `/plan`, `/goal`, `/default` reach
- * the same setter.
+ * Plan or Goal as a tinted pill with a clear button; Default shows nothing here and is chosen in
+ * the model picker's footer. Shift+Tab and `/plan`, `/goal`, `/default` reach the same setter.
  */
 export function MatterComposerModeControl(props: {
   readonly mode: ProviderInteractionMode;
@@ -67,6 +113,7 @@ export function MatterComposerModeControl(props: {
   const CurrentIcon = current.icon;
   const label = messages(current.label);
   const active = mode !== "default";
+  if (!active) return null;
   const tooltip =
     mode === "plan"
       ? gt("Plan mode: edits wait until you approve the plan")
@@ -126,46 +173,7 @@ export function MatterComposerModeControl(props: {
           </TooltipPopup>
         </Tooltip>
         <MenuPopup side="top" align="start" {...composerMenuProps}>
-          <div className="w-80" data-matter-mode-menu="">
-            <MenuGroup>
-              <MenuGroupLabel>
-                <T>Mode</T>
-              </MenuGroupLabel>
-              <MenuRadioGroup
-                value={mode}
-                onValueChange={(value: ProviderInteractionMode) => {
-                  if (value !== mode) onModeChange(value);
-                }}
-              >
-                {MATTER_INTERACTION_MODES.map((option) => {
-                  const copy = MODE_COPY[option];
-                  const OptionIcon = copy.icon;
-                  return (
-                    <MenuRadioItem key={option} value={option} closeOnClick>
-                      <span className="flex w-full items-start gap-2">
-                        <OptionIcon aria-hidden="true" className="mt-0.5 size-4" />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span>{messages(copy.label)}</span>
-                          <span className="text-muted-foreground text-xs leading-snug">
-                            {messages(copy.description)}
-                          </span>
-                        </span>
-                        <MenuRadioItemIndicator className="mt-0.5 ms-auto" />
-                      </span>
-                    </MenuRadioItem>
-                  );
-                })}
-              </MenuRadioGroup>
-            </MenuGroup>
-            <div
-              data-matter-mode-menu-hint=""
-              className="px-2 pt-1.5 pb-1 text-muted-foreground text-xs"
-            >
-              <T>
-                <kbd className="font-sans">⇧Tab</kbd> cycles modes
-              </T>
-            </div>
-          </div>
+          <MatterModeMenuItems mode={mode} onModeChange={onModeChange} />
         </MenuPopup>
       </Menu>
       {active ? (
@@ -194,5 +202,57 @@ export function MatterGoalModeGlyph(props: { readonly mode: ProviderInteractionM
       data-matter-goal-glyph=""
       className="size-3 shrink-0 text-warning-foreground"
     />
+  );
+}
+
+/** The mode menu in the model picker's footer, styled like its Permissions menu beside it. */
+export function MatterComposerModePickerMenu(props: {
+  readonly mode: ProviderInteractionMode;
+  readonly onModeChange: (mode: ProviderInteractionMode) => void;
+  readonly disabled?: boolean;
+}) {
+  const gt = useGT();
+  const messages = useMessages();
+  const current = MODE_COPY[props.mode];
+  const CurrentIcon = current.icon;
+  const label = messages(current.label);
+  return (
+    <Menu>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <MenuTrigger
+              render={
+                <button
+                  type="button"
+                  data-matter-mode-picker-trigger=""
+                  data-mode={props.mode}
+                  disabled={props.disabled}
+                  aria-label={gt("Interaction mode: {label}", { label })}
+                  className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-muted-foreground text-xs outline-none hover:bg-foreground/[0.09] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-64 data-popup-open:bg-foreground/[0.09] data-popup-open:text-foreground"
+                />
+              }
+            />
+          }
+        >
+          <CurrentIcon
+            aria-hidden="true"
+            className={cn(
+              "size-3.5",
+              props.mode === "plan" && "text-success-foreground",
+              props.mode === "goal" && "text-warning-foreground",
+            )}
+          />
+          {label}
+          <ChevronUpIcon aria-hidden="true" className="size-3" />
+        </TooltipTrigger>
+        <TooltipPopup side="top">
+          {gt("Interaction mode")} · {MATTER_MODE_SHORTCUT_LABEL}
+        </TooltipPopup>
+      </Tooltip>
+      <MenuPopup side="top" align="start" {...composerFloatingLayerProps}>
+        <MatterModeMenuItems mode={props.mode} onModeChange={props.onModeChange} />
+      </MenuPopup>
+    </Menu>
   );
 }

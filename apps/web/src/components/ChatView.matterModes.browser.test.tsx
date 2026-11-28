@@ -53,8 +53,21 @@ vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
 
 const insertText = (text: string) => cdp().send("Input.insertText", { text });
 
-const modeTrigger = (label: string) =>
-  page.getByRole("button", { name: `Interaction mode: ${label}` });
+/** Default draws nothing beside the composer's +; Plan and Goal show a pill. */
+const expectMode = (mode: "default" | "plan" | "goal") =>
+  vi.waitFor(() =>
+    expect(
+      document.querySelector<HTMLElement>("[data-matter-mode-control]")?.dataset.mode ?? "default",
+    ).toBe(mode),
+  );
+
+/** The mode menu lives in the model picker's footer. */
+async function chooseModeInModelPicker(name: RegExp) {
+  await userEvent.click(document.querySelector<HTMLElement>("[data-chat-provider-model-picker]")!);
+  await userEvent.click(page.getByRole("button", { name: "Interaction mode: Default" }));
+  await userEvent.click(page.getByRole("menuitemradio", { name }));
+  await userEvent.keyboard("{Escape}");
+}
 
 /** Renders the app on `thread` (Codex, a native-goal provider) with commands accepted. */
 async function openThread(thread: FakeThread): Promise<AsyncDisposable> {
@@ -87,19 +100,17 @@ it("switches composer modes from the menu and the clear button", async () => {
   const thread = threadWithHistory("thread-matter-modes-menu", 1);
   await using _app = await openThread(thread);
 
-  // Menu → Plan, then × back to Default.
-  await userEvent.click(modeTrigger("Default"));
-  await userEvent.click(page.getByRole("menuitemradio", { name: /^Plan/ }));
-  await expect.element(modeTrigger("Plan")).toBeVisible();
+  // Default draws no control in the bar; the model picker's footer → Plan, then × back.
+  await chooseModeInModelPicker(/^Plan/);
+  await expectMode("plan");
   await userEvent.click(page.getByRole("button", { name: "Leave Plan mode" }));
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
 
   // Menu → Goal.
-  await userEvent.click(modeTrigger("Default"));
-  await userEvent.click(page.getByRole("menuitemradio", { name: /^Goal/ }));
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await chooseModeInModelPicker(/^Goal/);
+  await expectMode("goal");
   await userEvent.click(page.getByRole("button", { name: "Leave Goal mode" }));
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
   // No Goal turn was sent, so leaving only switches the composer.
   expect(dispatchedCommands().filter((command) => command.type === "message.dispatch")).toEqual([]);
 });
@@ -111,11 +122,11 @@ it("cycles composer modes with Shift+Tab", async () => {
   // Default → Plan → Goal → Default.
   await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Plan")).toBeVisible();
+  await expectMode("plan");
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
 });
 
 it("switches composer modes from the slash menu", async () => {
@@ -127,18 +138,18 @@ it("switches composer modes from the slash menu", async () => {
   // Picking /plan from the slash menu switches and clears the text.
   await userEvent.keyboard("/pla");
   await userEvent.click(page.getByRole("option", { name: /\/plan/ }));
-  await expect.element(modeTrigger("Plan")).toBeVisible();
+  await expectMode("plan");
   await vi.waitFor(() => expect(editor.element().textContent?.trim()).toBe(""));
 
   // /default from the slash menu leaves Plan.
   await userEvent.keyboard("/defa");
   await userEvent.click(page.getByRole("option", { name: /\/default/ }));
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
 
   // On a native-goal provider (Codex), picking /goal enters Goal and keeps `/goal ` for the objective.
   await userEvent.keyboard("/goa");
   await userEvent.click(page.getByRole("option", { name: /\/goal/ }));
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
   await vi.waitFor(() => expect(editor.element().textContent).toContain("/goal"));
   await insertText("ship the release");
   await userEvent.keyboard("{Enter}");
@@ -167,7 +178,7 @@ it("switches to Plan and sends only the prompt for `/plan <prompt>`", async () =
   expect(dispatchedCommands()).toContainEqual(
     expect.objectContaining({ type: "thread.interaction-mode.set", interactionMode: "plan" }),
   );
-  await expect.element(modeTrigger("Plan")).toBeVisible();
+  await expectMode("plan");
 });
 
 it("starts a native goal with /goal from the first Goal prompt and steers it after", async () => {
@@ -176,7 +187,7 @@ it("starts a native goal with /goal from the first Goal prompt and steers it aft
   const editor = page.getByTestId("composer-editor");
   await userEvent.click(editor);
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
   await insertText("ship the release");
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() =>
@@ -192,7 +203,7 @@ it("clears a running native goal when leaving Goal mode", async () => {
     interactionMode: "goal",
   };
   await using _app = await openThread(thread);
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
 
   // A prompt in a thread already running its goal steers it as typed.
   await userEvent.click(page.getByTestId("composer-editor"));
@@ -205,7 +216,7 @@ it("clears a running native goal when leaving Goal mode", async () => {
   );
 
   await userEvent.click(page.getByRole("button", { name: "Leave Goal mode" }));
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
   await vi.waitFor(() =>
     expect(dispatchedCommands()).toContainEqual(
       expect.objectContaining({ type: "message.dispatch", text: "/goal clear" }),
@@ -243,7 +254,7 @@ it("starts a native goal from a brand-new draft thread left in Goal", async () =
   const router = getRouter(createMemoryHistory({ initialEntries: [`/draft/${draftId}`] }));
   await router.load();
   await using _app = await render(<AppRoot router={router} />, { router: false });
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
   await expect.element(page.getByText("render", { exact: true }).first()).toBeVisible();
 
   await userEvent.click(page.getByTestId("composer-editor"));
@@ -260,7 +271,7 @@ it("lets a server-side mode change show through after a Plan send", async () => 
   const threadRef = scopeThreadRef(ENVIRONMENT_ID, thread.id);
   await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Plan")).toBeVisible();
+  await expectMode("plan");
   await insertText("add dark mode");
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() => expect(dispatchedTexts()).toContain("add dark mode"));
@@ -270,11 +281,11 @@ it("lets a server-side mode change show through after a Plan send", async () => 
       useComposerDraftStore.getState().getComposerDraft(threadRef)?.interactionMode ?? null,
     ).toBeNull(),
   );
-  await expect.element(modeTrigger("Plan")).toBeVisible();
+  await expectMode("plan");
 
   // Approving the plan (or an agent) moves the thread back to Default.
   await setFakeThreadInteractionMode(thread.id, "default");
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
 });
 
 it("keeps /goal first when the first Goal prompt replies to a message", async () => {
@@ -299,7 +310,7 @@ it("keeps /goal first when the first Goal prompt replies to a message", async ()
   useComposerDraftStore.getState().setReplyTo(scopeThreadRef(ENVIRONMENT_ID, thread.id), record);
   await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
   await insertText("ship the release");
   await userEvent.keyboard("{Enter}");
   await vi.waitFor(() => expect(dispatchedTexts().length).toBeGreaterThan(0));
@@ -315,10 +326,10 @@ it("clears a running native goal when Shift+Tab leaves Goal mode", async () => {
     interactionMode: "goal",
   };
   await using _app = await openThread(thread);
-  await expect.element(modeTrigger("Goal")).toBeVisible();
+  await expectMode("goal");
   await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-  await expect.element(modeTrigger("Default")).toBeVisible();
+  await expectMode("default");
   await vi.waitFor(() => expect(dispatchedTexts()).toContain("/goal clear"));
   expect(dispatchedTexts().filter((text) => text === "/goal clear")).toHaveLength(1);
 });

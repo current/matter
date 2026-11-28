@@ -492,6 +492,16 @@ html[data-theme-id] [data-matter-composer] {
   margin-inline-start: auto;
 }
 
+/* The tray reads as words: no folder glyph before the workspace (the project has none either). */
+[data-matter-composer]
+  [data-slot="composer-context-strip"]
+  :is([class~="lucide-folder"], [class*="lucide-folder-git"]),
+[data-matter-composer]
+  [data-slot="composer-context-strip"]
+  span.inline-flex:has(> :is([class~="lucide-folder"], [class*="lucide-folder-git"]):only-child) {
+  display: none;
+}
+
 [data-matter-composer-project] {
   display: inline-flex;
   min-width: 0;
@@ -499,9 +509,7 @@ html[data-theme-id] [data-matter-composer] {
   max-width: 40%;
   height: 26px;
   align-items: center;
-  gap: 6px;
   padding-inline: 6px;
-  margin-inline-end: 8px;
   color: var(--mc-tray);
 }
 

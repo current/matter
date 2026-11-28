@@ -1,5 +1,6 @@
 import type { ChatComposerProps } from "./ChatComposer";
 import type { PromptUltrathink } from "./TraitsPicker";
+import type { ReactNode } from "react";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { type AppModelOption } from "../../modelSelection";
 import { useGT, useMessages } from "gt-react";
@@ -87,6 +88,8 @@ export function ComposerControlsBar(props: {
   onModelPickerOpenChange: (open: boolean) => void;
   modelPickerIconClassName: string | undefined;
   getModelDisabledReason: ChatComposerProps["getModelDisabledReason"];
+  /** Matter: the interaction mode menu, first in the model picker's footer. */
+  matterModeMenu?: ReactNode;
 }) {
   const {
     environmentId,
@@ -227,6 +230,7 @@ export function ComposerControlsBar(props: {
       effortColumn={<ComposerEffortColumn traits={traitsInput} />}
       footer={
         <ComposerPickerFooter
+          leading={props.matterModeMenu}
           traits={traitsInput}
           runtimeMode={compatibleRuntimeMode}
           runtimeModeOptions={compatibleRuntimeModeOptions}

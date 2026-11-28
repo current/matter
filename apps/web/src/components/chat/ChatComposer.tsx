@@ -143,7 +143,10 @@ import {
   MatterVoiceModeIcon,
 } from "./MatterComposerParts.matter";
 import { MatterComposerReplyBar } from "./MatterComposerReplyBar.matter";
-import { MatterComposerModeControl } from "./MatterComposerModeControl.matter";
+import {
+  MatterComposerModeControl,
+  MatterComposerModePickerMenu,
+} from "./MatterComposerModeControl.matter";
 import type { MatterPlanImplementation } from "@t3tools/client-runtime/matter/interaction-mode";
 import { deriveMatterComposerInteractionMode } from "./matterInteractionMode.matter";
 import { useMatterGooeySendSetting } from "../../matterGooeySend";
@@ -2855,6 +2858,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onModelPickerOpenChange={setIsComposerModelPickerOpen}
         modelPickerIconClassName={composerProviderState.modelPickerIconClassName}
         getModelDisabledReason={getModelDisabledReason}
+        matterModeMenu={
+          <MatterComposerModePickerMenu
+            mode={matterMode.mode}
+            onModeChange={matterMode.setMode}
+            disabled={!canOperateThread || environmentUnavailable !== null}
+          />
+        }
       />
     </RuntimeModeLimitsTargetContext>
   );

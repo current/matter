@@ -1,5 +1,5 @@
 import { T, useGT } from "gt-react";
-import { FolderIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -51,7 +51,6 @@ export function MatterComposerAttachButton({
 export function MatterComposerProjectLabel({ title }: { readonly title: string }) {
   return (
     <span data-matter-composer-project="">
-      <FolderIcon aria-hidden="true" />
       <span data-matter-composer-project-name="">{title}</span>
     </span>
   );
