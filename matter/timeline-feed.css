@@ -321,6 +321,16 @@
   color: var(--mts-ink);
 }
 
+/* "Working +3": the thread's running subagents, counted a step quieter than the state word while
+   they aren't nested under the row. It takes the pointer only so its tooltip can say what the
+   number counts. */
+.mts.mlf .mlf-row .mlf-sub-count {
+  color: var(--mts-muted);
+  font-weight: 400;
+  pointer-events: auto;
+  cursor: default;
+}
+
 /* The project's icon leads the row and names its project on hover; its provider moves to the
    start of line 2, quieter, since the title and project carry the row. */
 .mts.mlf .mlf-proj-icon {

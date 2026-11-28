@@ -54,6 +54,7 @@ import {
 import { MatterCloudCrew, useClaudeCloudCrewSessions } from "./MatterCloudCrew";
 import { MatterTip } from "./MatterSidebarParts";
 import {
+  useMatterHiddenUsageMeters,
   useMatterSidebarLayout,
   useMatterTimelineSubagents,
   type MatterSidebarLayout,
@@ -448,7 +449,12 @@ export function MatterFooter({ nowMs }: { nowMs: number }) {
   const onSettings = pathname.startsWith("/settings");
   const primaryId = usePrimaryEnvironmentId();
   const providers = useEnvironmentProviders();
-  const meters = pickUsageMeters(primaryId === null ? [] : (providers.get(primaryId) ?? []));
+  const [hiddenMeters] = useMatterHiddenUsageMeters();
+  const meters = pickUsageMeters(
+    primaryId === null ? [] : (providers.get(primaryId) ?? []),
+    2,
+    hiddenMeters,
+  );
   const host = useHostStatus();
   const go = (to: () => void) => {
     if (isMobile) setOpenMobile(false);

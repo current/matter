@@ -359,6 +359,19 @@ describe("usage meters", () => {
     ]);
   });
 
+  it("leaves out the providers hidden in Settings", () => {
+    const meters = pickUsageMeters(
+      [
+        provider("claudeAgent", "claudeAgent", [window("Weekly", "weekly", 62)]),
+        provider("codex", "codex", [window("Weekly", "weekly", 12)]),
+        provider("grok", "grok", [window("Weekly", "weekly", 5)]),
+      ],
+      2,
+      ["claudeAgent"],
+    );
+    expect(meters.map((meter) => meter.accountName)).toEqual(["codex", "grok"]);
+  });
+
   it("formats near resets and drops far ones", () => {
     expect(formatResetLabel("2026-03-10T17:14:00.000Z", NOW_MS)).toBe("2h 14m");
     expect(formatResetLabel("2026-03-10T15:20:00.000Z", NOW_MS)).toBe("20m");

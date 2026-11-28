@@ -10,6 +10,7 @@ const MATTER_SIDEBAR_SORT_STORAGE_KEY = "mattr:sidebar:sort:v1";
 const MATTER_SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY = "mattr:sidebar:collapsed-groups:v1";
 export const MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY = "mattr:sidebar:timeline-subagents:v1";
 const MATTER_TIMELINE_SORT_STORAGE_KEY = "mattr:sidebar:timeline-sort:v1";
+const MATTER_SIDEBAR_HIDDEN_METERS_STORAGE_KEY = "mattr:sidebar:hidden-usage-meters:v1";
 
 export const MatterSidebarLayout = Schema.Literals(["inbox", "spaces", "timeline", "classic"]);
 export type MatterSidebarLayout = typeof MatterSidebarLayout.Type;
@@ -69,6 +70,17 @@ export function useMatterCollapsedGroups() {
     MATTER_SIDEBAR_COLLAPSED_GROUPS_STORAGE_KEY,
     [],
     CollapsedGroups,
+  );
+}
+
+const HiddenUsageMeters = Schema.Array(Schema.String);
+
+/** Providers, by driver, whose usage meters the sidebar footer leaves out. */
+export function useMatterHiddenUsageMeters() {
+  return useLocalStorage<ReadonlyArray<string>, ReadonlyArray<string>>(
+    MATTER_SIDEBAR_HIDDEN_METERS_STORAGE_KEY,
+    [],
+    HiddenUsageMeters,
   );
 }
 

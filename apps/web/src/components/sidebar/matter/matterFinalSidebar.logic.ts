@@ -281,11 +281,13 @@ function mostConstrainingWindow(
 export function pickUsageMeters(
   providers: ReadonlyArray<ServerProvider>,
   limit = 2,
+  hiddenDrivers: ReadonlyArray<string> = [],
 ): ReadonlyArray<MatterUsageMeter> {
   const byDriver = new Map<string, MatterUsageMeter>();
   for (const provider of providers) {
     const limits = provider.usageLimits;
     if (!provider.enabled || limits === undefined || limits.unavailable !== undefined) continue;
+    if (hiddenDrivers.includes(provider.driver)) continue;
     const window = mostConstrainingWindow(limits.windows);
     if (window === null) continue;
     const meter: MatterUsageMeter = {

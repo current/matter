@@ -66,6 +66,7 @@ import type { MatterPullRequestState, MatterThreadItem } from "./matterSidebar.l
 import { MatterTimelineCloudRunRow } from "./MatterCloudRunRows.matter";
 import { MatterTip } from "./MatterSidebarParts";
 import {
+  useMatterHiddenUsageMeters,
   useMatterInboxProjectFilter,
   useMatterTimelineSort,
   useMatterTimelineSubagents,
@@ -95,6 +96,7 @@ import {
   WorktreeGlyph,
 } from "./MatterTimelineIcons";
 import {
+  activeSubagentCounts,
   activeSubagentsByParent,
   compactWindowLabel,
   usageMeterTone,
@@ -114,6 +116,7 @@ const METER_LIMIT = 5;
 const Folds = Schema.Record(Schema.String, Schema.Boolean);
 const NO_FOLDS: Readonly<Record<string, boolean>> = {};
 const NO_CLOUD_RUNS: ReadonlyMap<string, ReadonlyArray<MatterCloudRun>> = new Map();
+const NO_SUBAGENT_COUNTS: ReadonlyMap<string, number> = new Map();
 const ROW_FOCUS_STOPS =
   "button.mts-hit, button.mts-fold, button.mlf-elsewhere, button.mlf-show-more, button.mfs-hit, a.mfs-row";
 
@@ -232,7 +235,18 @@ function sectionLabel(section: MatterTimelineSection, nowMs: number, gt: GT): st
 }
 
 /** What a screen reader hears after a row's title: everything its two lines show. */
-function rowSummary(item: MatterThreadItem, state: MatterTimelineRowState, gt: GT): string {
+function subagentCountLabel(count: number, gt: GT): string {
+  return gt("{count, plural, one {{count} subagent running} other {{count} subagents running}}", {
+    count,
+  });
+}
+
+function rowSummary(
+  item: MatterThreadItem,
+  state: MatterTimelineRowState,
+  subagentCount: number,
+  gt: GT,
+): string {
   const parts: string[] = [];
   switch (state.tone) {
     case "needs":
@@ -253,6 +267,7 @@ function rowSummary(item: MatterThreadItem, state: MatterTimelineRowState, gt: G
       if (state.age !== "") parts.push(state.age);
       break;
   }
+  if (subagentCount > 0) parts.push(subagentCountLabel(subagentCount, gt));
   if (item.projectName !== null) parts.push(item.projectName);
   if (item.providerName !== null) parts.push(item.providerName);
   if (item.branch !== null) parts.push(gt("Branch {branch}", { branch: item.branch }));
@@ -267,6 +282,8 @@ const summaryId = (key: string) => `mlf-desc-${key}`;
 
 interface TimelineRowContext {
   readonly subagents: ReadonlyMap<string, ReadonlyArray<MatterChildItem>>;
+  /** Running subagents per thread, counted on its row while they aren't nested under it. */
+  readonly subagentCounts: ReadonlyMap<string, number>;
   /** Cloud runs nest like active subagents, behind the same Show active subagents switch. */
   readonly cloudRuns: ReadonlyMap<string, ReadonlyArray<MatterCloudRun>>;
   readonly needsChildParents: ReadonlySet<string>;
@@ -350,6 +367,18 @@ function TimelineRow({
   const pr = item.pullRequest;
   const PrGlyph = pr === null ? null : PR_GLYPH[pr.state];
   const revealKey = active ? item.key : holdsActive ? model.activeThreadKey : null;
+  const subagentCount =
+    state.tone === "running" || state.tone === "background"
+      ? (context.subagentCounts.get(item.key) ?? 0)
+      : 0;
+  const subagentTail =
+    subagentCount > 0 ? (
+      <MatterTip label={subagentCountLabel(subagentCount, gt)} side="top">
+        <span className="mlf-sub-count" onClick={() => model.actions.openThread(item)}>
+          {`+${subagentCount}`}
+        </span>
+      </MatterTip>
+    ) : null;
   const project =
     context.projectScoped || item.projectKey === null
       ? undefined
@@ -376,7 +405,7 @@ function TimelineRow({
         onClick={() => model.actions.openThread(item)}
       />
       <span id={summaryId(item.key)} className="sr-only">
-        {rowSummary(item, state, gt)}
+        {rowSummary(item, state, subagentCount, gt)}
       </span>
       <span className="mts-l1">
         <span className="mts-pi" aria-hidden>
@@ -500,12 +529,14 @@ function TimelineRow({
           ) : state.tone === "running" ? (
             <span className="mlf-st" data-tone="running">
               {gt("Working", { $context: "a thread's agent is running now" })}
+              {subagentTail}
             </span>
           ) : state.tone === "background" ? (
             <span className="mlf-st" data-tone="background">
               {gt("Waiting", {
                 $context: "a thread's agent resumes by itself once its background work ends",
               })}
+              {subagentTail}
             </span>
           ) : pr !== null && PrGlyph !== null ? (
             <span className="mts-pr" data-state={pr.state}>
@@ -882,9 +913,11 @@ export function MatterTimelineSidebar({
   const crew = useCrewBots();
   const primaryId = usePrimaryEnvironmentId();
   const providers = useEnvironmentProviders();
+  const [hiddenMeters] = useMatterHiddenUsageMeters();
   const meters = pickUsageMeters(
     primaryId === null ? [] : (providers.get(primaryId) ?? []),
     METER_LIMIT,
+    hiddenMeters,
   );
 
   const closeMobile = () => {
@@ -900,6 +933,9 @@ export function MatterTimelineSidebar({
       : null;
   const needsChildParents = parentsWithNeedsChild(indexChildrenByParent(children));
   const subagents = activeSubagentsByParent(children, showSubagents);
+  const subagentCounts = showSubagents
+    ? NO_SUBAGENT_COUNTS
+    : activeSubagentCounts(children, model.cloudRuns);
   const feed = buildTimelineSections(items, {
     nowMs,
     sort,
@@ -927,6 +963,7 @@ export function MatterTimelineSidebar({
     (subagents.get(activeChild.ancestorKey) ?? []).some((child) => child.key === activeChild.key);
   const rowContext: TimelineRowContext = {
     subagents,
+    subagentCounts,
     cloudRuns: showSubagents ? model.cloudRuns : NO_CLOUD_RUNS,
     needsChildParents,
     hiddenActiveParent:

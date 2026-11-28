@@ -38,6 +38,25 @@ export function activeSubagentsByParent(
   return index;
 }
 
+/**
+ * How many subagents, delegated tasks and cloud runs work or wait on you under each thread, at
+ * any depth, for the row's count while they aren't nested under it.
+ */
+export function activeSubagentCounts(
+  children: ReadonlyArray<MatterChildItem>,
+  cloudRuns: ReadonlyMap<string, ReadonlyArray<unknown>>,
+): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const child of children) {
+    if (child.ancestorKey === child.key || !isActiveSubagent(child)) continue;
+    counts.set(child.ancestorKey, (counts.get(child.ancestorKey) ?? 0) + 1);
+  }
+  for (const [key, runs] of cloudRuns) {
+    if (runs.length > 0) counts.set(key, (counts.get(key) ?? 0) + runs.length);
+  }
+  return counts;
+}
+
 /** Where the thread's files live: none when detached from a project, its own worktree, or the project's checkout. */
 export function workspaceKind(item: MatterThreadItem): "none" | "worktree" | "local" {
   if (item.projectName === null) return "none";

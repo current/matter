@@ -1,11 +1,16 @@
 import { useGT } from "gt-react";
 
+import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../../../state/environments";
 import { SettingResetButton, SettingsRow } from "../../settings/settingsLayout";
 import { Switch } from "../../ui/switch";
+import { Checkbox } from "../../ui/checkbox";
 import { Toggle, ToggleGroup } from "../../ui/toggle-group";
+import { MatterProviderMark } from "./MatterDefaultSidebarParts";
+import { pickUsageMeters } from "./matterFinalSidebar.logic";
 import {
   DEFAULT_MATTER_SIDEBAR_LAYOUT,
   MatterSidebarLayout,
+  useMatterHiddenUsageMeters,
   useMatterSidebarLayout,
   useMatterTimelineSubagents,
 } from "./matterSidebarStore";
@@ -77,6 +82,78 @@ export function MatterSidebarLayoutSetting() {
           }
         />
       ) : null}
+      {layout === "inbox" || layout === "timeline" ? <MatterUsageMetersSetting /> : null}
     </>
+  );
+}
+
+/** Which providers' limits the Default and Timeline footers show; saved on this device. */
+function MatterUsageMetersSetting() {
+  const gt = useGT();
+  const [hidden, setHidden] = useMatterHiddenUsageMeters();
+  const primaryId = usePrimaryEnvironmentId();
+  const providers = useEnvironmentProviders();
+  // By name, so the list doesn't reorder as usage moves.
+  const available = pickUsageMeters(
+    primaryId === null ? [] : (providers.get(primaryId) ?? []),
+    Number.POSITIVE_INFINITY,
+  ).toSorted((left, right) => left.providerName.localeCompare(right.providerName));
+  if (available.length === 0) return null;
+  const shownCount = available.filter((meter) => !hidden.includes(meter.driver)).length;
+  return (
+    <SettingsRow
+      id="matter-usage-meters"
+      title={gt("Usage meters")}
+      description={gt("Choose which providers' limits show at the bottom of the sidebar.")}
+      devicePreference
+      resetAction={
+        hidden.length > 0 ? (
+          <SettingResetButton
+            ariaLabel={gt("Show every usage meter")}
+            onClick={() => setHidden([])}
+          />
+        ) : null
+      }
+    >
+      <fieldset className="mt-2 mb-2 border-l-2 border-border/60 ps-3">
+        <legend className="pb-1 text-xs text-muted-foreground">{gt("Show in the sidebar")}</legend>
+        <ul>
+          {available.map((meter) => {
+            const shown = !hidden.includes(meter.driver);
+            return (
+              <li key={meter.driver}>
+                <label className="flex cursor-pointer items-center gap-2.5 py-1 text-sm has-data-disabled:cursor-default">
+                  <Checkbox
+                    checked={shown}
+                    // The last one stays, so the footer never goes blank without a reason.
+                    disabled={shown && shownCount === 1}
+                    onCheckedChange={(next) =>
+                      setHidden(
+                        next
+                          ? hidden.filter((driver) => driver !== meter.driver)
+                          : [...hidden, meter.driver],
+                      )
+                    }
+                  />
+                  <span className={shown ? undefined : "opacity-50 grayscale"}>
+                    <MatterProviderMark driver={meter.driver} />
+                  </span>
+                  <span
+                    className={
+                      shown ? "min-w-0 truncate" : "min-w-0 truncate text-muted-foreground"
+                    }
+                  >
+                    {meter.providerName}
+                  </span>
+                  <span className="min-w-0 truncate text-xs text-muted-foreground tabular-nums">
+                    {gt("{percent}% used", { percent: meter.usedPercent })}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      </fieldset>
+    </SettingsRow>
   );
 }

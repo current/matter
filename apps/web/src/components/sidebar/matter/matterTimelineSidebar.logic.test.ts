@@ -5,6 +5,7 @@ import { makeThreadFixture, type ThreadFixtureOverrides } from "../../../test-fi
 import { attachListedAncestors } from "./matterFinalSidebar.logic";
 import { toMatterThreadItem } from "./matterSidebar.logic";
 import {
+  activeSubagentCounts,
   activeSubagentsByParent,
   compactWindowLabel,
   isActiveSubagent,
@@ -108,6 +109,30 @@ describe("activeSubagentsByParent", () => {
 
   it("shows nothing while the setting is off", () => {
     expect(activeSubagentsByParent(children(running, waiting), false).size).toBe(0);
+  });
+});
+
+describe("activeSubagentCounts", () => {
+  const running = item("running child", { ...subagentOf("parent"), ...runtime("running") });
+  const waiting = item("waiting child", { ...subagentOf("parent"), hasPendingApprovals: true });
+  const done = item("done child", { ...subagentOf("parent"), ...runtime("completed") });
+
+  it("counts only running or waiting subagents", () => {
+    const counts = activeSubagentCounts(children(running, waiting, done), new Map());
+    expect(counts.get("local:parent")).toBe(2);
+    expect(activeSubagentCounts(children(done), new Map()).size).toBe(0);
+  });
+
+  it("adds the thread's cloud runs and leaves idle threads out", () => {
+    const counts = activeSubagentCounts(
+      children(running, done),
+      new Map([
+        ["local:parent", [{}, {}]],
+        ["local:quiet", []],
+      ]),
+    );
+    expect(counts.get("local:parent")).toBe(3);
+    expect(counts.has("local:quiet")).toBe(false);
   });
 });
 

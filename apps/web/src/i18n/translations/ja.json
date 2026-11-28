@@ -4346,21 +4346,21 @@
   "1b7c524fccf06537": "Needs you",
   "622a159ad0eabdcb": "Running",
   "a3db5fd6c4b955ec": "Back",
-  "198a7953b5cf8249": [
+  "f7e6e2f7dcc2dfec": [
     "Lineage · ",
     {
       "i": 1,
       "k": "_gt_value_1",
       "v": "v"
     },
-    " needs you · ",
+    " needs you ·",
+    " ",
     {
       "i": 2,
       "k": "_gt_value_2",
       "v": "v"
     },
-    " ",
-    "running"
+    " running"
   ],
   "a33df1497c9fa65b": [
     "Lineage · ",
@@ -13825,6 +13825,9 @@
   "7286a277a8a3cd5f": "Reset sidebar layout to default",
   "a706372494f5b265": "Nest a thread's running subagents under it. Each one leaves the list when it finishes.",
   "10c4970b73547ddc": "Reset show active subagents to default",
+  "bd6ef9ffb462a911": "Usage meters",
+  "a1e18a28bf739db6": "Choose which providers' limits show at the bottom of the sidebar.",
+  "7b8e7142154f07bb": "Show every usage meter",
   "0c446c1262e2b92b": "Ready to review",
   "ad4c9b3c63b1ebc5": "{count, plural, one {# unread} other {# unread}}",
   "46bb281c89d40594": "{count, plural, one {# thread} other {# threads}}",
@@ -13834,6 +13837,7 @@
   "f330dd6400e1ace2": "Switch space",
   "97a5d67467557719": "Back to threads",
   "b33728be74b80dda": "{host} menu",
+  "3d452b69b89d669e": "{count, plural, one {{count} subagent running} other {{count} subagents running}}",
   "7b59740f33629d79": "Needs you: {reason}",
   "508a935fc426f259": "Approval",
   "3fa83d210ecb41b5": "Question",

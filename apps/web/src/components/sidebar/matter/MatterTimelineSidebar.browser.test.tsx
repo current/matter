@@ -461,6 +461,30 @@ describe("MatterTimelineSidebar", () => {
     }
   });
 
+  it("counts a thread's running subagents beside its state while they aren't nested", async () => {
+    const agents = [subagent("Agent one"), subagent("Agent two"), subagent("Agent done", {})];
+    {
+      using _server = useServer({ [MATTER_TIMELINE_SUBAGENTS_STORAGE_KEY]: false });
+      await using screen = await renderTimeline(model({ children: agents }));
+      const thread = page.getByRole("button", { name: "Port the composer" });
+      await expect.element(thread).toBeVisible();
+      expect(row(screen.container, working)!.querySelector(".sr-only")?.textContent).toContain(
+        "2 subagents running",
+      );
+      const label = row(screen.container, working)!.querySelector(".mts-l2 .mlf-st");
+      expect(label?.textContent).toBe("Working+2");
+    }
+    {
+      using _server = useServer();
+      await using screen = await renderTimeline(model({ children: agents }));
+      await expect
+        .element(page.getByRole("list", { name: "Subagents of Port the composer" }))
+        .toBeVisible();
+      const label = row(screen.container, working)!.querySelector(".mts-l2 .mlf-st");
+      expect(label?.textContent).toBe("Working");
+    }
+  });
+
   it("sorts and toggles subagents from the view options menu", async () => {
     using _server = useServer();
     await using screen = await renderTimeline(model({ children: [subagent("Agent one")] }));
