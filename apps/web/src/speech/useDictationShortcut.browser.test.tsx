@@ -1,6 +1,7 @@
 import { DEFAULT_RESOLVED_KEYBINDINGS } from "@t3tools/shared/keybindings";
-import { createRef, type RefObject } from "react";
+import { createRef, type RefObject, useRef } from "react";
 import { expect, it, vi } from "vite-plus/test";
+import { userEvent } from "vite-plus/test/browser";
 import { render } from "../../test/render";
 import {
   beginHeldDictation,
@@ -9,6 +10,7 @@ import {
   useDictationShortcut,
   type DictationKeyHandlers,
 } from "./useDictationShortcut";
+import { useDictationSubmissionShortcut } from "./useDictationSubmissionShortcut";
 
 const settings = vi.hoisted(() => ({ mode: "hold" as "hold" | "auto" | "toggle" }));
 vi.mock("../hooks/useSettings", () => ({ useClientSettings: () => settings.mode }));
@@ -397,4 +399,36 @@ it("does not let a cancelled quick tap's late startup resolution cancel a subseq
   resolveSecondStart();
   await secondStart;
   expect(speech.stop).toHaveBeenCalledOnce();
+});
+
+function SubmissionProbe({ onKeyDown }: { onKeyDown: (event: KeyboardEvent) => void }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  useDictationSubmissionShortcut({ enabled: true, formRef, onKeyDown });
+  return (
+    <>
+      <div data-testid="timeline" tabIndex={0}>
+        <button type="button">Copy</button>
+        <input aria-label="Search" />
+      </div>
+      <form ref={formRef} />
+    </>
+  );
+}
+
+it("submits dictation on Enter while the chat timeline has focus", async () => {
+  const onKeyDown = vi.fn();
+  await using screen = await render(<SubmissionProbe onKeyDown={onKeyDown} />);
+  (screen.getByTestId("timeline").element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  expect(onKeyDown).toHaveBeenCalledOnce();
+});
+
+it("leaves dictation Enter to a focused button or field", async () => {
+  const onKeyDown = vi.fn();
+  await using screen = await render(<SubmissionProbe onKeyDown={onKeyDown} />);
+  (screen.getByRole("button", { name: "Copy" }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  (screen.getByRole("textbox", { name: "Search" }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+  expect(onKeyDown).not.toHaveBeenCalled();
 });
