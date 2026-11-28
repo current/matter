@@ -14,6 +14,7 @@ import {
   type ServerSettings as ServerSettingsType,
 } from "@t3tools/contracts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -49,7 +50,11 @@ const scope: McpInvocationScope = {
   issuedAt: 1,
 };
 
-const provider = (instanceId: ProviderInstanceId, usedPercent: number): ServerProvider => ({
+const provider = (
+  instanceId: ProviderInstanceId,
+  usedPercent: number,
+  resetsInHours?: number,
+): ServerProvider => ({
   instanceId,
   driver: claudeDriver,
   enabled: true,
@@ -63,7 +68,18 @@ const provider = (instanceId: ProviderInstanceId, usedPercent: number): ServerPr
   skills: [],
   usageLimits: {
     checkedAt: "2026-11-01T00:00:00.000Z",
-    windows: [{ id: "weekly", kind: "weekly", label: "Weekly", usedPercent }],
+    windows: [
+      {
+        id: "weekly",
+        kind: "weekly",
+        label: "Weekly",
+        usedPercent,
+        // The test clock starts at the epoch.
+        ...(resetsInHours === undefined
+          ? {}
+          : { resetsAt: DateTime.formatIso(DateTime.makeUnsafe(resetsInHours * 3_600_000)) }),
+      },
+    ],
   },
 });
 
@@ -92,9 +108,12 @@ const parentProjection = {
   subagents: [],
 } as unknown as OrchestrationV2ThreadProjection;
 
-const providers = [provider(claudeMain, 30), provider(claudeAlt, 80)];
+const unpacedProviders = [provider(claudeMain, 30), provider(claudeAlt, 80)];
 
-const serviceLayer = (settings: Partial<ServerSettingsType>) =>
+const serviceLayer = (
+  settings: Partial<ServerSettingsType>,
+  providers: ReadonlyArray<ServerProvider> = unpacedProviders,
+) =>
   OrchestratorMcpService.layer.pipe(
     Layer.provide(
       Layer.mock(ThreadLaunchService.ThreadLaunchService)({
@@ -136,12 +155,18 @@ const serviceLayer = (settings: Partial<ServerSettingsType>) =>
     ),
   );
 
-const capabilitiesWith = (settings: Partial<ServerSettingsType>) =>
+const capabilitiesWith = (
+  settings: Partial<ServerSettingsType>,
+  providers?: ReadonlyArray<ServerProvider>,
+) =>
   Effect.gen(function* () {
     const service = yield* OrchestratorMcpService.OrchestratorMcpService;
     const result = yield* service.capabilities(scope);
     return new Map(result.providers.map((entry) => [entry.providerInstanceId, entry]));
-  }).pipe(Effect.provide(serviceLayer(settings)));
+  }).pipe(Effect.provide(serviceLayer(settings, providers)));
+
+// Main has more usage left but resets much later, so alt can spend faster.
+const pacedProviders = [provider(claudeMain, 30, 140), provider(claudeAlt, 50, 20)];
 
 describe("OrchestratorMcpService Matter delegation", () => {
   it.effect("shows usage left while multi-provider delegation is on, even with usage hidden", () =>
@@ -184,6 +209,47 @@ describe("OrchestratorMcpService Matter delegation", () => {
       });
       assert.isUndefined(byId.get(claudeAlt)?.excludedFromDelegation);
       assert.isTrue(byId.get(claudeAlt)?.canRunChildTask);
+    }),
+  );
+
+  it.effect("ranks instances by usage left per hour until reset", () =>
+    Effect.gen(function* () {
+      const byId = yield* capabilitiesWith({}, pacedProviders);
+      assert.equal(byId.get(claudeAlt)?.delegationRank, 1);
+      assert.deepEqual(byId.get(claudeAlt)?.usagePace, {
+        leftPercentPerHour: 2.5,
+        bindingWindow: "Weekly",
+      });
+      assert.equal(byId.get(claudeMain)?.delegationRank, 2);
+      assert.deepEqual(byId.get(claudeMain)?.usagePace, {
+        leftPercentPerHour: 0.5,
+        bindingWindow: "Weekly",
+      });
+    }),
+  );
+
+  it.effect("never ranks an excluded instance", () =>
+    Effect.gen(function* () {
+      const byId = yield* capabilitiesWith(
+        { mattrDelegationExcludedInstanceIds: [claudeAlt] },
+        pacedProviders,
+      );
+      assert.equal(byId.get(claudeMain)?.delegationRank, 1);
+      assert.isUndefined(byId.get(claudeAlt)?.delegationRank);
+      assert.isUndefined(byId.get(claudeAlt)?.usagePace);
+    }),
+  );
+
+  it.effect("leaves ranks out while pace balancing or delegation is off", () =>
+    Effect.gen(function* () {
+      for (const settings of [
+        { mattrDelegationBalanceByPace: false },
+        { mattrMultiProviderDelegation: false },
+      ]) {
+        const byId = yield* capabilitiesWith(settings, pacedProviders);
+        assert.isUndefined(byId.get(claudeMain)?.delegationRank);
+        assert.isUndefined(byId.get(claudeAlt)?.usagePace);
+      }
     }),
   );
 

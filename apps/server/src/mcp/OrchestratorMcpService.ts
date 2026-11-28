@@ -153,6 +153,7 @@ import {
   matterDelegationExcludedMessage,
   matterDelegationExcludes,
   matterUsageVisible,
+  withMatterDelegationRanks,
 } from "../matter/delegation/matterDelegationPolicy.ts";
 
 // Return recoverable handles before common MCP client timeouts expire.
@@ -2881,7 +2882,8 @@ const make = Effect.gen(function* () {
       );
       const inherited = parent?.thread.modelSelection;
       const searchTerms = input.search?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
-      return {
+      const now = yield* Clock.currentTimeMillis;
+      return withMatterDelegationRanks(settings, providers, now, {
         parentThreadId: parent?.thread.id ?? null,
         inheritedProviderInstanceId: inherited?.instanceId ?? null,
         inheritedModel: inherited?.model ?? null,
@@ -2973,7 +2975,7 @@ const make = Effect.gen(function* () {
           scheduledTasks: true,
           maxBatchThreads: 20,
         },
-      };
+      });
     }),
     delegateTask: Effect.fn("OrchestratorMcpService.delegateTask")(function* (callerScope, input) {
       const environmentId =

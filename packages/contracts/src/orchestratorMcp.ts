@@ -693,6 +693,17 @@ export const OrchestratorMcpProviderCapability = Schema.Struct({
   constraints: Schema.Array(Schema.String),
   /** Matter: the user keeps this instance out of delegate_task. */
   excludedFromDelegation: Schema.optional(Schema.Boolean),
+  delegationRank: Schema.optional(PositiveInt).annotate({
+    description:
+      "Order to delegate in, 1 first: most usage left per hour until its limits reset. Near-limit instances rank last.",
+  }),
+  usagePace: Schema.optional(
+    Schema.Struct({
+      leftPercentPerHour: Schema.Number,
+      bindingWindow: Schema.String,
+      nearLimit: Schema.optional(Schema.Boolean),
+    }),
+  ),
 });
 export type OrchestratorMcpProviderCapability = typeof OrchestratorMcpProviderCapability.Type;
 

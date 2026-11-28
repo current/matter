@@ -24,7 +24,7 @@ import { isLocalLoopbackHost, isWildcardHost } from "./hostClassification.ts";
 
 const MINUTE = 60_000;
 
-function modelUsageWindows(provider: ServerProvider | undefined, model: string) {
+export function modelUsageWindows(provider: ServerProvider | undefined, model: string) {
   const windows = provider?.usageLimits?.windows ?? [];
   return windows.filter((window) => {
     if (window.modelIds && !window.modelIds.includes(model)) return false;

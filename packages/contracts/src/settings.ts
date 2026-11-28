@@ -1547,6 +1547,10 @@ export const ServerSettings = Schema.Struct({
   mattrDelegationExcludedInstanceIds: Schema.Array(ProviderInstanceId).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  /** Matter: delegation prefers instances with the most usage left per hour until reset. */
+  mattrDelegationBalanceByPace: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(true)),
+  ),
   defaultRuntimeMode: RuntimeMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_RUNTIME_MODE)),
   ),
@@ -2015,6 +2019,7 @@ export const ServerSettingsPatch = Schema.Struct({
   fallbackExcludedInstanceIds: Schema.optionalKey(Schema.Array(ProviderInstanceId)),
   mattrMultiProviderDelegation: Schema.optionalKey(Schema.Boolean),
   mattrDelegationExcludedInstanceIds: Schema.optionalKey(Schema.Array(ProviderInstanceId)),
+  mattrDelegationBalanceByPace: Schema.optionalKey(Schema.Boolean),
   /** Replaces each project's override set; null removes it. Omitted providerInstances retains its stored value. */
   projectSettingsOverrides: Schema.optionalKey(
     Schema.Record(

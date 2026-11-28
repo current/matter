@@ -99,12 +99,30 @@ describe("MatterDelegationSettings", () => {
     await userEvent.click(page.getByRole("switch", { name: "Multi-provider delegation" }));
     expect(state.updateSettings).toHaveBeenCalledWith({ mattrMultiProviderDelegation: false });
     await expect.element(page.getByText("Delegation pool")).not.toBeInTheDocument();
+    await expect
+      .element(page.getByRole("switch", { name: "Balance by usage pace" }))
+      .not.toBeInTheDocument();
 
     await userEvent.click(
       page.getByRole("button", { name: "Reset multi-provider delegation to default" }),
     );
     expect(state.updateSettings).toHaveBeenLastCalledWith({ mattrMultiProviderDelegation: true });
     await expect.element(page.getByText("Delegation pool")).toBeVisible();
+  });
+
+  it("balances by usage pace by default and can turn it off", async () => {
+    await using _screen = await setup();
+    const pace = page.getByRole("switch", { name: "Balance by usage pace" });
+    await expect.element(pace).toBeChecked();
+    await userEvent.click(pace);
+    expect(state.updateSettings).toHaveBeenCalledWith({ mattrDelegationBalanceByPace: false });
+    await expect.element(pace).not.toBeChecked();
+
+    await userEvent.click(
+      page.getByRole("button", { name: "Reset balance by usage pace to default" }),
+    );
+    expect(state.updateSettings).toHaveBeenLastCalledWith({ mattrDelegationBalanceByPace: true });
+    await expect.element(pace).toBeChecked();
   });
 
   it("excludes an unchecked account from delegation", async () => {

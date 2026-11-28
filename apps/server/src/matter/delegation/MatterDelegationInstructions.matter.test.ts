@@ -44,7 +44,7 @@ const provider = (
   ...overrides,
 });
 
-const on = { mattrMultiProviderDelegation: true };
+const on = { mattrMultiProviderDelegation: true, mattrDelegationBalanceByPace: true };
 
 describe("Matter delegation policy", () => {
   it("lists ready instances in the pool and keeps excluded ones out", () => {
@@ -72,11 +72,21 @@ describe("Matter delegation policy", () => {
     assert.match(text, /\n<\/matter_delegation>$/);
     assert.include(text, "`orchestrator_capabilities` first");
     assert.include(text, "`delegate_task`");
-    assert.include(text, "leftPercent");
+    assert.include(text, "`delegationRank`");
+    assert.notInclude(text, "leftPercent");
     assert.include(text, "- Pool: claudeAgent, antigravity");
     assert.include(text, "- Never delegate to: claude-alt");
     assert.include(text, "overrides this block");
     assert.isBelow(new TextEncoder().encode(text).length, 1500);
+  });
+
+  it("spreads by usage left instead of pace while pace balancing is off", () => {
+    const text = buildMatterDelegationInstructions(
+      { ...on, mattrDelegationBalanceByPace: false },
+      { pool: [claudeMain, antigravity], excluded: [] },
+    );
+    assert.include(text, "`usage.windows[].leftPercent`");
+    assert.notInclude(text, "delegationRank");
   });
 
   it("leaves out the never line when nothing is excluded", () => {
@@ -90,7 +100,7 @@ describe("Matter delegation policy", () => {
   it("costs nothing while off or with fewer than two instances", () => {
     assert.equal(
       buildMatterDelegationInstructions(
-        { mattrMultiProviderDelegation: false },
+        { ...on, mattrMultiProviderDelegation: false },
         { pool: [claudeMain, antigravity], excluded: [] },
       ),
       "",

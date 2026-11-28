@@ -443,6 +443,10 @@
       "types": "./src/usageLimits.ts",
       "import": "./src/usageLimits.ts"
     },
+    "./matterUsagePace": {
+      "types": "./src/matterUsagePace.ts",
+      "import": "./src/matterUsagePace.ts"
+    },
     "./desktopAppControl": {
       "types": "./src/desktopAppControl.ts",
       "import": "./src/desktopAppControl.ts"
